@@ -8,28 +8,36 @@ jobs:
   create-pr:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
       - name: Create PR if not exists
         uses: actions/github-script@v6
         with:
           script: |
-            const source = 'dev';
-            const dest = 'main';
+            const source = "dev";
+            const dest = "main";
+
+            // List open PRs from dev -> main
             const { data: prs } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
               head: `${context.repo.owner}:${source}`,
               base: dest,
-              state: 'open'
+              state: "open"
             });
+
             if ((prs || []).length === 0) {
+              // Create new PR
               await github.rest.pulls.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title: `Auto PR: Merge ${source} into ${dest}`,
                 head: source,
                 base: dest,
-                body: `This PR was automatically created because changes were pushed to **${source}**.\n\nPlease review and merge to deploy to production.`
+                body: `🚀 This PR was automatically created because changes were pushed to **${source}**.\n\nPlease review and merge to deploy to production.`
               });
+              console.log("✅ New PR created from dev to main.");
             } else {
-              console.log('PR already exists. Skipping creation.');
+              console.log("ℹ️ PR already exists. Skipping creation.");
             }
