@@ -32,7 +32,7 @@ try {
 }
 catch {
     $errMsg = $_.Exception.Message
-    Write-Error "Error deploying $appName: $errMsg"
+    Write-Error "Error deploying $errMsg"
     exit 1
 }
 
