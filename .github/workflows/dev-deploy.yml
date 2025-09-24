@@ -12,28 +12,19 @@ jobs:
       # 1. Checkout repo
       - uses: actions/checkout@v3
 
-      # 2. Setup Node
+      # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
 
-      # 3. Install dependencies
+      # 3. Install dependencies for backend
       - name: Install dependencies
-        shell: cmd
+        shell: powershell
         run: npm install
         working-directory: Backend
 
-      - name: Add pm2 to PATH
-        shell: powershell
-        run: |
-         $env:Path += ";C:\nvm4w\nodejs"
-         [System.Environment]::SetEnvironmentVariable("Path", $env:Path, [System.EnvironmentVariableTarget]::Process)
-         pm2.cmd -v
-
-
-
-      # 5. Deploy to dev/staging
+      # 4. Deploy with PM2
       - name: Deploy to staging
         shell: powershell
         run: .\scripts\deploy.ps1 -env 'development' -appName 'LifePulse-dev'
