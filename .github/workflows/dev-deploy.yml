@@ -8,37 +8,23 @@ jobs:
   build-and-deploy-dev:
     runs-on: [self-hosted, windows]
 
-    env:
-      HOME: C:\Users\Administrator   # 👈 Force HOME globally
-
     steps:
+      # 1. Checkout repo
       - uses: actions/checkout@v3
 
+      # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
 
+      # 3. Install dependencies for backend
       - name: Install dependencies
         shell: powershell
         run: npm install
         working-directory: Backend
 
-      - name: Install PM2
-        shell: powershell
-        run: npm install -g pm2
-
-      - name: Check pm2
-        shell: powershell
-        run: |
-          where pm2
-          pm2 -v
-          echo "HOME = $env:HOME"
-
-      - name: Add PM2 to PATH
-        shell: powershell
-        run: echo "$env:APPDATA\npm" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
+      # 4. Deploy with PM2
       - name: Deploy to staging
         shell: powershell
         run: .\scripts\deploy.ps1 -env 'development' -appName 'LifePulse-dev'
