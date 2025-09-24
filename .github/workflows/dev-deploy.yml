@@ -24,25 +24,6 @@ jobs:
         run: npm install
         working-directory: Backend
 
-      # 4. Install PM2 globally
-      - name: Install PM2 globally
-        shell: powershell
-        run: npm install -g pm2
-
-      # 5. Set PM2_HOME inside workspace to avoid permission issues
-      - name: Configure PM2 home
-        shell: powershell
-        run: |
-          $pm2Home = "$PWD\.pm2"
-          if (-not (Test-Path $pm2Home)) {
-              New-Item -ItemType Directory -Path $pm2Home | Out-Null
-          }
-          Write-Host "PM2_HOME = $pm2Home"
-          echo "PM2_HOME=$pm2Home" >> $env:GITHUB_ENV
-          $env:PM2_HOME = $pm2Home
-          $env:HOME = $pm2Home
-          $env:HOMEPATH = $pm2Home
-
       # 6. Deploy backend using PM2
       - name: Deploy backend
         shell: powershell
