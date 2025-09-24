@@ -26,7 +26,7 @@ jobs:
 
       # 4. Build (optional, safe check)
       - name: Build (if present)
-        shell: cmd
+        shell: pwsh
         run: |
           cd Backend
           if (Test-Path package.json) {
