@@ -31,6 +31,8 @@ try {
     Write-Host "✅ $appName deployed successfully in $env"
 }
 catch {
-    Write-Error "Error deploying $appName: ${($_.Exception.Message)}"
+    $errMsg = $_.Exception.Message
+    Write-Error "Error deploying $appName: $errMsg"
     exit 1
 }
+
