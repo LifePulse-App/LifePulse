@@ -7,6 +7,7 @@ on:
 jobs:
   build-and-deploy-dev:
     runs-on: [self-hosted, windows]
+
     steps:
       # 1. Checkout repo
       - uses: actions/checkout@v3
@@ -20,21 +21,19 @@ jobs:
       # 3. Install dependencies
       - name: Install dependencies
         shell: cmd
-        run: |
-            cd Backend
-            npm install
+        run: npm install
+        working-directory: Backend
 
-      # 4. Build (optional)
+      # 4. Build (if present)
       - name: Build (if present)
         shell: powershell
         run: |
-          cd Backend
-          if (Test-Path package.json) {
+          if (Test-Path "package.json") {
             npm run build
           }
+        working-directory: Backend
 
       # 5. Deploy to dev/staging
       - name: Deploy to staging
         shell: powershell
-        run: |
-          powershell .\scripts\deploy.ps1 -env 'development' -appName 'LifePulse-dev'
+        run: .\scripts\deploy.ps1 -env 'development' -appName 'LifePulse-dev'
