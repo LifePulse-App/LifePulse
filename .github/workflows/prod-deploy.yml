@@ -21,18 +21,14 @@ jobs:
       - name: Install dependencies
         shell: pwsh
         run: |
-          try {
-            npm ci --omit=dev
-          } catch {
             npm install --production
-          }
 
       # 4. Build (optional, safe check)
       - name: Build (if present)
         shell: pwsh
         run: |
           if (Test-Path package.json) {
-            npm run build --if-present
+            npm run build
           }
 
       # 5. Deploy (custom PowerShell script)
