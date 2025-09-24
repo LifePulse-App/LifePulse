@@ -1,34 +1,50 @@
 param(
-  [string]$env = "production",
-  [string]$appName = "LifePulse-prod"
+    [string]$env = "production",
+    [string]$appName = "LifePulse-prod"
 )
 
 Write-Host "Deploying $appName in $env"
 
-# Force PM2 to use a specific folder
-$pm2Home = "C:\Users\Administrator\.pm2"
-if (-not (Test-Path $pm2Home)) {
-    New-Item -ItemType Directory -Path $pm2Home | Out-Null
+# Use PM2_HOME from environment (set by GitHub Actions workflow)
+if (-not $env:PM2_HOME) {
+    $env:PM2_HOME = "$PWD\.pm2"
+    if (-not (Test-Path $env:PM2_HOME)) {
+        New-Item -ItemType Directory -Path $env:PM2_HOME | Out-Null
+    }
 }
-$env:PM2_HOME = $pm2Home
-$env:HOME = "C:\Users\Administrator"
-$env:HOMEPATH = "C:\Users\Administrator"
 
-# just call pm2 from PATH
-try {
-    pm2 describe $appName > $null 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "Reloading $appName"
-        pm2 reload ecosystem.config.js --only $appName --env $env
-    } else {
-        Write-Host "Starting $appName"
+Write-Host "PM2_HOME is set to $env:PM2_HOME"
+
+# Ensure PATH includes npm global bin (so pm2 command works)
+$env:PATH += ";" + (Split-Path (Get-Command npm).Source)
+
+# Function to start or reload PM2 app
+function Start-Or-ReloadApp {
+    param(
+        [string]$appName,
+        [string]$env
+    )
+
+    try {
+        pm2 describe $appName > $null 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Reloading $appName"
+            pm2 reload ecosystem.config.js --only $appName --env $env
+        } else {
+            Write-Host "Starting $appName"
+            pm2 start ecosystem.config.js --only $appName --env $env
+        }
+    } catch {
+        Write-Host "Error with PM2: $_"
+        Write-Host "Attempting to start $appName"
         pm2 start ecosystem.config.js --only $appName --env $env
     }
-} catch {
-    Write-Host "Error checking pm2 process: $_"
-    Write-Host "Starting $appName"
-    pm2 start ecosystem.config.js --only $appName --env $env
 }
 
+# Run deployment
+Start-Or-ReloadApp -appName $appName -env $env
+
+# Save PM2 process list
 pm2 save
+
 Write-Host "Deploy script finished."
