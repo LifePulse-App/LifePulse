@@ -24,9 +24,9 @@ try {
 
     Start-Sleep -Seconds 2
 
-    # Start the app in background
-    Write-Host "Starting $appName..."
-    Start-Process "node" $appPath -WindowStyle Hidden -RedirectStandardOutput "$appName.log" -RedirectStandardError "$appName.err"
+    # Start the app in a NEW CMD window and keep it open
+    Write-Host "Starting $appName in a new CMD window..."
+    Start-Process "cmd.exe" "/k node `"$appPath`""
 
     Write-Host "✅ $appName deployed successfully in $env"
 }
@@ -35,4 +35,3 @@ catch {
     Write-Error "Error deploying $errMsg"
     exit 1
 }
-
