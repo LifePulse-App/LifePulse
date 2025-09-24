@@ -5,23 +5,21 @@ param(
 
 Write-Host "Deploying $appName in $env"
 
-# Always use absolute pm2 path so PATH doesn't matter
-$pm2 = "C:\nvm4w\nodejs\pm2.cmd"
-
+# just call pm2 from PATH
 try {
-  & $pm2 describe $appName > $null 2>&1
+  pm2 describe $appName > $null 2>&1
   if ($LASTEXITCODE -eq 0) {
     Write-Host "Reloading $appName"
-    & $pm2 reload ecosystem.config.js --only $appName --env $env
+    pm2 reload ecosystem.config.js --only $appName --env $env
   } else {
     Write-Host "Starting $appName"
-    & $pm2 start ecosystem.config.js --only $appName --env $env
+    pm2 start ecosystem.config.js --only $appName --env $env
   }
 } catch {
   Write-Host "Error checking pm2 process: $_"
   Write-Host "Starting $appName"
-  & $pm2 start ecosystem.config.js --only $appName --env $env
+  pm2 start ecosystem.config.js --only $appName --env $env
 }
 
-& $pm2 save
+pm2 save
 Write-Host "Deploy script finished."
