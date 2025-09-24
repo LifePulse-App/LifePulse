@@ -9,17 +9,8 @@ jobs:
     runs-on: [self-hosted, windows]
 
     steps:
-      # 1. Checkout repo (system config avoids .gitconfig issue)
+      # 1. Checkout repo
       - uses: actions/checkout@v3
-        with:
-          persist-credentials: false
-
-      - name: Setup Git config
-        run: |
-         git config --global user.name "github-actions[bot]"
-         git config --global user.email "github-actions[bot]@users.noreply.github.com"
-        shell: powershell
-
 
       # 2. Setup Node.js
       - name: Setup Node.js
@@ -27,18 +18,32 @@ jobs:
         with:
           node-version: 18
 
-      # 3. Ensure PM2 is installed globally
-      - name: Install PM2
-        run: npm install -g pm2
+      # 3. Install dependencies for backend
+      - name: Install backend dependencies
         shell: powershell
-
-      # 4. Install dependencies for backend
-      - name: Install dependencies
         run: npm install
         working-directory: Backend
-        shell: powershell
 
-      # 5. Deploy with PM2 (HOME explicitly set inside script)
-      - name: Deploy to staging
-        run: .\scripts\deploy.ps1 -env 'development' -appName 'LifePulse-dev'
+      # 4. Install PM2 globally
+      - name: Install PM2 globally
         shell: powershell
+        run: npm install -g pm2
+
+      # 5. Set PM2_HOME inside workspace to avoid permission issues
+      - name: Configure PM2 home
+        shell: powershell
+        run: |
+          $pm2Home = "$PWD\.pm2"
+          if (-not (Test-Path $pm2Home)) {
+              New-Item -ItemType Directory -Path $pm2Home | Out-Null
+          }
+          Write-Host "PM2_HOME = $pm2Home"
+          echo "PM2_HOME=$pm2Home" >> $env:GITHUB_ENV
+          $env:PM2_HOME = $pm2Home
+          $env:HOME = $pm2Home
+          $env:HOMEPATH = $pm2Home
+
+      # 6. Deploy backend using PM2
+      - name: Deploy backend
+        shell: powershell
+        run: .\scripts\deploy.ps1 -env 'development' -appName 'LifePulse-dev'
