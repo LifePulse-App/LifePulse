@@ -1,0 +1,35 @@
+name: Auto PR from dev to main
+
+on:
+  push:
+    branches: [ dev ]
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create PR if not exists
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const source = 'dev';
+            const dest = 'main';
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${source}`,
+              base: dest,
+              state: 'open'
+            });
+            if ((prs || []).length === 0) {
+              await github.rest.pulls.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `Auto PR: Merge ${source} into ${dest}`,
+                head: source,
+                base: dest,
+                body: `This PR was automatically created because changes were pushed to **${source}**.\n\nPlease review and merge to deploy to production.`
+              });
+            } else {
+              console.log('PR already exists. Skipping creation.');
+            }
