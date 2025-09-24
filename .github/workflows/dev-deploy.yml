@@ -9,8 +9,16 @@ jobs:
     runs-on: [self-hosted, windows]
 
     steps:
-      # 1. Checkout repo
+      # 1. Checkout repo (system config avoids .gitconfig issue)
       - uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+
+      - name: Setup Git config
+        run: |
+          git config --system user.name "github-actions[bot]"
+          git config --system user.email "github-actions[bot]@users.noreply.github.com"
+        shell: powershell
 
       # 2. Setup Node.js
       - name: Setup Node.js
@@ -18,13 +26,18 @@ jobs:
         with:
           node-version: 18
 
-      # 3. Install dependencies for backend
-      - name: Install dependencies
+      # 3. Ensure PM2 is installed globally
+      - name: Install PM2
+        run: npm install -g pm2
         shell: powershell
+
+      # 4. Install dependencies for backend
+      - name: Install dependencies
         run: npm install
         working-directory: Backend
-
-      # 4. Deploy with PM2
-      - name: Deploy to staging
         shell: powershell
+
+      # 5. Deploy with PM2 (HOME explicitly set inside script)
+      - name: Deploy to staging
         run: .\scripts\deploy.ps1 -env 'development' -appName 'LifePulse-dev'
+        shell: powershell
