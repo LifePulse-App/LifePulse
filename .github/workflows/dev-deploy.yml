@@ -24,6 +24,13 @@ jobs:
         run: npm install
         working-directory: Backend
 
+      - name: Check pm2 installation
+        run: |
+         where pm2
+         which pm2
+         npm list -g pm2
+
+
       - name: Add PM2 to PATH
         run: echo "C:\Users\runneradmin\AppData\Roaming\npm" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
