@@ -8,24 +8,35 @@ jobs:
   build-and-deploy-prod:
     runs-on: [self-hosted, windows]
     steps:
+      # 1. Checkout repo
       - uses: actions/checkout@v3
 
+      # 2. Setup Node
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
 
+      # 3. Install dependencies
       - name: Install dependencies
-  run: |
-    if (!(npm ci --omit=dev)) {
-      npm install --production
-    }
-  shell: pwsh
+        shell: pwsh
+        run: |
+          try {
+            npm ci --omit=dev
+          } catch {
+            npm install --production
+          }
 
-
+      # 4. Build (optional, safe check)
       - name: Build (if present)
-        run: npm run build --if-present
+        shell: pwsh
+        run: |
+          if (Test-Path package.json) {
+            npm run build --if-present
+          }
 
+      # 5. Deploy (custom PowerShell script)
       - name: Deploy to production
         shell: pwsh
-        run: pwsh .\scripts\deploy.ps1 -env 'production' -appName 'LifePulse-prod'
+        run: |
+          pwsh .\scripts\deploy.ps1 -env 'production' -appName 'LifePulse-prod'
