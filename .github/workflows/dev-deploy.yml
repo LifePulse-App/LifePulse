@@ -27,7 +27,6 @@ jobs:
       - name: Check pm2 installation
         run: |
          where pm2
-         which pm2
          npm list -g pm2
 
 
