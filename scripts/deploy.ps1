@@ -1,24 +1,36 @@
 param(
-    [string]$env = "production",
-    [string]$appName = "LifePulse-dev"
+  [string]$env = "production",
+  [string]$appName = "LifePulse"
 )
 
-# Name of the scheduled task (must match what you created in Task Scheduler)
-$taskName = $appName
+Write-Host "Deploying $appName in $env..."
 
-Write-Host "Deploying $appName in $env using Windows Task Scheduler..."
+# Path to your app entry point
+$appPath = "C:\actions-runner\_work\LifePulse\LifePulse\backend\server.js"
 
 try {
-    # Stop the task if it's already running
-    Write-Host "Stopping existing task if running..."
-    Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    # Stop existing app if running
+    Write-Host "Stopping existing processes for $appName..."
+    Get-Process node -ErrorAction SilentlyContinue | ForEach-Object {
+        if ($_.Path -like "*node.exe") {
+            try {
+                Stop-Process -Id $_.Id -Force
+                Write-Host "Stopped Node process with PID $($_.Id)"
+            } catch {
+                Write-Host "Could not stop process: $($_.Id)"
+            }
+        }
+    }
 
-    # Start the task
-    Write-Host "Starting task $taskName..."
-    Start-ScheduledTask -TaskName $taskName
+    Start-Sleep -Seconds 2
 
-    Write-Host "Deployment of $appName completed successfully."
-} catch {
-    Write-Error "Error deploying ${appName}: $($_)"
+    # Start the app in background
+    Write-Host "Starting $appName..."
+    Start-Process "node" $appPath -WindowStyle Hidden -RedirectStandardOutput "$appName.log" -RedirectStandardError "$appName.err"
+
+    Write-Host "✅ $appName deployed successfully in $env"
+}
+catch {
+    Write-Error "Error deploying $appName: $($_.Exception.Message)"
     exit 1
 }
