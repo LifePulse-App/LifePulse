@@ -16,9 +16,10 @@ jobs:
 
       - name: Setup Git config
         run: |
-          git config --system user.name "github-actions[bot]"
-          git config --system user.email "github-actions[bot]@users.noreply.github.com"
-        shell: powershell
+         git config --global user.name "github-actions[bot]"
+         git config --global user.email "github-actions[bot]@users.noreply.github.com"
+         shell: powershell
+
 
       # 2. Setup Node.js
       - name: Setup Node.js
