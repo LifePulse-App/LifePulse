@@ -9,8 +9,7 @@ jobs:
     runs-on: [self-hosted, windows]
 
     env:
-      HOME: C:\Users\Administrator      # 👈 Correct HOME
-      PM2_HOME: C:\Users\Administrator\.pm2  # 👈 Force PM2 logs/process files here
+      HOME: C:\Users\Administrator   # 👈 Force HOME globally
 
     steps:
       - uses: actions/checkout@v3
@@ -35,7 +34,6 @@ jobs:
           where pm2
           pm2 -v
           echo "HOME = $env:HOME"
-          echo "PM2_HOME = $env:PM2_HOME"
 
       - name: Add PM2 to PATH
         shell: powershell
