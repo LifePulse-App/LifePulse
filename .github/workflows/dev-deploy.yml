@@ -8,6 +8,9 @@ jobs:
   build-and-deploy-dev:
     runs-on: [self-hosted, windows]
 
+    env:
+      HOME: C:\Users\runneradmin   # 👈 Force HOME globally
+
     steps:
       - uses: actions/checkout@v3
 
@@ -23,12 +26,7 @@ jobs:
 
       - name: Install PM2
         shell: powershell
-        run: |
-          npm install -g pm2
-          # set HOME explicitly for PM2
-          $env:HOME = "$env:USERPROFILE"
-          setx HOME $env:USERPROFILE
-          setx HOMEPATH $env:USERPROFILE
+        run: npm install -g pm2
 
       - name: Check pm2
         shell: powershell
@@ -43,6 +41,4 @@ jobs:
 
       - name: Deploy to staging
         shell: powershell
-        env:
-          HOME: ${{ env.USERPROFILE }}   # make sure HOME is visible inside deploy.ps1 too
         run: .\scripts\deploy.ps1 -env 'development' -appName 'LifePulse-dev'
