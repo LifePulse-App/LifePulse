@@ -3,9 +3,10 @@ param(
   [string]$appName = "LifePulse-prod"
 )
 
-$pm2 = "C:\nvm4w\nodejs\pm2.cmd"   # absolute path
-
 Write-Host "Deploying $appName in $env"
+
+# Always use absolute pm2 path so PATH doesn't matter
+$pm2 = "C:\nvm4w\nodejs\pm2.cmd"
 
 try {
   & $pm2 describe $appName > $null 2>&1
