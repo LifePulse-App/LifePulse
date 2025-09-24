@@ -5,11 +5,11 @@ param(
 
 Write-Host "Deploying $appName in $env..."
 
-# Path to your app entry point
-$appPath = "C:\actions-runner\_work\LifePulse\LifePulse\backend\server.js"
+# Path to backend folder
+$backendPath = "C:\actions-runner\_work\LifePulse\LifePulse\backend"
 
 try {
-    # Stop existing app if running
+    # Stop existing Node.js processes
     Write-Host "Stopping existing processes for $appName..."
     Get-Process node -ErrorAction SilentlyContinue | ForEach-Object {
         if ($_.Path -like "*node.exe") {
@@ -24,9 +24,13 @@ try {
 
     Start-Sleep -Seconds 2
 
-    # Start the app in a NEW CMD window and keep it open
+    # Start app in a NEW CMD window
     Write-Host "Starting $appName in a new CMD window..."
-    Start-Process "cmd.exe" "/k node `"$appPath`""
+    if ($env -eq "production") {
+        Start-Process "cmd.exe" "/k cd /d `"$backendPath`" && npm run dev"
+    } else {
+        Start-Process "cmd.exe" "/k cd /d `"$backendPath`" && npm run dev"
+    }
 
     Write-Host "✅ $appName deployed successfully in $env"
 }
