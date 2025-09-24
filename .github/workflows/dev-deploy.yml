@@ -19,24 +19,20 @@ jobs:
 
       # 3. Install dependencies
       - name: Install dependencies
-        shell: pwsh
+        shell: cmd
         run: |
-          try {
-            npm ci --omit=dev
-          } catch {
-            npm install --production
-          }
+            npm install
 
       # 4. Build (optional)
       - name: Build (if present)
-        shell: pwsh
+        shell: cmd
         run: |
           if (Test-Path package.json) {
-            npm run build --if-present
+            npm run build
           }
 
       # 5. Deploy to dev/staging
       - name: Deploy to staging
-        shell: pwsh
+        shell: cmd
         run: |
           pwsh .\scripts\deploy.ps1 -env 'development' -appName 'LifePulse-dev'
