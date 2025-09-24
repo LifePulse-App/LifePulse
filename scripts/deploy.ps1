@@ -1,6 +1,6 @@
 param(
     [string]$env = "production",
-    [string]$appName = "LifePulse-prod"
+    [string]$appName = "LifePulse-dev"
 )
 
 # Name of the scheduled task (must match what you created in Task Scheduler)
