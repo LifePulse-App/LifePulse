@@ -21,12 +21,14 @@ jobs:
       - name: Install dependencies
         shell: cmd
         run: |
+            cd Backend
             npm install
 
       # 4. Build (optional)
       - name: Build (if present)
         shell: cmd
         run: |
+          cd Backend
           if (Test-Path package.json) {
             npm run build
           }
