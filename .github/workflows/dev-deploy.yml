@@ -24,13 +24,6 @@ jobs:
         run: npm install
         working-directory: Backend
 
-      # 4. Add pm2 to PATH so powershell can find it
-      - name: Add pm2 to PATH
-        shell: powershell
-        run: |
-          $env:Path += ";C:\nvm4w\nodejs"
-          [System.Environment]::SetEnvironmentVariable("Path", $env:Path, [System.EnvironmentVariableTarget]::Process)
-          pm2 -v
 
       # 5. Deploy to dev/staging
       - name: Deploy to staging
