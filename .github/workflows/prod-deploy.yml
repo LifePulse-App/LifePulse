@@ -24,15 +24,6 @@ jobs:
             cd Backend
             npm install
 
-      # 4. Build (optional, safe check)
-      - name: Build (if present)
-        shell: pwsh
-        run: |
-          cd Backend
-          if (Test-Path package.json) {
-            npm run build
-          }
-
       # 5. Deploy (custom PowerShell script)
       - name: Deploy to production
         shell: pwsh
