@@ -19,6 +19,6 @@ try {
 
     Write-Host "Deployment of $appName completed successfully."
 } catch {
-    Write-Error "Error deploying $appName: $($_)"
+    Write-Error "Error deploying ${appName}: $($_)"
     exit 1
 }
