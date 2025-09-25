@@ -13,8 +13,10 @@ app.get('/', (req, res) => {
   res.send('Backend API is running 🚀');
 });
 
-// Pick port from env or default
-const PORT = process.env.PORT || 5000;
+// Pick port based on environment
+const ENV = process.env.NODE_ENV;
+const PORT = ENV === 'DEVELOPMENT' ? 4000 : 3000;
+
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on http://localhost:${PORT} in ${ENV} mode`);
 });
