@@ -9,6 +9,15 @@ jobs:
     runs-on: [self-hosted, windows]
 
     steps:
+      # 0. Kill existing PM2 processes before anything else
+      - name: Kill old PM2 processes
+        shell: powershell
+        run: |
+          Write-Host "Stopping any existing PM2 processes..."
+          pm2 stop LifePulse-dev -s
+          pm2 stop LifePulse-prod -s
+          Start-Sleep -Seconds 2
+
       # 1. Checkout repo
       - uses: actions/checkout@v3
 
@@ -24,7 +33,7 @@ jobs:
         run: npm install
         working-directory: Backend
 
-      # 6. Deploy backend using PM2
+      # 4. Deploy backend using PM2
       - name: Deploy backend
         shell: powershell
         run: .\scripts\deploy.ps1 -env 'development' -appName 'LifePulse-dev'
