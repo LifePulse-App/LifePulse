@@ -1,6 +1,6 @@
 param(
-  [string]$env = "production",
-  [string]$appName = "LifePulse"
+    [string]$env = "production",
+    [string]$appName = "LifePulse"
 )
 
 Write-Host "Deploying $appName in $env using PM2..."
@@ -20,9 +20,16 @@ try {
     Write-Host "Stopping old process (if exists)..."
     pm2 delete $appName -s
 
+    # Determine the npm script based on environment
+    if ($env -eq "development") {
+        $npmScript = "dev"
+    } else {
+        $npmScript = "prod"
+    }
+
     # Start with PM2
-    Write-Host "Starting $appName with PM2..."
-    pm2 start server.js --name $appName
+    Write-Host "Starting $appName with PM2 using npm run $npmScript..."
+    pm2 start "npm" --name $appName -- run $npmScript
 
     # Save PM2 process list for auto-restart on reboot
     pm2 save
@@ -31,6 +38,6 @@ try {
 }
 catch {
     $errMsg = $_.Exception.Message
-    Write-Error "Error deploying $errMsg"
+    Write-Error "Error deploying: $errMsg"
     exit 1
 }
