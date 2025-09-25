@@ -29,9 +29,9 @@ try {
         $npmScript = "prod"
     }
 
-    # Start with PM2
+    # Start with PM2 (Windows-safe)
     Write-Host "Starting $appName with PM2 using npm run $npmScript..."
-    pm2 start "$env:APPDATA\nvm\npm.cmd" --name $appName -- run $npmScript
+    pm2 start npm --name $appName -- run $npmScript
 
     # Save PM2 process list
     pm2 save
