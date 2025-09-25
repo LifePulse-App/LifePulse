@@ -17,7 +17,7 @@ try {
     schtasks /Run /TN $appName
 
     # Optional: Wait for health check
-    $url = "http://localhost:4000/health"
+    $url = "http://localhost:4000/"
     $maxRetries = 10
     $retry = 0
     $success = $false
@@ -41,6 +41,6 @@ try {
 }
 catch {
     $errMsg = $_.Exception.Message
-    Write-Error "Error deploying $appName: $errMsg"
+    Write-Error "Error deploying $errMsg"
     exit 1
 }
