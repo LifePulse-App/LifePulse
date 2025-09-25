@@ -1,43 +1,33 @@
 param(
-    [string]$env = "development",
-    [string]$appName = "LifePulse-dev"
+  [string]$env = "production",
+  [string]$appName = "LifePulse"
 )
 
-Write-Host "Deploying $appName in $env using Windows Task Scheduler..."
+Write-Host "Deploying $appName in $env using PM2..."
+
+# Path to backend folder
+$backendPath = "C:\Users\Administrator\actions-runner\_work\LifePulse\LifePulse\backend"
 
 try {
-    # Stop task if running
-    Write-Host "Stopping existing task if running..."
-    schtasks /End /TN $appName /F | Out-Null
+    # Change to backend folder
+    Set-Location $backendPath
 
-    Start-Sleep -Seconds 2
+    # Install dependencies if needed
+    Write-Host "Installing dependencies..."
+    npm install --legacy-peer-deps
 
-    # Start task
-    Write-Host "Starting task $appName..."
-    schtasks /Run /TN $appName
+    # Stop old process (if running)
+    Write-Host "Stopping old process (if exists)..."
+    pm2 delete $appName -s
 
-    # Optional: Wait for health check
-    $url = "http://localhost:4000/"
-    $maxRetries = 10
-    $retry = 0
-    $success = $false
+    # Start with PM2
+    Write-Host "Starting $appName with PM2..."
+    pm2 start server.js --name $appName
 
-    while ($retry -lt $maxRetries -and -not $success) {
-        Start-Sleep -Seconds 2
-        try {
-            $resp = Invoke-WebRequest $url -UseBasicParsing -ErrorAction Stop
-            if ($resp.StatusCode -eq 200) {
-                $success = $true
-                Write-Host "✅ $appName is running and healthy!"
-            }
-        } catch {}
-        $retry++
-    }
+    # Save PM2 process list for auto-restart on reboot
+    pm2 save
 
-    if (-not $success) {
-        Write-Error "❌ $appName did not respond to health check at $url"
-        exit 1
-    }
+    Write-Host "✅ $appName deployed successfully in $env"
 }
 catch {
     $errMsg = $_.Exception.Message
