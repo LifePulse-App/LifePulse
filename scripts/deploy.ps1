@@ -22,16 +22,18 @@ try {
     pm2 delete LifePulse-prod -s
     Start-Sleep -Seconds 2
 
-    # Determine npm script
+    # Determine script file
     if ($env -eq "development") {
-        $npmScript = "dev"
+        $scriptFile = "server-dev.js"
+        $appName = "LifePulse-dev"
     } else {
-        $npmScript = "prod"
+        $scriptFile = "server-prod.js"
+        $appName = "LifePulse-prod"
     }
 
-    # Start with PM2 (Windows-safe)
-    Write-Host "Starting $appName with PM2 using npm run $npmScript..."
-    pm2 start npm --name $appName -- run $npmScript
+    # Start PM2 directly on JS file
+    Write-Host "Starting $appName with PM2 using $scriptFile..."
+    pm2 start $scriptFile --name $appName
 
     # Save PM2 process list
     pm2 save
