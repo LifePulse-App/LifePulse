@@ -1,57 +1,46 @@
 param(
-  [string]$env = "production",
-  [string]$appName = "LifePulse",
-  [string]$port = "4000" # Change if your backend runs on a different port
+    [string]$env = "development",
+    [string]$appName = "LifePulse-dev"
 )
 
-Write-Host "Deploying $appName in $env..."
-
-# Path to your app entry point
-$appPath = "C:\actions-runner\_work\LifePulse\LifePulse\backend\server.js"
+Write-Host "Deploying $appName in $env using Windows Task Scheduler..."
 
 try {
-    # Stop existing app if running
-    Write-Host "Stopping existing processes for $appName..."
-    Get-Process node -ErrorAction SilentlyContinue | ForEach-Object {
-        if ($_.Path -like "*node.exe") {
-            try {
-                Stop-Process -Id $_.Id -Force
-                Write-Host "Stopped Node process with PID $($_.Id)"
-            } catch {
-                Write-Host "Could not stop process: $($_.Id)"
-            }
-        }
-    }
+    # Stop task if running
+    Write-Host "Stopping existing task if running..."
+    schtasks /End /TN $appName /F | Out-Null
 
     Start-Sleep -Seconds 2
 
-    # Start the app in a NEW CMD window and keep it open
-    Write-Host "Starting $appName in a new CMD window..."
-    Start-Process "cmd.exe" "/k cd `"$($appPath | Split-Path)`" ^&^& npm run dev"
+    # Start task
+    Write-Host "Starting task $appName..."
+    schtasks /Run /TN $appName
 
-    # Wait a bit before checking health
-    Write-Host "Waiting for $appName to boot..."
-    Start-Sleep -Seconds 8
+    # Optional: Wait for health check
+    $url = "http://localhost:4000/health"
+    $maxRetries = 10
+    $retry = 0
+    $success = $false
 
-    # Health check
-    $healthUrl = "http://localhost:$port/"
-    try {
-        $response = Invoke-WebRequest -Uri $healthUrl -UseBasicParsing -TimeoutSec 5
-        if ($response.StatusCode -eq 200) {
-            Write-Host "✅ $appName is running and passed health check at $healthUrl"
-        } else {
-            Write-Error "❌ $appName started but health check failed with status $($response.StatusCode)"
-            exit 1
-        }
-    } catch {
-        Write-Error "❌ $appName did not respond to health check at $healthUrl"
-        exit 1
+    while ($retry -lt $maxRetries -and -not $success) {
+        Start-Sleep -Seconds 2
+        try {
+            $resp = Invoke-WebRequest $url -UseBasicParsing -ErrorAction Stop
+            if ($resp.StatusCode -eq 200) {
+                $success = $true
+                Write-Host "✅ $appName is running and healthy!"
+            }
+        } catch {}
+        $retry++
     }
 
-    Write-Host "✅ $appName deployed successfully in $env"
+    if (-not $success) {
+        Write-Error "❌ $appName did not respond to health check at $url"
+        exit 1
+    }
 }
 catch {
     $errMsg = $_.Exception.Message
-    Write-Error "Error deploying $errMsg"
+    Write-Error "Error deploying $appName: $errMsg"
     exit 1
 }
