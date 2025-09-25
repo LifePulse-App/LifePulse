@@ -16,13 +16,7 @@ try {
     Write-Host "Installing dependencies..."
     npm install --legacy-peer-deps
 
-    # Stop old processes
-    Write-Host "Stopping old PM2 processes..."
-    pm2 delete LifePulse-dev -s
-    pm2 delete LifePulse-prod -s
-    Start-Sleep -Seconds 2
-
-    # Determine script file
+    # Determine script file and PM2 process name
     if ($env -eq "development") {
         $scriptFile = "server-dev.js"
         $appName = "LifePulse-dev"
@@ -30,6 +24,11 @@ try {
         $scriptFile = "server-prod.js"
         $appName = "LifePulse-prod"
     }
+
+    # Stop only the PM2 process we are about to deploy
+    Write-Host "Stopping old PM2 process for $appName if it exists..."
+    pm2 stop $appName -s
+    Start-Sleep -Seconds 2
 
     # Start PM2 directly on JS file
     Write-Host "Starting $appName with PM2 using $scriptFile..."
