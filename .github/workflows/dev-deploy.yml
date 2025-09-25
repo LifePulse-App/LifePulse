@@ -9,14 +9,18 @@ jobs:
     runs-on: [self-hosted, windows]
 
     steps:
-      # 0. Kill existing PM2 processes before anything else
-      - name: Kill old PM2 processes
+      # 0. Kill any lingering Node/PM2 processes that may lock files
+      - name: Kill old Node/PM2 processes
         shell: powershell
         run: |
-          Write-Host "Stopping any existing PM2 processes..."
-          pm2 stop LifePulse-dev -s
-          pm2 stop LifePulse-prod -s
+          Write-Host "Stopping PM2 processes..."
+          pm2 delete LifePulse-dev -s
+          pm2 delete LifePulse-prod -s
           Start-Sleep -Seconds 2
+
+          Write-Host "Killing stray Node processes for LifePulse..."
+          Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "*LifePulse*" } | Stop-Process -Force
+          Start-Sleep -Seconds 1
 
       # 1. Checkout repo
       - uses: actions/checkout@v3
