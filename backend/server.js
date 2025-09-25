@@ -15,8 +15,9 @@ app.get('/', (req, res) => {
 
 // Pick port based on environment
 const ENV = process.env.NODE_ENV;
-const PORT = ENV === 'DEVELOPMENT ' ? 4000 : 3000;
+const PORT = ENV === 'development' ? 4000 : 3000;  // lowercase 'development', no extra space
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT} in ${ENV} mode`);
 });
+
