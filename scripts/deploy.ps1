@@ -12,15 +12,17 @@ try {
     # Change to backend folder
     Set-Location $backendPath
 
-    # Install dependencies if needed
+    # Install dependencies
     Write-Host "Installing dependencies..."
     npm install --legacy-peer-deps
 
-    # Stop old process (if running)
-    Write-Host "Stopping old process (if exists)..."
-    pm2 delete $appName -s
+    # Stop old processes
+    Write-Host "Stopping old PM2 processes..."
+    pm2 delete LifePulse-dev -s
+    pm2 delete LifePulse-prod -s
+    Start-Sleep -Seconds 2
 
-    # Determine the npm script based on environment
+    # Determine npm script
     if ($env -eq "development") {
         $npmScript = "dev"
     } else {
@@ -31,7 +33,7 @@ try {
     Write-Host "Starting $appName with PM2 using npm run $npmScript..."
     pm2 start npm --name $appName -- run $npmScript
 
-    # Save PM2 process list for auto-restart on reboot
+    # Save PM2 process list
     pm2 save
 
     Write-Host "✅ $appName deployed successfully in $env"
