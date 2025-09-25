@@ -27,5 +27,4 @@ jobs:
       # 5. Deploy (custom PowerShell script)
       - name: Deploy to production
         shell: powershell
-        run: |
-          pwsh .\scripts\deploy.ps1 -env 'production' -appName 'LifePulse-prod'
+        run: .\scripts\deploy.ps1 -env 'production' -appName 'LifePulse-prod'
