@@ -19,13 +19,13 @@ jobs:
 
       # 3. Install dependencies
       - name: Install dependencies
-        shell: cmd
+        shell: powershell
         run: |
             cd Backend
             npm install
 
       # 5. Deploy (custom PowerShell script)
       - name: Deploy to production
-        shell: pwsh
+        shell: powershell
         run: |
           pwsh .\scripts\deploy.ps1 -env 'production' -appName 'LifePulse-prod'
