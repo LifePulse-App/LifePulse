@@ -1,0 +1,15 @@
+export default {
+  primary: "#617DC5",
+  secondary: "#ff4080",
+  black: "#000",
+  white: "#fff",
+  medium: "#6e6969",
+  light: "#f8f4f4",
+  dark: "#0c0c0c",
+  danger: "#f44336",
+  green: "#28a745",
+  yellow: "#FFFF00",
+  red: "#E25141",
+  pink: "#EC5281",
+  blue: "#314299",
+};

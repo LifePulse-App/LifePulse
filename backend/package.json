@@ -1,0 +1,19 @@
+{
+  "name": "LifePulse-App",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "dev": "set NODE_ENV=DEVELOPMENT && nodemon server.js",
+    "prod": "set NODE_ENV=PRODUCTION && nodemon server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0"
+  }
+}

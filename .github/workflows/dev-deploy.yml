@@ -1,0 +1,32 @@
+name: Dev - Build & Deploy
+
+on:
+  push:
+    branches: [ dev ]
+
+jobs:
+  build-and-deploy-dev:
+    runs-on: [self-hosted, windows]
+
+    steps:
+      # 0. Kill any lingering Node/PM2 processes that may lock file
+
+      # 1. Checkout repo
+      - uses: actions/checkout@v3
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      # 3. Install dependencies for backend
+      - name: Install backend dependencies
+        shell: powershell
+        run: npm install
+        working-directory: Backend
+
+      # 4. Deploy backend using PM2
+      - name: Deploy backend
+        shell: powershell
+        run: .\scripts\deploy.ps1 -env 'development' -appName 'LifePulse-dev'
