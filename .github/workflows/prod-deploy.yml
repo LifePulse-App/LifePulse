@@ -8,6 +8,11 @@ jobs:
   build-and-deploy-prod:
     runs-on: [self-hosted, windows]
     steps:
+     # 0. Stopping prod
+      - name: pm2 stopping prod
+        shell: powershell
+        run: pm2 stop LifePulse-prod
+        
       # 1. Checkout repo
       - uses: actions/checkout@v3
 

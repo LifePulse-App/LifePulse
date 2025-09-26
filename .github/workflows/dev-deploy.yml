@@ -10,6 +10,9 @@ jobs:
 
     steps:
       # 0. Kill any lingering Node/PM2 processes that may lock file
+      - name: pm2 stopping dev
+        shell: powershell
+        run: pm2 stop LifePulse-dev
 
       # 1. Checkout repo
       - uses: actions/checkout@v3
