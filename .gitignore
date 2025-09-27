@@ -1,9 +1,6 @@
 # Android build artifacts
 *.apk
 *.aab
-/android/
-/frontend/android/app/build/
-/frontend/android/.gradle/
 
 # Ignore node_modules everywhere
 node_modules/
