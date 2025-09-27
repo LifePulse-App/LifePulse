@@ -1,6 +1,7 @@
 {
   "name": "LifePulse-App",
   "version": "1.0.0",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "dev": "set NODE_ENV=DEVELOPMENT && nodemon server.js",
