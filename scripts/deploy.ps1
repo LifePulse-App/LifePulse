@@ -14,7 +14,7 @@ try {
 
     # Install dependencies
     Write-Host "Installing dependencies..."
-    npm install
+    npm install --legacy-peer-deps
 
     # Determine script file and PM2 process name
     if ($env -eq "development") {
