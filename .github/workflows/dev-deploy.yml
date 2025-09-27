@@ -26,8 +26,9 @@ jobs:
       # 3. Install dependencies for backend
       - name: Install backend dependencies
         shell: powershell
-        run: npm install
-        working-directory: Backend
+        run: |
+            cd Backend 
+            npm install
 
       # 4. Deploy backend using PM2
       - name: Deploy backend
