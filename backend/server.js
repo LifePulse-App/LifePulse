@@ -3,6 +3,7 @@ import cors from 'cors';
 import mongoose from "mongoose";
 import apiKeyMiddleware from './middlewares/api-middleware.js';
 import dotenv from "dotenv";
+import cookieParser from 'cookie-parser';
 import errorMiddleware from "./utils/errorMiddleware.js"
 
 const app = express();
