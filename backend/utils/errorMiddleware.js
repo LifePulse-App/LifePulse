@@ -31,7 +31,7 @@ export default (err, req, res, next) => {
         error = new errorHandler(message, 400)
     }
 
-    if (process.env.NODE_ENV === "DEVELOPMENT"){    
+    if (process.env.NODE_ENV === "development"){    
         res.status(error.statusCode).json ({
         message: error.message,
         error: err,
@@ -39,7 +39,7 @@ export default (err, req, res, next) => {
     })
 }
 
-    if (process.env.NODE_ENV === "PRODUCTION"){ 
+    if (process.env.NODE_ENV === "production"){ 
         res.status(error.statusCode).json ({
         message: error.message,
     })

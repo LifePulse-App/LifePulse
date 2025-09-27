@@ -4,8 +4,8 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "dev": "set NODE_ENV=DEVELOPMENT && nodemon server.js",
-    "prod": "set NODE_ENV=PRODUCTION && nodemon server.js",
+    "dev": "set NODE_ENV=development && nodemon server-dev.js",
+    "prod": "set NODE_ENV=production && nodemon server-prod.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,10 +13,16 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "crypto": "^1.0.1",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }

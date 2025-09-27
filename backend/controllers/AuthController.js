@@ -1,0 +1,200 @@
+import User from "../models/UserSchema.js";
+import Jwt from "jsonwebtoken";
+import crypto from "crypto";
+import ErrorHandler from "../utils/errorHandler.js";
+import catchAsyncErrors from "../utils/catchAsyncErrors.js";
+
+// Helper to send access + refresh tokens
+const sendTokens = async (res, user, deviceName) => {
+  const accessToken = user.getJwtToken();
+  const refreshToken = user.getRefreshToken(deviceName || "Unknown");
+
+  return {
+    accessToken,
+    refreshToken,
+    user: {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      providers: user.providers,
+    },
+  };
+};
+
+// Registration
+export const register = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const { name, email, password, username, phone, deviceName } = req.body;
+
+    if (!name || !email || !password) {
+      return next(new ErrorHandler("Name, Username and Password is Required", 400));
+    }
+
+    if (await User.findOne({ email })) {
+      return next(new ErrorHandler("Email already exists", 400));
+    }
+
+    if (username && (await User.findOne({ username }))) {
+      return next(new ErrorHandler("Username already exists", 400));
+    }
+
+    if (phone && (await User.findOne({ phone }))) {
+      return next(new ErrorHandler("Phone number already exists", 400));
+    }
+
+    const user = await User.create({ name, email, password, username, phone });
+    const tokens = await sendTokens(res, user, deviceName);
+
+    res.status(201).json({ success: true, ...tokens });
+  } catch (err) {
+    return next(new ErrorHandler("Server error", 500));
+  }
+});
+
+// Login
+export const login = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const { identifier, password, deviceName } = req.body;
+
+    if (!identifier || !password || !deviceName) {
+      return next(new ErrorHandler("Credentials Missing", 400));
+    }
+
+    const user = await User.findOne({
+      $or: [{ email: identifier }, { username: identifier }, { phone: identifier }],
+    }).select("+password");
+
+    if (!user) return next(new ErrorHandler("Invalid credentials", 401));
+
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) return next(new ErrorHandler("Invalid credentials", 401));
+
+    const tokens = await sendTokens(res, user, deviceName);
+    res.status(200).json({ success: true, ...tokens });
+  } catch (err) {
+    return next(new ErrorHandler("Server error", 500));
+  }
+});
+
+// SSO Login (Google/Apple)
+export const ssoLogin = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const { provider, providerId, email, name, deviceName } = req.body;
+
+    if (!provider || !providerId || !email) {
+      return next(new ErrorHandler("Missing SSO data", 400));
+    }
+
+    let user = await User.findOne({ email });
+
+    if (user) {
+      const existingProvider = user.providers.find(
+        (p) => p.provider === provider && p.providerId === providerId
+      );
+      if (!existingProvider) {
+        user.providers.push({ provider, providerId, device: deviceName || "Unknown" });
+        await user.save({ validateBeforeSave: false });
+      }
+    } else {
+      user = await User.create({
+        name,
+        email,
+        providers: [{ provider, providerId, device: deviceName || "Unknown" }],
+      });
+    }
+
+    const tokens = await sendTokens(res, user, deviceName);
+    res.status(200).json({ success: true, ...tokens });
+  } catch (err) {
+    return next(new ErrorHandler("Server error", 500));
+  }
+});
+
+// Refresh Token
+export const refreshToken = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const { token } = req.body;
+    if (!token) return next(new ErrorHandler("No refresh token provided", 401));
+
+    const decoded = Jwt.verify(token, process.env.REFRESH_SECRET);
+
+    const user = await User.findById(decoded.id);
+    if (!user) return next(new ErrorHandler("User not found", 401));
+
+    const storedToken = user.refreshTokens.find((t) => t.token === token);
+    if (!storedToken) return next(new ErrorHandler("Invalid token", 401));
+
+    user.refreshTokens = user.refreshTokens.filter((t) => t.token !== token);
+    await user.save({ validateBeforeSave: false });
+
+    const tokens = await sendTokens(res, user, storedToken.device);
+    res.status(200).json({ success: true, ...tokens });
+  } catch (err) {
+    return next(new ErrorHandler("Invalid or expired token", 401));
+  }
+});
+
+// Logout (per device)
+export const logout = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const { userId, token } = req.body;
+
+    const user = await User.findById(userId);
+    if (!user) return next(new ErrorHandler("User not found", 404));
+
+    user.refreshTokens = user.refreshTokens.filter((t) => t.token !== token);
+    await user.save({ validateBeforeSave: false });
+
+    res.cookie("refreshToken", "", { maxAge: 0 });
+    res.status(200).json({ success: true, message: "Logged out successfully" });
+  } catch (err) {
+    return next(new ErrorHandler("Server error", 500));
+  }
+});
+
+// Forgot Password
+export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return next(new ErrorHandler("User not found", 404));
+
+    const resetToken = user.getResetPasswordToken();
+    await user.save({ validateBeforeSave: false });
+
+    const resetUrl = `${req.protocol}://${req.get("host")}/api/auth/reset-password/${resetToken}`;
+    console.log("Reset URL:", resetUrl);
+
+    res.status(200).json({ success: true, message: "Reset token sent to email" });
+  } catch (err) {
+    return next(new ErrorHandler("Server error", 500));
+  }
+});
+
+// Reset Password
+export const resetPassword = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const resetPasswordToken = crypto
+      .createHash("sha256")
+      .update(req.params.resetToken)
+      .digest("hex");
+
+    const user = await User.findOne({
+      resetPasswordToken,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) return next(new ErrorHandler("Invalid or expired token", 400));
+
+    user.password = req.body.password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.status(200).json({ success: true, message: "Password reset successful" });
+  } catch (err) {
+    return next(new ErrorHandler("Server error", 500));
+  }
+});

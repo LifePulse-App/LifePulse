@@ -21,18 +21,17 @@ export const connectDatabase = () => {
     .catch(err => console.error("error:",err));    
 };
 
+//import routes
+import AuthRoutes from "./routes/AuthRoutes.js"
+
 // Middlewares
-app.use("/api/v1", apiKeyMiddleware);
-app.use(cors());
-app.use(json());
-connectDatabase();
 app.use(cookieParser());
-app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-    next();
-});
+app.use(express.json());
+app.use(cors());
+app.use("/api", apiKeyMiddleware);
+app.use("/api/auth", AuthRoutes);
 app.use(errorMiddleware);
+
 
 // Pick port based on environment
 const ENV = process.env.NODE_ENV;
