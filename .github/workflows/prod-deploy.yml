@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         shell: powershell
         run: |
-            cd Backend
+            cd backend
             npm install
 
       # 5. Deploy (custom PowerShell script)
