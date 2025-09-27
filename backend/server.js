@@ -7,10 +7,12 @@ import cookieParser from 'cookie-parser';
 import errorMiddleware from "./utils/errorMiddleware.js"
 
 const app = express();
-dotenv.config();
+// Load environment based on NODE_ENV
+const envFile = `.env.${process.env.NODE_ENV || ''}`;
+dotenv.config({ path: envFile });
 
 //Connection Database
-let DB_URL = process.env.DB_Con_String;
+let DB_URL = process.env.MONGO_URI;
 export const connectDatabase = () => { 
     mongoose.connect(DB_URL)
     .then((con) => {
