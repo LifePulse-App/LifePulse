@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "LifePulse-prod",
-      script: "./Backend/server.js",      // or your entry file
+      script: "./backend/server.js",      // or your entry file
       env: {
         NODE_ENV: "production",
         PORT: 3000
@@ -10,7 +10,7 @@ module.exports = {
     },
     {
       name: "LifePulse-dev",
-      script: "./Backend/server.js",
+      script: "./backend/server.js",
       env: {
         NODE_ENV: "development",
         PORT: 4000
