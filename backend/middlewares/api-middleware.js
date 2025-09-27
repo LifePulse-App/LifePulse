@@ -1,4 +1,4 @@
-import ErrorHandler from "../utils/errorHandler";
+import ErrorHandler from "../utils/errorHandler.js";
 
 export default function apiKeyMiddleware(req, res, next) {
   const apiKey = req.headers["api-key"]; // Expect API key in headers
