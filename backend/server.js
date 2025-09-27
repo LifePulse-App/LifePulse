@@ -9,7 +9,6 @@ import errorMiddleware from "./utils/errorMiddleware.js"
 const app = express();
 // Load environment based on NODE_ENV
 const envFile = `.env.${process.env.NODE_ENV || ''}`;
-console.log("📂 Loading env file:", envFile);
 dotenv.config({ path: envFile });
 
 //Connection Database

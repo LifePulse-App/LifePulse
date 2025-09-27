@@ -1,5 +1,6 @@
-// Set environment to development
 process.env.NODE_ENV = 'production';
 
-// Import your main server file
-import './server.js';
+// Dynamically import AFTER setting NODE_ENV
+import('./server.js')
+  .then(() => console.log("✅ Dev server started with NODE_ENV=production"))
+  .catch(err => console.error("❌ Failed to start server:", err));
