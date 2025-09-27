@@ -2,10 +2,11 @@ import express, { json } from 'express';
 import cors from 'cors';
 import mongoose from "mongoose";
 import apiKeyMiddleware from './middlewares/api-middleware.js';
-require('dotenv').config();
+import dotenv from "dotenv";
 import errorMiddleware from "./utils/errorMiddleware.js"
 
 const app = express();
+dotenv.config();
 
 //Connection Database
 let DB_URL = process.env.DB_Con_String;
