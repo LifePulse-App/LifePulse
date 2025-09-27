@@ -14,11 +14,7 @@ try {
 
     # Install dependencies
     Write-Host "Installing dependencies..."
-    npm ci
-
-    if ($LASTEXITCODE -ne 0) {
-    throw "npm ci failed"
-}
+    npm install
 
     # Determine script file and PM2 process name
     if ($env -eq "development") {

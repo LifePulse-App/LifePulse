@@ -27,7 +27,7 @@ jobs:
         shell: powershell
         run: |
             cd backend
-            npm ci
+            npm install
 
       # 5. Deploy (custom PowerShell script)
       - name: Deploy to production

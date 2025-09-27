@@ -28,7 +28,7 @@ jobs:
         shell: powershell
         run: |
             cd backend 
-            npm ci
+            npm install
 
       # 4. Deploy backend using PM2
       - name: Deploy backend
