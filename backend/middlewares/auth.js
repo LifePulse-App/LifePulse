@@ -7,12 +7,12 @@ import Jwt from "jsonwebtoken";
 export const isAuthenticatedUser = catchAsyncErrors(async (req, res, next) => {
   let token;
 
-  // 1. Try cookies first
-  if (req.cookies && req.cookies.token) {
-    token = req.cookies.token;
-  }
+  // // 1. Try cookies first
+  // if (req.cookies && req.cookies.token) {
+  //   token = req.cookies.token;
+  // }
   // 2. Fallback to Authorization header (Bearer token)
-  else if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
+ if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
     token = req.headers.authorization.split(" ")[1];
   }
 
@@ -29,14 +29,3 @@ export const isAuthenticatedUser = catchAsyncErrors(async (req, res, next) => {
 
   next();
 });
-
-export const authorizeRoles = (...roles) => {
-  return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-      return next(
-        new ErrorHandler("You are not allowed to access this resource, you are not admin.", 403)
-      );
-    }
-    next();
-  };
-};

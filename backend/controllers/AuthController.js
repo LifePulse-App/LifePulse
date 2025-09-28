@@ -1,8 +1,11 @@
 import User from "../models/UserSchema.js";
 import Jwt from "jsonwebtoken";
 import crypto from "crypto";
+import validator from "validator"
 import ErrorHandler from "../utils/errorHandler.js";
 import catchAsyncErrors from "../utils/catchAsyncErrors.js";
+import { sendResetPasswordEmail, sendVerificationEmail, verifyEmail } from "./OtpController.js";
+import { log } from "console";
 
 // Helper to send access + refresh tokens
 const sendTokens = async (res, user, deviceName) => {
@@ -31,6 +34,10 @@ export const register = catchAsyncErrors(async (req, res, next) => {
       return next(new ErrorHandler("Name, Username and Password is Required", 400));
     }
 
+    if (!validator.isEmail(email)) {
+      return next(new ErrorHandler("Invalid email format", 400));
+    }
+
     if (await User.findOne({ email })) {
       return next(new ErrorHandler("Email already exists", 400));
     }
@@ -43,14 +50,27 @@ export const register = catchAsyncErrors(async (req, res, next) => {
       return next(new ErrorHandler("Phone number already exists", 400));
     }
 
-    const user = await User.create({ name, email, password, username, phone });
-    const tokens = await sendTokens(res, user, deviceName);
+    const user = await User.create({ name, email, password, username, phone, isVerified: false });
 
-    res.status(201).json({ success: true, ...tokens });
+    // Generate OTP
+    const otp = user.generateVerificationCode();
+
+    // Send OTP
+    await sendVerificationEmail(email, otp);
+
+    await user.save({ validateBeforeSave: false });
+
+    res.status(201).json({
+      success: true,
+      message: "User registered. Verification code sent to email.",
+    });
   } catch (err) {
+    console.log(err);
     return next(new ErrorHandler("Server error", 500));
   }
 });
+
+
 
 // Login
 export const login = catchAsyncErrors(async (req, res, next) => {
@@ -107,6 +127,7 @@ export const ssoLogin = catchAsyncErrors(async (req, res, next) => {
     const tokens = await sendTokens(res, user, deviceName);
     res.status(200).json({ success: true, ...tokens });
   } catch (err) {
+    console.log(err);
     return next(new ErrorHandler("Server error", 500));
   }
 });
@@ -143,20 +164,31 @@ export const logout = catchAsyncErrors(async (req, res, next) => {
     const user = await User.findById(userId);
     if (!user) return next(new ErrorHandler("User not found", 404));
 
-    user.refreshTokens = user.refreshTokens.filter((t) => t.token !== token);
-    await user.save({ validateBeforeSave: false });
+    const tokenExists = user.refreshTokens.some((t) => t.token === token);
+    if (!tokenExists) {
+      return next(new ErrorHandler("Invalid or already logged out token", 400));
+    }
 
-    res.cookie("refreshToken", "", { maxAge: 0 });
+    user.refreshTokens = user.refreshTokens.filter(
+      (t) => t.token !== token
+    );
+    
+    await user.save({ validateBeforeSave: false });
+    
+
     res.status(200).json({ success: true, message: "Logged out successfully" });
   } catch (err) {
     return next(new ErrorHandler("Server error", 500));
   }
 });
 
+
 // Forgot Password
 export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
   try {
     const { email } = req.body;
+
+    if (!email) return next(new ErrorHandler("Enter email", 401));
 
     const user = await User.findOne({ email });
     if (!user) return next(new ErrorHandler("User not found", 404));
@@ -165,13 +197,19 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
     await user.save({ validateBeforeSave: false });
 
     const resetUrl = `${req.protocol}://${req.get("host")}/api/auth/reset-password/${resetToken}`;
-    console.log("Reset URL:", resetUrl);
 
-    res.status(200).json({ success: true, message: "Reset token sent to email" });
+    await sendResetPasswordEmail(user.email, resetUrl);
+
+    res.status(200).json({
+      success: true,
+      message: `Reset token sent to ${user.email}`,
+    });
   } catch (err) {
+    console.log(err);
     return next(new ErrorHandler("Server error", 500));
   }
 });
+
 
 // Reset Password
 export const resetPassword = catchAsyncErrors(async (req, res, next) => {
@@ -189,8 +227,10 @@ export const resetPassword = catchAsyncErrors(async (req, res, next) => {
     if (!user) return next(new ErrorHandler("Invalid or expired token", 400));
 
     user.password = req.body.password;
+    if(!req.body.password) return next(new ErrorHandler("Enter Password", 401));
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
+    user.refreshTokens = [];
     await user.save();
 
     res.status(200).json({ success: true, message: "Password reset successful" });

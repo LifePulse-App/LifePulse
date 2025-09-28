@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import apiKeyMiddleware from './middlewares/api-middleware.js';
 import dotenv from "dotenv";
 import cookieParser from 'cookie-parser';
+import nodemailer from "nodemailer"
 import errorMiddleware from "./utils/errorMiddleware.js"
 
 const app = express();
@@ -13,13 +14,23 @@ dotenv.config({ path: envFile });
 
 //Connection Database
 let DB_URL = process.env.MONGO_URI;
-export const connectDatabase = () => { 
+const connectDatabase = () => { 
     mongoose.connect(DB_URL)
     .then((con) => {
         console.log('connected with database',DB_URL);
     })
     .catch(err => console.error("error:",err));    
 };
+
+connectDatabase()
+
+export const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER, // your Gmail address
+    pass: process.env.EMAIL_PASS, // App password (not normal password!)
+  },
+});
 
 //import routes
 import AuthRoutes from "./routes/AuthRoutes.js"

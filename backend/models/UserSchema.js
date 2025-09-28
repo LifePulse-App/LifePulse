@@ -48,12 +48,20 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "user",
     },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationCode: String,
+    verificationCodeExpire: Date,
     refreshTokens: [
-        {
-          token: { type: String },
-          expiresAt: { type: Date },
-        },
-      ],
+      {
+        token: { type: String, required: true },
+        device: { type: String }, // store device name here
+        expiresAt: { type: Date, required: true },
+      },
+    ],
+    
     avatar: {
       public_id: String,
       url: String,
@@ -89,9 +97,14 @@ userSchema.methods.getJwtToken = function () {
 };
 
 userSchema.methods.getRefreshToken = function (deviceName) {
-    const token = Jwt.sign({ id: this._id }, process.env.REFRESH_SECRET, {
+    const token = Jwt.sign({ id: this._id, device: deviceName }, process.env.REFRESH_SECRET, {
       expiresIn: "60d",
     });
+
+      // Remove any old token for this device
+  this.refreshTokens = this.refreshTokens.filter(
+    (t) => t.device !== deviceName
+  );
   
     this.refreshTokens.push({
       token,
@@ -113,7 +126,7 @@ userSchema.methods.getResetPasswordToken = function () {
     .update(resetToken)
     .digest("hex");
 
-  this.resetPasswordExpire = Date.now() + 2 * 60 * 1000;
+  this.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
 
   return resetToken;
 };
@@ -122,6 +135,32 @@ userSchema.methods.getResetPasswordToken = function () {
 userSchema.methods.comparePassword = async function (enteredPassword) {
   if (!this.password) return false; // SSO user has no password
   return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// 🔹 Generate OTP
+userSchema.methods.generateVerificationCode = function () {
+  // simple 6-digit numeric OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+  // hash OTP before saving (for security)
+  this.verificationCode = crypto
+    .createHash("sha256")
+    .update(otp)
+    .digest("hex");
+
+  this.verificationCodeExpire = Date.now() + 5 * 60 * 1000; 
+
+  return otp; // return plain OTP so we can email it
+};
+
+// 🔹 Verify OTP
+userSchema.methods.verifyOtp = async function (enteredOtp) {
+  const hashedOtp = crypto.createHash("sha256").update(enteredOtp).digest("hex");
+
+  return (
+    this.verificationCode === hashedOtp &&
+    this.verificationCodeExpire > Date.now()
+  );
 };
 
 export default mongoose.model("User", userSchema);
