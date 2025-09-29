@@ -17,7 +17,7 @@ export const isAuthenticatedUser = catchAsyncErrors(async (req, res, next) => {
   }
 
   if (!token) {
-    return next(new ErrorHandler("Login first to access this area", 401));
+    return next(new ErrorHandler("Unauthorized User", 401));
   }
 
   const decoded = Jwt.verify(token, process.env.JWT_SECRET);

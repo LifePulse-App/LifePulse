@@ -8,13 +8,13 @@ import {
   forgotPassword,
   resetPassword,
 } from "../controllers/AuthController.js";
-import { isAuthenticatedUser} from "../middlewares/auth.js";
+import { isAuthenticatedUser } from "../middlewares/auth.js";
 import { verifyEmail } from "../controllers/OtpController.js";
 
 const router = express.Router();
 
 router.post("/register", register);
-router.post("/verify_email", verifyEmail);
+router.post("/verify-email", verifyEmail);
 router.post("/login", login);
 router.post("/sso-login", ssoLogin);
 router.post("/refresh-token", refreshToken);

@@ -57,7 +57,7 @@ const userSchema = new mongoose.Schema(
     refreshTokens: [
       {
         token: { type: String, required: true },
-        device: { type: String }, // store device name here
+        deviceId: { type: String }, // store device name here
         expiresAt: { type: Date, required: true },
       },
     ],
@@ -70,7 +70,7 @@ const userSchema = new mongoose.Schema(
       {
         provider: { type: String, enum: ["google", "apple"] },
         providerId: { type: String },
-        device: { type: String },
+        deviceId: { type: String },
       },
     ],
     resetPasswordToken: String,
@@ -96,8 +96,8 @@ userSchema.methods.getJwtToken = function () {
   });
 };
 
-userSchema.methods.getRefreshToken = function (deviceName) {
-    const token = Jwt.sign({ id: this._id, device: deviceName }, process.env.REFRESH_SECRET, {
+userSchema.methods.getRefreshToken = function (uniqueId) {
+    const token = Jwt.sign({ id: this._id, deviceId: uniqueId }, process.env.REFRESH_SECRET, {
       expiresIn: "60d",
     });
 

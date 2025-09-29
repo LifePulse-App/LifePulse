@@ -5,12 +5,12 @@ import validator from "validator"
 import ErrorHandler from "../utils/errorHandler.js";
 import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import { sendResetPasswordEmail, sendVerificationEmail, verifyEmail } from "./OtpController.js";
-import { log } from "console";
+import DeviceInfo from 'react-native-device-info';
 
 // Helper to send access + refresh tokens
-const sendTokens = async (res, user, deviceName) => {
+const sendTokens = async (res, user, deviceId) => {                
   const accessToken = user.getJwtToken();
-  const refreshToken = user.getRefreshToken(deviceName || "Unknown");
+  const refreshToken = user.getRefreshToken(deviceId || "Unknown");
 
   return {
     accessToken,
@@ -28,7 +28,7 @@ const sendTokens = async (res, user, deviceName) => {
 // Registration
 export const register = catchAsyncErrors(async (req, res, next) => {
   try {
-    const { name, email, password, username, phone, deviceName } = req.body;
+    const { name, email, password, username, phone } = req.body;
 
     if (!name || !email || !password) {
       return next(new ErrorHandler("Name, Username and Password is Required", 400));
@@ -75,9 +75,9 @@ export const register = catchAsyncErrors(async (req, res, next) => {
 // Login
 export const login = catchAsyncErrors(async (req, res, next) => {
   try {
-    const { identifier, password, deviceName } = req.body;
+    const { identifier, password } = req.body;
 
-    if (!identifier || !password || !deviceName) {
+    if (!identifier || !password) {
       return next(new ErrorHandler("Credentials Missing", 400));
     }
 
@@ -90,7 +90,9 @@ export const login = catchAsyncErrors(async (req, res, next) => {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return next(new ErrorHandler("Invalid credentials", 401));
 
-    const tokens = await sendTokens(res, user, deviceName);
+    const deviceId = DeviceInfo.getUniqueId() || "Unknown";  
+
+    const tokens = await sendTokens(res, user, deviceId);
     res.status(200).json({ success: true, ...tokens });
   } catch (err) {
     return next(new ErrorHandler("Server error", 500));
@@ -100,7 +102,7 @@ export const login = catchAsyncErrors(async (req, res, next) => {
 // SSO Login (Google/Apple)
 export const ssoLogin = catchAsyncErrors(async (req, res, next) => {
   try {
-    const { provider, providerId, email, name, deviceName } = req.body;
+    const { provider, providerId, email, name } = req.body;
 
     if (!provider || !providerId || !email) {
       return next(new ErrorHandler("Missing SSO data", 400));
@@ -112,19 +114,20 @@ export const ssoLogin = catchAsyncErrors(async (req, res, next) => {
       const existingProvider = user.providers.find(
         (p) => p.provider === provider && p.providerId === providerId
       );
+      const deviceId = DeviceInfo.getUniqueId() || "Unknown";  
       if (!existingProvider) {
-        user.providers.push({ provider, providerId, device: deviceName || "Unknown" });
+        user.providers.push({ provider, providerId, deviceId });
         await user.save({ validateBeforeSave: false });
       }
     } else {
       user = await User.create({
         name,
         email,
-        providers: [{ provider, providerId, device: deviceName || "Unknown" }],
+        providers: [{ provider, providerId, deviceId }],
       });
     }
 
-    const tokens = await sendTokens(res, user, deviceName);
+    const tokens = await sendTokens(res, user, deviceId);
     res.status(200).json({ success: true, ...tokens });
   } catch (err) {
     console.log(err);
@@ -149,7 +152,7 @@ export const refreshToken = catchAsyncErrors(async (req, res, next) => {
     user.refreshTokens = user.refreshTokens.filter((t) => t.token !== token);
     await user.save({ validateBeforeSave: false });
 
-    const tokens = await sendTokens(res, user, storedToken.device);
+    const tokens = await sendTokens(res, user, storedToken.deviceId);
     res.status(200).json({ success: true, ...tokens });
   } catch (err) {
     return next(new ErrorHandler("Invalid or expired token", 401));
