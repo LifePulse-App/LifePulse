@@ -120,7 +120,7 @@ userSchema.methods.getRefreshToken = function (deviceId) {
 
       // Remove any old token for this device
   this.refreshTokens = this.refreshTokens.filter(
-    (t) => t.device !== deviceId
+    (t) => t.deviceId !== deviceId
   );
   
     this.refreshTokens.push({
