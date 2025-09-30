@@ -5,9 +5,9 @@ import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import ErrorHandler from "../utils/errorHandler.js";
 
 // Helper to send access + refresh tokens
-const sendTokens = async (res, user, deviceName) => {
+const sendTokens = async (res, user, deviceId) => {
     const accessToken = user.getJwtToken();
-    const refreshToken = user.getRefreshToken(deviceName || "Unknown");
+    const refreshToken = user.getRefreshToken(deviceId || "Unknown");
   
     return {
       accessToken,
@@ -65,9 +65,9 @@ export const sendVerificationEmail = async (to, otp) => {
   
 // verifyEmail.js
 export const verifyEmail = catchAsyncErrors(async (req, res, next) => {
-    const { email, otp, deviceName } = req.body;
+    const { email, otp, deviceId } = req.body;
 
-    if (!email || !otp || !deviceName) {
+    if (!email || !otp ) {
         return next(new ErrorHandler("Info Required", 400));
       }
   
@@ -87,7 +87,7 @@ export const verifyEmail = catchAsyncErrors(async (req, res, next) => {
     await user.save();
   
     // now issue tokens only AFTER verification
-    const tokens = await sendTokens(res, user, deviceName);
+    const tokens = await sendTokens(res, user, deviceId);
   
     res.status(200).json({
       success: true,

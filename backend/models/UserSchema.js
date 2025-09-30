@@ -3,6 +3,11 @@ import Jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
+const streakSchema = new mongoose.Schema({
+  count: { type: Number, default: 0 },
+  lastUpdated: { type: Date, default: null },
+});
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -15,7 +20,7 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       lowercase: true,
-      sparse: true, // allow null if SSO
+      sparse: true,
     },
     email: {
       type: String,
@@ -52,6 +57,18 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    currentTitle: {
+      type: String,
+    },
+    xp: { type: Number, default: 0 },
+    streak: { type: streakSchema, default: () => ({}) },
+    deviceInfo: [
+      {
+        deviceName: { type: String },
+        deviceBrand: { type: String }, 
+        deviceModel: { type: String },
+      },
+    ],
     verificationCode: String,
     verificationCodeExpire: Date,
     refreshTokens: [

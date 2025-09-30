@@ -27,13 +27,14 @@ connectDatabase()
 export const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.EMAIL_USER, // your Gmail address
-    pass: process.env.EMAIL_PASS, // App password (not normal password!)
+    user: process.env.EMAIL_USER, 
+    pass: process.env.EMAIL_PASS,
   },
 });
 
 //import routes
 import AuthRoutes from "./routes/AuthRoutes.js"
+import DashboardRoutes from "./routes/DashboardRoutes.js"
 
 // Middlewares
 app.use(cookieParser());
@@ -41,6 +42,7 @@ app.use(express.json());
 app.use(cors());
 app.use("/api", apiKeyMiddleware);
 app.use("/api/auth", AuthRoutes);
+app.use("/api/dashboard", DashboardRoutes);
 app.use(errorMiddleware);
 
 

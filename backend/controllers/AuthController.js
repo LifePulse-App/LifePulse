@@ -5,7 +5,6 @@ import validator from "validator"
 import ErrorHandler from "../utils/errorHandler.js";
 import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import { sendResetPasswordEmail, sendVerificationEmail, verifyEmail } from "./OtpController.js";
-import DeviceInfo from 'react-native-device-info';
 
 // Helper to send access + refresh tokens
 const sendTokens = async (res, user, deviceId) => {                
@@ -75,7 +74,7 @@ export const register = catchAsyncErrors(async (req, res, next) => {
 // Login
 export const login = catchAsyncErrors(async (req, res, next) => {
   try {
-    const { identifier, password } = req.body;
+    const { identifier, password, deviceId } = req.body;
 
     if (!identifier || !password) {
       return next(new ErrorHandler("Credentials Missing", 400));
@@ -90,8 +89,6 @@ export const login = catchAsyncErrors(async (req, res, next) => {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return next(new ErrorHandler("Invalid credentials", 401));
 
-    const deviceId = DeviceInfo.getUniqueId() || "Unknown";  
-
     const tokens = await sendTokens(res, user, deviceId);
     res.status(200).json({ success: true, ...tokens });
   } catch (err) {
@@ -102,7 +99,7 @@ export const login = catchAsyncErrors(async (req, res, next) => {
 // SSO Login (Google/Apple)
 export const ssoLogin = catchAsyncErrors(async (req, res, next) => {
   try {
-    const { provider, providerId, email, name } = req.body;
+    const { provider, providerId, email, name, deviceId } = req.body;
 
     if (!provider || !providerId || !email) {
       return next(new ErrorHandler("Missing SSO data", 400));
@@ -113,8 +110,7 @@ export const ssoLogin = catchAsyncErrors(async (req, res, next) => {
     if (user) {
       const existingProvider = user.providers.find(
         (p) => p.provider === provider && p.providerId === providerId
-      );
-      const deviceId = DeviceInfo.getUniqueId() || "Unknown";  
+      ); 
       if (!existingProvider) {
         user.providers.push({ provider, providerId, deviceId });
         await user.save({ validateBeforeSave: false });
