@@ -96,6 +96,21 @@ export const login = catchAsyncErrors(async (req, res, next) => {
   }
 });
 
+// Me
+export const me = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user._id)
+    .select("-password -resetPasswordToken -resetPasswordExpire -verificationCode -verificationCodeExpire");
+
+  if (!user) {
+    return next(new ErrorHandler("User not found", 404));
+  }
+
+  res.status(200).json({
+    success: true,
+    user,
+  });
+});
+
 // SSO Login (Google/Apple)
 export const ssoLogin = catchAsyncErrors(async (req, res, next) => {
   try {
