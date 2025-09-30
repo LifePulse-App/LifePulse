@@ -120,12 +120,12 @@ userSchema.methods.getRefreshToken = function (uniqueId) {
 
       // Remove any old token for this device
   this.refreshTokens = this.refreshTokens.filter(
-    (t) => t.device !== deviceName
+    (t) => t.device !== deviceId
   );
   
     this.refreshTokens.push({
       token,
-      device: deviceName,
+      device: deviceId,
       expiresAt: Date.now() + 60 * 24 * 60 * 60 * 1000, // 60 days
     });
   
