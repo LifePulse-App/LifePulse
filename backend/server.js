@@ -48,7 +48,7 @@ app.use(errorMiddleware);
 
 // Pick port based on environment
 const ENV = process.env.NODE_ENV;
-const PORT = ENV === 'development' ? 4000 : 3000;
+const PORT = ENV === 'development' ? 4000 : 8080;
 
 // Test route
 app.get('/health', (req, res) => {
