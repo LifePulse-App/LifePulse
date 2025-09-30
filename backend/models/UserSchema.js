@@ -113,8 +113,8 @@ userSchema.methods.getJwtToken = function () {
   });
 };
 
-userSchema.methods.getRefreshToken = function (uniqueId) {
-    const token = Jwt.sign({ id: this._id, deviceId: uniqueId }, process.env.REFRESH_SECRET, {
+userSchema.methods.getRefreshToken = function (deviceId) {
+    const token = Jwt.sign({ id: this._id, deviceId }, process.env.REFRESH_SECRET, {
       expiresIn: "60d",
     });
 
@@ -125,7 +125,7 @@ userSchema.methods.getRefreshToken = function (uniqueId) {
   
     this.refreshTokens.push({
       token,
-      device: deviceId,
+      deviceId,
       expiresAt: Date.now() + 60 * 24 * 60 * 60 * 1000, // 60 days
     });
   
