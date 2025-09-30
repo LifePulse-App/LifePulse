@@ -1,4 +1,4 @@
-import express, { json } from 'express';
+import express from 'express';
 import cors from 'cors';
 import mongoose from "mongoose";
 import apiKeyMiddleware from './middlewares/api-middleware.js';
@@ -35,6 +35,7 @@ export const transporter = nodemailer.createTransport({
 //import routes
 import AuthRoutes from "./routes/AuthRoutes.js"
 import DashboardRoutes from "./routes/DashboardRoutes.js"
+import HabitRoutes from "./routes/HabitRoutes.js"
 
 // Middlewares
 app.use(cookieParser());
@@ -43,6 +44,7 @@ app.use(cors());
 app.use("/api", apiKeyMiddleware);
 app.use("/api/auth", AuthRoutes);
 app.use("/api/dashboard", DashboardRoutes);
+app.use("/api/habit", HabitRoutes);
 app.use(errorMiddleware);
 
 
