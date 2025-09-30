@@ -79,9 +79,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.SchoolApp"
+    namespace "com.Qalam"
     defaultConfig {
-        applicationId "com.SchoolApp"
+        applicationId "com.Qalam"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

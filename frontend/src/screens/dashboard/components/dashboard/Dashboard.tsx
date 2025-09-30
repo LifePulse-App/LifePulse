@@ -29,6 +29,9 @@ import { DashboardEmployeeSummaryResponse } from '../../models/dashboard/Dashboa
 import { DashboardStudentSummaryResponse } from '../../models/dashboard/DashboardStudentSummaryResponse';
 import sharedApi from '../../../../shared/services/shared-api';
 import Toast from 'react-native-toast-message';
+import api_Login from '../../../login/services/api_Login';
+import { DashboardResponse } from '../../models/dashboard/DashboardResponse';
+import { Image } from '@rneui/base';
 
 
 const Dashboard = ({ navigation }: any) => {
@@ -42,211 +45,69 @@ const Dashboard = ({ navigation }: any) => {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState<string[]>([]);
   const [items, setItems] = useState<ItemType[]>([]);
-  const [Employee_Summary, setEmployee_Summary] =
-    useState<DashboardEmployeeSummaryResponse>();
-  const [Student_Summary, setStudent_Summary] =
-    useState<DashboardStudentSummaryResponse>();
+  const [Dashboard_Summary, setDashboard_Summary] =
+    useState<DashboardResponse>();
     const [carouselSwipeEnabled, setCarouselSwipeEnabled] = useState(false); // ❌ Disabled at start
 
 
   const getDashboardSummary = async () => {
-    let Branches = '';
-    if (authContext?.User?.RoleName === RoleName.SchoolAdmin) {
-      Branches = value.toString();
-    } else {
-      Branches =
-        authContext?.User?.InstituteProfile.DefaultBranchId?.toString() ?? '';
-    }
 
     setLoading(true);
 
-    const Employee_Response = await api.getDashboardEmployeeSummary(
-      authContext?.User?.InstituteId || 0,
-      Branches,
-    );
+    const Dashboard_Response = await api_Login.GetProfile();
 
-    // const requestResponse = await sharedApi.RefreshToken();
-    // console.log(requestResponse);
-    
-
-    if (!Employee_Response.ok) {
+    if (!Dashboard_Response.ok) {
       setLoading(false);
-      return Toast.show({ type: 'error', text1: 'Error Getting Employee Data'});
+      return Toast.show({ type: 'error', text1: 'Error Getting Data'});
       
     }
 
     if (
-      typeof Employee_Response.data === 'object' &&
-      Employee_Response.data !== null
+      typeof Dashboard_Response.data === 'object' &&
+      Dashboard_Response.data !== null
     ) {
-      setEmployee_Summary(Employee_Response.data);
-    }
-
-    const Student_Response = await api.getDashboardStudentSummary(
-      authContext?.User?.InstituteId || 0,
-      Branches,
-    );
-
-    if (!Student_Response.ok) {
-      setLoading(false);
-      return Toast.show({ type: 'error', text1: 'Error Getting Student Data'});
-    }
-
-    if (
-      typeof Student_Response.data === 'object' &&
-      Student_Response.data !== null
-    ) {
-      setStudent_Summary(Student_Response.data);
+      setDashboard_Summary(Dashboard_Response.data);
     }
 
     setLoading(false);
   };
 
-  const getBranchList = async () => {
-   // console.log(authContext?.BranchList);
-    if (
-      authContext?.User?.RoleName === RoleName.SchoolAdmin
-    ) {
-      const response = await sharedApi.getBranchList(
-        authContext?.User?.InstituteId,
-        '',
-      );
-      
-
-      if (!response.ok) {
-        setLoading(false);
-        return Toast.show({ type: 'error', text1: 'Error Getting Branch List'});
-      }
-
-      if (typeof response.data === 'object' && response.data !== null) {
-        const data = response.data.map(item => ({
-          label: item.BranchName,
-          value: item.BranchId.toString(),
-        }));
-
-        //data.unshift({ label: 'Select All', value: 'all' });
-        
-
-        setItems(data);
-        
-        
-
-        authContext?.setBranchList(response.data);
-      }
-    }
-
-    setValue([authContext?.User?.BranchId?.toString() || '']);
-    authContext?.setSelectedBranch([
-      authContext?.User?.BranchId.toString() || '',
-    ]);
-  };
-
   useEffect(() => {
-    if (authContext?.User?.RoleName === RoleName.SchoolAdmin) {
-      getBranchList();
       getDashboardSummary();
-    } else {
-      getBranchList();
-      getDashboardSummary();
-    }
   }, []);
-
-  useEffect(() => {
-    if (authContext?.User?.RoleName === RoleName.SchoolAdmin) {
-      if (
-        !open &&
-        value.length > 0 &&
-        JSON.stringify(value) !==
-          JSON.stringify(authContext?.SelectedBranch)
-      ) {
-        authContext?.setSelectedBranch(value);
-        getDashboardSummary();
-      } else if (!open &&
-        value.length > 0 &&
-        JSON.stringify(value) ===
-        JSON.stringify(authContext?.SelectedBranch)){
-        authContext?.setSelectedBranch(value);
-        getDashboardSummary();
-      }
-    }
-  }, [open, value]);
   
-
   return (
     <MainLayout>
         <View style={{ flex: 1 }}>
           <AppScreen style={styles.container}>
-            <View style={styles.uppercontainer}>
-              <View style={styles.Iconcontainer}>
-                <Icon
-                  color={colors.white}
-                  size={25}
-                  name="menu"
-                  onPress={() => navigation.openDrawer()}
-                />
-              </View>
-              <AppText
-                style={{
-                  textAlign: 'start',
-                  color: 'white',
-                  fontWeight: 'bold',
-                  fontSize: 18,
-                  marginRight: '10%',
-                }}
-              >
-                Welcome To Dashboard
-              </AppText>
-            </View>
-  
-            {authContext?.User?.RoleName === RoleName.SchoolAdmin && (
-              <DropDownPicker
-                textStyle={{
-                  fontFamily: defaultstyles.text.fontFamily,
-                  fontSize: 12,
-                  fontWeight: '500',
-                }}
-                multiple={true}
-                min={1}
-                open={open}
-                value={value}
-                items={items}
-                setOpen={setOpen}
-                setValue={setValue}
-                setItems={setItems}
-                maxHeight={300}
-                searchable={true}
-                showTickIcon={true}
-                listMode="FLATLIST"
-                mode="BADGE"
-                placeholder="Select Branch..."
-                disabled={loading}
-                style={styles.dropdown}
-                dropDownContainerStyle={styles.dropdownContainer}
-                listItemContainerStyle={styles.dropdownItem}
-                labelStyle={styles.dropdownLabel}
-                placeholderStyle={styles.dropdownPlaceholder}
-              />
-            )}
-  
+          <View style={styles.uppercontainer}>
+  <Image
+    source={require('../../../../shared/assets/logoo.png')} // ✅ replace with your logo path
+    style={styles.logo}
+    resizeMode="contain"
+  />
+  <AppText style={styles.welcomeText}>
+    Nust Student Portal
+  </AppText>
+</View>
+
             <AppActivityIndicator visible={loading} />
   
             <ScrollView>
          
                 <BranchSummarySection
-                  StudentSummary={Student_Summary}
-                  EmployeeSummary={Employee_Summary}
+                  StudentSummary={Dashboard_Summary?.student?.student_info}
+                  DashboardSummary={Dashboard_Summary?.student?.dashboard}
                   swipeEnabled={carouselSwipeEnabled}
                 />
-                <FinanceSummarySection
-                  financeSummary={Student_Summary?.DashboardFinanceSummary}
-                  payrollSummary={Employee_Summary?.PayrollSummary}
+                  <FinanceSummarySection
+                  DashboardSummary={Dashboard_Summary?.student?.dashboard}
                   swipeEnabled={carouselSwipeEnabled}
                 />
-                <AttendanceSummarySection
-                  StudentSummary={Student_Summary}
-                  EmployeeSummary={Employee_Summary}
+                  <AttendanceSummarySection
+                  DashboardSummary={Dashboard_Summary?.student?.dashboard}
                   swipeEnabled={carouselSwipeEnabled}
-                />
+                /> 
           
             </ScrollView>
           </AppScreen>

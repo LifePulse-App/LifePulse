@@ -23,17 +23,30 @@ export default StyleSheet.create({
     borderColor: "black",
     borderWidth: 0.1
   },
+  footer: {
+    marginTop: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  footerText: {
+    color: "#5a75c2",
+    fontSize: 14,
+    textDecorationLine: "underline",
+  },
+  
   logoContainer: {
     alignItems: 'center',
     marginBottom: 20,
     
   },
   logo: {
-    width: 140,
-    height: 60,
+    marginTop: 11,
+    width: 200,
+    height: 70,
   },
   input: {
     marginBottom: 15,
+    backgroundColor: "white"
   },
   checkboxContainer: {
     flexDirection: 'row',
@@ -47,13 +60,21 @@ export default StyleSheet.create({
     backgroundColor: "#5a75c2",
     margin: 10,
   },
+  buttonn: {
+    marginTop: 15,
+    borderRadius: 8,
+    backgroundColor: "white",
+    borderColor: "#5a75c2",
+    borderWidth: 1.5,
+    margin: 10,
+  },
   loadingOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.4)', // light overlay
+    backgroundColor: 'rgba(255, 255, 255, 0.5)', // light overlay
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 999,

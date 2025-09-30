@@ -1,0 +1,4 @@
+/Users/apple/Documents/My_Projects/QPHS_Portal/android/app/.cxx/RelWithDebInfo/4f4t3q3s/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/foo.dir
+/Users/apple/Documents/My_Projects/QPHS_Portal/android/app/.cxx/RelWithDebInfo/4f4t3q3s/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/boo.dir
+/Users/apple/Documents/My_Projects/QPHS_Portal/android/app/.cxx/RelWithDebInfo/4f4t3q3s/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/edit_cache.dir
+/Users/apple/Documents/My_Projects/QPHS_Portal/android/app/.cxx/RelWithDebInfo/4f4t3q3s/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/rebuild_cache.dir

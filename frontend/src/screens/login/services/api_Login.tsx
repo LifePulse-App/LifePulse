@@ -1,26 +1,29 @@
 import client from '../../../auth/api-client/api_client';
 import {InstituteProfileResponse} from '../../../shared/models/InstituteProfileResponse';
+import { DashboardResponse } from '../../dashboard/models/dashboard/DashboardResponse';
+import { UserLoginResponse } from '../../user/models/UserLoginResponse';
 
 // Login API
-const getLogin = (username: string, password: string) =>
-  client.post<object>('/Identity/UserLogin', {
-    UserName: username,
-    Password: password,
-  });
+const getLogin = async (identifier: string, password: string) => {
+  try {
+    return await client.post<object>('/auth/login', {
+      identifier,
+      password,
+    });
+  } catch (error: any) {
+    if (!error.response) {
+      // No response from server (network error / offline)
+      throw new Error('Server is offline, try again later.');
+    }
+    throw error;
+  }
+};
 
-// GetInstituteProfile API
-const GetInstituteProfile = (
-  instituteId: number,
-  branchId: number,
-  includeDetail: boolean,
-) =>
-  client.get<InstituteProfileResponse>('/Institute/GetInstituteProfile', {
-    instituteId: instituteId,
-    branchId: branchId,
-    includeDetail: includeDetail,
-  });
+// GetProfile API
+const GetProfile = () =>
+  client.get<DashboardResponse>('/me');
 
 export default {
   getLogin,
-  GetInstituteProfile,
+  GetProfile,
 };

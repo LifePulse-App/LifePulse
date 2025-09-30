@@ -1,262 +1,214 @@
-import React, { useContext, useEffect, useState } from 'react';
-import {
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-  View,
-  TouchableWithoutFeedback,
-  Keyboard,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, FlatList, StyleSheet, Platform, TouchableOpacity, Linking } from 'react-native';
 import AppText from '../../../../components/Layout/AppText/AppText';
 import AppScreen from '../../../../components/Layout/AppScreen/AppScreen';
 import AppActivityIndicator from '../../../../components/Layout/AppActivityIndicator/AppActivityIndicator';
-import StudentListItem from '../studentlist-item/StudentListItem';
-import styles from './StudentListstyles';
-import colors from '../../../../shared/styling/colors';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import api_Branch from '../../../../shared/services/shared-api';
-import api_Student from '../../services/api_Student';
-import { StudentListResponse } from '../../models/StudentListResponse';
-import { BranchClassListResponse } from '../../../../shared/models/BranchClassListResponse';
-import { ClassSectionListResponse } from '../../../../shared/models/ClassSectionListResponse';
-import AuthContext from '../../../../auth/user/UserContext';
-import { RoleName } from '../../../../shared/config/enum';
 import MainLayout from '../../../../shared/components/MainLayout';
-import WheelPickerModal from '../../../../shared/components/Wheel';
+import * as Progress from 'react-native-progress';
+import colors from '../../../../shared/styling/colors';
+import { DashboardResponse } from '../../../dashboard/models/dashboard/DashboardResponse';
+import api_Login from '../../../login/services/api_Login';
+import Toast from 'react-native-toast-message';
 
-const StudentList = ({ navigation }: any) => {
-  const [initialStudentList, setinitialStudentList] = useState<StudentListResponse>([]);
-  const [studentList, setStudentList] = useState<StudentListResponse>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [Branchvalue, setBranchValue] = useState('');
-  const [ClassValue, setClassValue] = useState('');
-  const [SectionValue, setSectionValue] = useState('');
-  const [Branchitems, setBranchItems] = useState<any[]>([]);
-  const [Classitems, setClassItems] = useState<any[]>([]);
-  const [Sectionitems, setSectionItems] = useState<any[]>([]);
+const StudentList = () => {
+  const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dataFetched, setdataFetched] = useState(false);
-  const [BranchClass, setBranchClass] = useState<BranchClassListResponse>([]);
-  const [ClassSection, setClassSection] = useState<ClassSectionListResponse>([]);
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [currentPicker, setCurrentPicker] = useState<'branch' | 'class' | 'section' | null>(null);
 
-  // 🔽 Dropdown state to control which item is open
-  const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
-
-  const authContext = useContext(AuthContext);
-
-  const handleSearch = (query: string) => {
-    const filteredStudents = initialStudentList.filter(student =>
-      [student.FirstName, student.FatherName, student.ClassSectionName, student.BranchClassName]
-        .some(field => field.toLowerCase().includes(query.toLowerCase()))
-    );
-    setStudentList(filteredStudents);
-    setSearchQuery(query);
-  };
-
-  const getAll = async () => {
-    if (authContext?.User?.RoleName === RoleName.SchoolAdmin) {
-      const branches = authContext?.BranchList?.map(item => ({
-        label: item.BranchName,
-        value: item.BranchId.toString(),
-      })) || [];
-      setBranchItems(branches);
-    }
-
-    const defaultBranchId = authContext?.User?.InstituteProfile?.DefaultBranchId?.toString() || '';
-    if (!defaultBranchId) return;
-
-    setBranchValue(defaultBranchId);
-
-    const [classes, section] = await Promise.all([
-      api_Branch.getBranchClassList(authContext?.User?.InstituteId || 0, defaultBranchId),
-      api_Branch.getClassSectionList(authContext?.User?.InstituteId || 0, defaultBranchId, 0),
-    ]);
-
-    if (classes.ok && typeof classes.data === 'object') {
-      setBranchClass(classes.data);
-      const classItems = classes.data.map((item: any) => ({
-        label: item.BranchClassName,
-        value: item.BranchClassId.toString(),
-      }));
-      setClassItems(classItems);
-    }
-
-    if (section.ok && typeof section.data === 'object') {
-      setClassSection(section.data);
-    }
-  };
-
-  const getBranchClassList = () => {
-    const data = BranchClass.filter(c => c.BranchId.toString() === Branchvalue)
-      .map(item => ({ label: item.BranchClassName, value: item.BranchClassId.toString() }));
-    setClassItems(data);
-  };
-
-  const getClassSectionList = () => {
-    const data = ClassSection.filter(s => s.BranchClassId.toString() === ClassValue)
-      .map(item => ({ label: item.SectionName, value: item.ClassSectionId.toString() }));
-    setSectionItems(data);
-  };
-
-  const getStudentList = async () => {
+  const fetchClasses = async () => {
     setLoading(true);
-    const BranchID: string = authContext?.User?.RoleName === RoleName.SchoolAdmin
-      ? Branchvalue
-      : authContext?.User?.InstituteProfile.DefaultBranchId.toString() || '';
+    const Dashboard_Response = await api_Login.GetProfile();
+    
 
-    const response = await api_Student.getStudentList(
-      parseInt(BranchID),
-      authContext?.User?.InstituteId || 0,
-      BranchID,
-      '', '', '', '',
-      ClassValue,
-      SectionValue,
-      '',
-      'Active',
-    );
-
-    if (response.ok && typeof response.data === 'object') {
-      setinitialStudentList(response.data);
-      setStudentList(response.data);
-      setdataFetched(true);
+    if (!Dashboard_Response.ok) {
+      setLoading(false);
+      Toast.show({ type: 'error', text1: 'Error Getting Data' });
+      return [];
     }
+    
+    if (
+      typeof Dashboard_Response.data === 'object'
+    ) {
+      const dashboard = Dashboard_Response.data as DashboardResponse;
+      setLoading(false);
+      return dashboard.student.dashboard.classes; // ✅ return classes here
+    }
+
     setLoading(false);
+     return []
+    // {  _id: '67dbc670805df0eb70672a5f',
+    //   course_name: 'Database Systems',
+    //   instructor: 'Aamna Saeed',
+    //   course_code: 'CS-220',
+    //   credits: 4,
+    //   attendance: '100.0%',
+    //   semester: 'Spring 2025',
+    //   href: 'https://qalam.nust.edu.pk/student/course/gradebook/1985684',
+    // },
+    // {
+    //   _id: '67dbc670805df0eb70672a5f',
+    //   course_name: 'skmnsnkj',
+    //   instructor: 'Aamna Saeed',
+    //   course_code: 'CS-220',
+    //   credits: 4,
+    //   attendance: '76.0%',
+    //   semester: 'Spring 2025',
+    //   href: 'https://qalam.nust.edu.pk/student/course/gradebook/1985684',
+    // },
+    // {
+    //   _id: '67dbc670805df0eb70672a5g',
+    //   course_name: 'Object Oriented Programming',
+    //   instructor: 'Muhammad Shahzad',
+    //   course_code: 'CS-212',
+    //   credits: 4,
+    //   attendance: '72.0%',
+    //   semester: 'Spring 2025',
+    //   href: 'https://qalam.nust.edu.pk/student/course/gradebook/1985685',
+    // },];
   };
 
-  useEffect(() => { getAll(); }, []);
-  useEffect(() => { getClassSectionList(); }, [ClassValue]);
-  useEffect(() => { getStudentList(); }, [SectionValue]);
+  useEffect(() => {
+    const load = async () => {
+      const data = await fetchClasses();
+      setClasses(data);
+    };
+    load();
+  }, []);
+  
 
-  const handleSelect = (value: string) => {
-    if (currentPicker === 'branch') {
-      setBranchValue(value);
-      setClassValue('');
-      setSectionValue('');
-      getBranchClassList();
-      getClassSectionList();
-    } else if (currentPicker === 'class') {
-      setClassValue(value);
-      setSectionValue('');
-      getClassSectionList();
-    } else {
-      setSectionValue(value);
-    }
-    setPickerVisible(false);
+  const renderItem = ({ item }: any) => {
+    const percentage = parseFloat(item.attendance.replace('%', '')) / 100;
+
+    return (
+      <View style={styles.card}>
+        {/* Course + Instructor */}
+        <AppText style={styles.title}>{item.course_name}</AppText>
+        <AppText style={styles.subtitle}>{item.instructor}</AppText>
+
+        {/* Details */}
+        <View style={styles.row}>
+          <AppText style={styles.detail}>{item.course_code}</AppText>
+          <AppText style={styles.detail}>{item.semester}</AppText>
+          <AppText style={styles.detail}>Credit Hrs: {item.credits}</AppText>
+        </View>
+
+        {/* Attendance Bar */}
+        <View style={styles.progressRow}>
+          <Progress.Bar
+            progress={percentage}
+            width={200}
+            height={12}
+            borderRadius={8}
+            borderColor="grey"
+            color={
+              percentage >= 0.8
+                ? colors.success
+                : percentage >= 0.73
+                ? colors.warning
+                : colors.danger
+            }
+            unfilledColor="#e0e0e0"
+          />
+          <AppText style={styles.attendanceText}>{item.attendance}</AppText>
+        </View>
+
+        {/* Clickable link */}
+
+      </View>
+    );
   };
-
-  const dismissAll = () => {
-    Keyboard.dismiss();
-    setOpenDropdownId(null);
-  };
-
-  const currentItems =
-    currentPicker === 'branch' ? Branchitems :
-    currentPicker === 'class' ? Classitems :
-    Sectionitems;
 
   return (
     <MainLayout>
       <AppScreen style={styles.container}>
         <AppActivityIndicator visible={loading} />
 
-        <TouchableWithoutFeedback onPress={() => {
-          Keyboard.dismiss();
-          setOpenDropdownId(null); // ✅ Close dropdown on outside click
-        }}>
-          <View style={{ flex: 1 }}>
-            <View style={styles.topBar}>
-              <Icon name="menu" size={30} color={colors.primary} onPress={() => navigation.openDrawer()} />
-            </View>
+        <View style={styles.uppercontainer}>
+          <AppText
+            style={{
+              textAlign: 'start',
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: 18,
+              marginLeft: '0%',
+            }}
+          >
+            Semester Attendance
+          </AppText>
+        </View>
 
-            {/* Row 1: Branch */}
-            <View style={styles.singleDropdownRow}>
-              <TouchableOpacity
-                style={styles.dropdownButtonn}
-                onPress={() => {
-                  setCurrentPicker('branch');
-                  setPickerVisible(true);
-                }}
-              >
-                <AppText style={styles.dropdownText}>
-                  {Branchitems.find(i => i.value === Branchvalue)?.label || 'Select Branch'}
-                </AppText>
-              </TouchableOpacity>
-            </View>
-
-            {/* Row 2: Class & Section */}
-            <View style={styles.dropdownRow}>
-              {(['class', 'section'] as const).map((key) => {
-                const disabled = (key === 'class' && !Branchvalue) || (key === 'section' && !ClassValue);
-                const label = key === 'class'
-                  ? Classitems.find(i => i.value === ClassValue)?.label
-                  : Sectionitems.find(i => i.value === SectionValue)?.label;
-
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    style={[styles.dropdownButton, disabled && styles.disabled]}
-                    disabled={disabled}
-                    onPress={() => {
-                      setCurrentPicker(key);
-                      setPickerVisible(true);
-                    }}
-                  >
-                    <AppText style={styles.dropdownText}>
-                      {label || `Select ${key.charAt(0).toUpperCase() + key.slice(1)}`}
-                    </AppText>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {SectionValue && (
-              <TextInput
-                style={styles.searchInput}
-                placeholder="🔍 Search students..."
-                value={searchQuery}
-                onChangeText={handleSearch}
-              />
-            )}
-
-            {(!loading && dataFetched && studentList.length === 0) ? (
-              <View style={styles.noDataContainer}><AppText>No students found</AppText></View>
-            ) : (
-              <TouchableWithoutFeedback onPress={dismissAll}>
-              <View style={{ flex: 1 }}>
-              <FlatList
-                data={studentList}
-                keyExtractor={s => s.StudentBasicId.toString()}
-                renderItem={({ item }) => (
-                  <StudentListItem
-                    {...item}
-                    navigation={navigation}
-                    openDropdownId={openDropdownId}
-                    setOpenDropdownId={setOpenDropdownId}
-                  />
-                )}
-              />
-              </View>
-        </TouchableWithoutFeedback>
-            )}
-
-            <WheelPickerModal
-              visible={pickerVisible}
-              items={currentItems}
-              selectedValue={
-                currentPicker === 'branch' ? Branchvalue :
-                currentPicker === 'class' ? ClassValue :
-                SectionValue
-              }
-              onSelect={handleSelect}
-              onClose={() => setPickerVisible(false)}
-            />
-          </View>
-        </TouchableWithoutFeedback>
+        {!loading && (
+          <FlatList
+            data={classes}
+            keyExtractor={(item) => item._id}
+            renderItem={renderItem}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          />
+        )}
       </AppScreen>
     </MainLayout>
   );
 };
 
 export default StudentList;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
+  uppercontainer: {
+    backgroundColor: colors.primary,
+    height: 60,
+    marginBottom: 5,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: Platform.OS === 'android' ? 0 : 20,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 15,
+    margin: 7,
+    marginBottom: 5,
+    elevation: 3,
+    borderColor: colors.primary,
+    borderWidth: 1.5,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.medium,
+    marginBottom: 5,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  detail: {
+    fontSize: 12,
+    color: colors.dark,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 0,
+  },
+  attendanceText: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  link: {
+    fontSize: 13,
+    color: colors.primary,
+    marginTop: 5,
+    textDecorationLine: 'underline',
+  },
+});

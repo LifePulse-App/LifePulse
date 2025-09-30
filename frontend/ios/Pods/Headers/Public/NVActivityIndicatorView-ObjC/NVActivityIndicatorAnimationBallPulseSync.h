@@ -1,0 +1,1 @@
+../../../NVActivityIndicatorView-ObjC/NVActivityIndicatorView-ObjC/Classes/Animations/NVActivityIndicatorAnimationBallPulseSync.h

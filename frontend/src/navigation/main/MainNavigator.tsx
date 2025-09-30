@@ -6,6 +6,7 @@ import EmployeeList from '../../screens/employee/components/employee-list/Employ
 import UserList from '../../screens/user/components/UserList/UserList';
 import AnnualItemDetails from '../../screens/student/components/overdues/AnnualItemDetails';
 import Overdues from '../../screens/student/components/overdues/Overdues';
+import UserNavigator from '../user/UserNavigator';
 
 const Stack = createNativeStackNavigator();
 
@@ -14,6 +15,8 @@ const MainNavigator = () => (
     <Stack.Screen name="Dashboard" component={Dashboard} />
     <Stack.Screen name="Student" component={StudentList} />
     <Stack.Screen name="EmployeeList" component={EmployeeList} />
+    <Stack.Screen name="User" component={UserNavigator} />
+
     <Stack.Screen name="UserList" component={UserList} />
     <Stack.Screen name="AnnualItemDetails" component={AnnualItemDetails} />
   </Stack.Navigator>

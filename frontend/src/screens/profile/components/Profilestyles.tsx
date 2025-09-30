@@ -1,10 +1,59 @@
 import { StyleSheet } from 'react-native';
 import colors from '../../../shared/styling/colors';
+import { Platform } from 'react-native';
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.white,
+  },
+  devButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    elevation: 0,
+  },
+  devText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  
+  settingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: 'white',
+    borderRadius: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.primary,
+  },
+  settingText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.black,
+  },
+  
+  logoutButton: {
+    marginTop: 0,
+    flexDirection: 'row',
+    minWidth: "100%",
+    borderColor: colors.primary, // use your theme color, e.g. red
+    borderTopWidth: 2,
+    borderBottomWidth: 2,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignSelf: 'center',
+  },
+  logoutText: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '600',
   },
   card: {
     borderRadius: 16,
@@ -68,7 +117,7 @@ const styles = StyleSheet.create({
   },
   uppercontainer: {
     backgroundColor: colors.primary,
-    height: 80,
+    height: 50,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',

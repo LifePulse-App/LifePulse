@@ -16,7 +16,7 @@ export default {
       },
     
       uppercontainer: {
-        backgroundColor: colors.primary,
+        backgroundColor: "#005691",
         height: 80,
         paddingHorizontal: 16,
         flexDirection: 'row',
@@ -128,13 +128,16 @@ export default {
         fontSize: 16,
         fontWeight: '500',
       },
-      
       logo: {
-        width: 80,
-        height: 80,
-        alignSelf: 'center',
-        marginTop: 50,
-        marginBottom: 50,
+        width: 60,     // adjust as needed
+        height: 60,
+        marginRight: 8,
+      },
+      welcomeText: {
+        textAlign: 'start',
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 18,
       },
     
       lowertext: {
@@ -354,7 +357,7 @@ export default {
         fontFamily: 'System',
       },
       textSubheading: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: 'bold',
         color: '#314299',
         fontFamily: 'System',
@@ -505,7 +508,7 @@ export default {
         fontFamily: 'System',
       },
       branchtextSubheading: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: 'bold',
         color: '#E25141',
         fontFamily: 'System',

@@ -1,5 +1,5 @@
 export default {
-  primary: "#617DC5",
+  primary: "#005691",
   secondary: "#ff4080",
   black: "#000",
   white: "#fff",
@@ -7,6 +7,9 @@ export default {
   light: "#f8f4f4",
   dark: "#0c0c0c",
   danger: "#f44336",
+  success: "#28a745",
+  warning: "#FFFF00",
+  danger: "#E25141",
   green: "#28a745",
   yellow: "#FFFF00",
   red: "#E25141",

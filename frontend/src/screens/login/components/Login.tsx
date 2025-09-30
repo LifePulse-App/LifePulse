@@ -8,13 +8,14 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import styles from './Loginstyles';
 import { Card, TextInput, Button, Checkbox, ActivityIndicator, Text } from 'react-native-paper';
 import AuthContext from '../../../auth/user/UserContext';
 import UserStorage from '../../../auth/user/UserStorage';
 import { UserLoginResponse } from '../../user/models/UserLoginResponse';
-import { setAuthHeaders, setSecretKey } from '../../../auth/api-client/api_client';
+import { setAuthHeaders, setSecretKey} from '../../../auth/api-client/api_client';
 import api_Login from '../services/api_Login';
 import api_InstituteProfile from '../services/api_Login';
 import AppActivityIndicator from '../../../components/Layout/AppActivityIndicator/AppActivityIndicator';
@@ -45,15 +46,17 @@ const Login = ({ navigation }: any) => {
   }, []);
 
   const handleSubmit = async (values: any) => {
+    Keyboard.dismiss();
     setLoading(true);
 
 
     if(values.username === "" || values.password === "") {
       setLoading(false);
-      return Toast.show({ type: 'error', text1: 'Username and Password are required!'});
+      return Toast.show({ type: 'error', text1: 'Identifier and Password are required!'});
     }
 
-    setSecretKey();
+     setSecretKey();
+     
 
     const response = await api_Login.getLogin(values.username, values.password);
 
@@ -63,7 +66,7 @@ const Login = ({ navigation }: any) => {
       setLoading(false);
       console.log(response);
       
-      return Toast.show({ type: 'error', text1: 'Server is Down...'});
+      return Toast.show({ type: 'error', text1: `${response.data?.message}`});
     }
 
     if (
@@ -77,30 +80,31 @@ const Login = ({ navigation }: any) => {
         UserStorage.deleteUser();
         authContext?.setUser(null);
         setLoading(false);
-        return Toast.show({ type: 'error', text1: 'Username or Password is incorrect!'});
+        return Toast.show({ type: 'error', text1: `${response.data?.message}`});
       }
     } else {
       const user = response.data as UserLoginResponse;
+      user.UserName = values.username
       user.Password = values.password;
-      setAuthHeaders(user.Token, user);
+      setAuthHeaders(user.Token);
 
-      const InstituteProfileResponse = await api_InstituteProfile.GetInstituteProfile(
-        user.InstituteId,
-        user.BranchId,
-        true
-      );
+      // const InstituteProfileResponse = await api_InstituteProfile.GetInstituteProfile(
+      //   user.InstituteId,
+      //   user.BranchId,
+      //   true
+      // );
 
-      if (!InstituteProfileResponse.ok) {
-        setLoading(false);
-        return Toast.show({ type: 'error', text1: 'Error Fetching Data!'});
-      }
+      // if (!InstituteProfileResponse.ok) {
+      //   setLoading(false);
+      //   return Toast.show({ type: 'error', text1: 'Error Fetching Data!'});
+      // }
 
-      if (
-        typeof InstituteProfileResponse.data === 'object' &&
-        InstituteProfileResponse.data !== null
-      ) {
-        user.InstituteProfile = InstituteProfileResponse.data;
-      }
+      // if (
+      //   typeof InstituteProfileResponse.data === 'object' &&
+      //   InstituteProfileResponse.data !== null
+      // ) {
+      //   user.InstituteProfile = InstituteProfileResponse.data;
+      // }
 
       authContext?.setUser(user);
       if (check) UserStorage.setUser(user);
@@ -123,7 +127,7 @@ const Login = ({ navigation }: any) => {
           <Card.Content>
             <View style={styles.logoContainer}>
               <Image
-                source={require('../../../shared/assets/logo.png')}
+                source={require('../../../shared/assets/loginn.png')}
                 style={styles.logo}
                 resizeMode="contain"
               />
@@ -147,7 +151,9 @@ const Login = ({ navigation }: any) => {
               secureTextEntry
               style={styles.input}
               mode="outlined"
+              activeOutlineColor='#5a75c2'
               left={<TextInput.Icon icon="lock" />}
+
             />
 
             <View style={styles.checkboxContainer}>

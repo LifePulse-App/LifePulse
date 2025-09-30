@@ -1,17 +1,13 @@
 import {UserListResponse} from '../models/UserListResponse';
 import client from '../../../auth/api-client/api_client';
+import { DashboardSummary } from '../../dashboard/models/dashboard/DashboardResponse';
+import  {ResultSummary} from '../../dashboard/models/dashboard/resultsummaryresponse';
 
 // getUserList API
-const getUserList = (
-  instituteId: number,
-  branchIds: string,
-  userLimit: number,
-) =>
-  client.get<UserListResponse>('/Identity/GetUsers', {
-    instituteId: instituteId,
-    branchIds: branchIds,
-    userLimit: userLimit,
-  });
+// api_Student.ts (or wherever your client calls are)
+const getResult = (courseName: string) =>
+  client.get<ResultSummary>(`/results/${encodeURIComponent(courseName)}`);
+
 
 // getUserChangePassword API
 const getUserChangePassword = (
@@ -54,7 +50,7 @@ const getMainUserChangePassword = (
 };
 
 export default {
-  getUserList,
+  getResult,
   getUserChangePassword,
   updateUserStatus,
   getMainUserChangePassword,

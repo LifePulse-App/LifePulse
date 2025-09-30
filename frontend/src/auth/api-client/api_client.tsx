@@ -8,12 +8,12 @@ import { DateHelperService, MomentDateFormats } from '../../shared/services/Date
 import UserStorage from '../user/UserStorage';
 //import { BASE_URL } from '../../../env';
 
-const jwtValidators = new JwtValidators() 
-    jwtValidators.ApplicationName = HTTP_Headers.ApplicationName;
-    jwtValidators.DomainName = HTTP_Headers.DomainName;
+// const jwtValidators = new JwtValidators() 
+//     jwtValidators.ApplicationName = HTTP_Headers.ApplicationName;
+//     jwtValidators.DomainName = HTTP_Headers.DomainName;
 
 const apiClient = create({
-  baseURL: "https://api.gateway.nafdevtech.net/SchoolApp/api/",
+  baseURL: "http://10.244.226.197:4000/api",
   headers: {
     'Content-Type': 'application/json',
   },
@@ -21,51 +21,50 @@ const apiClient = create({
 
 
 export const setSecretKey = () => {
-  apiClient.setHeader('Internal-Secret-Key', HTTP_Headers.InternalSecretKey);
-  apiClient.setHeader('JV', JSON.stringify(jwtValidators));
+  apiClient.setHeader('api-key', HTTP_Headers['key']);
 };
 
 
 // Function to set bearer token
-export const setAuthHeaders = async (token: string, userFromContext: any) => {
-  let decodedToken: UserTokenProfile = new UserTokenProfile();
-  let currentUser = "";
-  if (token) {
-    decodedToken = jwtDecode<UserTokenProfile>(token);
-    const User = userFromContext
-    //console.log(User);
+export const setAuthHeaders = async (token: string) => {
+  apiClient.setHeader('Authorization', `Bearer ${token}`);
+//   let decodedToken: UserTokenProfile = new UserTokenProfile();
+//   let currentUser = "";
+//   if (token) {
+//     decodedToken = jwtDecode<UserTokenProfile>(token);
+//     const User = userFromContext
+//     //console.log(User);
     
-    if (decodedToken) {
-      if (User?.InstituteProfile) {
-        let startDate = User?.InstituteProfile?.StartDate;
-        let endDate = User?.InstituteProfile?.EndDate;
-        if (startDate && endDate) {
-          decodedToken.SessionStartDate =
-            DateHelperService.getServerDateFormat(
-              startDate,
-              MomentDateFormats.currentDateFormatSlash
-            );
-          decodedToken.SessionEndDate = DateHelperService.getServerDateFormat(
-            endDate,
-            MomentDateFormats.currentDateFormatSlash
-          );
-        }
-        decodedToken.CurrentBranchId = User?.CurrentBranch
-          ?.toString();
-      }
-    } 
-    if (decodedToken) {
-      decodedToken.UserId = User?.Id;
-    }
+//     if (decodedToken) {
+//       if (User?.InstituteProfile) {
+//         let startDate = User?.InstituteProfile?.StartDate;
+//         let endDate = User?.InstituteProfile?.EndDate;
+//         if (startDate && endDate) {
+//           decodedToken.SessionStartDate =
+//             DateHelperService.getServerDateFormat(
+//               startDate,
+//               MomentDateFormats.currentDateFormatSlash
+//             );
+//           decodedToken.SessionEndDate = DateHelperService.getServerDateFormat(
+//             endDate,
+//             MomentDateFormats.currentDateFormatSlash
+//           );
+//         }
+//         decodedToken.CurrentBranchId = User?.CurrentBranch
+//           ?.toString();
+//       }
+//     } 
+//     if (decodedToken) {
+//       decodedToken.UserId = User?.Id;
+//     }
 
-      currentUser = JSON.stringify(decodedToken);
-      //console.log(currentUser);
-      let CurrentBranchId = decodedToken.BranchId?.toString();
-      //console.log(CurrentBranchId)
-    apiClient.setHeader('CurrentUser', `${currentUser}`); 
-    apiClient.setHeader('CurrentBranchId', `${CurrentBranchId}`);
-    apiClient.setHeader('Authorization', `Bearer ${token}`);
-}
+//       currentUser = JSON.stringify(decodedToken);
+//       //console.log(currentUser);
+//       let CurrentBranchId = decodedToken.BranchId?.toString();
+//       //console.log(CurrentBranchId)
+//     apiClient.setHeader('CurrentUser', `${currentUser}`); 
+//     apiClient.setHeader('CurrentBranchId', `${CurrentBranchId}`);
+// }
 };
 
 export default apiClient;

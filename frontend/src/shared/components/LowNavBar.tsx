@@ -12,16 +12,17 @@ const LowNavBAr = () => {
 
   const routes = [
     { key: 'home', title: 'Home', icon: 'home' },
-    { key: 'search', title: 'Search', icon: 'magnify', disabled: true },
-    { key: 'notifications', title: 'Notification', icon: 'bell', disabled: true },
-    { key: 'profile', title: 'Profile', icon: 'account-outline' },
+    { key: 'attendance', title: 'Attendance', icon: 'calendar-multiple-check' },
+    { key: 'results', title: 'Results', icon: 'chart-box-outline' },
+    { key: 'settings', title: 'Settings', icon: 'account-wrench' },
   ];
 
+  // match actual screen names here
   const getIndexFromRoute = () => {
     switch (route.name) {
       case 'Dashboard': return 0;
-      case 'Search': return 1;
-      case 'Notifications': return 2;
+      case 'StudentList': return 1;
+      case 'EmployeeList': return 2;
       case 'Profile': return 3;
       default: return 0;
     }
@@ -34,19 +35,17 @@ const LowNavBAr = () => {
   }, [route.name]);
 
   const handleNavigation = (i: number) => {
-    if (routes[i].disabled) return; // Skip navigation if disabled
-
     switch (routes[i].key) {
       case 'home':
         navigation.navigate('Dashboard');
         break;
-      case 'search':
-        navigation.navigate('Search');
+      case 'attendance':
+        navigation.navigate('Student');
         break;
-      case 'notifications':
-        navigation.navigate('Notifications');
+      case 'results':
+        navigation.navigate('Employee')
         break;
-      case 'profile':
+      case 'settings':
         navigation.navigate('Profile');
         break;
     }
@@ -56,23 +55,20 @@ const LowNavBAr = () => {
     <BottomNavigation
       navigationState={{ index, routes }}
       onIndexChange={handleNavigation}
-      renderScene={() => null}
-      renderIcon={({ route, color }) => {
-        const iconColor = (route as any).disabled ? '#A9A9A9' : color;
-        return (
-          <MaterialCommunityIcons
-            name={route.icon as string}
-            size={20}
-            color={iconColor}
-          />
-        );
-      }}
+      renderScene={() => null} // you're controlling screens via React Navigation
+      renderIcon={({ route, color }) => (
+        <MaterialCommunityIcons
+          name={route.icon as string}
+          size={22}
+          color={color}
+
+        />
+      )}
       barStyle={styles.bottomBar}
-      labeled={true}
-      shifting={false}
-      sceneAnimationEnabled={false}
+      labeled
     />
   );
 };
+
 
 export default LowNavBAr;

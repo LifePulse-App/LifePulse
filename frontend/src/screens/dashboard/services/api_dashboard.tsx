@@ -3,26 +3,26 @@ import { DashboardEmployeeSummaryResponse } from "../models/dashboard/DashboardE
 import { DashboardResponse } from "../models/dashboard/DashboardResponse";
 import { DashboardStudentSummaryResponse } from "../models/dashboard/DashboardStudentSummaryResponse";
 
-const endpoint = '/Dashboard/GetAdminAppDashboardSummary';
+const endpoint = '/me';
 
 const GetDashboardSummary = () => client.get<DashboardResponse>(endpoint);
 
-// getDashboardEmployeeSummary API
-const getDashboardEmployeeSummary = (instituteId: number, branchIds: string) =>
-    client.get<DashboardEmployeeSummaryResponse>(
-      '/Dashboard/GetDashboardEmployeeSummary',
-      {instituteId: instituteId, branchIds: branchIds},
-);
+// // getDashboardEmployeeSummary API
+// const getDashboardEmployeeSummary = (instituteId: number, branchIds: string) =>
+//     client.get<DashboardEmployeeSummaryResponse>(
+//       '/Dashboard/GetDashboardEmployeeSummary',
+//       {instituteId: instituteId, branchIds: branchIds},
+// );
 
-// getDashboardStudentSummary API
-const getDashboardStudentSummary = (instituteId: number, branchIds: string) =>
-    client.get<DashboardStudentSummaryResponse>(
-      '/Student/GetDashboardStudentSummary',
-      {instituteId: instituteId, branchIds: branchIds},
-);
+// // getDashboardStudentSummary API
+// const getDashboardStudentSummary = (instituteId: number, branchIds: string) =>
+//     client.get<DashboardStudentSummaryResponse>(
+//       '/Student/GetDashboardStudentSummary',
+//       {instituteId: instituteId, branchIds: branchIds},
+// );
 
 export default {
     GetDashboardSummary,
-    getDashboardEmployeeSummary,
-    getDashboardStudentSummary,
+    // getDashboardEmployeeSummary,
+    // getDashboardStudentSummary,
 };

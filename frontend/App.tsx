@@ -7,7 +7,7 @@ import AuthNavigator from './src/navigation/main/AuthNavigator';
 import { UserLogin } from './src/screens/user/models/UserLoginResponse';
 import { BranchListResponse } from './src/shared/models/BranchListResponse';
 import Toast, { BaseToast, BaseToastProps } from 'react-native-toast-message';
-import { useColorScheme } from 'react-native';
+import { Alert, useColorScheme } from 'react-native';
 import { DefaultTheme, MD3DarkTheme, PaperProvider } from 'react-native-paper';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import UserInactivity from 'react-native-user-inactivity';
@@ -16,6 +16,9 @@ import UserStorage from './src/auth/user/UserStorage';
 import { jwtDecode } from 'jwt-decode';
 import sharedApi from './src/shared/services/shared-api';
 import apiClient from './src/auth/api-client/api_client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import ReactNativeBiometrics from 'react-native-biometrics';
+
 
 const App = () => {
   const [User, setUser] = useState<UserLogin | undefined>();
@@ -28,8 +31,11 @@ const App = () => {
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const navigationRef = useRef<any>(null);
   const colorScheme = useColorScheme();
+  const [isBiometricVerified, setIsBiometricVerified] = useState(false);
+const [isCheckingBiometric, setIsCheckingBiometric] = useState(true);
+
   const isDarkMode = colorScheme === 'dark';
-  const theme = isDarkMode ? MD3DarkTheme : DefaultTheme;  
+  const theme = isDarkMode ? DefaultTheme : DefaultTheme;  
 
   const handleLogout = async () => {
     await sharedApi.LogoutUser()
@@ -155,59 +161,85 @@ const toastConfig = {
       Toast.hide();
     }
   };
+
+  useEffect(() => {
+    const checkBiometric = async () => {
+      try {
+        const biometricEnabled = await AsyncStorage.getItem('biometricEnabled');
+        const savedUser = await UserStorage.getUser(); // or AsyncStorage.getItem('user')
+        
+        if (biometricEnabled === 'true' && savedUser) {
+          const rnBiometrics = new ReactNativeBiometrics();
+  
+          const { success } = await rnBiometrics.simplePrompt({
+            promptMessage: 'Unlock with Face ID / Fingerprint',
+          });
+  
+          if (success) {
+            setIsBiometricVerified(true);
+          } else {
+            setIsBiometricVerified(false);
+          }
+        } else {
+          // No biometric required
+          setIsBiometricVerified(true);
+        }
+      } catch (e) {
+        console.log('Biometric check failed:', e);
+        setIsBiometricVerified(false); // fallback, don’t block app
+        UserStorage.deleteUser();
+
+        navigationRef.current?.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          })
+        );
+      } finally {
+        setIsCheckingBiometric(false);
+        UserStorage.deleteUser();
+
+        navigationRef.current?.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          })
+        );
+      }
+    };
+  
+    checkBiometric();
+  }, []);
   
 
-  // Run refresh token every 1 minute if user is logged in
-  useEffect(() => {
-    if (User) {
-      refreshIntervalRef.current = setInterval(() => {
-        checkAndRefreshToken();
-      }, 60000); // every 60 seconds
-    }
-
-    return () => {
-      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
-    };
-  }, [User]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
-
+  
   return (
-    <PaperProvider
-      theme={theme}
-      settings={{
-        icon: ({ name, size, color }) => (
-          <MaterialCommunityIcons name={name as string} size={size} color={color} />
-        ),
-      }}
-    >
-      <AuthContext.Provider
-        value={{
-          User,
-          setUser,
-          BranchList,
-          setBranchList,
-          SelectedBranch,
-          setSelectedBranch,
-        }}
-      >
-  <UserInactivity
-    timeForInactivity={5 * 60 * 1000}
-    onAction={(active) => onInactivityChange(!active)}
-  >
-    <NavigationContainer theme={NavigationTheme} ref={navigationRef}>
-      <AuthNavigator />
-    </NavigationContainer>
-  </UserInactivity>
-  <Toast config={toastConfig} position="top" topOffset={0} />
+    <PaperProvider theme={theme} settings={{
+      icon: ({ name, size, color }) => (
+        <MaterialCommunityIcons name={name as string} size={size} color={color} />
+      ),
+    }}>
+      <AuthContext.Provider value={{
+        User, setUser,
+        BranchList, setBranchList,
+        SelectedBranch, setSelectedBranch,
+      }}>
+        <UserInactivity
+          timeForInactivity={2 * 60 * 1000}
+          onAction={(active) => onInactivityChange(!active)}
+        >
+          {isBiometricVerified ? (
+            <NavigationContainer theme={NavigationTheme} ref={navigationRef}>
+              <AuthNavigator />
+            </NavigationContainer>
+          ) : null}
+        </UserInactivity>
+        <Toast config={toastConfig} position="top" topOffset={0} />
       </AuthContext.Provider>
     </PaperProvider>
   );
 };
 
+
 export default App;
+
