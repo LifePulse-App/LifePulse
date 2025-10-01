@@ -35,7 +35,7 @@ const App = () => {
 const [isCheckingBiometric, setIsCheckingBiometric] = useState(true);
 
   const isDarkMode = colorScheme === 'dark';
-  const theme = isDarkMode ? DefaultTheme : DefaultTheme;  
+  const theme = isDarkMode ? MD3DarkTheme : DefaultTheme;  
 
   const handleLogout = async () => {
     await sharedApi.LogoutUser()

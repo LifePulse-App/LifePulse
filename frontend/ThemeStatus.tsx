@@ -8,7 +8,7 @@ const ThemeStatus = () => {
   return (
     <View style={{ padding: 20 }}>
       <Text style={{ color: theme.colors.primary }}>
-        Current Theme: {theme.dark ? 'Light Mode' : 'Light Mode'}
+        Current Theme: {theme.dark ? 'Dark Mode' : 'Light Mode'}
       </Text>
     </View>
   );

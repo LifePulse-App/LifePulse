@@ -12,7 +12,6 @@ const getLogin = async (identifier: string, password: string) => {
     });
   } catch (error: any) {
     if (!error.response) {
-      // No response from server (network error / offline)
       throw new Error('Server is offline, try again later.');
     }
     throw error;

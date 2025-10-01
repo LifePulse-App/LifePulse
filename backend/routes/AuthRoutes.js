@@ -7,6 +7,7 @@ import {
   logout,
   forgotPassword,
   resetPassword,
+  me,
 } from "../controllers/AuthController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 import { verifyEmail } from "../controllers/OtpController.js";
@@ -21,6 +22,6 @@ router.post("/refresh-token", refreshToken);
 router.post("/forgot-password", forgotPassword);
 router.put("/reset-password/:resetToken", resetPassword);
 router.post("/logout", isAuthenticatedUser, logout);
-router.get("/me", isAuthenticatedUser, logout);
+router.get("/me", isAuthenticatedUser, me);
 
 export default router;
