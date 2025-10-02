@@ -2,14 +2,12 @@ import express from "express";
 import {
   register,
   login,
-  ssoLogin,
   refreshToken,
   logout,
   forgotPassword,
   resetPassword,
   me,
   googleLogin,
-  appleLogin,
 } from "../controllers/AuthController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 import { verifyEmail } from "../controllers/OtpController.js";

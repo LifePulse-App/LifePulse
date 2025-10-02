@@ -20,10 +20,10 @@ const getLogin = async (identifier: string, password: string, deviceId: string) 
 };
 
 // Google API
-const googleLogin = async (identityToken: string, deviceId: string) => {
+const googleLogin = async (idToken: string, deviceId: string) => {
   try {
     return await client.post<object>('/auth/sso/google', {
-      identityToken, 
+      idToken, 
       deviceId
     });
   } catch (error: any) {

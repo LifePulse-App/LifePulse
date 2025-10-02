@@ -89,19 +89,21 @@ const Login = ({ navigation }: any) => {
   const handleGoogleLogin = async () => {
     if (googleLoading) return; // prevent duplicate calls
     setGoogleLoading(true);
+    setSecretKey();
     try {
       await GoogleSignin.hasPlayServices();
       const data = await GoogleSignin.signIn();
 
-      if (!data) {
+      if (data?.type !== "success") {
         return Toast.show({ type: 'error', text1: 'Google login failed' });
       }
 
       const deviceId = await DeviceInfo.getUniqueId(); 
-
-      const idToken = data?.idToken
-
+      const idToken = data?.data?.idToken
+      
       const response = await api_Login.googleLogin(idToken, deviceId);
+      console.log(response);
+      
       if (!response.ok) {
         return Toast.show({ type: 'error', text1: 'Google login failed' });
       }
