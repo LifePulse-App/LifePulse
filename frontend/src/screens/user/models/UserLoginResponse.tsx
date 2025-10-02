@@ -1,45 +1,51 @@
-import { InstituteProfileResponse } from "../../../shared/models/InstituteProfileResponse"
+export interface ProviderInfo {
+  provider: "google" | "apple";
+  providerId: string;
+  deviceId?: string;
+}
 
-export type UserLoginResponse = UserLogin
+export interface AvatarInfo {
+  public_id?: string;
+  url?: string;
+}
 
-export interface UserLogin {
-    Id: string
-    FirstName: string
-    LastName: string
-    Email: string
-    UserName: string
-    PhoneNumber: string
-    BranchId: number
-    InstituteId: number
-    CurrentBranch: number
-    Since: string
-    RoleName: string
-    Token: string
-    ImagePath: string
-    InstituteRoleId: number
-    InstituteProfile: InstituteProfileResponse
-    Password: string
-  }
+export interface RefreshTokenInfo {
+  token: string;
+  deviceId?: string;
+  expiresAt: number;
+}
 
-  //export type JwtValidatorsResponse = JwtValidators
-  
-  // export interface JwtValidators {
-  //   ApplicationName: string;
-  //   DomainName: string;
-  // }
+export interface DeviceInfo {
+  deviceName?: string;
+  deviceBrand?: string;
+  deviceModel?: string;
+}
 
-  export class JwtValidators {
-    ApplicationName: string = "";
-    DomainName: string = "";
-  }
+export interface StreakInfo {
+  count: number;
+  lastUpdated?: string;
+}
+export interface user {
+id: string; // Mongo _id
+name: string;
+username?: string;
+email: string;
+phone?: string;
+}
 
-  export class UserTokenProfile {
-    UserId: string = "";
-    UserName: string = "";
-    SessionStartDate: Date | string = "";
-    SessionEndDate: Date | string = "";
-    InstituteId: string = "";
-    BranchId: string = "";
-    CurrentBranchId: string = "";
-  }
-  
+export interface UserLoginResponse {
+  user: user
+  role: string;
+  isVerified: boolean;
+  currentTitle?: string;
+  xp: number;
+  streak: StreakInfo;
+  avatar?: AvatarInfo;
+  providers?: ProviderInfo[];
+  deviceInfo?: DeviceInfo[];
+  refreshTokens?: RefreshTokenInfo[];
+  accessToken: string;   // JWT from backend
+  refreshToken: string;  // JWT from backend
+  createdAt: string;
+  updatedAt: string;
+}

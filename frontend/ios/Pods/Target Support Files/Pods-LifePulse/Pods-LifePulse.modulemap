@@ -1,0 +1,6 @@
+module Pods_LifePulse {
+  umbrella header "Pods-LifePulse-umbrella.h"
+
+  export *
+  module * { export * }
+}

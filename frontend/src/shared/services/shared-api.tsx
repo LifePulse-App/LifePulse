@@ -25,8 +25,17 @@ const getBranchClassList = (instituteId: number, branchIds: string) =>
   const RefreshToken = () =>
     client.get<JWTrequest>('/Identity/RefreshToken');
 
-  const LogoutUser = () =>
-    client.post('/logout');
+  // Logout API
+const LogoutUser = async (userId: string, token: string) => {
+  try {
+    return await client.post<object>('/auth/logout', {
+      userId,
+      token,
+    });
+  } catch (error: any) {
+    throw error;
+  }
+};
 
 // getClassSectionList APIhttps://api.gateway.nafdevtech.net/AdminApp/api/Identity/RefreshToken
 const getClassSectionList = (

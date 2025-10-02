@@ -21,6 +21,9 @@ const rnBiometrics = new ReactNativeBiometrics();
 const ProfileScreen = ({ navigation }: any) => {
   const authContext = useContext(AuthContext);
 
+  const id = authContext?.User?.user?.id
+  const refreshToken = authContext?.User?.refreshToken
+
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -148,7 +151,8 @@ const ProfileScreen = ({ navigation }: any) => {
         onConfirm={async () => {
           try {
             setIsLoggingOut(true); // show loader
-            await sharedApi.LogoutUser();
+            await sharedApi.LogoutUser(id, refreshToken);
+            
             UserStorage.deleteUser();
             setShowLogoutModal(false);
 

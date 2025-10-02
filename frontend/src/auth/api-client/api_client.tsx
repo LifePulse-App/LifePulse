@@ -1,16 +1,6 @@
-import {create} from 'apisauce';
+import { create } from 'apisauce';
 import { HTTP_Headers } from '../../shared/config/enum';
-import { JwtValidators, UserTokenProfile } from '../../screens/user/models/UserLoginResponse';
-import { jwtDecode } from 'jwt-decode';
-import { useContext } from 'react';
-import AuthContext from '../user/UserContext';
-import { DateHelperService, MomentDateFormats } from '../../shared/services/DateHelperService';
 import UserStorage from '../user/UserStorage';
-//import { BASE_URL } from '../../../env';
-
-// const jwtValidators = new JwtValidators() 
-//     jwtValidators.ApplicationName = HTTP_Headers.ApplicationName;
-//     jwtValidators.DomainName = HTTP_Headers.DomainName;
 
 const apiClient = create({
   baseURL: "http://10.244.226.197:4000/api",
@@ -19,52 +9,67 @@ const apiClient = create({
   },
 });
 
-
+// Set API secret key
 export const setSecretKey = () => {
   apiClient.setHeader('api-key', HTTP_Headers['key']);
 };
 
-
-// Function to set bearer token
+// Set bearer token manually if needed
 export const setAuthHeaders = async (token: string) => {
   apiClient.setHeader('Authorization', `Bearer ${token}`);
-//   let decodedToken: UserTokenProfile = new UserTokenProfile();
-//   let currentUser = "";
-//   if (token) {
-//     decodedToken = jwtDecode<UserTokenProfile>(token);
-//     const User = userFromContext
-//     //console.log(User);
-    
-//     if (decodedToken) {
-//       if (User?.InstituteProfile) {
-//         let startDate = User?.InstituteProfile?.StartDate;
-//         let endDate = User?.InstituteProfile?.EndDate;
-//         if (startDate && endDate) {
-//           decodedToken.SessionStartDate =
-//             DateHelperService.getServerDateFormat(
-//               startDate,
-//               MomentDateFormats.currentDateFormatSlash
-//             );
-//           decodedToken.SessionEndDate = DateHelperService.getServerDateFormat(
-//             endDate,
-//             MomentDateFormats.currentDateFormatSlash
-//           );
-//         }
-//         decodedToken.CurrentBranchId = User?.CurrentBranch
-//           ?.toString();
-//       }
-//     } 
-//     if (decodedToken) {
-//       decodedToken.UserId = User?.Id;
-//     }
-
-//       currentUser = JSON.stringify(decodedToken);
-//       //console.log(currentUser);
-//       let CurrentBranchId = decodedToken.BranchId?.toString();
-//       //console.log(CurrentBranchId)
-//     apiClient.setHeader('CurrentUser', `${currentUser}`); 
-//     apiClient.setHeader('CurrentBranchId', `${CurrentBranchId}`);
-// }
 };
+
+// =============================
+// App-wide interceptor for refresh token
+// =============================
+apiClient.axiosInstance.interceptors.request.use(
+  async config => {
+    // Always get latest access token from storage before request
+    const token = await UserStorage.getAccessToken();
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  error => Promise.reject(error)
+);
+
+apiClient.axiosInstance.interceptors.response.use(
+  response => response,
+  async error => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const refreshToken = await UserStorage.getRefreshToken();
+        if (!refreshToken) throw new Error('No refresh token available');
+
+        // Call your refresh token API
+        const refreshResponse = await apiClient.post('/auth/refresh-token', { refreshToken });
+        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = refreshResponse.data;
+
+        // Save new tokens
+        await UserStorage.setAccessToken(newAccessToken);
+        await UserStorage.setRefreshToken(newRefreshToken);
+
+        // Update header for retried request
+        originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+
+        // Retry original request
+        return apiClient.axiosInstance(originalRequest);
+      } catch (refreshError) {
+        console.error('Refresh token failed:', refreshError);
+        await UserStorage.clearTokens();
+        await UserStorage.deleteUser();
+
+      return Promise.reject(refreshError);
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export default apiClient;

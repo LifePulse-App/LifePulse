@@ -104,14 +104,17 @@ const Login = ({ navigation }: any) => {
       const response = await api_Login.googleLogin(idToken, deviceId);
       console.log(response);
       
+      
       if (!response.ok) {
         return Toast.show({ type: 'error', text1: 'Google login failed' });
       }
 
       const user = response.data as UserLoginResponse;
-      setAuthHeaders(user.Token);
+      setAuthHeaders(user.accessToken);
       authContext?.setUser(user);
-      if (check) UserStorage.setUser(user);
+       UserStorage.setAccessToken(user.accessToken);
+       UserStorage.setRefreshToken(user.refreshToken);
+
       navigation.navigate('Drawer');
     } catch (err) {
       console.error(err);
