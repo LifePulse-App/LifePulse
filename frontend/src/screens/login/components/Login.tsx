@@ -23,7 +23,7 @@ import DeviceInfo from 'react-native-device-info';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 GoogleSignin.configure({
-  webClientId: 'GOOGLE_CLIENT_ID=10264792243-p5171mr6h01rlp8k9hubgsd0ve9i6f96.apps.googleusercontent.com', // Google Cloud Console
+  "webClientId": "166800210069-bpl8kgan7qqb0sv3o3onhgue4cr4mj0v.apps.googleusercontent.com", // Google Cloud Console
 });
 
 const Login = ({ navigation }: any) => {
@@ -34,6 +34,8 @@ const Login = ({ navigation }: any) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const authContext = useContext(AuthContext);
+  const [googleLoading, setGoogleLoading] = useState(false);
+
 
   const restoreUser = async () => {
     const data = await UserStorage.getUser();
@@ -85,17 +87,19 @@ const Login = ({ navigation }: any) => {
 
   // ✅ Google Login
   const handleGoogleLogin = async () => {
+    if (googleLoading) return; // prevent duplicate calls
+    setGoogleLoading(true);
     try {
       await GoogleSignin.hasPlayServices();
-      const { data } = await GoogleSignin.signIn();
+      const data = await GoogleSignin.signIn();
 
-      const idToken = data?.idToken
-
-      if (!idToken) {
+      if (!data) {
         return Toast.show({ type: 'error', text1: 'Google login failed' });
       }
 
       const deviceId = await DeviceInfo.getUniqueId(); 
+
+      const idToken = data?.idToken
 
       const response = await api_Login.googleLogin(idToken, deviceId);
       if (!response.ok) {
@@ -110,6 +114,8 @@ const Login = ({ navigation }: any) => {
     } catch (err) {
       console.error(err);
       Toast.show({ type: 'error', text1: 'Google sign-in error' });
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -125,7 +131,7 @@ const Login = ({ navigation }: any) => {
         <Text style={styles.subtitle}>Sign in to continue</Text>
 
         {/* Google Login */}
-        <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
+        <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin} disabled={googleLoading}>
           <Image
             source={{ uri: "https://img.icons8.com/color/48/google-logo.png" }}
             style={{ width: 20, height: 20 }}

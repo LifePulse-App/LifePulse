@@ -19,20 +19,6 @@ const getLogin = async (identifier: string, password: string, deviceId: string) 
   }
 };
 
-// Apple API
-const appleLogin = async (identityToken: string) => {
-  try {
-    return await client.post<object>('/auth/sso/apple', {
-      identityToken
-    });
-  } catch (error: any) {
-    if (!error.response) {
-      throw new Error('Server is offline, try again later.');
-    }
-    throw error;
-  }
-};
-
 // Google API
 const googleLogin = async (identityToken: string, deviceId: string) => {
   try {
@@ -54,7 +40,6 @@ const GetProfile = () =>
 
 export default {
   getLogin,
-  appleLogin,
   googleLogin,
   GetProfile,
 };
