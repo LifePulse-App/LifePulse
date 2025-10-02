@@ -2,7 +2,7 @@ import React from 'react';
 import {ActivityIndicator, View} from 'react-native';
 import styles from './AppActivityIndicatorstyles';
 import AppText from '../AppText/AppText';
-import colors from '../../../shared/styling/colors';
+import colors from '../../../shared/styling/lightModeColors';
 import {
   LoaderKitView,
 } from 'react-native-loader-kit';

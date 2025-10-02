@@ -23,7 +23,7 @@ import api from "../../services/api_dashboard"
 import AuthContext from '../../../../auth/user/UserContext';
 import styles from '../../../../shared/styling/styles';
 import defaultstyles from '../../../../shared/styling/styles';
-import colors from '../../../../shared/styling/colors';
+import colors from '../../../../shared/styling/lightModeColors';
 import { RoleName } from '../../../../shared/config/enum';
 import { DashboardEmployeeSummaryResponse } from '../../models/dashboard/DashboardEmployeeSummaryResponse';
 import { DashboardStudentSummaryResponse } from '../../models/dashboard/DashboardStudentSummaryResponse';

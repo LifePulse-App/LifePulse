@@ -9,7 +9,7 @@ import { DashboardStudentSummaryResponse } from '../../models/dashboard/Dashboar
 import { DashboardEmployeeSummaryResponse } from '../../models/dashboard/DashboardEmployeeSummaryResponse';
 import styles from '../../../../shared/styling/styles';
 import { AnimatedCircularProgress } from 'react-native-circular-progress';
-import colors from '../../../../shared/styling/colors';
+import colors from '../../../../shared/styling/lightModeColors';
 
 const { width } = Dimensions.get('window');
 

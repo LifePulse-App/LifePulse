@@ -11,7 +11,7 @@ import {Card} from '@rneui/base';
 import AppText from '../../components/Layout/AppText/AppText';
 import AuthContext from '../../auth/user/UserContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import colors from '../../shared/styling/colors';
+import colors from '../../shared/styling/lightModeColors';
 import Dashboard from '../dashboard/components/dashboard/Dashboard';
 import StudentNavigator from '../../navigation/student/StudentNavigator';
 import EmployeeNavigator from '../../navigation/employee/EmployeeNavigator';

@@ -10,7 +10,7 @@ import AppActivityIndicator from '../../../../components/Layout/AppActivityIndic
 import {StudentOverduesAdjustmentListResponse} from '../../models/StudentOverduesAdjustmentListResponse';
 import api_Student from '../../services/api_Student';
 import styles from './Adjustmentstyles';
-import colors from '../../../../shared/styling/colors';
+import colors from '../../../../shared/styling/lightModeColors';
 import Toast from 'react-native-toast-message';
 
 const Adjustment = ({navigation, route}: any) => {

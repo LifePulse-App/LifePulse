@@ -1,6 +1,6 @@
 // AdjustmentDetailScreenStyles.ts
 import { StyleSheet, Dimensions, Platform } from 'react-native';
-import colors from '../../../../shared/styling/colors';
+import colors from '../../../../shared/styling/lightModeColors';
 
 const { width } = Dimensions.get('window');
 

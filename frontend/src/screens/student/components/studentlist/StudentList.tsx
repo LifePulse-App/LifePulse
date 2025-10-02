@@ -5,7 +5,7 @@ import AppScreen from '../../../../components/Layout/AppScreen/AppScreen';
 import AppActivityIndicator from '../../../../components/Layout/AppActivityIndicator/AppActivityIndicator';
 import MainLayout from '../../../../shared/components/MainLayout';
 import * as Progress from 'react-native-progress';
-import colors from '../../../../shared/styling/colors';
+import colors from '../../../../shared/styling/lightModeColors';
 import { DashboardResponse } from '../../../dashboard/models/dashboard/DashboardResponse';
 import api_Login from '../../../login/services/api_Login';
 import Toast from 'react-native-toast-message';

@@ -34,6 +34,7 @@ const App = () => {
   const [isBiometricVerified, setIsBiometricVerified] = useState(false);
 const [isCheckingBiometric, setIsCheckingBiometric] = useState(true);
 
+
   const isDarkMode = colorScheme === 'dark';
   const theme = isDarkMode ? MD3DarkTheme : DefaultTheme;  
 

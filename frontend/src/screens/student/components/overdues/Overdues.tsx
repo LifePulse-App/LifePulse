@@ -6,7 +6,7 @@ import AppText from '../../../../components/Layout/AppText/AppText';
 import {Alert, View} from 'react-native';
 
 import {ScrollView} from 'react-native-gesture-handler';
-import colors from '../../../../shared/styling/colors';
+import colors from '../../../../shared/styling/lightModeColors';
 import {StudentOverduesListResponse} from '../../models/StudentOverduesListResponse';
 import api_Student from '../../services/api_Student';
 import {useIsFocused} from '@react-navigation/native';

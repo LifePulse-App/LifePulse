@@ -5,7 +5,7 @@ import AuthContext from '../../../auth/user/UserContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import styles from './Profilestyles';
 import MainLayout from '../../../shared/components/MainLayout';
-import colors from '../../../shared/styling/colors';
+import colors from '../../../shared/styling/lightModeColors';
 import { IMAGE_BASE_URL } from '@env';
 import LogoutConfirmationModal from '../../logout-popup/components/LogoutConfirmationModal';
 import sharedApi from '../../../shared/services/shared-api';

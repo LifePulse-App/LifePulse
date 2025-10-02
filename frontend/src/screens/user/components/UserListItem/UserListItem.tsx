@@ -9,7 +9,7 @@ import React, {useState} from 'react';
 import styles from './UserListItemstyles';
 import AppText from '../../../../components/Layout/AppText/AppText';
 import {Card} from '@rneui/themed';
-import colors from '../../../../shared/styling/colors';
+import colors from '../../../../shared/styling/lightModeColors';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Icon1 from 'react-native-vector-icons/FontAwesome';
 import Icon2 from 'react-native-vector-icons/Ionicons';

@@ -5,7 +5,7 @@ import AppScreen from '../../../../components/Layout/AppScreen/AppScreen';
 import AppText from '../../../../components/Layout/AppText/AppText';
 import {Alert, View} from 'react-native';
 import {ScrollView} from 'react-native-gesture-handler';
-import colors from '../../../../shared/styling/colors';
+import colors from '../../../../shared/styling/lightModeColors';
 import {useIsFocused} from '@react-navigation/native';
 import AuthContext from '../../../../auth/user/UserContext';
 import AppActivityIndicator from '../../../../components/Layout/AppActivityIndicator/AppActivityIndicator';

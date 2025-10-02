@@ -5,7 +5,7 @@ import AppText from '../AppText/AppText';
 import DropDownPicker from 'react-native-dropdown-picker';
 import {Card} from '@rneui/themed';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import colors from '../../../shared/styling/colors';
+import colors from '../../../shared/styling/lightModeColors';
 
 interface AppListItemProp {
   title: string;

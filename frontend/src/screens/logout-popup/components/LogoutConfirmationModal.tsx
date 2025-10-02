@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Text,
 } from 'react-native';
-import colors from '../../../shared/styling/colors';
+import colors from '../../../shared/styling/lightModeColors';
 
 interface LogoutModalProps {
   visible: boolean;

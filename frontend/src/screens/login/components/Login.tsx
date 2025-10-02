@@ -1,29 +1,34 @@
 import React, { useContext, useEffect, useState } from 'react';
-import Toast from "react-native-toast-message"
+import Toast from "react-native-toast-message";
 import {
-  Alert,
-  ImageBackground,
-  StyleSheet,
   View,
   Image,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  TouchableOpacity,
 } from 'react-native';
-import styles from './Loginstyles';
-import { Card, TextInput, Button, Checkbox, ActivityIndicator, Text } from 'react-native-paper';
+import { TextInput, Button, Text } from 'react-native-paper';
 import AuthContext from '../../../auth/user/UserContext';
 import UserStorage from '../../../auth/user/UserStorage';
 import { UserLoginResponse } from '../../user/models/UserLoginResponse';
-import { setAuthHeaders, setSecretKey} from '../../../auth/api-client/api_client';
+import { setAuthHeaders, setSecretKey } from '../../../auth/api-client/api_client';
 import api_Login from '../services/api_Login';
-import api_InstituteProfile from '../services/api_Login';
-import AppActivityIndicator from '../../../components/Layout/AppActivityIndicator/AppActivityIndicator';
 import LoaderKitView from 'react-native-loader-kit';
-import colors from '../../../shared/styling/colors';
 import AppText from '../../../components/Layout/AppText/AppText';
+import { loginStyles } from './Loginstyles';
+import DeviceInfo from 'react-native-device-info';
+
+// ✅ Google Sign-In
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+
+GoogleSignin.configure({
+  webClientId: 'GOOGLE_CLIENT_ID=10264792243-p5171mr6h01rlp8k9hubgsd0ve9i6f96.apps.googleusercontent.com', // Google Cloud Console
+});
 
 const Login = ({ navigation }: any) => {
+  const styles = loginStyles();
+
   const [check, setCheck] = useState(false);
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
@@ -45,150 +50,150 @@ const Login = ({ navigation }: any) => {
     restoreUser();
   }, []);
 
+  // ✅ Email/Password login
   const handleSubmit = async (values: any) => {
     Keyboard.dismiss();
     setLoading(true);
 
-
-    if(values.username === "" || values.password === "") {
+    if (values.username === "" || values.password === "") {
       setLoading(false);
-      return Toast.show({ type: 'error', text1: 'Identifier and Password are required!'});
+      return Toast.show({ type: 'error', text1: 'Email and Password are required!' });
     }
 
-     setSecretKey();
-     
-
-    const response = await api_Login.getLogin(values.username, values.password);
+    setSecretKey();
+    const deviceId = await DeviceInfo.getUniqueId(); 
+    const response = await api_Login.getLogin(values.username, values.password, deviceId);
 
     if (!response.ok) {
       UserStorage.deleteUser();
       authContext?.setUser(null);
       setLoading(false);
-      console.log(response);
-      
-      return Toast.show({ type: 'error', text1: `${response.data?.message}`});
+      return Toast.show({ type: 'error', text1: `${response.data?.message}` });
     }
 
-    if (
-      typeof response.data === 'object' &&
-      response.data !== null &&
-      'Success' in response.data
-    ) {
-      const responseData = response.data as { Message: string; Success: boolean };
+    const user = response.data as UserLoginResponse;
+    user.UserName = values.username;
+    user.Password = values.password;
+    setAuthHeaders(user.Token);
 
-      if (!responseData.Success) {
-        UserStorage.deleteUser();
-        authContext?.setUser(null);
-        setLoading(false);
-        return Toast.show({ type: 'error', text1: `${response.data?.message}`});
-      }
-    } else {
-      const user = response.data as UserLoginResponse;
-      user.UserName = values.username
-      user.Password = values.password;
-      setAuthHeaders(user.Token);
+    authContext?.setUser(user);
+    if (check) UserStorage.setUser(user);
 
-      // const InstituteProfileResponse = await api_InstituteProfile.GetInstituteProfile(
-      //   user.InstituteId,
-      //   user.BranchId,
-      //   true
-      // );
-
-      // if (!InstituteProfileResponse.ok) {
-      //   setLoading(false);
-      //   return Toast.show({ type: 'error', text1: 'Error Fetching Data!'});
-      // }
-
-      // if (
-      //   typeof InstituteProfileResponse.data === 'object' &&
-      //   InstituteProfileResponse.data !== null
-      // ) {
-      //   user.InstituteProfile = InstituteProfileResponse.data;
-      // }
-
-      authContext?.setUser(user);
-      if (check) UserStorage.setUser(user);
-
-      navigation.navigate('Drawer');
-    }
-
+    navigation.navigate('Drawer');
     setLoading(false);
   };
 
+  // ✅ Google Login
+  const handleGoogleLogin = async () => {
+    try {
+      await GoogleSignin.hasPlayServices();
+      const { data } = await GoogleSignin.signIn();
+
+      const idToken = data?.idToken
+
+      if (!idToken) {
+        return Toast.show({ type: 'error', text1: 'Google login failed' });
+      }
+
+      const deviceId = await DeviceInfo.getUniqueId(); 
+
+      const response = await api_Login.googleLogin(idToken, deviceId);
+      if (!response.ok) {
+        return Toast.show({ type: 'error', text1: 'Google login failed' });
+      }
+
+      const user = response.data as UserLoginResponse;
+      setAuthHeaders(user.Token);
+      authContext?.setUser(user);
+      if (check) UserStorage.setUser(user);
+      navigation.navigate('Drawer');
+    } catch (err) {
+      console.error(err);
+      Toast.show({ type: 'error', text1: 'Google sign-in error' });
+    }
+  };
+
+
   return (
-    <ImageBackground
-      source={require('../../../shared/assets/login_bg_white.png')} // replace with your background image path
-      style={styles.background}
-      resizeMode="cover">
+    <View style={styles.container}>
       <KeyboardAvoidingView
-        style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Card style={styles.card}>
-          <Card.Content>
-            <View style={styles.logoContainer}>
-              <Image
-                source={require('../../../shared/assets/loginn.png')}
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </View>
+        style={{ width: "100%", alignItems: "center" }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        {/* Title & Subtitle */}
+        <Text style={styles.title}>Welcome Back</Text>
+        <Text style={styles.subtitle}>Sign in to continue</Text>
 
-            <TextInput
-              label="Username"
-              value={username}
-              onChangeText={setUsername}
-              style={styles.input}
-              mode="outlined"
-              left={<TextInput.Icon icon="account" />}
-              autoCapitalize="none"
-              activeOutlineColor='#5a75c2'
+        {/* Google Login */}
+        <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin}>
+          <Image
+            source={{ uri: "https://img.icons8.com/color/48/google-logo.png" }}
+            style={{ width: 20, height: 20 }}
+          />
+          <Text style={styles.socialText}>Continue with Google</Text>
+        </TouchableOpacity>
+
+        {/* Divider */}
+        <View style={styles.dividerContainer}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* Username */}
+        <TextInput
+          label="Email"
+          value={username}
+          onChangeText={setUsername}
+          style={styles.input}
+          mode="outlined"
+          autoCapitalize="none"
+          activeOutlineColor="#5a75c2"
+        />
+
+        {/* Password */}
+        <TextInput
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          style={styles.input}
+          mode="outlined"
+          activeOutlineColor="#5a75c2"
+        />
+
+        {/* Forgot Password */}
+        <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+
+        {/* Loader or Button */}
+        {loading ? (
+          <View style={styles.loadingOverlay}>
+            <LoaderKitView
+              style={{ width: 60, height: 60 }}
+              name={'BallSpinFadeLoader'}
+              animationSpeedMultiplier={1.0}
+              color={"#5a75c2"}
             />
+            <AppText style={styles.loadingText}>Logging in...</AppText>
+          </View>
+        ) : (
+          <Button
+            onPress={() => handleSubmit({ username, password })}
+            style={styles.button}
+          >
+            <AppText style={styles.buttonText}>Sign in</AppText>
+          </Button>
+        )}
 
-            <TextInput
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              style={styles.input}
-              mode="outlined"
-              activeOutlineColor='#5a75c2'
-              left={<TextInput.Icon icon="lock" />}
-
-            />
-
-            <View style={styles.checkboxContainer}>
-              <Checkbox
-                status={check ? 'checked' : 'unchecked'}
-                onPress={() => setCheck(!check)}
-                color='#5a75c2'
-              />
-              <Text>Remember Me</Text>
-            </View>
-
-            {loading ? (
-             <View style={styles.loadingOverlay}>
-             <LoaderKitView
-         style={{ width: 60, height: 60 }}
-         name={'BallSpinFadeLoader'}
-         animationSpeedMultiplier={1.0} // speed up/slow down animation, default: 1.0, larger is faster
-         color={colors.primary} // Optional: color can be: 'red', 'green',... or '#ddd', '#ffffff',...
-       />
-       <AppText style={styles.loadingText}>Logging in...</AppText>
-           </View>
-) : (
-  <Button
-    onPress={() => handleSubmit({ username, password })}
-    style={styles.button}>
-      <AppText style={{color: "white"}}>
-    Login
-    </AppText>
-  </Button>
-)}
-
-          </Card.Content>
-        </Card>
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>Don’t have an account?</Text>
+          <Text style={styles.footerLink} onPress={() => navigation.navigate("Register")}>
+            Register
+          </Text>
+        </View>
       </KeyboardAvoidingView>
-    </ImageBackground>
+    </View>
   );
 };
 

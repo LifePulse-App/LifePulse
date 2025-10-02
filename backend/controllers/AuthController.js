@@ -5,6 +5,10 @@ import validator from "validator"
 import ErrorHandler from "../utils/errorHandler.js";
 import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import { sendResetPasswordEmail, sendVerificationEmail, verifyEmail } from "./OtpController.js";
+import { OAuth2Client } from "google-auth-library";
+import appleSignin from "apple-signin-auth";
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Helper to send access + refresh tokens
 const sendTokens = async (res, user, deviceId) => {                
@@ -111,21 +115,47 @@ export const me = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
-// SSO Login (Google/Apple)
-export const ssoLogin = catchAsyncErrors(async (req, res, next) => {
+// 🔹 Google Login
+export const googleLogin = catchAsyncErrors(async (req, res, next) => {
   try {
-    const { provider, providerId, email, name, deviceId } = req.body;
+    const { idToken, deviceId } = req.body;
 
-    if (!provider || !providerId || !email) {
-      return next(new ErrorHandler("Missing SSO data", 400));
+    if (!idToken) {
+      return next(new ErrorHandler("Missing Google ID token", 400));
     }
 
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const { sub: providerId, email, name } = payload;
+
+    // Forward to common SSO handler
+    return ssoLoginHandler(req, res, next, {
+      provider: "google",
+      providerId,
+      email,
+      name,
+      deviceId,
+    });
+  } catch (err) {
+    console.error(err);
+    return next(new ErrorHandler("Invalid Google token", 401));
+  }
+});
+
+// 🔹 Common Handler
+const ssoLoginHandler = async (req, res, next, { provider, providerId, email, name, deviceId }) => {
+  try {
     let user = await User.findOne({ email });
 
     if (user) {
       const existingProvider = user.providers.find(
         (p) => p.provider === provider && p.providerId === providerId
-      ); 
+      );
+
       if (!existingProvider) {
         user.providers.push({ provider, providerId, deviceId });
         await user.save({ validateBeforeSave: false });
@@ -139,12 +169,12 @@ export const ssoLogin = catchAsyncErrors(async (req, res, next) => {
     }
 
     const tokens = await sendTokens(res, user, deviceId);
-    res.status(200).json({ success: true, ...tokens });
+    return res.status(200).json({ success: true, ...tokens });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     return next(new ErrorHandler("Server error", 500));
   }
-});
+};
 
 // Refresh Token
 export const refreshToken = catchAsyncErrors(async (req, res, next) => {
