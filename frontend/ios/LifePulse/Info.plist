@@ -49,5 +49,16 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+
+	<!-- ✅ Add this block for Google Sign-In -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.166800210069-hlg4drj85lotn4ql77puddef8r61d44v</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

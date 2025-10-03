@@ -24,7 +24,8 @@ import DeviceInfo from 'react-native-device-info';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 GoogleSignin.configure({
-  "webClientId": "166800210069-pvjp2265cd9cmirvcouru83qcknn6ouk.apps.googleusercontent.com", // Google Cloud Console
+  "webClientId": "166800210069-pvjp2265cd9cmirvcouru83qcknn6ouk.apps.googleusercontent.com",
+  "iosClientId": "166800210069-hlg4drj85lotn4ql77puddef8r61d44v.apps.googleusercontent.com"
 });
 
 const Login = ({ navigation }: any) => {
