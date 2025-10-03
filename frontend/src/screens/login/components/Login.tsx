@@ -7,6 +7,7 @@ import {
   Platform,
   Keyboard,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { TextInput, Button, Text } from 'react-native-paper';
 import AuthContext from '../../../auth/user/UserContext';
@@ -23,7 +24,7 @@ import DeviceInfo from 'react-native-device-info';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
 GoogleSignin.configure({
-  "webClientId": "166800210069-bpl8kgan7qqb0sv3o3onhgue4cr4mj0v.apps.googleusercontent.com", // Google Cloud Console
+  "webClientId": "166800210069-pvjp2265cd9cmirvcouru83qcknn6ouk.apps.googleusercontent.com", // Google Cloud Console
 });
 
 const Login = ({ navigation }: any) => {
@@ -76,7 +77,7 @@ const Login = ({ navigation }: any) => {
     const user = response.data as UserLoginResponse;
     user.UserName = values.username;
     user.Password = values.password;
-    setAuthHeaders(user.Token);
+    setAuthHeaders(user.accessToken);
 
     authContext?.setUser(user);
     if (check) UserStorage.setUser(user);
@@ -91,8 +92,10 @@ const Login = ({ navigation }: any) => {
     setGoogleLoading(true);
     setSecretKey();
     try {
-      await GoogleSignin.hasPlayServices();
+
+      await GoogleSignin.hasPlayServices()
       const data = await GoogleSignin.signIn();
+      
 
       if (data?.type !== "success") {
         return Toast.show({ type: 'error', text1: 'Google login failed' });
@@ -116,8 +119,8 @@ const Login = ({ navigation }: any) => {
        UserStorage.setRefreshToken(user.refreshToken);
 
       navigation.navigate('Drawer');
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      console.log("Google Sign-In Error:", JSON.stringify(err, null, 2));
       Toast.show({ type: 'error', text1: 'Google sign-in error' });
     } finally {
       setGoogleLoading(false);

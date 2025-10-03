@@ -225,16 +225,11 @@ const toastConfig = {
         BranchList, setBranchList,
         SelectedBranch, setSelectedBranch,
       }}>
-        <UserInactivity
-          timeForInactivity={2 * 60 * 1000}
-          onAction={(active) => onInactivityChange(!active)}
-        >
           {isBiometricVerified ? (
             <NavigationContainer theme={NavigationTheme} ref={navigationRef}>
               <AuthNavigator />
             </NavigationContainer>
           ) : null}
-        </UserInactivity>
         <Toast config={toastConfig} position="top" topOffset={0} />
       </AuthContext.Provider>
     </PaperProvider>
