@@ -1,16 +1,12 @@
-current directory: /Users/apple/Documents/My_Projects/QPHS_Portal/QPHS_Portal/vendor/bundle/ruby/2.6.0/gems/nkf-0.2.0/ext/nkf
-/System/Library/Frameworks/Ruby.framework/Versions/2.6/usr/bin/ruby -I /System/Library/Frameworks/Ruby.framework/Versions/2.6/usr/lib/ruby/2.6.0 -r ./siteconf20250630-5231-1n2x9vt.rb extconf.rb
+current directory: /Users/apple/Documents/My_Projects/LifePulse/LifePulse/vendor/bundle/ruby/2.6.0/gems/nkf-0.2.0/ext/nkf
+/System/Library/Frameworks/Ruby.framework/Versions/2.6/usr/bin/ruby -I /System/Library/Frameworks/Ruby.framework/Versions/2.6/usr/lib/ruby/2.6.0 -r ./siteconf20251003-4800-tirkat.rb extconf.rb
 creating Makefile
 
-current directory: /Users/apple/Documents/My_Projects/QPHS_Portal/QPHS_Portal/vendor/bundle/ruby/2.6.0/gems/nkf-0.2.0/ext/nkf
+current directory: /Users/apple/Documents/My_Projects/LifePulse/LifePulse/vendor/bundle/ruby/2.6.0/gems/nkf-0.2.0/ext/nkf
 make "DESTDIR=" clean
 
-current directory: /Users/apple/Documents/My_Projects/QPHS_Portal/QPHS_Portal/vendor/bundle/ruby/2.6.0/gems/nkf-0.2.0/ext/nkf
+current directory: /Users/apple/Documents/My_Projects/LifePulse/LifePulse/vendor/bundle/ruby/2.6.0/gems/nkf-0.2.0/ext/nkf
 make "DESTDIR="
-compiling nkf.c
-linking shared-object nkf.bundle
-ld: warning: search path '/AppleInternal/Library/BuildRoots/1c8f7852-1ca9-11f0-b28b-226177e5bb69/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.5.Internal.sdk/usr/local/lib' not found
+make: *** No rule to make target `/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk/System/Library/Frameworks/Ruby.framework/Versions/2.6/usr/include/ruby-2.6.0/universal-darwin24/ruby/config.h', needed by `nkf.o'.  Stop.
 
-current directory: /Users/apple/Documents/My_Projects/QPHS_Portal/QPHS_Portal/vendor/bundle/ruby/2.6.0/gems/nkf-0.2.0/ext/nkf
-make "DESTDIR=" install
-/usr/bin/install -c -m 0755 nkf.bundle ./.gem.20250630-5231-16sszqg
+make failed, exit code 2

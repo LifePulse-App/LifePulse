@@ -6,7 +6,6 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import styles from './Profilestyles';
 import MainLayout from '../../../shared/components/MainLayout';
 import colors from '../../../shared/styling/lightModeColors';
-import { IMAGE_BASE_URL } from '@env';
 import LogoutConfirmationModal from '../../logout-popup/components/LogoutConfirmationModal';
 import sharedApi from '../../../shared/services/shared-api';
 import UserStorage from '../../../auth/user/UserStorage';
@@ -73,7 +72,7 @@ const ProfileScreen = ({ navigation }: any) => {
   };
 
   const renderAvatar = () => {
-    const baseURL = IMAGE_BASE_URL + authContext?.User?.ImagePath;
+    const baseURL = authContext?.User?.ImagePath;
 
     if (authContext?.User?.ImagePath) {
       return <Image source={{ uri: baseURL }} style={styles.image} />;

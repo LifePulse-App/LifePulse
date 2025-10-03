@@ -22,7 +22,6 @@ import UserStorage from '../../auth/user/UserStorage';
 import styles from './Drawerstyles';
 import LogoutConfirmationModal from '../logout-popup/components/LogoutConfirmationModal';
 import sharedApi from '../../shared/services/shared-api';
-import { IMAGE_BASE_URL } from '@env';
 import { CommonActions } from '@react-navigation/native';
 import { UserLogin } from '../user/models/UserLoginResponse';
 import AppActivityIndicator from '../../components/Layout/AppActivityIndicator/AppActivityIndicator';
@@ -46,7 +45,7 @@ const CustomDrawer = ({navigation}: any) => {
   };  
 
   const renderLogo = () => {
-    const imageURL =  IMAGE_BASE_URL + authContext?.User?.ImagePath;
+    const imageURL =  authContext?.User?.ImagePath;
     const initials = authContext?.User?.FirstName?.charAt(0)?.toUpperCase() || '?';
 
     return authContext?.User?.ImagePath ? (
