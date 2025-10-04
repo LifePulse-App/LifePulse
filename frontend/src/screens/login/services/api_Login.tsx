@@ -36,7 +36,7 @@ const googleLogin = async (idToken: string, deviceId: string) => {
 
 // GetProfile API
 const GetProfile = () =>
-  client.get<DashboardResponse>('/me');
+  client.get<DashboardResponse>('/auth/me');
 
 export default {
   getLogin,
