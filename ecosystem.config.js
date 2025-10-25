@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "LifePulse-prod",
+      name: "StreakSphere-prod",
       script: "./backend/server.js",      // or your entry file
       env: {
         NODE_ENV: "production",
@@ -9,7 +9,7 @@ module.exports = {
       }
     },
     {
-      name: "LifePulse-dev",
+      name: "StreakSphere-dev",
       script: "./backend/server.js",
       env: {
         NODE_ENV: "development",
