@@ -12,7 +12,7 @@ jobs:
       # 0. Kill any lingering Node/PM2 processes that may lock file
       - name: pm2 stopping dev
         shell: powershell
-        run: pm2 stop LifePulse-dev
+        run: pm2 stop StreakSphere-dev
 
       # 1. Checkout repo
       - uses: actions/checkout@v3
@@ -33,4 +33,4 @@ jobs:
       # 4. Deploy backend using PM2
       - name: Deploy backend
         shell: powershell
-        run: .\scripts\deploy.ps1 -env 'development' -appName 'LifePulse-dev'
+        run: .\scripts\deploy.ps1 -env 'development' -appName 'StreakSphere-dev'
