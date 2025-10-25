@@ -1,12 +1,12 @@
 param(
     [string]$env = "production",
-    [string]$appName = "LifePulse"
+    [string]$appName = "StreakSphere"
 )
 
 Write-Host "Deploying $appName in $env using PM2..."
 
 # Path to backend folder
-$backendPath = "C:\Users\Administrator\actions-runner\_work\LifePulse\LifePulse\backend"
+$backendPath = "C:\Users\Administrator\actions-runner\_work\StreakSphere\StreakSphere\backend"
 
 try {
     # Change to backend folder
@@ -19,10 +19,10 @@ try {
     # Determine script file and PM2 process name
     if ($env -eq "development") {
         $scriptFile = "server-dev.js"
-        $appName = "LifePulse-dev"
+        $appName = "StreakSphere-dev"
     } else {
         $scriptFile = "server-prod.js"
-        $appName = "LifePulse-prod"
+        $appName = "StreakSphere-prod"
     }
 
     # Stop only the PM2 process we are about to deploy
