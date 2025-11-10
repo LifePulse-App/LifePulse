@@ -60,14 +60,14 @@ const toastConfig = {
       style={{
         borderLeftColor: 'green',
         backgroundColor: '#e6ffed', // light green background
-        width: 300,
+        width: "100%",
         alignSelf: 'center',
       }}
       contentContainerStyle={{
-        paddingHorizontal: 15,
+        paddingHorizontal: 20,
       }}
       text1Style={{
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '600',
         color: 'green',
       }}
@@ -80,14 +80,14 @@ const toastConfig = {
       style={{
         borderLeftColor: 'red',
         backgroundColor: '#ffeaea', // light red background
-        width: 300,
+        width:  "100%",
         alignSelf: 'center',
       }}
       contentContainerStyle={{
-        paddingHorizontal: 15,
+        paddingHorizontal: 20,
       }}
       text1Style={{
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '600',
         color: 'red',
       }}

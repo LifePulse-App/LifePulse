@@ -4,5 +4,5 @@ export enum RoleName {
 }
 
 export enum HTTP_Headers {
-  key = "LifePulse_Security",
+  key = "StreakSphere_Security",
 }

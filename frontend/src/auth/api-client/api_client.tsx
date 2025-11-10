@@ -2,69 +2,111 @@ import { create } from 'apisauce';
 import { HTTP_Headers } from '../../shared/config/enum';
 import UserStorage from '../user/UserStorage';
 
+let isRefreshing = false;
+let failedQueue: any[] = [];
+
+// Process retry queue
+const processQueue = (error: any, token: string | null = null) => {
+  failedQueue.forEach(prom => {
+    if (error) prom.reject(error);
+    else prom.resolve(token);
+  });
+  failedQueue = [];
+};
+
 const apiClient = create({
-  baseURL: "http://10.244.226.197:4000/api",
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: "http://10.90.19.216:40000/api",
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Set API secret key
+// Set static secret key
 export const setSecretKey = () => {
   apiClient.setHeader('api-key', HTTP_Headers['key']);
 };
 
-// Set bearer token manually if needed
+// Set token manually (optional)
 export const setAuthHeaders = async (token: string) => {
   apiClient.setHeader('Authorization', `Bearer ${token}`);
 };
 
 // =============================
-// App-wide interceptor for refresh token
+// REQUEST INTERCEPTOR
 // =============================
-apiClient.axiosInstance.interceptors.request.use(
-  async config => {
-    // Always get latest access token from storage before request
-    const token = await UserStorage.getAccessToken();
+apiClient.axiosInstance.interceptors.request.use(async config => {
+  const token = await UserStorage.getAccessToken();
+
+  // Don't attach Authorization header for refresh request
+  if (!config.url?.includes('/auth/refresh-token')) {
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
-    return config;
-  },
-  error => Promise.reject(error)
-);
+  }
 
+  return config;
+});
+
+// =============================
+// RESPONSE INTERCEPTOR
+// =============================
 apiClient.axiosInstance.interceptors.response.use(
   response => response,
   async error => {
+
     const originalRequest = error.config;
 
+    // If token expired (401)
     if (error.response?.status === 401 && !originalRequest._retry) {
+
+      // Avoid retry loop
+      if (originalRequest.url.includes('/auth/refresh-token')) {
+        await UserStorage.clearTokens();
+        await UserStorage.deleteUser();
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        return new Promise(function(resolve, reject) {
+          failedQueue.push({ resolve, reject });
+        })
+          .then(token => {
+            originalRequest.headers['Authorization'] = 'Bearer ' + token;
+            return apiClient.axiosInstance(originalRequest);
+          })
+          .catch(err => Promise.reject(err));
+      }
+
       originalRequest._retry = true;
+      isRefreshing = true;
 
       try {
         const refreshToken = await UserStorage.getRefreshToken();
-        if (!refreshToken) throw new Error('No refresh token available');
+        if (!refreshToken) throw new Error('No refresh token');
 
-        // Call your refresh token API
-        const refreshResponse = await apiClient.post('/auth/refresh-token', { refreshToken });
-        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = refreshResponse.data;
+        // CALL REFRESH WITHOUT AUTH HEADER
+        const refreshResponse = await apiClient.post('/auth/refresh-token', {
+          refreshToken,
+        });
 
-        // Save new tokens
-        await UserStorage.setAccessToken(newAccessToken);
+        const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data;
+
+        await UserStorage.setAccessToken(accessToken);
         await UserStorage.setRefreshToken(newRefreshToken);
 
-        // Update header for retried request
-        originalRequest.headers['Authorization'] = `Bearer ${newAccessToken}`;
+        processQueue(null, accessToken);
+        isRefreshing = false;
 
         // Retry original request
+        originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
         return apiClient.axiosInstance(originalRequest);
+
       } catch (refreshError) {
-        console.error('Refresh token failed:', refreshError);
+        processQueue(refreshError, null);
+        isRefreshing = false;
+
         await UserStorage.clearTokens();
         await UserStorage.deleteUser();
 
-      return Promise.reject(refreshError);
+        return Promise.reject(refreshError);
       }
     }
 

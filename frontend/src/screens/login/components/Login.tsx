@@ -66,6 +66,7 @@ const Login = ({ navigation }: any) => {
 
     setSecretKey();
     const deviceId = await DeviceInfo.getUniqueId(); 
+    
     const response = await api_Login.getLogin(values.username, values.password, deviceId);
 
     if (!response.ok) {
@@ -143,7 +144,7 @@ const Login = ({ navigation }: any) => {
         <TouchableOpacity style={styles.socialButton} onPress={handleGoogleLogin} disabled={googleLoading}>
           <Image
             source={{ uri: "https://img.icons8.com/color/48/google-logo.png" }}
-            style={{ width: 20, height: 20 }}
+            style={{ width: 25, height: 25 }}
           />
           <Text style={styles.socialText}>Continue with Google</Text>
         </TouchableOpacity>
@@ -184,7 +185,7 @@ const Login = ({ navigation }: any) => {
         {loading ? (
           <View style={styles.loadingOverlay}>
             <LoaderKitView
-              style={{ width: 60, height: 60 }}
+              style={{ width: 50, height: 50 }}
               name={'BallSpinFadeLoader'}
               animationSpeedMultiplier={1.0}
               color={"#5a75c2"}

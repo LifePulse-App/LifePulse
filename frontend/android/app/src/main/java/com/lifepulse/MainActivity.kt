@@ -1,4 +1,4 @@
-package com.lifepulse
+package com.streaksphere
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

@@ -1,5 +1,6 @@
-import { StyleSheet, useColorScheme } from 'react-native';
+import { Dimensions, StyleSheet, useColorScheme } from 'react-native';
 import colors from '../../../shared/styling/colors';
+const { width } = Dimensions.get("window");
 
 export const loginStyles = () => {
   const scheme = useColorScheme();
@@ -65,7 +66,7 @@ export const loginStyles = () => {
     forgotPasswordText: {
       color: '#5a75c2',   // same color you used for checkbox tick
       fontSize: 14,
-      marginLeft: "50%",
+      marginLeft: "69%",
       marginBottom: 5
     },
     dividerContainer: {
@@ -82,7 +83,7 @@ export const loginStyles = () => {
     dividerText: {
       marginHorizontal: 10,
       color: "#6B7280",
-      fontSize: 14,
+      fontSize: 16,
     },
     input: {
       width: "100%",

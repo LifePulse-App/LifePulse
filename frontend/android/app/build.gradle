@@ -78,9 +78,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.lifepulse"
+    namespace "com.streaksphere"
     defaultConfig {
-        applicationId "com.lifepulse"
+        applicationId "com.streaksphere"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
