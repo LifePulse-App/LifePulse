@@ -5,7 +5,6 @@ import {
   refreshToken,
   logout,
   forgotPassword,
-  resetPassword,
   me,
   googleLogin,
   resendVerificationOtp,
