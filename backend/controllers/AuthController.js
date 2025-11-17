@@ -308,58 +308,125 @@ export const logout = catchAsyncErrors(async (req, res, next) => {
 });
 
 
-// Forgot Password
+// Forgot Password (code-based)
 export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
   try {
-    const { email } = req.body;
+    const { identifier } = req.body;
+    if (!identifier) {
+      return next(new ErrorHandler("Please provide email or username", 400));
+    }
 
-    if (!email) return next(new ErrorHandler("Enter email", 401));
+    // Find user by email OR username
+    const user = await User.findOne({
+      $or: [{ email: identifier }, { username: identifier }],
+    });
 
-    const user = await User.findOne({ email });
-    if (!user) return next(new ErrorHandler("User not found", 404));
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
 
-    const resetToken = user.getResetPasswordToken();
+    // Generate verification code
+    const resetCode = user.generateResetCode();
     await user.save({ validateBeforeSave: false });
 
-    const resetUrl = `${req.protocol}://${req.get("host")}/api/auth/reset-password/${resetToken}`;
+    // Send email with code
+    await sendResetPasswordEmail(user.email, resetCode);
 
-    await sendResetPasswordEmail(user.email, resetUrl);
+    // OPTIONAL: send WhatsApp message as well
+    // await sendWhatsAppResetCode(user.phoneNumber, resetCode);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: `Reset token sent to ${user.email}`,
+      message: `Verification code sent to ${user.email}`,
     });
   } catch (err) {
-    console.log(err);
+    console.error(err);
     return next(new ErrorHandler("Server error", 500));
   }
 });
 
-
-// Reset Password
-export const resetPassword = catchAsyncErrors(async (req, res, next) => {
+export const resetPasswordVerifyOtp = catchAsyncErrors(async (req, res, next) => {
   try {
-    const resetPasswordToken = crypto
-      .createHash("sha256")
-      .update(req.params.resetToken)
-      .digest("hex");
+    const { emailOrUsername, code } = req.body;
+
+    if (!emailOrUsername || !code) {
+      return next(new ErrorHandler("Email/username and code are required", 400));
+    }
 
     const user = await User.findOne({
-      resetPasswordToken,
-      resetPasswordExpire: { $gt: Date.now() },
+      $or: [{ email: emailOrUsername }, { username: emailOrUsername }],
+    }).select("+resetPasswordCode +resetPasswordCodeExpire");
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    const hashedCode = crypto.createHash("sha256").update(code).digest("hex");
+
+    const isCodeValid =
+      user.resetPasswordCode &&
+      user.resetPasswordCode === hashedCode &&
+      user.resetPasswordCodeExpire &&
+      user.resetPasswordCodeExpire > Date.now();
+
+    if (!isCodeValid) {
+      return next(new ErrorHandler("Invalid or expired code", 400));
+    }
+
+    // Mark as verified for reset (one-time)
+    user.resetPasswordVerified = true;
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(200).json({
+      success: true,
+      message: "Code verified. You can now reset your password.",
     });
+  } catch (err) {
+    console.error(err);
+    return next(new ErrorHandler("Server error", 500));
+  }
+});
 
-    if (!user) return next(new ErrorHandler("Invalid or expired token", 400));
+export const resetPasswordSetNew = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const { emailOrUsername, newPassword } = req.body;
 
-    user.password = req.body.password;
-    if(!req.body.password) return next(new ErrorHandler("Enter Password", 401));
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-    user.refreshTokens = [];
+    if (!emailOrUsername || !newPassword) {
+      return next(new ErrorHandler("Email/username and new password are required", 400));
+    }
+
+    const user = await User.findOne({
+      $or: [{ email: emailOrUsername }, { username: emailOrUsername }],
+    }).select("+password +resetPasswordCode +resetPasswordCodeExpire +resetPasswordVerified");
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    // Ensure OTP was verified and not expired
+    const isStillValid =
+      user.resetPasswordCode &&
+      user.resetPasswordCodeExpire &&
+      user.resetPasswordCodeExpire > Date.now();
+
+    if (!user.resetPasswordVerified || !isStillValid) {
+      return next(new ErrorHandler("You must verify the code again", 400));
+    }
+
+    // Set new password
+    user.password = newPassword;
+    user.resetPasswordCode = undefined;
+    user.resetPasswordCodeExpire = undefined;
+    user.resetPasswordVerified = false; // reset flag
+
     await user.save();
 
-    res.status(200).json({ success: true, message: "Password reset successful" });
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successfully",
+    });
   } catch (err) {
+    console.error(err);
     return next(new ErrorHandler("Server error", 500));
   }
 });

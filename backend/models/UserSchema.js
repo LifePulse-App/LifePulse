@@ -78,6 +78,11 @@ const userSchema = new mongoose.Schema(
     otpResendResetAt: {
       type: Date,
     },
+    // in User schema
+resetPasswordVerified: {
+  type: Boolean,
+  default: false,
+},
     refreshTokens: [
       {
         token: { type: String, required: true },
@@ -97,8 +102,9 @@ const userSchema = new mongoose.Schema(
         deviceId: { type: String },
       },
     ],
-    resetPasswordToken: String,
-    resetPasswordExpire: Date,
+// In your User schema
+resetPasswordCode: String,
+resetPasswordCodeExpire: Date,
   },
   
   { timestamps: true }
@@ -141,18 +147,15 @@ userSchema.methods.getRefreshToken = function (deviceId) {
   };
   
 
-// 🔑 Password reset token
-userSchema.methods.getResetPasswordToken = function () {
-  const resetToken = crypto.randomBytes(20).toString("hex");
+// 🔑 Password reset code
+userSchema.methods.generateResetCode = function () {
+  const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
+  const hashedCode = crypto.createHash("sha256").update(code).digest("hex");
 
-  this.resetPasswordToken = crypto
-    .createHash("sha256")
-    .update(resetToken)
-    .digest("hex");
+  this.resetPasswordCode = hashedCode;
+  this.resetPasswordCodeExpire = Date.now() + 2 * 60 * 1000; // 15 minutes
 
-  this.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
-
-  return resetToken;
+  return code; // send this to user
 };
 
 // 🔑 Compare hashed password
@@ -172,7 +175,7 @@ userSchema.methods.generateVerificationCode = function () {
     .update(otp)
     .digest("hex");
 
-  this.verificationCodeExpire = Date.now() + 5 * 60 * 1000; 
+  this.verificationCodeExpire = Date.now() + 2 * 60 * 1000; 
 
   return otp; // return plain OTP so we can email it
 };

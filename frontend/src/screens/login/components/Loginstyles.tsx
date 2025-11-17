@@ -151,6 +151,8 @@ export const loginStyles = () => {
       color: '#E5E7EB',
       fontSize: 14,
       fontWeight: '500',
+      borderWidth: 1,
+      borderColor: 'white',
     },
 
     loadingOverlay: {

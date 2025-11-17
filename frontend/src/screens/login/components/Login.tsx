@@ -256,8 +256,19 @@ const Login = ({ navigation }: any) => {
                 <AppText style={styles.primaryButtonText}>Continue</AppText>
               </TouchableOpacity>
             )}
+            <View style={{ marginTop: 0, alignItems: 'center' }}>
+  <Text style={{ color: '#000' }}>
+    Want to reset password?{' '}
+    <Text
+      style={{ fontWeight: '700', textDecorationLine: 'underline', color: '#fff' }}
+      onPress={() => navigation.navigate('ForgotPass')}
+    >
+      Forget Password
+    </Text>
+  </Text>
+</View>
 
-<View style={{ marginTop: 12, alignItems: 'center' }}>
+<View style={{ marginTop: 5, alignItems: 'center' }}>
   <Text style={{ color: '#000' }}>
     Don’t have an account?{' '}
     <Text

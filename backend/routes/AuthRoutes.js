@@ -9,6 +9,8 @@ import {
   me,
   googleLogin,
   resendVerificationOtp,
+  resetPasswordVerifyOtp,
+  resetPasswordSetNew,
 } from "../controllers/AuthController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 import { verifyEmail } from "../controllers/OtpController.js";
@@ -22,7 +24,8 @@ router.post("/login", login);
 router.post("/sso/google", googleLogin);
 router.post("/refresh-token", refreshToken);
 router.post("/forgot-password", forgotPassword);
-router.put("/reset-password/:resetToken", resetPassword);
+router.post("/reset-password/verify-otp", resetPasswordVerifyOtp);
+router.post("/reset-password/verified-otp", resetPasswordSetNew);
 router.post("/logout", isAuthenticatedUser, logout);
 router.get("/me", isAuthenticatedUser, me);
 

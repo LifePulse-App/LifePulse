@@ -67,6 +67,50 @@ const resendOtp = async (email: string) => {
   }
 };
 
+// Verify OTP API
+const forgotPass = async (identifier: string) => {
+  try {
+    return await client.post<object>('/auth/forgot-password', {
+      identifier
+    });
+  } catch (error: any) {
+    if (!error.response) {
+      throw new Error('Server is offline, try again later.');
+    }
+    throw error;
+  }
+};
+
+// Verify ResetPassOTP API
+const verifyResetPassOtp = async (email: string, otp: number) => {
+  try {
+    return await client.post<object>('/reset-password/verify-otp', {
+      email,
+      otp
+    });
+  } catch (error: any) {
+    if (!error.response) {
+      throw new Error('Server is offline, try again later.');
+    }
+    throw error;
+  }
+};
+
+// Verify ResetPassOTP API
+const resetPassword = async (email: string, password: string) => {
+  try {
+    return await client.post<object>('/reset-password/verified-otp', {
+      email,
+      password
+    });
+  } catch (error: any) {
+    if (!error.response) {
+      throw new Error('Server is offline, try again later.');
+    }
+    throw error;
+  }
+};
+
 // Google API
 const googleLogin = async (idToken: string, deviceId: string) => {
   try {
@@ -91,6 +135,9 @@ export default {
   getRegister,
   verifyOtp,
   resendOtp,
+  verifyResetPassOtp,
   googleLogin,
   GetProfile,
+  resetPassword,
+  forgotPass
 };
