@@ -212,7 +212,7 @@ export const loginStyles = () => {
       color: '#000',
       textAlign: 'center',
       lineHeight: 17,
-      marginTop: 4,
+      marginTop: 10,
     },
   });
 };

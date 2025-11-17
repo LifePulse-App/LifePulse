@@ -211,7 +211,7 @@ const Login = ({ navigation }: any) => {
 
             {/* Identifier */}
             <TextInput
-              label="Username, Email or Phone No."
+              label="Username or Email"
               value={username}
               onChangeText={setUsername}
               style={styles.input}
