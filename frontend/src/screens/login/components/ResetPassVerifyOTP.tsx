@@ -186,7 +186,7 @@ const ResetPassVerifyOTP = ({ navigation, route }: any) => {
             <View style={styles.glassContent}>
               <Text style={styles.mainTitle}>Verify OTP</Text>
               <Text style={styles.mainSubtitle}>
-                Enter the 6-digit code we emailed you to: {email}
+                Enter the 6-digit code we emailed you to your email
               </Text>
 
               <TextInput

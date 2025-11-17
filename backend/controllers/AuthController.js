@@ -406,8 +406,7 @@ export const resetPasswordSetNew = catchAsyncErrors(async (req, res, next) => {
     // Ensure OTP was verified and not expired
     const isStillValid =
       user.resetPasswordCode &&
-      user.resetPasswordCodeExpire &&
-      user.resetPasswordCodeExpire > Date.now();
+      user.resetPasswordCodeExpire
 
     if (!user.resetPasswordVerified || !isStillValid) {
       return next(new ErrorHandler("You must verify the code again", 400));
