@@ -354,7 +354,7 @@ export const resetPasswordVerifyOtp = catchAsyncErrors(async (req, res, next) =>
     }
 
     const user = await User.findOne({
-      $or: [{ email: email }],
+      $or: [{ email: email }, { username: email }],
     }).select("+resetPasswordCode +resetPasswordCodeExpire");
 
     if (!user) {

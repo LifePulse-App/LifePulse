@@ -82,11 +82,11 @@ const forgotPass = async (identifier: string) => {
 };
 
 // Verify ResetPassOTP API
-const verifyResetPassOtp = async (email: string, otp: number) => {
+const verifyResetPassOtp = async (email: string, code: number) => {
   try {
     return await client.post<object>('/auth/reset-password/verify-otp', {
       email,
-      otp
+      code
     });
   } catch (error: any) {
     if (!error.response) {
@@ -97,11 +97,11 @@ const verifyResetPassOtp = async (email: string, otp: number) => {
 };
 
 // Verify ResetPassOTP API
-const resetPassword = async (email: string, password: string) => {
+const resetPassword = async (emailOrUsername: string, newPassword: string) => {
   try {
     return await client.post<object>('/auth/reset-password/verified-otp', {
-      email,
-      password
+      emailOrUsername,
+      newPassword
     });
   } catch (error: any) {
     if (!error.response) {

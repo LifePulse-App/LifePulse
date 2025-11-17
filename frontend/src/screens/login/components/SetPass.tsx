@@ -169,7 +169,8 @@ if (!passwordRegex.test(newPassword)) {
 
       if (!response.ok) {
         setLoading(false);
-        showError(response.data?.message || 'OTP verification failed');
+        navigation.navigate('ForgotPass')
+        showError(response.data?.message || 'Process Failed');
         return;
       }
 

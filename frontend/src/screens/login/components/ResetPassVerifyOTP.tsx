@@ -224,7 +224,7 @@ const ResetPassVerifyOTP = ({ navigation, route }: any) => {
 
               <Text style={styles.termsText} numberOfLines={2}>
                 Didn’t receive the code? Check your spam folder or wait a few
-                moments before requesting again.
+                moments.
               </Text>
             </View>
           </View>
