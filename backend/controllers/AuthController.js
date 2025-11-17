@@ -33,8 +33,8 @@ export const register = catchAsyncErrors(async (req, res, next) => {
   try {
     const { name, email, password, username, phone } = req.body;
 
-    if (!name || !email || !password) {
-      return next(new ErrorHandler("Name, Username and Password is Required", 400));
+    if (!name || !username || !email || !password) {
+      return next(new ErrorHandler("Name, Username, Email and Password is Required", 400));
     }
 
     if (!validator.isEmail(email)) {
@@ -69,9 +69,78 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     });
   } catch (err) {
     console.log(err);
-    return next(new ErrorHandler("Server error", 500));
+    return next(new ErrorHandler(err, 500));
   }
 });
+
+
+export const resendVerificationOtp = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return next(new ErrorHandler("Email is required", 400));
+    }
+
+    if (!validator.isEmail(email)) {
+      return next(new ErrorHandler("Invalid email format", 400));
+    }
+
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    if (user.isVerified) {
+      return next(new ErrorHandler("User already verified", 400));
+    }
+
+    const now = new Date();
+
+    // If no window is set or window has passed → reset window
+    if (!user.otpResendResetAt || user.otpResendResetAt <= now) {
+      user.otpResendCount = 0;
+      // New window: 1 hour from now
+      user.otpResendResetAt = new Date(now.getTime() + 60 * 60 * 1000);
+    }
+
+    // Check if user already hit the limit (3 per hour)
+    if (user.otpResendCount >= 3) {
+      const waitMs = user.otpResendResetAt.getTime() - now.getTime();
+      const waitMinutes = Math.ceil(waitMs / (60 * 1000)); // round up
+
+      return next(
+        new ErrorHandler(
+          `OTP resend limit reached. Try again in ${waitMinutes} minute(s).`,
+          429 // Too Many Requests
+        )
+      );
+    }
+
+    // Generate new OTP
+    const otp = user.generateVerificationCode();
+
+    // Increment counter
+    user.otpResendCount += 1;
+
+    // Send OTP email
+    await sendVerificationEmail(user.email, otp);
+
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({
+      success: true,
+      message: "Verification code resent to email.",
+      remainingRequests: 3 - user.otpResendCount,
+      resetAt: user.otpResendResetAt,
+    });
+  } catch (err) {
+    console.log(err);
+    return next(new ErrorHandler(err.message || "Internal Server Error", 500));
+  }
+});
+
 
 
 

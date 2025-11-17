@@ -1,124 +1,216 @@
 import { Dimensions, StyleSheet, useColorScheme } from 'react-native';
 import colors from '../../../shared/styling/colors';
-const { width } = Dimensions.get("window");
+
+const { width, height } = Dimensions.get('window');
 
 export const loginStyles = () => {
   const scheme = useColorScheme();
-  const isDark = scheme === "dark";
+  const isDark = scheme === 'dark';
 
   return StyleSheet.create({
     container: {
       flex: 1,
-      justifyContent: "center",
-      alignItems: "center",
-      backgroundColor: isDark ? colors.black : "#F9FAFB", // very light gray background
+      backgroundColor: '#000000',
+      overflow: 'hidden',
+    },
+
+    // Glassy, colorful background blobs
+    gradientLayer1: {
+      position: 'absolute',
+      width: width * 1.8,
+      height: width * 1.8,
+      borderRadius: width * 0.8,
+      backgroundColor: '#34d399',
+      opacity: 0.7,
+      top: -width * 0.6,
+      left: -width * 0.3,
+    },
+    gradientLayer2: {
+      position: 'absolute',
+      width: width * 1.6,
+      height: width * 1.6,
+      borderRadius: width * 0.8,
+      backgroundColor: '#facc15',
+      opacity: 0.5,
+      top: height * 0.15,
+      right: -width * 0.5,
+    },
+    gradientLayer3: {
+      position: 'absolute',
+      width: width * 1.8,
+      height: width * 1.8,
+      borderRadius: width * 0.9,
+      backgroundColor: '#a855f7',
+      opacity: 0.55,
+      bottom: -width * 0.6,
+      left: -width * 0.4,
+    },
+
+    kbWrapper: {
+      flex: 1,
+      paddingHorizontal: 24,
+      paddingBottom: 32,
+    },
+
+    // App name at top, like screenshot
+    appNameWrapper: {
+      flex: 1.2,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    appName: {
+      fontSize: 32,
+      fontWeight: '700',
+      color: '#A8FFF8',
+    },
+
+    // Glass card near bottom
+    glassWrapper: {
+      flex: 3,
+      justifyContent: 'flex-start',
+      alignItems: 'center',
+      paddingBottom: 16,
+    },
+    glassBlur: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: 24,
+    },
+    glassContent: {
+      width: '100%',
+      borderRadius: 24,
       paddingHorizontal: 20,
+      paddingTop: 24,
+      paddingBottom: 28,
+      backgroundColor: 'rgba(255,255,255,0.25)',
+      borderWidth: 1.5,
+      borderColor: 'rgba(255,255,255,0.35)',
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOpacity: 0.25,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 10 },
     },
-    title: {
-      fontSize: 24,
-      fontWeight: "700",
-      color: isDark ? colors.white : "#111827", // dark text
-      marginBottom: 4,
-      textAlign: "center",
+
+    mainTitle: {
+      fontSize: 22,
+      fontWeight: '700',
+      color: '#000',
+      textAlign: 'center',
+      marginBottom: 8,
     },
-    subtitle: {
-      fontSize: 16,
-      color: isDark ? "#9CA3AF" : "#6B7280", // subtle gray
-      marginBottom: 24,
-      textAlign: "center",
+    mainSubtitle: {
+      fontSize: 15,
+      color: '#000',
+      textAlign: 'center',
+      marginBottom: 10,
     },
-    socialButton: {
-      width: "100%",
-      height: 50,
+
+    input: {
+      width: '100%',
+      height: 52,
+      borderTopStartRadius: 12,
+      borderTopEndRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.9)',
+      paddingHorizontal: 12,
+      marginBottom: 10,
+    },
+    passwordInput: {
+      width: '100%',
+      height: 48,
       borderRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.85)',
+      paddingHorizontal: 12,
+      marginBottom: 14,
+    },
+
+    primaryButton: {
+      width: '100%',
+      height: 52,
+      borderRadius: 12,
+      backgroundColor: '#000000',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 4,
+      marginBottom: 10,
+    },
+    primaryButtonText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+
+    secondaryButton: {
+      marginTop: 12,
+      paddingVertical: 10,
+      alignItems: 'center',
+      borderRadius: 999,
       borderWidth: 1,
-      borderColor: "#E5E7EB",
-      backgroundColor: "#FFFFFF",
-      justifyContent: "center",
-      alignItems: "center",
-      flexDirection: "row",
-      marginBottom: 12,
-      elevation: 1
+      borderColor: 'rgba(148,163,184,0.6)',
     },
-    appleButton: {
-      width: "100%",
-      height: 50,
-      borderRadius: 12,
-      backgroundColor: "#000000",
-      justifyContent: "center",
-      alignItems: "center",
-      flexDirection: "row",
-      marginBottom: 5,
-      elevation: 1
-    },
-    socialText: {
-      fontSize: 16,
-      fontWeight: "500",
-      marginLeft: 8,
-      color: "#111827",
-    },
-    appleText: {
-      fontSize: 16,
-      fontWeight: "500",
-      marginLeft: 15,
-      color: "#FFFFFF",
-    },
-    forgotPasswordText: {
-      color: '#5a75c2',   // same color you used for checkbox tick
+    secondaryButtonText: {
+      color: '#E5E7EB',
       fontSize: 14,
-      marginLeft: "69%",
-      marginBottom: 5
+      fontWeight: '500',
     },
+
+    loadingOverlay: {
+      width: '100%',
+      height: 52,
+      borderRadius: 12,
+      backgroundColor: '#000000',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    loadingText: {
+      color: '#FFFFFF',
+      marginLeft: 8,
+    },
+
     dividerContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginVertical: 20,
-      width: "100%",
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: 16,
+      width: '100%',
     },
     dividerLine: {
       flex: 1,
       height: 1,
-      backgroundColor: "#E5E7EB",
+      backgroundColor: 'rgba(255,255,255,0.7)',
     },
     dividerText: {
       marginHorizontal: 10,
-      color: "#6B7280",
-      fontSize: 16,
-    },
-    input: {
-      width: "100%",
-      height: 50,
-      borderRadius: 12,
-      backgroundColor: "#FFFFFF",
-      marginBottom: 10,
-    },
-    button: {
-      width: "100%",
-      height: 52,
-      borderRadius: 12,
-      backgroundColor: "#1D4ED8", // blue-600
-      justifyContent: "center",
-      alignItems: "center",
-      marginTop: 8,
-    },
-    buttonText: {
-      color: "#FFFFFF",
-      fontSize: 16,
-      fontWeight: "600",
-    },
-    footer: {
-      marginTop: 20,
-      flexDirection: "row",
-      justifyContent: "center",
-    },
-    footerText: {
-      color: "#6B7280",
+      color: '#fff',
       fontSize: 14,
     },
-    footerLink: {
-      color: "#2563EB", // blue link
-      fontWeight: "500",
-      marginLeft: 4,
+
+    socialButton: {
+      width: '100%',
+      height: 52,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.96)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      flexDirection: 'row',
+      marginBottom: 16,
+    },
+    googleIcon: {
+      width: 20,
+      height: 20,
+      marginRight: 10,
+    },
+    socialText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: '#111827',
+    },
+
+    termsText: {
+      fontSize: 12,
+      color: '#000',
+      textAlign: 'center',
+      lineHeight: 17,
+      marginTop: 4,
     },
   });
 };

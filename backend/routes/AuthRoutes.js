@@ -8,6 +8,7 @@ import {
   resetPassword,
   me,
   googleLogin,
+  resendVerificationOtp,
 } from "../controllers/AuthController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 import { verifyEmail } from "../controllers/OtpController.js";
@@ -16,6 +17,7 @@ const router = express.Router();
 
 router.post("/register", register);
 router.post("/verify-email", verifyEmail);
+router.post("/resend-otp", resendVerificationOtp);
 router.post("/login", login);
 router.post("/sso/google", googleLogin);
 router.post("/refresh-token", refreshToken);

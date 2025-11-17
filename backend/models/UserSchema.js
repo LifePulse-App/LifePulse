@@ -71,6 +71,13 @@ const userSchema = new mongoose.Schema(
     ],
     verificationCode: String,
     verificationCodeExpire: Date,
+    otpResendCount: {
+      type: Number,
+      default: 0,
+    },
+    otpResendResetAt: {
+      type: Date,
+    },
     refreshTokens: [
       {
         token: { type: String, required: true },

@@ -230,7 +230,7 @@ const toastConfig = {
               <AuthNavigator />
             </NavigationContainer>
           ) : null}
-        <Toast config={toastConfig} position="top" topOffset={0} />
+        <Toast config={toastConfig} position="top" topOffset={5} />
       </AuthContext.Provider>
     </PaperProvider>
   );

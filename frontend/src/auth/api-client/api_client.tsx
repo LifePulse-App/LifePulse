@@ -5,7 +5,9 @@ import UserStorage from '../user/UserStorage';
 let isRefreshing = false;
 let failedQueue: any[] = [];
 
-// Process retry queue
+// =============================
+// QUEUE PROCESSOR
+// =============================
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach(prom => {
     if (error) prom.reject(error);
@@ -14,19 +16,22 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
+// =============================
+// API CLIENT
+// =============================
 const apiClient = create({
-  baseURL: "http://10.90.19.216:40000/api",
-  headers: { 'Content-Type': 'application/json' },
+  baseURL: "http://10.244.226.197:40000/api",
+  headers: { "Content-Type": "application/json" }
 });
 
 // Set static secret key
 export const setSecretKey = () => {
-  apiClient.setHeader('api-key', HTTP_Headers['key']);
+  apiClient.setHeader("api-key", HTTP_Headers["key"]);
 };
 
-// Set token manually (optional)
+// Manually set token (optional)
 export const setAuthHeaders = async (token: string) => {
-  apiClient.setHeader('Authorization', `Bearer ${token}`);
+  apiClient.setHeader("Authorization", `Bearer ${token}`);
 };
 
 // =============================
@@ -35,7 +40,7 @@ export const setAuthHeaders = async (token: string) => {
 apiClient.axiosInstance.interceptors.request.use(async config => {
   const token = await UserStorage.getAccessToken();
 
-  // Don't attach Authorization header for refresh request
+  // Skip attaching Authorization header for refresh request
   if (!config.url?.includes('/auth/refresh-token')) {
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
@@ -50,26 +55,35 @@ apiClient.axiosInstance.interceptors.request.use(async config => {
 // =============================
 apiClient.axiosInstance.interceptors.response.use(
   response => response,
-  async error => {
 
+  async error => {
     const originalRequest = error.config;
 
-    // If token expired (401)
+    // ✅ Check if user is logged in
+    const accessToken = await UserStorage.getAccessToken();
+
+    // ✅ If no accessToken exists → user NOT logged in → DO NOT refresh
+    if (!accessToken) {
+      return Promise.reject(error);
+    }
+
+    // ✅ If request already retried, do not retry again
     if (error.response?.status === 401 && !originalRequest._retry) {
 
-      // Avoid retry loop
-      if (originalRequest.url.includes('/auth/refresh-token')) {
+      // ✅ If refresh-token route itself failed → logout user
+      if (originalRequest.url.includes("/auth/refresh-token")) {
         await UserStorage.clearTokens();
         await UserStorage.deleteUser();
         return Promise.reject(error);
       }
 
       if (isRefreshing) {
+        // Wait until refresh completes
         return new Promise(function(resolve, reject) {
           failedQueue.push({ resolve, reject });
         })
           .then(token => {
-            originalRequest.headers['Authorization'] = 'Bearer ' + token;
+            originalRequest.headers["Authorization"] = "Bearer " + token;
             return apiClient.axiosInstance(originalRequest);
           })
           .catch(err => Promise.reject(err));
@@ -80,29 +94,33 @@ apiClient.axiosInstance.interceptors.response.use(
 
       try {
         const refreshToken = await UserStorage.getRefreshToken();
-        if (!refreshToken) throw new Error('No refresh token');
+        if (!refreshToken) throw new Error("No refresh token available");
 
-        // CALL REFRESH WITHOUT AUTH HEADER
-        const refreshResponse = await apiClient.post('/auth/refresh-token', {
-          refreshToken,
+        // ✅ No Authorization header required for refresh
+        const refreshResponse = await apiClient.post("/auth/refresh-token", {
+          refreshToken
         });
 
-        const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data;
+        const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
+          refreshResponse.data;
 
-        await UserStorage.setAccessToken(accessToken);
+        // ✅ Store new tokens
+        await UserStorage.setAccessToken(newAccessToken);
         await UserStorage.setRefreshToken(newRefreshToken);
 
-        processQueue(null, accessToken);
+        // ✅ Process queued failed requests
+        processQueue(null, newAccessToken);
         isRefreshing = false;
 
-        // Retry original request
-        originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
+        // ✅ Retry original request
+        originalRequest.headers["Authorization"] = `Bearer ${newAccessToken}`;
         return apiClient.axiosInstance(originalRequest);
 
       } catch (refreshError) {
         processQueue(refreshError, null);
         isRefreshing = false;
 
+        // Logout user completely
         await UserStorage.clearTokens();
         await UserStorage.deleteUser();
 
