@@ -55,6 +55,7 @@ const ResetPassVerifyOTP = ({ navigation, route }: any) => {
 
   // Optional: identifier/email passed from previous screen
   const email = route?.params?.identifier;
+  
 
   // background animations (same as login/register)
   const anim1 = useRef(new Animated.Value(0)).current;

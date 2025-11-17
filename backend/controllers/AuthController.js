@@ -347,14 +347,14 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
 
 export const resetPasswordVerifyOtp = catchAsyncErrors(async (req, res, next) => {
   try {
-    const { emailOrUsername, code } = req.body;
+    const { email, code } = req.body;
 
-    if (!emailOrUsername || !code) {
-      return next(new ErrorHandler("Email/username and code are required", 400));
+    if (!email || !code) {
+      return next(new ErrorHandler("Email and otp are required", 400));
     }
 
     const user = await User.findOne({
-      $or: [{ email: emailOrUsername }, { username: emailOrUsername }],
+      $or: [{ email: email }],
     }).select("+resetPasswordCode +resetPasswordCodeExpire");
 
     if (!user) {
