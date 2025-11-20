@@ -18,14 +18,13 @@ import NetInfo from "@react-native-community/netinfo";
 import MainLayout from "../../../../shared/components/MainLayout";
 import AppScreen from "../../../../components/Layout/AppScreen/AppScreen";
 import DashboardService from "../../services/api_dashboard";
-import { loadDashboardCache, saveDashboardCache, CachedDashboard } from "./DashboardStorage";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
 const ICON_GLASS_BG = "rgba(15, 23, 42, 0)";
 
 const Dashboard = () => {
-  const [loading, setLoading] = useState(true);      // "no UI yet" loading
+  const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,89 +72,66 @@ const Dashboard = () => {
     };
   }, []);
 
-  const fetchDashboard = useCallback(
-    async (options?: { fromUserAction?: boolean }) => {
-      try {
-        if (options?.fromUserAction) {
-          setLoading(true); // show loader if user explicitly taps retry
-        }
-        setError(null);
+  const fetchDashboard = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        if (offline) {
-          if (options?.fromUserAction) setLoading(false);
-          return;
-        }
-
-        const res = await DashboardService.GetDashboardSummary();
-        const responseData = (res as any).data ?? res;
-
-        if (!responseData.success) {
-          throw new Error(responseData.message || "Failed to load dashboard");
-        }
-
-        const { profile, secondaryCards } = responseData.data;
-        setProfile(profile);
-        setSecondaryCards(secondaryCards || null);
-
-        // ✅ Save snapshot to cache
-        const cache: CachedDashboard = {
-          profile: profile || null,
-          secondaryCards: secondaryCards || null,
-        };
-        await saveDashboardCache(cache);
-      } catch (err: any) {
-        console.error("Dashboard fetch error:", err?.message || err);
-        const msg =
-          err?.response?.data?.message ||
-          err?.message ||
-          "Failed to load dashboard";
-        setError(msg);
-      } finally {
-        if (options?.fromUserAction) {
-          setLoading(false);
-        }
+      // Optional: early return if offline
+      if (offline) {
+        setLoading(false);
+        return;
       }
-    },
-    [offline]
-  );
+
+      const res = await DashboardService.GetDashboardSummary();
+      console.log(res);
+      
+      const responseData = (res as any).data ?? res;
+
+      if (!responseData.success) {
+        throw new Error(responseData.message || "Failed to load dashboard");
+      }
+
+      const { profile, secondaryCards } = responseData.data;
+      setProfile(profile);
+      setSecondaryCards(secondaryCards || null);
+    } catch (err: any) {
+      console.error("Dashboard fetch error:", err?.message || err);
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to load dashboard";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [offline]);
 
   useEffect(() => {
-    let mounted = true;
-
-    const bootstrap = async () => {
-      // 1) Try to load cached snapshot first
-      const cached = await loadDashboardCache();
-      if (mounted && cached) {
-        setProfile(cached.profile);
-        setSecondaryCards(cached.secondaryCards);
-        setLoading(false); // UI can show immediately
-      }
-
-      // 2) Fetch fresh data in background (no blocking if we had cache)
-      await fetchDashboard();
-      if (mounted) {
-        // If we had no cache at all, stop the spinner now
-        setLoading(false);
-      }
-    };
-
-    bootstrap();
-
-    return () => {
-      mounted = false;
-    };
+    fetchDashboard();
   }, [fetchDashboard]);
 
   const handleRetry = () => {
-    fetchDashboard({ fromUserAction: true });
+    fetchDashboard();
   };
 
   const handleHabitPress = (habitId: string) => {
     Alert.alert("Habit tapped", `Habit id: ${habitId}`);
   };
 
-  if (loading && !profile && !secondaryCards) {
-    return <DashboardSkeleton />;
+  if (loading) {
+    return (
+      <MainLayout>
+        <AppScreen
+          style={[
+            styles.root,
+            { justifyContent: "center", alignItems: "center" },
+          ]}
+        >
+          <ActivityIndicator size="large" color="#A855F7" />
+        </AppScreen>
+      </MainLayout>
+    );
   }
 
   const level = profile?.xpProgress.level ?? 1;
@@ -224,9 +200,8 @@ const Dashboard = () => {
             <Text style={styles.subtitle}>
               Track your feelings, grow your habits, and level up daily.
             </Text>
-
-            {/* Offline / error banner */}
-            {(offline || error) && (
+             {/* Offline / error banner */}
+             {(offline || error) && (
               <View style={styles.errorCard}>
                 <Icon name="cloud-alert" size={20} color="#F87171" />
                 <View style={{ flex: 1, marginLeft: 10 }}>
@@ -688,289 +663,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "600",
   },
-  skeletonCard: {
-    backgroundColor: GLASS_BG,
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: GLASS_BORDER,
-    marginBottom: 18,
-    overflow: 'hidden',
-  },
-  skeletonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  skeletonCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(31, 41, 55, 0.7)',
-  },
-  skeletonRight: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  skeletonLine: {
-    height: 12,
-    borderRadius: 999,
-    backgroundColor: 'rgba(31, 41, 55, 0.8)',
-    marginBottom: 8,
-  },
-  skeletonLineShort: {
-    width: '40%',
-  },
-  skeletonLineMedium: {
-    width: '65%',
-  },
-  skeletonLineLong: {
-    width: '85%',
-  },
-  skeletonSmallCardRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 18,
-  },
-  skeletonSmallCard: {
-    flex: 1,
-    backgroundColor: GLASS_BG,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: GLASS_BORDER,
-    marginRight: 10,
-  },
-  skeletonHabitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  skeletonHabitLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  skeletonHabitIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(31, 41, 55, 0.8)',
-    marginRight: 10,
-  },
-  skeletonHabitTextBlock: {
-    width: 150,
-  },
-  skeletonHabitCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    backgroundColor: 'rgba(31, 41, 55, 0.9)',
-  },
 });
-
-const DashboardSkeleton = () => {
-  return (
-    <MainLayout>
-      <AppScreen style={styles.root}>
-        {/* Background */}
-        <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
-
-        <StatusBar
-          barStyle="light-content"
-          translucent
-          backgroundColor="transparent"
-        />
-
-        <View style={styles.overlay}>
-          {/* Top bar skeleton */}
-          <View style={styles.topBar}>
-            <View style={styles.iconGlass} />
-            <View style={styles.topBarRight}>
-              <View style={styles.iconGlass} />
-              <View style={styles.iconGlass} />
-            </View>
-          </View>
-
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
-          >
-            {/* Header skeleton */}
-            <View style={styles.headerRow}>
-              <View style={styles.streakPill}>
-                <View
-                  style={[
-                    styles.skeletonLine,
-                    styles.skeletonLineShort,
-                    { backgroundColor: 'rgba(15, 23, 42, 0.9)' },
-                  ]}
-                />
-              </View>
-
-              <View style={styles.profileTextBlock}>
-                <View
-                  style={[
-                    styles.skeletonLine,
-                    styles.skeletonLineMedium,
-                    { marginBottom: 4 },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.skeletonLine,
-                    styles.skeletonLineShort,
-                    { marginBottom: 0 },
-                  ]}
-                />
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.skeletonLine,
-                styles.skeletonLineLong,
-                { marginBottom: 6 },
-              ]}
-            />
-            <View
-              style={[
-                styles.skeletonLine,
-                styles.skeletonLineMedium,
-                { marginBottom: 18 },
-              ]}
-            />
-
-            {/* Level card skeleton */}
-            <View style={styles.skeletonCard}>
-              <View style={styles.skeletonRow}>
-                <View style={styles.skeletonCircle} />
-                <View style={styles.skeletonRight}>
-                  <View
-                    style={[
-                      styles.skeletonLine,
-                      styles.skeletonLineMedium,
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.skeletonLine,
-                      styles.skeletonLineLong,
-                    ]}
-                  />
-                  <View
-                    style={[
-                      styles.skeletonLine,
-                      styles.skeletonLineShort,
-                      { marginBottom: 0 },
-                    ]}
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Small cards skeleton */}
-            <View style={styles.skeletonSmallCardRow}>
-              <View style={styles.skeletonSmallCard}>
-                <View
-                  style={[
-                    styles.skeletonLine,
-                    styles.skeletonLineShort,
-                    { marginBottom: 12 },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.skeletonLine,
-                    styles.skeletonLineMedium,
-                    { marginBottom: 4 },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.skeletonLine,
-                    styles.skeletonLineShort,
-                    { marginBottom: 0 },
-                  ]}
-                />
-              </View>
-              <View style={[styles.skeletonSmallCard, { marginRight: 0 }]}>
-                <View
-                  style={[
-                    styles.skeletonLine,
-                    styles.skeletonLineShort,
-                    { marginBottom: 12 },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.skeletonLine,
-                    styles.skeletonLineMedium,
-                    { marginBottom: 4 },
-                  ]}
-                />
-                <View
-                  style={[
-                    styles.skeletonLine,
-                    styles.skeletonLineShort,
-                    { marginBottom: 0 },
-                  ]}
-                />
-              </View>
-            </View>
-
-            {/* Habits skeleton card */}
-            <View style={styles.skeletonCard}>
-              <View
-                style={[
-                  styles.skeletonLine,
-                  styles.skeletonLineMedium,
-                  { marginBottom: 8 },
-                ]}
-              />
-              <View
-                style={[
-                  styles.skeletonLine,
-                  styles.skeletonLineShort,
-                  { marginBottom: 16 },
-                ]}
-              />
-
-              {Array.from({ length: 4 }).map((_, index) => (
-                <View key={index}>
-                  <View style={styles.skeletonHabitRow}>
-                    <View style={styles.skeletonHabitLeft}>
-                      <View style={styles.skeletonHabitIcon} />
-                      <View style={styles.skeletonHabitTextBlock}>
-                        <View
-                          style={[
-                            styles.skeletonLine,
-                            styles.skeletonLineLong,
-                          ]}
-                        />
-                        <View
-                          style={[
-                            styles.skeletonLine,
-                            styles.skeletonLineShort,
-                            { marginBottom: 0 },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                    <View style={styles.skeletonHabitCheckbox} />
-                  </View>
-                  {index < 3 && <View style={styles.listSeparator} />}
-                </View>
-              ))}
-            </View>
-
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        </View>
-      </AppScreen>
-    </MainLayout>
-  );
-};
 
 export default Dashboard;
