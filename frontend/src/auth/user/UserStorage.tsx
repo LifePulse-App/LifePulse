@@ -8,9 +8,10 @@ const REFRESH_TOKEN_KEY = 'REFRESH_TOKEN';
 
 const setUser = async (User: UserLoginResponse) => {
   try {
-    await Keychain.setGenericPassword(JSON.stringify(User), User.Password);
-  } catch (error) {
-    Alert.alert('Error', 'Error Storing User');
+    await Keychain.setGenericPassword(JSON.stringify(User), User.Password ?? '');
+  } catch (error: any) {
+    console.log('Keychain setUser error:', error);
+    Alert.alert('Error', `Error Storing User: ${String(error?.message || error)}`);
   }
 };
 

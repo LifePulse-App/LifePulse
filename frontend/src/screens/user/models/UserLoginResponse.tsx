@@ -48,4 +48,6 @@ export interface UserLoginResponse {
   refreshToken: string;  // JWT from backend
   createdAt: string;
   updatedAt: string;
+  UserName: string;
+  Password: string;
 }

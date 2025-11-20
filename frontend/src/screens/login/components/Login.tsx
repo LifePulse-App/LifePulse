@@ -1,15 +1,15 @@
 import React, { useContext, useEffect, useRef, useState } from 'react';
-import Toast from "react-native-toast-message"; // <- you can now remove this import if not used anywhere else
 import {
   View,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
   TouchableOpacity,
   Animated,
 } from 'react-native';
-import { TextInput, Button, Text } from 'react-native-paper';
+import { TextInput, Text } from 'react-native-paper';
+import NetInfo from '@react-native-community/netinfo';
+
 import AuthContext from '../../../auth/user/UserContext';
 import UserStorage from '../../../auth/user/UserStorage';
 import { UserLoginResponse } from '../../user/models/UserLoginResponse';
@@ -19,23 +19,20 @@ import LoaderKitView from 'react-native-loader-kit';
 import AppText from '../../../components/Layout/AppText/AppText';
 import { loginStyles } from './Loginstyles';
 import DeviceInfo from 'react-native-device-info';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { BlurView } from '@react-native-community/blur';
-// NEW
-import GlassyErrorModal from '../../../shared/components/GlassyErrorModal'; // adjust path as needed
+import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
 
 const Login = ({ navigation }: any) => {
   const styles = loginStyles();
 
-  const [check, setCheck] = useState(false);
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const authContext = useContext(AuthContext);
 
-  // NEW: local error state instead of Toast
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorVisible, setErrorVisible] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   const showError = (message: string) => {
     setErrorMessage(message);
@@ -46,6 +43,19 @@ const Login = ({ navigation }: any) => {
     setErrorVisible(false);
     setErrorMessage(null);
   };
+
+  // ---------- NetInfo: connectivity ----------
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const isOffline =
+        !state.isConnected || state.isInternetReachable === false;
+      setOffline(isOffline);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   // ---------- Animated values for glassy background ----------
   const anim1 = useRef(new Animated.Value(0)).current;
@@ -75,41 +85,64 @@ const Login = ({ navigation }: any) => {
     makeLoop(anim3, 3000).start();
   }, [anim1, anim2, anim3]);
 
+  // ---------- Restore user from Keychain (NO login API here) ----------
   const restoreUser = async () => {
-    const data = await UserStorage.getUser();
-    if (!data) return;
+    try {
+      const creds = await UserStorage.getUser();
+      if (!creds || !creds.username) return;
 
-    const objuser = JSON.parse(data.username);
-    setUsername(objuser.UserName);
-    setPassword(data.password);
+      // creds.username is JSON.stringify(UserLoginResponse)
+      const storedUser: UserLoginResponse = JSON.parse(creds.username);
 
-    handleSubmit({ username: objuser.UserName, password: data.password });
+      // Prefill fields (optional)
+      if (storedUser.UserName) setUsername(storedUser.UserName);
+      // creds.password is the saved password; you can prefill if you want
+      if (creds.password) setPassword(creds.password);
+
+      if (storedUser.accessToken) {
+        // Use existing token: set headers + context, then go in app
+        setAuthHeaders(storedUser.accessToken);
+        authContext?.setUser(storedUser);
+        navigation.navigate('Drawer');
+      }
+    } catch (e) {
+      // Any error: clear stored user
+      await UserStorage.deleteUser();
+    }
   };
 
   useEffect(() => {
     restoreUser();
   }, []);
 
-  // ✅ Email/Password login
-  const handleSubmit = async (values: any) => {
+  // ---------- Email/Password login (ONLY here you hit API) ----------
+  const handleSubmit = async (values: { username: string; password: string }) => {
     Keyboard.dismiss();
-    setLoading(true);
 
-    if (values.username === "" || values.password === "") {
-      setLoading(false);
+    if (offline) {
+      showError("You’re offline. Please connect to the internet and try again.");
+      return;
+    }
+
+    if (!values.username || !values.password) {
       showError('Email and Password are required!');
       return;
     }
 
+    setLoading(true);
+
     try {
       setSecretKey();
       const deviceId = await DeviceInfo.getUniqueId();
-      const response = await api_Login.getLogin(values.username, values.password, deviceId);
+      const response = await api_Login.getLogin(
+        values.username,
+        values.password,
+        deviceId,
+      );
 
       if (!response.ok) {
-        UserStorage.deleteUser();
+        await UserStorage.deleteUser();
         authContext?.setUser(null);
-        setLoading(false);
         showError(response.data?.message || 'Login failed');
         return;
       }
@@ -117,12 +150,23 @@ const Login = ({ navigation }: any) => {
       const user = response.data as UserLoginResponse;
       user.UserName = values.username;
       user.Password = values.password;
-      setAuthHeaders(user.accessToken);
 
-      authContext?.setUser(user);
-      if (check) UserStorage.setUser(user);
+      // 1) Set auth header for current session
+    setAuthHeaders(user.accessToken);
 
-      navigation.navigate('Drawer');
+    // 2) Save full user for auto-login UI/context
+    authContext?.setUser(user);
+    await UserStorage.setUser(user);
+
+    // 3) Save tokens for interceptors
+    if (user.accessToken) {
+      await UserStorage.setAccessToken(user.accessToken);
+    }
+    if (user.refreshToken) {
+      await UserStorage.setRefreshToken(user.refreshToken);
+    }
+    
+    navigation.navigate('Drawer');
     } catch (e) {
       showError('Unexpected error while logging in');
     } finally {
@@ -184,119 +228,132 @@ const Login = ({ navigation }: any) => {
 
   return (
     <>
-    <View style={styles.container}>
-      {/* Animated glassy gradient background */}
-      <Animated.View style={[styles.gradientLayer1, blob1Style]} />
-      <Animated.View style={[styles.gradientLayer2, blob2Style]} />
-      <Animated.View style={[styles.gradientLayer3, blob3Style]} />
+      <View style={styles.container}>
+        {/* Animated glassy gradient background */}
+        <Animated.View style={[styles.gradientLayer1, blob1Style]} />
+        <Animated.View style={[styles.gradientLayer2, blob2Style]} />
+        <Animated.View style={[styles.gradientLayer3, blob3Style]} />
 
-      <KeyboardAvoidingView
-        style={styles.kbWrapper}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <BlurView style={styles.glassBlur} blurType="light" blurAmount={5} />
+        <KeyboardAvoidingView
+          style={styles.kbWrapper}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <BlurView style={styles.glassBlur} blurType="light" blurAmount={5} />
 
-        {/* Top app name */}
-        <View style={styles.appNameWrapper}>
-          <Text style={styles.appName}>StreakSphere</Text>
-        </View>
-
-        {/* Glassy card */}
-        <View style={styles.glassWrapper}>
-          <View style={styles.glassContent}>
-            <Text style={styles.mainTitle}>Welcome Back</Text>
-            <Text style={styles.mainSubtitle}>
-              To Login, Enter Credentials Below...
-            </Text>
-
-            {/* Identifier */}
-            <TextInput
-              label="Username or Email"
-              value={username}
-              onChangeText={setUsername}
-              style={styles.input}
-              mode="flat"
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
-              textColor="#111827"
-              placeholderTextColor="#9CA3AF"
-            />
-
-            {/* Password */}
-            <TextInput
-              label="Password"
-              placeholder="Password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              style={styles.passwordInput}
-              mode="flat"
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
-              textColor="#111827"
-              placeholderTextColor="#9CA3AF"
-            />
-
-            {/* Loader or primary button */}
-            {loading ? (
-              <View style={styles.loadingOverlay}>
-                <LoaderKitView
-                  style={{ width: 24, height: 24 }}
-                  name={'BallSpinFadeLoader'}
-                  animationSpeedMultiplier={1.0}
-                  color={"#FFFFFF"}
-                />
-                <AppText style={styles.loadingText}>Logging in...</AppText>
-              </View>
-            ) : (
-              <TouchableOpacity
-                onPress={() => handleSubmit({ username, password })}
-                style={styles.primaryButton}
-              >
-                <AppText style={styles.primaryButtonText}>Continue</AppText>
-              </TouchableOpacity>
-            )}
-            <View style={{ marginTop: 0, alignItems: 'center' }}>
-  <Text style={{ color: '#000' }}>
-    Want to reset password?{' '}
-    <Text
-      style={{ fontWeight: '700', textDecorationLine: 'underline', color: '#fff' }}
-      onPress={() => navigation.navigate('ForgotPass')}
-    >
-      Forget Password
-    </Text>
-  </Text>
-</View>
-
-<View style={{ marginTop: 5, alignItems: 'center' }}>
-  <Text style={{ color: '#000' }}>
-    Don’t have an account?{' '}
-    <Text
-      style={{ fontWeight: '700', textDecorationLine: 'underline', color: '#fff' }}
-      onPress={() => navigation.navigate('Register')}
-    >
-      Register
-    </Text>
-  </Text>
-</View>
-
-            {/* Terms */}
-            <Text style={styles.termsText}>
-              By logging in or continuing, you agree to our Terms of Service
-              and Privacy Policy
-            </Text>
+          {/* Top app name */}
+          <View style={styles.appNameWrapper}>
+            <Text style={styles.appName}>StreakSphere</Text>
           </View>
-        </View>
-      </KeyboardAvoidingView>
-    </View>
 
-    {/* Glassy error box */}
-    <GlassyErrorModal
-      visible={errorVisible}
-      message={errorMessage}
-      onClose={hideError}
-    />
-  </>
+          {/* Glassy card */}
+          <View style={styles.glassWrapper}>
+            <View style={styles.glassContent}>
+              <Text style={styles.mainTitle}>Welcome Back</Text>
+              <Text style={styles.mainSubtitle}>
+                To Login, Enter Credentials Below...
+              </Text>
+
+              {/* Identifier */}
+              <TextInput
+                label="Username or Email"
+                value={username}
+                onChangeText={setUsername}
+                style={styles.input}
+                mode="flat"
+                underlineColor="transparent"
+                activeUnderlineColor="transparent"
+                textColor="black"
+                placeholderTextColor="#9CA3AF"
+              />
+
+              {/* Password */}
+              <TextInput
+                label="Password"
+                placeholder="Password"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                style={styles.passwordInput}
+                mode="flat"
+                underlineColor="transparent"
+                activeUnderlineColor="transparent"
+                textColor="black"
+                placeholderTextColor="#9CA3AF"
+              />
+
+              {/* Loader or primary button */}
+              {loading ? (
+                <View style={styles.loadingOverlay}>
+                  <LoaderKitView
+                    style={{ width: 24, height: 24 }}
+                    name={'BallSpinFadeLoader'}
+                    animationSpeedMultiplier={1.0}
+                    color={'#FFFFFF'}
+                  />
+                  <AppText style={styles.loadingText}>Logging in...</AppText>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => handleSubmit({ username, password })}
+                  style={styles.primaryButton}
+                >
+                  <AppText style={styles.primaryButtonText}>Continue</AppText>
+                </TouchableOpacity>
+              )}
+
+              <View style={{ marginTop: 4, alignItems: 'center' }}>
+                <Text style={{ color: 'black' }}>
+                  Want to reset password?{' '}
+                  <Text
+                    style={{
+                      fontWeight: '700',
+                      textDecorationLine: 'underline',
+                      color: '#F9FAFB',
+                    }}
+                    onPress={() => navigation.navigate('ForgotPass')}
+                  >
+                    Forget Password
+                  </Text>
+                </Text>
+              </View>
+
+              <View style={{ marginTop: 5, alignItems: 'center' }}>
+                <Text style={{ color: 'black' }}>
+                  Don’t have an account?{' '}
+                  <Text
+                    style={{
+                      fontWeight: '700',
+                      textDecorationLine: 'underline',
+                      color: '#F9FAFB',
+                    }}
+                    onPress={() => navigation.navigate('Register')}
+                  >
+                    Register
+                  </Text>
+                </Text>
+              </View>
+
+              {/* Terms */}
+              <Text style={styles.termsText}>
+                By logging in or continuing, you agree to our Terms of Service
+                and Privacy Policy
+              </Text>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+
+      {/* Glassy error box – also used for offline */}
+      <GlassyErrorModal
+        visible={errorVisible || offline}
+        message={
+          offline && !errorMessage
+            ? "You’re offline. Please connect to the internet and try again."
+            : errorMessage || ''
+        }
+        onClose={hideError}
+      />
+    </>
   );
 };
 

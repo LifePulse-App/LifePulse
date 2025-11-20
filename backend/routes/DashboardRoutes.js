@@ -5,7 +5,7 @@ import { isAuthenticatedUser } from "../middlewares/auth.js";
 
 const router = express.Router();
 
-router.get("/", isAuthenticatedUser, getDashboard);
+router.get("/dashboard", isAuthenticatedUser, getDashboard);
 router.put("/proof/verify/:id", isAuthenticatedUser, verifyProof);
 
 export default router;

@@ -102,6 +102,9 @@ resetPasswordVerified: {
         deviceId: { type: String },
       },
     ],
+    publicKey: {
+      type: String,
+    },
 // In your User schema
 resetPasswordCode: String,
 resetPasswordCodeExpire: Date,

@@ -3,7 +3,7 @@ import { DashboardEmployeeSummaryResponse } from "../models/dashboard/DashboardE
 import { DashboardResponse } from "../models/dashboard/DashboardResponse";
 import { DashboardStudentSummaryResponse } from "../models/dashboard/DashboardStudentSummaryResponse";
 
-const endpoint = '/me';
+const endpoint = '/dashboard';
 
 const GetDashboardSummary = () => client.get<DashboardResponse>(endpoint);
 

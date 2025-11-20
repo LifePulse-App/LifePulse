@@ -1,30 +1,34 @@
 export type DashboardResponse = DashboardSummary
 
-export interface DashboardSummary {
-    student: {
-      student_info: {
-        student_id: string;
-        campus: string;
-        name: string;
-        status: string;
+export interface DashboardSummary // backend response shape:
+{
+  success: true,
+  data: {
+    greeting: string;
+    profile: {
+      name: string;
+      xpProgress: {
+        level: number;
+        title: string;
+        currentXp: number;
+        nextLevelXp: number | null;
+        progressPercent: number;
       };
-      dashboard: {
-        academic_standings: {
-          cgpa: number;
-          earned_credits: number;
-          total_credits: number;
-          inprogress_credits: number;
-        };
-        classes: any[]; // you can replace `any` with a proper class interface later
-        news_announcements: {
-          title: string;
-          date: string;
-          _id: string;
-        }[];
-        results: any[]; // placeholder for future
-        today_classes: any[]; // placeholder for future
+      streak: {
+        count: number;
+        lastUpdated: string;
       };
-      _id: string;
-      __v: number;
+      streakTitle: string;
     };
-  }
+    quickLogs: {
+      mood: MoodDoc | null;
+      habit: HabitDoc | null;
+      proof: ProofDoc | null;
+    };
+    secondaryCards: {
+      motivation: string;
+      reflectionCount: number;
+      habitCompletionRate: number;
+    };
+  };
+}

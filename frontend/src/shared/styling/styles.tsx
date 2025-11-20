@@ -304,13 +304,11 @@ export default {
         fontWeight: 'bold',
       },
       bottomBar: {
-        backgroundColor: '#f6f6f6',
-        elevation: 6,
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 16,
-        height: Platform.OS === 'android' ? 60 : 90,
-        paddingBottom: 3,
-        overflow: 'hidden',
+        backgroundColor: 'transparent',  // must be backgroundColor, not background
+        elevation: 0,                    // remove Android shadow
+        borderTopWidth: 0.5,
+        borderTopColor: "white",                  // no top border
+        height: 70,                      // fixed normal tab height, NOT "70%"
         justifyContent: 'center',
       },
       cardCarosal: {
