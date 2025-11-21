@@ -50,14 +50,7 @@ const Dashboard = () => {
     habitCompletionRate: number;
   } | null>(null);
 
-  const [habits] = useState<
-    { id: string; label: string; time: string; icon: string }[]
-  >([
-    { id: "1", label: "Drink Water", time: "Morning", icon: "cup-water" },
-    { id: "2", label: "Meditate", time: "Morning", icon: "meditation" },
-    { id: "3", label: "Read", time: "Evening", icon: "book-open-variant" },
-    { id: "4", label: "Walk 5k steps", time: "Anytime", icon: "walk" },
-  ]);
+  const [habits, setHabits] = useState([]);
 
   // NetInfo: connectivity listener
   useEffect(() => {
@@ -70,6 +63,26 @@ const Dashboard = () => {
     return () => {
       unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    const fetchTodayHabits = async () => {
+      try {
+        const res = await DashboardService.GetTodayHabits(); // adjust base url
+        if (res.data?.success) {
+          setHabits(res.data.habits);
+        }
+      } catch (err: any) {
+        console.log("Error loading today habits", err);
+        const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to load dashboard";
+      setError(msg);
+      }
+    };
+  
+    fetchTodayHabits();
   }, []);
 
   const fetchDashboard = useCallback(async () => {
@@ -94,6 +107,7 @@ const Dashboard = () => {
       const { profile, secondaryCards } = responseData.data;
       setProfile(profile);
       setSecondaryCards(secondaryCards || null);
+
     } catch (err: any) {
       console.error("Dashboard fetch error:", err?.message || err);
       const msg =
@@ -187,7 +201,7 @@ const Dashboard = () => {
 
             <Text style={styles.mainTitle}>Your Mood Journey</Text>
             <Text style={styles.subtitle}>
-              Track your feelings, grow your habits, and level up daily.
+              Share your mood, grow your habits, and level up daily.
             </Text>
              {/* Offline / error banner */}
              {(offline || error) && (
@@ -266,7 +280,7 @@ const Dashboard = () => {
                   size={22}
                   color="#F9FAFB"
                 />
-                <Text style={styles.glassButtonText}>Log today’s mood</Text>
+                <Text style={styles.glassButtonText}>Share your current mood</Text>
               </View>
             </TouchableOpacity>
 
@@ -291,42 +305,72 @@ const Dashboard = () => {
 
             {/* Habits list */}
             <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.sectionTitle}>Today’s Habits</Text>
-                <Text style={styles.sectionHint}>
-                  Tap to complete and earn XP
-                </Text>
-              </View>
+  <View style={styles.cardHeaderRow}>
+    <Text style={styles.sectionTitle}>Today’s Habits</Text>
+    <Text style={styles.sectionHint}>Verified and earned XP</Text>
+  </View>
 
-              <FlatList
-                data={habits}
-                keyExtractor={(item) => item.id}
-                scrollEnabled={false}
-                ItemSeparatorComponent={() => (
-                  <View style={styles.listSeparator} />
-                )}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={styles.habitRow}
-                    onPress={() => handleHabitPress(item.id)}
-                  >
-                    <View style={styles.habitLeft}>
-                      <View style={styles.habitIconWrap}>
-                        <Icon name={item.icon} size={22} color="#C4B5FD" />
-                      </View>
-                      <View>
-                        <Text style={styles.habitLabel}>{item.label}</Text>
-                        <Text style={styles.habitTime}>{item.time}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.checkboxOuter}>
-                      <View style={styles.checkboxInner} />
-                    </View>
-                  </TouchableOpacity>
-                )}
+  {habits.length === 0 ? (
+    <View style={{ paddingVertical: 10 }}>
+      <Text
+        style={{
+          fontSize: 13,
+          color: "#9CA3AF",
+          textAlign: "center",
+        }}
+      >
+        No habits logged for today yet.
+      </Text>
+    </View>
+  ) : (
+    <FlatList
+      data={habits}
+      keyExtractor={(item: any) => item.id}
+      scrollEnabled={false}
+      ItemSeparatorComponent={() => (
+        <View style={styles.listSeparator} />
+      )}
+      renderItem={({ item }: any) => (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={styles.habitRow}
+          onPress={() => handleHabitPress(item.id)}
+        >
+          <View style={styles.habitLeft}>
+            <View style={styles.habitIconWrap}>
+              <Icon name={item.icon || "check"} size={22} color="#C4B5FD" />
+            </View>
+            <View>
+              <Text style={styles.habitLabel}>
+                {item.label || item.habitName}
+              </Text>
+              <Text style={styles.habitTime}>{item.time || ""}</Text>
+            </View>
+          </View>
+
+          <View style={styles.checkboxOuter}>
+            <View
+              style={[
+                styles.checkboxInner,
+                item.status === "verified" && { backgroundColor: "#22C55E" },
+                item.status === "rejected" && { backgroundColor: "#EF4444" },
+                item.status === "pending" && { backgroundColor: "#FFFFFF" },
+              ]}
+            >
+              <Icon
+                name="check"
+                size={14}
+                color={
+                  item.status === "pending" ? "#111827" : "#FFFFFF"
+                }
               />
             </View>
+          </View>
+        </TouchableOpacity>
+      )}
+    />
+  )}
+</View>
 
             <View style={{ height: 40 }} />
           </ScrollView>
@@ -809,20 +853,21 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
   },
   checkboxOuter: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 999,
     borderWidth: 1.5,
-    borderColor: "#A855F7",
+    borderColor: "rgba(148,163,184,0.8)",
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(15, 23, 42, 0.85)",
   },
   checkboxInner: {
-    width: 14,
-    height: 14,
-    borderRadius: 5,
-    backgroundColor: "rgba(168, 85, 247, 0.15)",
+    width: 22,
+    height: 22,
+    borderRadius: 999,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF", // default white (pending)
   },
   errorCard: {
     flexDirection: "row",

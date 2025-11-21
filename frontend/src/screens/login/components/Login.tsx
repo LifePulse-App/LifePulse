@@ -21,6 +21,7 @@ import { loginStyles } from './Loginstyles';
 import DeviceInfo from 'react-native-device-info';
 import { BlurView } from '@react-native-community/blur';
 import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
+import { CommonActions } from '@react-navigation/native';
 
 const Login = ({ navigation }: any) => {
   const styles = loginStyles();
@@ -103,7 +104,12 @@ const Login = ({ navigation }: any) => {
         // Use existing token: set headers + context, then go in app
         setAuthHeaders(storedUser.accessToken);
         authContext?.setUser(storedUser);
-        navigation.navigate('Drawer');
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Drawer' }],
+          }),
+        );
       }
     } catch (e) {
       // Any error: clear stored user
@@ -166,7 +172,12 @@ if (user.refreshToken) {
   await UserStorage.setRefreshToken(user.refreshToken);
 }
     
-    navigation.navigate('Drawer');
+navigation.dispatch(
+  CommonActions.reset({
+    index: 0,
+    routes: [{ name: 'Drawer' }],
+  }),
+);
     } catch (e) {
       showError('Unexpected error while logging in');
     } finally {

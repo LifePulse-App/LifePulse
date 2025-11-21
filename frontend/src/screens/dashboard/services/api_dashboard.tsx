@@ -1,4 +1,5 @@
 import client from "../../../auth/api-client/api_client";
+import { GetTodayHabitsResponse } from "../models/HabitResponse";
 import { DashboardEmployeeSummaryResponse } from "../models/dashboard/DashboardEmployeeSummaryResponse";
 import { DashboardResponse } from "../models/dashboard/DashboardResponse";
 import { DashboardStudentSummaryResponse } from "../models/dashboard/DashboardStudentSummaryResponse";
@@ -6,6 +7,7 @@ import { DashboardStudentSummaryResponse } from "../models/dashboard/DashboardSt
 const endpoint = '/dashboard';
 
 const GetDashboardSummary = () => client.get<DashboardResponse>(endpoint);
+const GetTodayHabits = () => client.get<GetTodayHabitsResponse>('/habit/getToday');
 
 // // getDashboardEmployeeSummary API
 // const getDashboardEmployeeSummary = (instituteId: number, branchIds: string) =>
@@ -23,6 +25,7 @@ const GetDashboardSummary = () => client.get<DashboardResponse>(endpoint);
 
 export default {
     GetDashboardSummary,
+    GetTodayHabits
     // getDashboardEmployeeSummary,
     // getDashboardStudentSummary,
 };

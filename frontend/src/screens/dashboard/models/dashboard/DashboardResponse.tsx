@@ -1,8 +1,7 @@
-export type DashboardResponse = DashboardSummary
+export type DashboardResponse = DashboardSummary;
 
-export interface DashboardSummary // backend response shape:
-{
-  success: true,
+export interface DashboardSummary {
+  success: true;
   data: {
     greeting: string;
     profile: {
@@ -30,5 +29,15 @@ export interface DashboardSummary // backend response shape:
       reflectionCount: number;
       habitCompletionRate: number;
     };
+
+    // 🔥 NEW: today’s habits exactly for that FlatList
+    todayHabits: Array<{
+      id: string;
+      habitName: string;
+      icon: string;   // e.g. "book", "dumbbell"
+      label: string;  // UI label
+      time: string;   // "7:00 PM"
+      status: "pending" | "verified" | "rejected";
+    }>;
   };
 }

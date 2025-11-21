@@ -33,11 +33,66 @@ export const createHabit = async (req, res) => {
 };
 
 
-export const getHabits = async (req, res, next) => {
+export const getTodayHabits = async (req, res, next) => {
   try {
-    const habits = await Habit.find({ user: req.user._id });
-    res.status(200).json({ success: true, habits });
+    const userId = req.user._id;
+
+    // Start & end of "today"
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    // Find proofs created today for this user
+    const todaysProofs = await Proof.find({
+      user: userId,
+      createdAt: { $gte: startOfToday, $lte: endOfToday },
+    }).lean();
+
+    const habitIds = todaysProofs.map((p) => p.habitId);
+
+    // Get the matching habits
+    const habits = await Habit.find({
+      _id: { $in: habitIds },
+      user: userId,
+    }).lean();
+
+    // Build map habitId -> proof
+    const proofByHabit = todaysProofs.reduce((acc, proof) => {
+      acc[proof.habitId.toString()] = proof;
+      return acc;
+    }, {});
+
+    const result = habits.map((habit) => {
+      const proof = proofByHabit[habit._id.toString()];
+
+      // Normalize status
+      let status = "pending";
+      if (proof?.status) {
+        status = proof.status; // "pending" | "verified" | "rejected"
+      } else if (proof) {
+        // Fallback if you only have `verified` flag
+        status = proof.verified ? "verified" : "pending";
+      }
+
+      return {
+        id: habit._id.toString(),
+        habitName: habit.habitName,
+        icon: habit.icon || "check",     // default icon if not set
+        label: habit.label || habit.habitName,
+        time: habit.time || "",
+
+        status, // "pending" | "verified" | "rejected"
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      habits: result,
+    });
   } catch (error) {
+    console.error("Get Today Habits Error:", error);
     next(error);
   }
 };
