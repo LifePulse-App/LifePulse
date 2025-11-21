@@ -164,16 +164,16 @@ const ForgotPass = ({ navigation, route }: any) => {
 
   return (
     <>
-      <View style={styles.container}>
-        <Animated.View style={[styles.gradientLayer1, blob1Style]} />
-        <Animated.View style={[styles.gradientLayer2, blob2Style]} />
-        <Animated.View style={[styles.gradientLayer3, blob3Style]} />
+      <View style={styles.root}>
+      {/* Dashboard-like background */}
+      <View style={styles.baseBackground} />
+      <View style={styles.glowTop} />
+      <View style={styles.glowBottom} />
 
-        <KeyboardAvoidingView
-          style={styles.kbWrapper}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <BlurView style={styles.glassBlur} blurType="light" blurAmount={5} />
+      <KeyboardAvoidingView
+        style={styles.kbWrapper}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
 
           <View style={styles.appNameWrapper}>
             <Text style={styles.appName}>StreakSphere</Text>

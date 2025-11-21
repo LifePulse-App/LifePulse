@@ -54,33 +54,41 @@ export const getDashboard = async (req, res) => {
         .json({ success: false, message: "User not found" });
 
     // ---- Update streak dynamically (using day-diff) ----
-    const today = new Date();
-    const lastUpdated = user.streak?.lastUpdated
-      ? new Date(user.streak.lastUpdated)
-      : null;
-    let streakCount = user.streak?.count || 0;
+const today = new Date();
+const lastUpdated = user.streak?.lastUpdated
+  ? new Date(user.streak.lastUpdated)
+  : null;
 
-    if (!lastUpdated) {
-      streakCount = 1;
-    } else {
-      const startOfToday = new Date(today);
-      startOfToday.setHours(0, 0, 0, 0);
-      const startOfLast = new Date(lastUpdated);
-      startOfLast.setHours(0, 0, 0, 0);
+// default streak is 0
+let streakCount = user.streak?.count || 0;
 
-      const daysDiff =
-        (startOfToday.getTime() - startOfLast.getTime()) /
-        (1000 * 60 * 60 * 24);
+// Normalize both dates to start of day
+const startOfToday = new Date(today);
+startOfToday.setHours(0, 0, 0, 0);
 
-      if (daysDiff > 1) {
-        streakCount = 1; // missed at least one full day
-      } else if (daysDiff === 1) {
-        streakCount += 1; // consecutive day
-      } // if daysDiff === 0, keep same count
-    }
+if (!lastUpdated) {
+  // No lastUpdated – treat as streak 0
+  streakCount = 0;
+} else {
+  const startOfLast = new Date(lastUpdated);
+  startOfLast.setHours(0, 0, 0, 0);
 
-    user.streak = { count: streakCount, lastUpdated: today };
-    await user.save();
+  const daysDiff =
+    (startOfToday.getTime() - startOfLast.getTime()) /
+    (1000 * 60 * 60 * 24);
+
+  if (daysDiff >= 1) {
+    // 24 hours or more difference -> reset to 0
+    streakCount = 0;
+  } else {
+    // daysDiff === 0 -> same day, keep current count
+    streakCount = user.streak?.count || 0;
+  }
+}
+
+// Persist streak
+user.streak = { count: streakCount, lastUpdated: today };
+await user.save();
 
     // ---- Calculate XP ----
     const habits = await Habit.find({ user: userId });

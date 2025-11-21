@@ -1,4 +1,4 @@
-import { Dimensions, StyleSheet, useColorScheme } from 'react-native';
+import { Dimensions, Platform, StyleSheet, useColorScheme } from 'react-native';
 import colors from '../../../shared/styling/colors';
 
 const { width, height } = Dimensions.get('window');
@@ -8,6 +8,59 @@ export const loginStyles = () => {
   const isDark = scheme === 'dark';
 
   return StyleSheet.create({
+    root: {
+      flex: 1,
+    },
+    baseBackground: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: '#020617', // same as Dashboard
+    },
+    glowTop: {
+      position: 'absolute',
+      top: -80,
+      left: -60,
+      width: 260,
+      height: 260,
+      borderRadius: 260,
+      //backgroundColor: '#E74C3C', // blue glow
+      backgroundColor: 'rgba(59, 130, 246, 0.35)',
+    },
+    // NEW: mid glow on the right, lower than glowTop
+    glowMidRight: {
+      position: 'absolute',
+      top: 150,          // lower than glowTop
+      right: -60,       // opposite horizontal side
+      width: 260,
+      height: 260,
+      borderRadius: 260,
+      backgroundColor: '#F39C12', // slightly softer blue
+    },
+    glowBottom: {
+      position: 'absolute',
+      bottom: -100,
+      right: -70,
+      width: 260,
+      height: 260,
+      borderRadius: 260,
+      //backgroundColor: '#4CAF50', // purple glow
+      backgroundColor: 'rgba(168, 85, 247, 0.35)', // purple glow
+    },
+    // NEW: mid glow on the left, higher than glowBottom
+    glowMidLeft: {
+      position: 'absolute',
+      bottom: 130,       // higher than glowBottom
+      left: -40,        // opposite horizontal side
+      width: 260,
+      height: 260,
+      borderRadius: 260,
+      backgroundColor: '#F4D03F', // slightly softer purple
+    },
+    kbWrapper: {
+      flex: 1,
+      paddingTop: Platform.OS === 'android' ? '3%' : '5%',
+      paddingHorizontal: 20,
+      justifyContent: 'center',
+    },
     container: {
       flex: 1,
       backgroundColor: '#000000',
@@ -46,12 +99,6 @@ export const loginStyles = () => {
       left: -width * 0.4,
     },
 
-    kbWrapper: {
-      flex: 1,
-      paddingHorizontal: 24,
-      paddingBottom: 32,
-    },
-
     // App name at top, like screenshot
     appNameWrapper: {
       flex: 1.2,
@@ -83,7 +130,7 @@ export const loginStyles = () => {
       paddingBottom: 28,
       backgroundColor: 'rgba(255,255,255,0.25)',
       borderWidth: 1.5,
-      borderColor: 'rgba(255,255,255,0.35)',
+      borderColor: 'rgba(255,255,255,0.4)',
       overflow: 'hidden',
       shadowColor: '#000',
       shadowOpacity: 0.25,
@@ -140,19 +187,18 @@ export const loginStyles = () => {
     },
 
     secondaryButton: {
+      backgroundColor: 'rgba(148,163,184,0.8)',
       marginTop: 12,
       paddingVertical: 10,
       alignItems: 'center',
       borderRadius: 999,
       borderWidth: 1,
-      borderColor: 'rgba(148,163,184,0.6)',
+      borderColor: 'rgba(148,163,184,1)',
     },
     secondaryButtonText: {
       color: '#E5E7EB',
       fontSize: 14,
       fontWeight: '500',
-      borderWidth: 1,
-      borderColor: 'white',
     },
 
     loadingOverlay: {

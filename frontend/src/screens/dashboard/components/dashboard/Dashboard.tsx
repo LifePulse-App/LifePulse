@@ -199,7 +199,7 @@ const Dashboard = () => {
                   </Text>
                   <Text style={styles.errorText}>
                     {offline
-                      ? "You’re not connected. Your mood logs will sync when you’re back online."
+                      ? "You’re not connected to internet. Your will be synced with server when you’re back online."
                       : error}
                   </Text>
                 </View>
