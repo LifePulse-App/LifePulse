@@ -84,7 +84,6 @@ const Dashboard = () => {
       }
 
       const res = await DashboardService.GetDashboardSummary();
-      console.log(res);
       
       const responseData = (res as any).data ?? res;
 
@@ -119,19 +118,9 @@ const Dashboard = () => {
     Alert.alert("Habit tapped", `Habit id: ${habitId}`);
   };
 
+  // Use skeleton instead of full-screen loader
   if (loading) {
-    return (
-      <MainLayout>
-        <AppScreen
-          style={[
-            styles.root,
-            { justifyContent: "center", alignItems: "center" },
-          ]}
-        >
-          <ActivityIndicator size="large" color="#A855F7" />
-        </AppScreen>
-      </MainLayout>
-    );
+    return <DashboardSkeleton />;
   }
 
   const level = profile?.xpProgress.level ?? 1;
@@ -337,6 +326,212 @@ const Dashboard = () => {
                   </TouchableOpacity>
                 )}
               />
+            </View>
+
+            <View style={{ height: 40 }} />
+          </ScrollView>
+        </View>
+      </AppScreen>
+    </MainLayout>
+  );
+};
+
+// Skeleton component for glass cards
+const DashboardSkeleton = () => {
+  return (
+    <MainLayout>
+      <AppScreen style={styles.root}>
+        {/* Background */}
+        <View style={styles.baseBackground} />
+        <View style={styles.glowTop} />
+        <View style={styles.glowBottom} />
+
+        <StatusBar
+          barStyle="light-content"
+          translucent
+          backgroundColor="transparent"
+        />
+
+        <View style={styles.overlay}>
+          {/* Top bar skeleton */}
+          <View style={styles.topBar}>
+            <View style={styles.iconGlass} />
+            <View style={styles.topBarRight}>
+              <View style={styles.iconGlass} />
+              <View style={styles.iconGlass} />
+            </View>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Header skeleton */}
+            <View style={styles.headerRow}>
+              <View style={styles.streakPill}>
+                <View
+                  style={[
+                    styles.skeletonLine,
+                    styles.skeletonLineShort,
+                    { backgroundColor: "rgba(15, 23, 42, 0.9)" },
+                  ]}
+                />
+              </View>
+
+              <View style={styles.profileTextBlock}>
+                <View
+                  style={[
+                    styles.skeletonLine,
+                    styles.skeletonLineMedium,
+                    { marginBottom: 4 },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.skeletonLine,
+                    styles.skeletonLineShort,
+                    { marginBottom: 0 },
+                  ]}
+                />
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.skeletonLine,
+                styles.skeletonLineLong,
+                { marginBottom: 6 },
+              ]}
+            />
+            <View
+              style={[
+                styles.skeletonLine,
+                styles.skeletonLineMedium,
+                { marginBottom: 18 },
+              ]}
+            />
+
+            {/* Level card skeleton */}
+            <View style={styles.skeletonCard}>
+              <View style={styles.skeletonRow}>
+                <View style={styles.skeletonCircle} />
+                <View style={styles.skeletonRight}>
+                  <View
+                    style={[
+                      styles.skeletonLine,
+                      styles.skeletonLineMedium,
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.skeletonLine,
+                      styles.skeletonLineLong,
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.skeletonLine,
+                      styles.skeletonLineShort,
+                      { marginBottom: 0 },
+                    ]}
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Small cards skeleton */}
+            <View style={styles.skeletonSmallCardRow}>
+              <View style={styles.skeletonSmallCard}>
+                <View
+                  style={[
+                    styles.skeletonLine,
+                    styles.skeletonLineShort,
+                    { marginBottom: 12 },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.skeletonLine,
+                    styles.skeletonLineMedium,
+                    { marginBottom: 4 },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.skeletonLine,
+                    styles.skeletonLineShort,
+                    { marginBottom: 0 },
+                  ]}
+                />
+              </View>
+              <View style={[styles.skeletonSmallCard, { marginRight: 0 }]}>
+                <View
+                  style={[
+                    styles.skeletonLine,
+                    styles.skeletonLineShort,
+                    { marginBottom: 12 },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.skeletonLine,
+                    styles.skeletonLineMedium,
+                    { marginBottom: 4 },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.skeletonLine,
+                    styles.skeletonLineShort,
+                    { marginBottom: 0 },
+                  ]}
+                />
+              </View>
+            </View>
+
+            {/* Habits skeleton card */}
+            <View style={styles.skeletonCard}>
+              <View
+                style={[
+                  styles.skeletonLine,
+                  styles.skeletonLineMedium,
+                  { marginBottom: 8 },
+                ]}
+              />
+              <View
+                style={[
+                  styles.skeletonLine,
+                  styles.skeletonLineShort,
+                  { marginBottom: 16 },
+                ]}
+              />
+
+              {Array.from({ length: 4 }).map((_, index) => (
+                <View key={index}>
+                  <View style={styles.skeletonHabitRow}>
+                    <View style={styles.skeletonHabitLeft}>
+                      <View style={styles.skeletonHabitIcon} />
+                      <View style={styles.skeletonHabitTextBlock}>
+                        <View
+                          style={[
+                            styles.skeletonLine,
+                            styles.skeletonLineLong,
+                          ]}
+                        />
+                        <View
+                          style={[
+                            styles.skeletonLine,
+                            styles.skeletonLineShort,
+                            { marginBottom: 0 },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                    <View style={styles.skeletonHabitCheckbox} />
+                  </View>
+                  {index < 3 && <View style={styles.listSeparator} />}
+                </View>
+              ))}
             </View>
 
             <View style={{ height: 40 }} />
@@ -662,6 +857,86 @@ const styles = StyleSheet.create({
     color: "#FEF2F2",
     fontSize: 11,
     fontWeight: "600",
+  },
+
+  // Skeleton styles
+  skeletonCard: {
+    backgroundColor: GLASS_BG,
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    marginBottom: 18,
+    overflow: "hidden",
+  },
+  skeletonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  skeletonCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(31, 41, 55, 0.7)",
+  },
+  skeletonRight: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  skeletonLine: {
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: "rgba(31, 41, 55, 0.8)",
+    marginBottom: 8,
+  },
+  skeletonLineShort: {
+    width: "40%",
+  },
+  skeletonLineMedium: {
+    width: "65%",
+  },
+  skeletonLineLong: {
+    width: "85%",
+  },
+  skeletonSmallCardRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 18,
+  },
+  skeletonSmallCard: {
+    flex: 1,
+    backgroundColor: GLASS_BG,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+    marginRight: 10,
+  },
+  skeletonHabitRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  skeletonHabitLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  skeletonHabitIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(31, 41, 55, 0.8)",
+    marginRight: 10,
+  },
+  skeletonHabitTextBlock: {
+    width: 150,
+  },
+  skeletonHabitCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: "rgba(31, 41, 55, 0.9)",
   },
 });
 

@@ -176,7 +176,6 @@ const SplashScreen = () => {
         >
           Loading your experience...
         </Text>
-        <ActivityIndicator size="small" color="#A855F7" />
       </View>
     </View>
   );

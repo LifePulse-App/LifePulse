@@ -159,12 +159,12 @@ const Login = ({ navigation }: any) => {
     await UserStorage.setUser(user);
 
     // 3) Save tokens for interceptors
-    if (user.accessToken) {
-      await UserStorage.setAccessToken(user.accessToken);
-    }
-    if (user.refreshToken) {
-      await UserStorage.setRefreshToken(user.refreshToken);
-    }
+if (user.accessToken) {
+  await UserStorage.setAccessToken(user.accessToken);
+}
+if (user.refreshToken) {
+  await UserStorage.setRefreshToken(user.refreshToken);
+}
     
     navigation.navigate('Drawer');
     } catch (e) {

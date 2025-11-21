@@ -100,14 +100,14 @@ apiClient.axiosInstance.interceptors.response.use(
           refreshToken,
         });
 
-        const {
-          accessToken: newAccessToken,
-          refreshToken: newRefreshToken,
-        } = refreshResponse.data;
+        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = refreshResponse.data;
 
-        // ✅ Store new tokens
-        await UserStorage.setAccessToken(newAccessToken);
-        await UserStorage.setRefreshToken(newRefreshToken);
+if (newAccessToken) {
+  await UserStorage.setAccessToken(newAccessToken);
+}
+if (newRefreshToken) {
+  await UserStorage.setRefreshToken(newRefreshToken);
+}
 
         // ✅ Process queued failed requests
         processQueue(null, newAccessToken);
