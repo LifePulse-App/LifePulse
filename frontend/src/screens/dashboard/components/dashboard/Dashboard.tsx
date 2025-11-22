@@ -23,7 +23,41 @@ const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
 const ICON_GLASS_BG = "rgba(15, 23, 42, 0)";
 
-const Dashboard = () => {
+const MOOD_METADATA: Record<
+  string,
+  { label: string; icon: string; color?: string }
+> = {
+  ecstatic: { label: "Ecstatic", icon: "emoticon-excited-outline", color: "#FACC15" },
+  happy: { label: "Happy", icon: "emoticon-happy-outline", color: "#FBBF24" },
+  grateful: { label: "Grateful", icon: "hand-heart-outline", color: "#F97316" },
+  calm: { label: "Calm", icon: "meditation", color: "#22C55E" },
+  relaxed: { label: "Relaxed", icon: "emoticon-neutral-outline", color: "#38BDF8" },
+  lovely: { label: "Lovely", icon: "heart-outline", color: "#FB7185" },
+
+  neutral: { label: "Okay", icon: "emoticon-neutral-outline", color: "#9CA3AF" },
+  meh: { label: "Meh", icon: "minus-circle-outline", color: "#9CA3AF" },
+  tired: { label: "Tired", icon: "sleep", color: "#818CF8" },
+  confused: { label: "Confused", icon: "help-circle-outline", color: "#F97316" },
+
+  sad: { label: "Sad", icon: "emoticon-sad-outline", color: "#60A5FA" },
+  lonely: { label: "Lonely", icon: "account-off-outline", color: "#6B7280" },
+  discouraged: {
+    label: "Discouraged",
+    icon: "arrow-down-bold-circle-outline",
+    color: "#F97316",
+  },
+  numb: { label: "Numb", icon: "emoticon-dead-outline", color: "#9CA3AF" },
+
+  anxious: { label: "Anxious", icon: "alert-circle-outline", color: "#F97316" },
+  stressed: { label: "Stressed", icon: "clock-alert-outline", color: "#FBBF24" },
+  overwhelmed: { label: "Overwhelmed", icon: "water", color: "#38BDF8" },
+
+  annoyed: { label: "Annoyed", icon: "emoticon-angry-outline", color: "#FB923C" },
+  frustrated: { label: "Frustrated", icon: "emoticon-angry-outline", color: "#F97316" },
+  angry: { label: "Angry", icon: "emoticon-angry-outline", color: "#EF4444" },
+};
+
+const Dashboard = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,6 +85,10 @@ const Dashboard = () => {
   } | null>(null);
 
   const [habits, setHabits] = useState([]);
+  const [currentMood, setCurrentMood] = useState<{
+    mood: string;
+    createdAt: string;
+  } | null>(null);
 
   // NetInfo: connectivity listener
   useEffect(() => {
@@ -104,9 +142,10 @@ const Dashboard = () => {
         throw new Error(responseData.message || "Failed to load dashboard");
       }
 
-      const { profile, secondaryCards } = responseData.data;
+      const { profile, secondaryCards, currentMood } = responseData.data;
       setProfile(profile);
       setSecondaryCards(secondaryCards || null);
+      setCurrentMood(currentMood || null);
 
     } catch (err: any) {
       console.error("Dashboard fetch error:", err?.message || err);
@@ -268,21 +307,39 @@ const Dashboard = () => {
 
             {/* Main glass button */}
             <TouchableOpacity
-              activeOpacity={0.9}
-              style={styles.glassButton}
-              onPress={() => {
-                // navigate to mood log screen
-              }}
-            >
-              <View style={styles.glassButtonInner}>
-                <Icon
-                  name="emoticon-happy-outline"
-                  size={22}
-                  color="#F9FAFB"
-                />
-                <Text style={styles.glassButtonText}>Share your current mood</Text>
-              </View>
-            </TouchableOpacity>
+  activeOpacity={0.9}
+  style={styles.glassButton}
+  onPress={() => {
+    // use whatever navigation logic you already fixed (parent navigators etc.)
+    navigation.navigate("MoodScreen");
+  }}
+>
+  <View style={styles.glassButtonInner}>
+    {currentMood && MOOD_METADATA[currentMood.mood] ? (
+      <>
+        <Icon
+          name={MOOD_METADATA[currentMood.mood].icon}
+          size={22}
+          color={MOOD_METADATA[currentMood.mood].color || "#F9FAFB"}
+        />
+        <Text style={styles.glassButtonText}>
+          {MOOD_METADATA[currentMood.mood].label}
+        </Text>
+      </>
+    ) : (
+      <>
+        <Icon
+          name="emoticon-happy-outline"
+          size={22}
+          color="#F9FAFB"
+        />
+        <Text style={styles.glassButtonText}>
+          Share your current mood
+        </Text>
+      </>
+    )}
+  </View>
+</TouchableOpacity>
 
             {/* Today overview cards */}
             <View style={styles.smallCardRow}>
@@ -307,7 +364,7 @@ const Dashboard = () => {
             <View style={styles.card}>
   <View style={styles.cardHeaderRow}>
     <Text style={styles.sectionTitle}>Today’s Habits</Text>
-    <Text style={styles.sectionHint}>Verified and earned XP</Text>
+    <Text style={styles.sectionHint}>Verify and earn XP</Text>
   </View>
 
   {habits.length === 0 ? (
@@ -374,6 +431,17 @@ const Dashboard = () => {
 
             <View style={{ height: 40 }} />
           </ScrollView>
+                  {/* Floating Camera Button */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={styles.floatingCameraButton}
+          onPress={() => {
+            // TODO: open camera screen / modal
+            Alert.alert("Camera", "Open camera to capture a habit proof.");
+          }}
+        >
+          <Icon name="camera-outline" size={26} color="#F9FAFB" />
+        </TouchableOpacity>
         </View>
       </AppScreen>
     </MainLayout>
@@ -742,11 +810,14 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(15, 23, 42, 0.9)",
     marginTop: 8,
     overflow: "hidden",
+    borderColor: "white",
+    borderWidth: 0.2
   },
   xpBarFill: {
     height: "100%",
     borderRadius: 999,
     backgroundColor: "#8B5CF6",
+    
   },
   levelHint: {
     fontSize: 11,
@@ -982,6 +1053,24 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 8,
     backgroundColor: "rgba(31, 41, 55, 0.9)",
+  },
+  floatingCameraButton: {
+    position: "absolute",
+    right: 20,
+    bottom: Platform.OS === "android" ? 20 : 25, // slightly above navbar / home indicator
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "rgba(30, 64, 175, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(191, 219, 254, 0.4)",
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 10 },
+    shadowRadius: 18,
+    elevation: 10,
   },
 });
 

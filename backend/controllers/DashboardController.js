@@ -54,41 +54,41 @@ export const getDashboard = async (req, res) => {
         .json({ success: false, message: "User not found" });
 
     // ---- Update streak dynamically (using day-diff) ----
-const today = new Date();
-const lastUpdated = user.streak?.lastUpdated
-  ? new Date(user.streak.lastUpdated)
-  : null;
+    const today = new Date();
+    const lastUpdated = user.streak?.lastUpdated
+      ? new Date(user.streak.lastUpdated)
+      : null;
 
-// default streak is 0
-let streakCount = user.streak?.count || 0;
+    // default streak is 0
+    let streakCount = user.streak?.count || 0;
 
-// Normalize both dates to start of day
-const startOfToday = new Date(today);
-startOfToday.setHours(0, 0, 0, 0);
+    // Normalize both dates to start of day
+    const startOfToday = new Date(today);
+    startOfToday.setHours(0, 0, 0, 0);
 
-if (!lastUpdated) {
-  // No lastUpdated – treat as streak 0
-  streakCount = 0;
-} else {
-  const startOfLast = new Date(lastUpdated);
-  startOfLast.setHours(0, 0, 0, 0);
+    if (!lastUpdated) {
+      // No lastUpdated – treat as streak 0
+      streakCount = 0;
+    } else {
+      const startOfLast = new Date(lastUpdated);
+      startOfLast.setHours(0, 0, 0, 0);
 
-  const daysDiff =
-    (startOfToday.getTime() - startOfLast.getTime()) /
-    (1000 * 60 * 60 * 24);
+      const daysDiff =
+        (startOfToday.getTime() - startOfLast.getTime()) /
+        (1000 * 60 * 60 * 24);
 
-  if (daysDiff >= 1) {
-    // 24 hours or more difference -> reset to 0
-    streakCount = 0;
-  } else {
-    // daysDiff === 0 -> same day, keep current count
-    streakCount = user.streak?.count || 0;
-  }
-}
+      if (daysDiff >= 1) {
+        // 24 hours or more difference -> reset to 0
+        streakCount = 0;
+      } else {
+        // daysDiff === 0 -> same day, keep current count
+        streakCount = user.streak?.count || 0;
+      }
+    }
 
-// Persist streak
-user.streak = { count: streakCount, lastUpdated: today };
-await user.save();
+    // Persist streak
+    user.streak = { count: streakCount, lastUpdated: today };
+    await user.save();
 
     // ---- Calculate XP ----
     const habits = await Habit.find({ user: userId });
@@ -108,7 +108,9 @@ await user.save();
       } else totalXp += 10;
     }
 
-    totalXp += (await Mood.countDocuments({ user: userId })) * 10;
+    // each mood gives XP
+    const moodCount = await Mood.countDocuments({ user: userId });
+    totalXp += moodCount * 10;
     user.xp = totalXp;
     await user.save();
 
@@ -130,8 +132,27 @@ await user.save();
       Habit.findOne({ user: userId }).sort({ createdAt: -1 }),
       Proof.findOne({ user: userId }).sort({ createdAt: -1 }),
       Mood.countDocuments({ user: userId }),
-      Habit.countDocuments({ user: userId, completed: true }), // make sure `completed` exists in schema if you rely on this
+      Habit.countDocuments({ user: userId, completed: true }),
     ]);
+
+    // ---- Current mood logic (reset after 24h) ----
+    let currentMood = null;
+    if (recentMood) {
+      const now = new Date();
+      const diffMs = now.getTime() - recentMood.createdAt.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+
+      // If mood was logged less than 24 hours ago, treat it as current
+      if (diffHours < 24) {
+        currentMood = {
+          mood: recentMood.mood,
+          createdAt: recentMood.createdAt,
+        };
+      } else {
+        // older than 24h -> treat as "none" on dashboard
+        currentMood = null;
+      }
+    }
 
     const secondaryCards = {
       motivation: getRandomQuote(),
@@ -150,7 +171,12 @@ await user.save();
           streak: user.streak,
           streakTitle,
         },
-        quickLogs: { mood: recentMood, habit: recentHabit, proof: recentProof },
+        quickLogs: {
+          mood: recentMood, // full latest mood doc if you still want it
+          habit: recentHabit,
+          proof: recentProof,
+        },
+        currentMood, // <--- this will be null ("none") if last mood > 24h ago
         secondaryCards,
       },
     });

@@ -14,6 +14,7 @@ import UserStorage from '../../auth/user/UserStorage';
 import { UserLoginResponse } from '../../screens/user/models/UserLoginResponse';
 import AuthContext from '../../auth/user/UserContext';
 import { setAuthHeaders, setSecretKey } from '../../auth/api-client/api_client';
+import MoodScreen from '../../screens/moodscreen/comp/component/MoodScreen';
 
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');
@@ -239,6 +240,7 @@ const AuthNavigator = () => {
       <Stack.Screen name="SetPass" component={SetPassVerifiedOTP} />
       <Stack.Screen name="Register" component={Register} />
       <Stack.Screen name="Drawer" component={DrawerNavigator} />
+      <Stack.Screen name="MoodScreen" component={MoodScreen} />
     </Stack.Navigator>
   );
 };

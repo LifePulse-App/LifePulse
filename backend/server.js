@@ -36,6 +36,7 @@ export const transporter = nodemailer.createTransport({
 import AuthRoutes from "./routes/AuthRoutes.js"
 import DashboardRoutes from "./routes/DashboardRoutes.js"
 import HabitRoutes from "./routes/HabitRoutes.js"
+import MoodRoutes from "./routes/MoodRoutes.js"
 
 // Middlewares
 app.use(cookieParser());
@@ -45,7 +46,8 @@ app.use("/api", apiKeyMiddleware);
 app.use("/api/auth", AuthRoutes);
 app.use("/api/dashboard", DashboardRoutes);
 app.use("/api/habit", HabitRoutes);
-app.use(errorMiddleware);
+app.use("/api/moods", MoodRoutes);
+app.use(errorMiddleware)
 
 
 // Pick port based on environment
