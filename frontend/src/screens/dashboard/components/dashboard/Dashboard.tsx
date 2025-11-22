@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { Text } from "@rneui/themed";
 import { AnimatedCircularProgress } from "react-native-circular-progress";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
@@ -163,6 +164,13 @@ const Dashboard = ({ navigation }: any) => {
     fetchDashboard();
   }, [fetchDashboard]);
 
+  useFocusEffect(
+    useCallback(() => {
+      // Called every time Dashboard comes into focus
+      fetchDashboard();
+    }, [fetchDashboard])
+  );
+
   const handleRetry = () => {
     fetchDashboard();
   };
@@ -311,7 +319,9 @@ const Dashboard = ({ navigation }: any) => {
   style={styles.glassButton}
   onPress={() => {
     // use whatever navigation logic you already fixed (parent navigators etc.)
-    navigation.navigate("MoodScreen");
+    navigation.navigate("MoodScreen", {
+      currentMoodId: currentMood?.mood || null,
+    });
   }}
 >
   <View style={styles.glassButtonInner}>

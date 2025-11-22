@@ -2,7 +2,7 @@ import client from '../../../auth/api-client/api_client';
 
 const logMood = async (mood: string) => {
   try {
-    return await client.post<object>('/api/moods', {
+    return await client.post<object>('/moods', {
       mood
     });
   } catch (error: any) {

@@ -28,13 +28,11 @@ const apiClient = create({
 
 // Set static secret key
 export const setSecretKey = () => {
-  console.log('[API] Setting api-key header');
   apiClient.setHeader('api-key', HTTP_Headers['key']);
 };
 
 // Manually set token (optional)
 export const setAuthHeaders = async (token: string) => {
-  console.log('[API] Manually setting Authorization header');
   apiClient.setHeader('Authorization', `Bearer ${token}`);
 };
 

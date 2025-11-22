@@ -29,7 +29,22 @@ export const recalculateXp = async (userId) => {
     } else totalXp += 10;
   }
 
-  totalXp += await Mood.countDocuments({ user: userId }) * 10;
+  // instead of: const moodCount = await Mood.countDocuments({ user: userId });
+const moodDayAgg = await Mood.aggregate([
+  { $match: { user: userId } },
+  {
+    $group: {
+      _id: {
+        year: { $year: "$createdAt" },
+        month: { $month: "$createdAt" },
+        day: { $dayOfMonth: "$createdAt" },
+      },
+    },
+  },
+]);
+
+const uniqueMoodDays = moodDayAgg.length;
+totalXp += uniqueMoodDays * 10;
 
   // Update user XP
   const user = await User.findById(userId);

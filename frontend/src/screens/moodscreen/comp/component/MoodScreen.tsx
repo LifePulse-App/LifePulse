@@ -13,7 +13,7 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import MainLayout from "../../../../shared/components/MainLayout";
 import AppScreen from "../../../../components/Layout/AppScreen/AppScreen";
 import GlassyErrorModal from "../../../../shared/components/GlassyErrorModal";
-import MoodService from "../../services/api_mood"; // <-- new service
+import MoodService from "../../services/api_mood";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
@@ -30,7 +30,7 @@ const MOOD_GROUPS = [
       { id: "grateful", label: "Grateful", icon: "hand-heart-outline" },
       { id: "calm", label: "Calm", icon: "meditation" },
       { id: "relaxed", label: "Relaxed", icon: "emoticon-neutral-outline" },
-      { id: "lovely", label: "Lovely", icon: "heart-outline" }, // your new mood
+      { id: "lovely", label: "Lovely", icon: "heart-outline" },
     ],
   },
   {
@@ -81,8 +81,12 @@ const MOOD_GROUPS = [
   },
 ];
 
-const MoodScreen = ({ navigation }: any) => {
-  const [selectedMoodId, setSelectedMoodId] = useState<string | null>(null);
+const MoodScreen = ({ navigation, route }: any) => {
+  const initialMoodId: string | null = route?.params?.currentMoodId || null;
+
+  const [selectedMoodId, setSelectedMoodId] = useState<string | null>(
+    initialMoodId
+  );
   const [submitting, setSubmitting] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -117,7 +121,7 @@ const MoodScreen = ({ navigation }: any) => {
         return;
       }
 
-      // success -> go back to dashboard, which will recalc XP and show latest mood
+      // On success go back – dashboard will refetch and show latest mood
       navigation.goBack?.();
     } catch (err: any) {
       console.log("Mood save error:", err);
@@ -135,6 +139,7 @@ const MoodScreen = ({ navigation }: any) => {
     <>
       <MainLayout>
         <AppScreen style={styles.root}>
+          {/* Background */}
           <View style={styles.baseBackground} />
           <View style={styles.glowTop} />
           <View style={styles.glowBottom} />
@@ -146,6 +151,7 @@ const MoodScreen = ({ navigation }: any) => {
           />
 
           <View style={styles.overlay}>
+            {/* Top bar */}
             <View style={styles.topBar}>
               <TouchableOpacity
                 activeOpacity={0.8}
@@ -160,6 +166,7 @@ const MoodScreen = ({ navigation }: any) => {
               </View>
             </View>
 
+            {/* Scrollable mood grid */}
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}
@@ -216,28 +223,30 @@ const MoodScreen = ({ navigation }: any) => {
                 </View>
               ))}
 
-              <TouchableOpacity
-                activeOpacity={0.9}
-                style={[
-                  styles.glassButton,
-                  (!selectedMoodId || submitting) && { opacity: 0.7 },
-                ]}
-                onPress={submitting ? undefined : handleSubmit}
-              >
-                <View style={styles.glassButtonInner}>
-                  <Icon
-                    name={submitting ? "loading" : "check-circle-outline"}
-                    size={22}
-                    color="#F9FAFB"
-                  />
-                  <Text style={styles.glassButtonText}>
-                    {submitting ? "Saving..." : "Save mood"}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              <View style={{ height: 40 }} />
+              {/* Spacer so last card isn't hidden behind floating button */}
+              <View style={{ height: 80 }} />
             </ScrollView>
+
+            {/* Floating Save button */}
+            <TouchableOpacity
+              activeOpacity={0.9}
+              style={[
+                styles.glassButton,
+                (!selectedMoodId || submitting) && { opacity: 0.7 },
+              ]}
+              onPress={submitting ? undefined : handleSubmit}
+            >
+              <View style={styles.glassButtonInner}>
+                <Icon
+                  name={submitting ? "loading" : "check-circle-outline"}
+                  size={22}
+                  color="#F9FAFB"
+                />
+                <Text style={styles.glassButtonText}>
+                  {submitting ? "Saving..." : "Save mood"}
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </AppScreen>
       </MainLayout>
@@ -394,8 +403,10 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   glassButton: {
-    marginTop: 4,
-    marginBottom: 1,
+    position: "absolute",
+    left: 20,
+    right: 20,
+    bottom: Platform.OS === "android" ? 24 : 34,
     borderRadius: 999,
     overflow: "hidden",
     backgroundColor: "rgba(30, 64, 175, 0.85)",

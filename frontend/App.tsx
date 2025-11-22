@@ -38,9 +38,14 @@ const App = () => {
   const isDarkMode = colorScheme === 'dark';
   const theme = isDarkMode ? MD3DarkTheme : DefaultTheme;
 
-  useEffect(() => {
+const secretKeySetRef = useRef(false);
+
+useEffect(() => {
+  if (!secretKeySetRef.current) {
     setSecretKey();
-  }, []);
+    secretKeySetRef.current = true;
+  }
+}, []);
 
   const handleLogout = async () => {
     try {
