@@ -59,15 +59,12 @@ export const getDashboard = async (req, res) => {
       ? new Date(user.streak.lastUpdated)
       : null;
 
-    // default streak is 0
     let streakCount = user.streak?.count || 0;
 
-    // Normalize both dates to start of day
     const startOfToday = new Date(today);
     startOfToday.setHours(0, 0, 0, 0);
 
     if (!lastUpdated) {
-      // No lastUpdated – treat as streak 0
       streakCount = 0;
     } else {
       const startOfLast = new Date(lastUpdated);
@@ -78,19 +75,16 @@ export const getDashboard = async (req, res) => {
         (1000 * 60 * 60 * 24);
 
       if (daysDiff >= 1) {
-        // 24 hours or more difference -> reset to 0
         streakCount = 0;
       } else {
-        // daysDiff === 0 -> same day, keep current count
         streakCount = user.streak?.count || 0;
       }
     }
 
-    // Persist streak
     user.streak = { count: streakCount, lastUpdated: today };
     await user.save();
 
-    // ---- Calculate XP ----
+    // ---- Calculate XP (single source of truth here) ----
     const habits = await Habit.find({ user: userId });
     let totalXp = 0;
 
@@ -105,16 +99,30 @@ export const getDashboard = async (req, res) => {
       if (HABIT_XP[type]) {
         totalXp += HABIT_XP[type].base;
         if (proof) totalXp += HABIT_XP[type].verified;
-      } else totalXp += 10;
+      } else {
+        totalXp += 10;
+      }
     }
 
-    // each mood gives XP
-    const moodCount = await Mood.countDocuments({ user: userId });
-    totalXp += moodCount * 10;
+    // ⬇️ Mood XP based on DISTINCT days with at least one mood
+    const moodDayAgg = await Mood.aggregate([
+      { $match: { user: userId } },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" },
+            day: { $dayOfMonth: "$createdAt" },
+          },
+        },
+      },
+    ]);
+    const uniqueMoodDays = moodDayAgg.length;
+    totalXp += uniqueMoodDays * 10;
+
     user.xp = totalXp;
     await user.save();
 
-    // ---- XP progress ----
     const xpProgress = calculateXpProgress(totalXp);
 
     // ---- Streak title ----
@@ -131,7 +139,6 @@ export const getDashboard = async (req, res) => {
       Mood.findOne({ user: userId }).sort({ createdAt: -1 }),
       Habit.findOne({ user: userId }).sort({ createdAt: -1 }),
       Proof.findOne({ user: userId }).sort({ createdAt: -1 }),
-      // ⬇️ count distinct days with mood logs
       Mood.aggregate([
         { $match: { user: userId } },
         {
@@ -146,7 +153,7 @@ export const getDashboard = async (req, res) => {
       ]),
       Habit.countDocuments({ user: userId, completed: true }),
     ]);
-    
+
     // reflectionCount is number of unique days with at least one mood
     const reflectionCount = reflectionDayAgg.length;
 
@@ -157,14 +164,12 @@ export const getDashboard = async (req, res) => {
       const diffMs = now.getTime() - recentMood.createdAt.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
 
-      // If mood was logged less than 24 hours ago, treat it as current
       if (diffHours < 24) {
         currentMood = {
           mood: recentMood.mood,
           createdAt: recentMood.createdAt,
         };
       } else {
-        // older than 24h -> treat as "none" on dashboard
         currentMood = null;
       }
     }
@@ -175,7 +180,6 @@ export const getDashboard = async (req, res) => {
       habitCompletionRate,
     };
 
-    // ---- Response ----
     res.status(200).json({
       success: true,
       data: {
@@ -187,11 +191,11 @@ export const getDashboard = async (req, res) => {
           streakTitle,
         },
         quickLogs: {
-          mood: recentMood, // full latest mood doc if you still want it
+          mood: recentMood,
           habit: recentHabit,
           proof: recentProof,
         },
-        currentMood, // <--- this will be null ("none") if last mood > 24h ago
+        currentMood,
         secondaryCards,
       },
     });
