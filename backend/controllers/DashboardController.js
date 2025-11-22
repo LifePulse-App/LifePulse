@@ -125,15 +125,30 @@ export const getDashboard = async (req, res) => {
       recentMood,
       recentHabit,
       recentProof,
-      reflectionCount,
+      reflectionDayAgg,
       habitCompletionRate,
     ] = await Promise.all([
       Mood.findOne({ user: userId }).sort({ createdAt: -1 }),
       Habit.findOne({ user: userId }).sort({ createdAt: -1 }),
       Proof.findOne({ user: userId }).sort({ createdAt: -1 }),
-      Mood.countDocuments({ user: userId }),
+      // ⬇️ count distinct days with mood logs
+      Mood.aggregate([
+        { $match: { user: userId } },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createdAt" },
+              month: { $month: "$createdAt" },
+              day: { $dayOfMonth: "$createdAt" },
+            },
+          },
+        },
+      ]),
       Habit.countDocuments({ user: userId, completed: true }),
     ]);
+    
+    // reflectionCount is number of unique days with at least one mood
+    const reflectionCount = reflectionDayAgg.length;
 
     // ---- Current mood logic (reset after 24h) ----
     let currentMood = null;
