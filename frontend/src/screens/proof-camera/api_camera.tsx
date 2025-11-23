@@ -1,17 +1,26 @@
 import client from "../../auth/api-client/api_client";
-import { GetTodayHabitsResponse } from "../dashboard/models/HabitResponse";
 
-// adjust these paths/types to your actual structure
+type ListHabitsResponse = {
+  success: boolean;
+  habits: any[];
+};
 
-// GET /api/habits – predefined habits for selection/search
-const GetHabits = (search?: string) =>
-  client.get<GetTodayHabitsResponse>("/habit", {
-    params: search ? { search } : undefined,
-  }
-);
+const GetHabits = (search?: string) => {
+  console.log("GetHabits called with search:", search);
 
-// POST /api/proofs – upload proof for a habit
-// formData: FormData with fields { proof, habitId }
+  return client
+    .get<ListHabitsResponse>("/habit", {
+      params: { search: search ?? "" }, // ALWAYS send search
+    })
+    .then((res) => {
+      console.log("GetHabits axios config:", {
+        url: res.config?.url,
+        params: (res.config as any)?.params,
+      });
+      return res;
+    });
+};
+
 const SubmitProof = (formData: FormData) =>
   client.post("/proofs", formData, {
     headers: { "Content-Type": "multipart/form-data" },

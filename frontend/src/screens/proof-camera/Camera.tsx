@@ -101,6 +101,8 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
     setHabitsLoading(true);
     try {
       const res = await ProofApi.GetHabits(query || undefined);
+      console.log(res);
+      
       const data = (res as any).data?.habits ?? (res as any).habits ?? [];
       const normalized: Habit[] = data.map((h: any) => ({
         id: h.id || h._id?.toString(),
