@@ -29,8 +29,8 @@ export const submitProof = async (req, res) => {
     const expectedSlot = habit.timeSlot; // from DB
     const isTimeValid = !expectedSlot || currentSlot === expectedSlot;
 
-    const initialStatus = isTimeValid ? "submitted" : "rejected";
-    const initialPoints = isTimeValid ? 1 : 0;
+    const initialStatus = "submitted";
+    const initialPoints = 1 ;
 
     // Create initial proof
     const proof = await Proof.create({
@@ -43,16 +43,6 @@ export const submitProof = async (req, res) => {
       timeSlotAtProof: currentSlot,
     });
 
-    // If wrong time window, don't call AI model
-    if (!isTimeValid) {
-      return res.json({
-        success: true,
-        status: "rejected",
-        points: 0,
-        proofId: proof._id,
-        reason: `This habit is for ${expectedSlot}, but proof was taken in ${currentSlot} window.`,
-      });
-    }
 
     // Call AI verification microservice
     try {
