@@ -59,7 +59,7 @@ export const getTodayHabits = async (req, res, next) => {
 // List predefined habits (for search & selection)
 export const listHabits = async (req, res) => {
   try {
-    const search = req.query.search || "";
+    const search = req.params.search || "";
     const query = { active: true }; // no : any
     console.log(search);
     if (search) {

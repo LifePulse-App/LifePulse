@@ -7,7 +7,8 @@ import { GetTodayHabitsResponse } from "../dashboard/models/HabitResponse";
 const GetHabits = (search?: string) =>
   client.get<GetTodayHabitsResponse>("/habit", {
     params: search ? { search } : undefined,
-  });
+  }
+);
 
 // POST /api/proofs – upload proof for a habit
 // formData: FormData with fields { proof, habitId }
