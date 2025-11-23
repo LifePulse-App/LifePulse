@@ -5,26 +5,29 @@ export const getTodayHabits = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // 1) 24‑hour window: now back to now‑24h
-    const now = new Date();
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    // 1) Today’s date range: 00:00 → 23:59:59
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
 
-    // 2) Get this user's proofs in last 24h
-    const recentProofs = await Proof.find({
+    const endOfToday = new Date(startOfToday);
+    endOfToday.setDate(endOfToday.getDate() + 1); // tomorrow 00:00
+
+    // 2) Get this user's proofs for today
+    const todayProofs = await Proof.find({
       user: userId,
-      createdAt: { $gte: twentyFourHoursAgo, $lte: now },
+      createdAt: { $gte: startOfToday, $lt: endOfToday },
     }).sort({ createdAt: -1 }); // newest first
 
-    if (!recentProofs.length) {
+    if (!todayProofs.length) {
       return res.json({
         success: true,
         habits: [],
       });
     }
 
-    // 3) Get unique habitIds from these proofs (one habit per user)
+    // 3) Unique habitIds from these proofs (one habit per type)
     const uniqueHabitIds = [
-      ...new Set(recentProofs.map((p) => p.habit.toString())),
+      ...new Set(todayProofs.map((p) => p.habit.toString())),
     ];
 
     // 4) Fetch those habits from global catalog
@@ -41,18 +44,16 @@ export const getTodayHabits = async (req, res) => {
         const habit = habitMap.get(habitId);
         if (!habit) return null;
 
-        const proofForHabit = recentProofs.find(
+        const proofForHabit = todayProofs.find(
           (p) => p.habit.toString() === habitId
         );
 
-        // default: pending
         let status= "pending" | "verified" | "rejected";
         if (proofForHabit) {
           if (proofForHabit.status === "verified") status = "verified";
           else if (proofForHabit.status === "rejected") status = "rejected";
         }
 
-        // use proof timeSlotAtProof as time; fallback to habit.defaultTime
         const timeFromProof = proofForHabit?.timeSlotAtProof || "";
 
         return {

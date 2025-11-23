@@ -54,19 +54,30 @@ export const getDashboard = async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
-    // ---- Update streak dynamically (using day-diff) ----
-    const today = new Date();
+    // ---- Date helpers ----
+    const now = new Date();
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+    const endOfToday = new Date(startOfToday);
+    endOfToday.setDate(endOfToday.getDate() + 1);
+
+    // ---- Check if user has at least one verified proof TODAY ----
+    const hasTodayVerifiedProof = await Proof.exists({
+      user: userId,
+      verified: true,
+      createdAt: { $gte: startOfToday, $lt: endOfToday },
+    });
+
+    // ---- Streak logic (increment when at least one proof today) ----
     const lastUpdated = user.streak?.lastUpdated
       ? new Date(user.streak.lastUpdated)
       : null;
 
     let streakCount = user.streak?.count || 0;
 
-    const startOfToday = new Date(today);
-    startOfToday.setHours(0, 0, 0, 0);
-
     if (!lastUpdated) {
-      streakCount = 0;
+      // first time using streak
+      streakCount = hasTodayVerifiedProof ? 1 : 0;
     } else {
       const startOfLast = new Date(lastUpdated);
       startOfLast.setHours(0, 0, 0, 0);
@@ -75,14 +86,29 @@ export const getDashboard = async (req, res) => {
         (startOfToday.getTime() - startOfLast.getTime()) /
         (1000 * 60 * 60 * 24);
 
-      if (daysDiff >= 1) {
-        streakCount = 0;
-      } else {
-        streakCount = user.streak?.count || 0;
+      if (daysDiff === 0) {
+        // same calendar day
+        if (streakCount === 0 && hasTodayVerifiedProof) {
+          // first ever proof today
+          streakCount = 1;
+        }
+        // otherwise keep streakCount as is
+      } else if (daysDiff === 1) {
+        // yesterday was last updated day
+        if (hasTodayVerifiedProof) {
+          // continuous streak
+          streakCount = (streakCount || 0) + 1;
+        } else {
+          // no proof today yet: you can keep streak as-is or decide to reset later
+          // here we keep it for now; it will reset if user skips a full day and comes back
+        }
+      } else if (daysDiff > 1) {
+        // gap of >= 2 days -> streak broken
+        streakCount = hasTodayVerifiedProof ? 1 : 0;
       }
     }
 
-    user.streak = { count: streakCount, lastUpdated: today };
+    user.streak = { count: streakCount, lastUpdated: now };
     await user.save();
 
     // ---- Calculate XP (single source of truth here) ----
@@ -134,13 +160,13 @@ export const getDashboard = async (req, res) => {
     // ---- Quick logs & secondary cards ----
     const [
       recentMood,
-      recentHabit, // this still reads from global habits; adjust if you later add UserHabit
+      recentHabit,
       recentProof,
       reflectionDayAgg,
       habitCompletionRate,
     ] = await Promise.all([
       Mood.findOne({ user: userId }).sort({ createdAt: -1 }),
-      Habit.findOne().sort({ createdAt: -1 }), // no user filter because habits are global
+      Habit.findOne().sort({ createdAt: -1 }), // global habit
       Proof.findOne({ user: userId }).sort({ createdAt: -1 }),
       Mood.aggregate([
         { $match: { user: userId } },
@@ -154,20 +180,19 @@ export const getDashboard = async (req, res) => {
           },
         },
       ]),
-      // this will stay 0 until you actually track completion per user/ habit
       Promise.resolve(0),
     ]);
 
     const reflectionCount = reflectionDayAgg.length;
 
-    // ---- Current mood logic (reset after 24h) ----
+    // ---- Current mood logic (reset at 12 AM) ----
     let currentMood = null;
     if (recentMood) {
-      const now = new Date();
-      const diffMs = now.getTime() - recentMood.createdAt.getTime();
-      const diffHours = diffMs / (1000 * 60 * 60);
+      const moodDate = new Date(recentMood.createdAt);
+      const startOfMoodDay = new Date(moodDate);
+      startOfMoodDay.setHours(0, 0, 0, 0);
 
-      if (diffHours < 24) {
+      if (startOfMoodDay.getTime() === startOfToday.getTime()) {
         currentMood = {
           mood: recentMood.mood,
           createdAt: recentMood.createdAt,
