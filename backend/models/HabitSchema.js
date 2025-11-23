@@ -2,13 +2,7 @@ import mongoose from "mongoose";
 
 const habitSchema = new mongoose.Schema(
   {
-    user: {                             // <-- NEW: make habits user-specific
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    key: { type: String, required: true },
+    key: { type: String, required: true, unique: true },
     habitName: { type: String, required: true },
     label: { type: String },
     icon: { type: String },
@@ -18,7 +12,7 @@ const habitSchema = new mongoose.Schema(
       enum: ["morning", "afternoon", "evening", "night"],
       required: true,
     },
-    group: { type: String },
+    group: { type: String }, // <--- add this
     active: { type: Boolean, default: true },
   },
   { timestamps: true }

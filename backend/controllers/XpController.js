@@ -123,27 +123,31 @@ const HABIT_XP = {
 
 export const recalculateXp = async (userId) => {
   const objectId = new mongoose.Types.ObjectId(userId);
-  const habits = await Habit.find({ user: objectId });
 
   let totalXp = 0;
 
-  for (let habit of habits) {
+  // 1) XP from proofs + habits (using global Habit catalog)
+  //    We look at all verified proofs for this user and derive XP from the linked Habit.
+  const verifiedProofs = await Proof.find({
+    user: objectId,
+    verified: true,
+  }).populate("habit");
+
+  for (const proof of verifiedProofs) {
+    const habit = proof.habit;
+    if (!habit) continue;
+
     const type = (habit.habitName || "").trim().toLowerCase();
 
-    const proof = await Proof.findOne({
-      user: objectId,
-      habit: habit._id,       // <-- FIXED: field is "habit", not "habitId"
-      verified: true,
-    });
-
     if (HABIT_XP[type]) {
-      totalXp += HABIT_XP[type].base;
-      if (proof) totalXp += HABIT_XP[type].verified;
+      totalXp += HABIT_XP[type].base + HABIT_XP[type].verified;
     } else {
+      // fallback XP when habitName not in HABIT_XP
       totalXp += 10;
     }
   }
 
+  // 2) XP from moods – distinct days
   const moodDayAgg = await Mood.aggregate([
     { $match: { user: objectId } },
     {
@@ -156,9 +160,11 @@ export const recalculateXp = async (userId) => {
       },
     },
   ]);
+
   const uniqueMoodDays = moodDayAgg.length;
   totalXp += uniqueMoodDays * 10;
 
+  // 3) Save on user
   const user = await User.findById(objectId);
   if (user) {
     user.xp = totalXp;

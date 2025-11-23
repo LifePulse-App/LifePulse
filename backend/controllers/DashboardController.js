@@ -48,10 +48,11 @@ export const getDashboard = async (req, res) => {
   try {
     const userId = req.user._id;
     const user = await User.findById(userId).select("name xp streak");
-    if (!user)
+    if (!user) {
       return res
         .status(404)
         .json({ success: false, message: "User not found" });
+    }
 
     // ---- Update streak dynamically (using day-diff) ----
     const today = new Date();
@@ -85,26 +86,28 @@ export const getDashboard = async (req, res) => {
     await user.save();
 
     // ---- Calculate XP (single source of truth here) ----
-    const habits = await Habit.find({ user: userId });
     let totalXp = 0;
 
-    for (let habit of habits) {
-      const type = habit.habitName.toLowerCase();
-      const proof = await Proof.findOne({
-        user: userId,
-        habit: habit._id,   // change from habitId to habit
-        verified: true,
-      });
+    // 1) XP from verified proofs + their habits (global catalog)
+    const verifiedProofs = await Proof.find({
+      user: userId,
+      verified: true,
+    }).populate("habit");
+
+    for (const proof of verifiedProofs) {
+      const habit = proof.habit;
+      if (!habit) continue;
+
+      const type = (habit.habitName || "").trim().toLowerCase();
 
       if (HABIT_XP[type]) {
-        totalXp += HABIT_XP[type].base;
-        if (proof) totalXp += HABIT_XP[type].verified;
+        totalXp += HABIT_XP[type].base + HABIT_XP[type].verified;
       } else {
         totalXp += 10;
       }
     }
 
-    // ⬇️ Mood XP based on DISTINCT days with at least one mood
+    // 2) Mood XP based on DISTINCT days with at least one mood
     const moodDayAgg = await Mood.aggregate([
       { $match: { user: userId } },
       {
@@ -131,13 +134,13 @@ export const getDashboard = async (req, res) => {
     // ---- Quick logs & secondary cards ----
     const [
       recentMood,
-      recentHabit,
+      recentHabit, // this still reads from global habits; adjust if you later add UserHabit
       recentProof,
       reflectionDayAgg,
       habitCompletionRate,
     ] = await Promise.all([
       Mood.findOne({ user: userId }).sort({ createdAt: -1 }),
-      Habit.findOne({ user: userId }).sort({ createdAt: -1 }),
+      Habit.findOne().sort({ createdAt: -1 }), // no user filter because habits are global
       Proof.findOne({ user: userId }).sort({ createdAt: -1 }),
       Mood.aggregate([
         { $match: { user: userId } },
@@ -151,10 +154,10 @@ export const getDashboard = async (req, res) => {
           },
         },
       ]),
-      Habit.countDocuments({ user: userId, completed: true }),
+      // this will stay 0 until you actually track completion per user/ habit
+      Promise.resolve(0),
     ]);
 
-    // reflectionCount is number of unique days with at least one mood
     const reflectionCount = reflectionDayAgg.length;
 
     // ---- Current mood logic (reset after 24h) ----

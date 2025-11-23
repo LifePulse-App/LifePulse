@@ -139,6 +139,9 @@ const Dashboard = ({ navigation }: any) => {
       
       const responseData = (res as any).data ?? res;
 
+      console.log(responseData);
+      
+
       if (!responseData.success) {
         throw new Error(responseData.message || "Failed to load dashboard");
       }
