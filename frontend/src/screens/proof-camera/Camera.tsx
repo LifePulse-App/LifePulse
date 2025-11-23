@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useContext } from 'react';
 import {
   View,
   StyleSheet,
@@ -19,6 +19,7 @@ import AppActivityIndicator from '../../components/Layout/AppActivityIndicator/A
 import AppText from '../../components/Layout/AppText/AppText';
 import colors from '../../shared/styling/lightModeColors';
 import ProofApi from './api_camera';
+import AuthContext from '../../auth/user/UserContext';
 
 type Habit = {
   id: string;
@@ -43,6 +44,9 @@ const GLASS_BG = 'rgba(15, 23, 42, 0.65)';
 const GLASS_BORDER = 'rgba(148, 163, 184, 0.35)';
 
 const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
+  const authContext = useContext(AuthContext);
+  console.log(authContext);
+  
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -154,7 +158,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
     }, 400);
   };
   
-
+  const userId = authContext?.User?.user?.id ;
   const uploadProof = async (uri: string, habitId: string) => {
     try {
       setUploading(true);
@@ -165,6 +169,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
         type: 'image/jpeg',
       } as any);
       formData.append('habitId', habitId);
+      formData.append('userId', userId);
 
       const res = await ProofApi.SubmitProof(formData);
       console.log(res);
