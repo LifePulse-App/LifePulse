@@ -5,42 +5,67 @@ export const getTodayHabits = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // 1) Compute today's date range (00:00–23:59)
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date(startOfToday);
-    endOfToday.setDate(endOfToday.getDate() + 1);
+    // 1) 24‑hour window: now back to now‑24h
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    // 2) Get all active habits (global catalog)
-    // If you later want per-timeslot: filter by `timeSlot`
-    const habits = await Habit.find({ active: true }).sort({ createdAt: 1 });
+    // 2) Get this user's proofs in last 24h
+    const recentProofs = await Proof.find({
+      user: userId,
+      createdAt: { $gte: twentyFourHoursAgo, $lte: now },
+    }).sort({ createdAt: -1 }); // newest first
 
-    // 3) For each habit, find today's proof for this user
-    const todayHabits = await Promise.all(
-      habits.map(async (habit) => {
-        const todayProof = await Proof.findOne({
-          user: userId,
-          habit: habit._id,
-          createdAt: { $gte: startOfToday, $lt: endOfToday },
-        }).sort({ createdAt: -1 });
+    if (!recentProofs.length) {
+      return res.json({
+        success: true,
+        habits: [],
+      });
+    }
 
-        let status= "pending" | "verified" | "rejected";
-        if (todayProof) {
-          if (todayProof.status === "verified") status = "verified";
-          else if (todayProof.status === "rejected") status = "rejected";
-          else status = "pending"
-        }
-
-        return {
-          id: habit._id.toString(),
-          icon: habit.icon || null,
-          label: habit.label || habit.habitName,
-          habitName: habit.habitName,
-          time: habit.defaultTime || "",
-          status,
-        };
-      })
+    // 3) Get unique habitIds from these proofs (one habit per user)
+    const uniqueHabitIdsSet = new Set(
+      recentProofs.map((p) => p.habit.toString())
     );
+    const uniqueHabitIds = Array.from(uniqueHabitIdsSet);
+
+    // 4) Fetch those habits from global catalog
+    const habits = await Habit.find({
+      _id: { $in: uniqueHabitIds },
+      active: true,
+    });
+
+    // Map for quick lookup
+    const habitMap = new Map(
+      habits.map((h) => [h._id.toString(), h])
+    );
+
+    // 5) Build todayHabits list:
+    //    for each unique habitId, find the most recent proof (already sorted),
+    //    derive status from that proof, and attach habit info
+    const todayHabits = uniqueHabitIds.map((habitId) => {
+      const habit = habitMap.get(habitId);
+      if (!habit) return null;
+
+      const proofForHabit = recentProofs.find(
+        (p) => p.habit.toString() === habitId
+      );
+
+      let status= "pending" | "verified" | "rejected";
+      if (proofForHabit) {
+        if (proofForHabit.status === "verified") status = "verified";
+        else if (proofForHabit.status === "rejected") status = "rejected";
+        else status = "pending";
+      }
+
+      return {
+        id: habit._id.toString(),
+        icon: habit.icon || null,
+        label: habit.label || habit.habitName,
+        habitName: habit.habitName,
+        time: habit.defaultTime || "",
+        status,
+      };
+    }).filter(Boolean); // remove any nulls (if habit not found)
 
     return res.json({
       success: true,
