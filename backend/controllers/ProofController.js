@@ -41,6 +41,8 @@ export const submitProof = async (req, res) => {
       headers: formData.getHeaders(),
     });
 
+    console.log(aiRes);
+
     proof.status = aiRes.data.verified ? "verified" : "rejected";
     proof.points = aiRes.data.verified ? 10 : 0;
     proof.verified = !!aiRes.data.verified;
