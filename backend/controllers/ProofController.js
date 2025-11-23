@@ -4,86 +4,58 @@ import axios from "axios";
 import { recalculateXp } from "./XpController.js";
 import { getTimeSlotForDate } from "../utils/timeSlotCheck.js";
 
-// Submit a habit proof (with image + AI check and time-slot validation)
+// Submit a habit proof (image + AI verification)
 export const submitProof = async (req, res) => {
   try {
-    const { habitId, userId } = req.body; // predefined Habit _id
-
+    const { habitId, userId } = req.body;
     if (!habitId || !req.file) {
-      return res.status(400).json({
-        success: false,
-        message: "habitId and proof image are required.",
-      });
+      return res.status(400).json({ success: false, message: "habitId and proof image required." });
     }
 
-    // Predefined habit (global)
     const habit = await Habit.findOne({ _id: habitId, active: true });
-    if (!habit) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Habit not found." });
-    }
+    if (!habit) return res.status(404).json({ success: false, message: "Habit not found." });
 
-    // Time window check
-    const currentSlot = getTimeSlotForDate(new Date()); // "morning"/"afternoon"/"evening"/"night"
-    const expectedSlot = habit.timeSlot; // from DB
+    const currentSlot = getTimeSlotForDate(new Date());
+    const expectedSlot = habit.timeSlot;
     const isTimeValid = !expectedSlot || currentSlot === expectedSlot;
 
-    const initialStatus = "submitted";
-    const initialPoints = 1 ;
-
-    // Create initial proof
     const proof = await Proof.create({
       user: userId,
       habit: habit._id,
       imageUrl: req.file.path,
-      status: initialStatus,
-      points: initialPoints,
+      status: "submitted",
+      points: 1,
       verified: false,
       timeSlotAtProof: currentSlot,
     });
 
+    // Send image to FastAPI AI verification
+    const formData = new FormData();
+    formData.append("habitName", habit.key);
+    formData.append("image", fs.createReadStream(req.file.path));
 
-    // Call AI verification microservice
-    try {
-      const aiRes = await axios.post("http://localhost:8000/verify", {
-        imageUrl: req.file.path,
-        habitName: habit.key, // use key to match HABIT_LABEL_MAP
-      });
+    const aiRes = await axios.post("http://localhost:8000/verify", formData, {
+      headers: formData.getHeaders(),
+    });
 
-      proof.status = aiRes.data.verified ? "verified" : "rejected";
-      proof.points = aiRes.data.verified ? 10 : 0;
-      proof.verified = !!aiRes.data.verified;
-      proof.aiScore = aiRes.data.score;
-      if (proof.verified) proof.verifiedAt = new Date();
+    proof.status = aiRes.data.verified ? "verified" : "rejected";
+    proof.points = aiRes.data.verified ? 10 : 0;
+    proof.verified = !!aiRes.data.verified;
+    proof.aiScore = aiRes.data.score;
+    if (proof.verified) proof.verifiedAt = new Date();
 
-      await proof.save();
+    await proof.save();
 
-      // Award XP only on verified proofs
-      if (proof.verified) {
-        await recalculateXp(userId);
-      }
+    if (proof.verified) await recalculateXp(userId);
 
-      return res.json({
-        success: true,
-        status: proof.status,
-        points: proof.points,
-        proofId: proof._id,
-      });
-    } catch (err) {
-      console.error("AI verification error:", err);
-      await proof.save();
-      return res.json({
-        success: true,
-        status: proof.status,
-        points: proof.points,
-        aiError: true,
-      });
-    }
+    return res.json({
+      success: true,
+      status: proof.status,
+      points: proof.points,
+      proofId: proof._id,
+    });
   } catch (error) {
     console.error("Submit Proof Error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to submit proof." });
+    return res.status(500).json({ success: false, message: "Failed to submit proof." });
   }
 };

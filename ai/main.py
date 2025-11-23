@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Dict, List, Tuple
 import torch
@@ -10,46 +10,33 @@ import os
 
 app = FastAPI()
 
-# ---------- INPUT MODEL ----------
-
-class ProofInput(BaseModel):
-    imageUrl: str      # local path to image: uploads/xxxx.jpg
-    habitName: str     # e.g. "pushups", "reading", "drink water"
-
 # ---------- MODEL LOADING ----------
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
 model.eval()
 model.to(device)
 
 # ---------- IMAGENET LABELS ----------
-
 IMAGENET_LABELS_PATH = "imagenet_class_index.json"
-
 if os.path.exists(IMAGENET_LABELS_PATH):
     with open(IMAGENET_LABELS_PATH, "r") as f:
         idx_to_label_raw = json.load(f)
-    # idx_to_label: int -> label string (e.g. "Labrador_retriever")
     idx_to_label: Dict[int, str] = {int(k): v[1] for k, v in idx_to_label_raw.items()}
 else:
-    # Minimal fallback if file not present
     idx_to_label = {i: f"class_{i}" for i in range(1000)}
 
 # ---------- TRANSFORMS ----------
-
 transform = T.Compose([
     T.Resize(256),
     T.CenterCrop(224),
     T.ToTensor(),
     T.Normalize(
-        mean=[0.485, 0.456, 0.406],  # ImageNet means
+        mean=[0.485, 0.456, 0.406],
         std=[0.229, 0.224, 0.225],
     ),
 ])
 
 # ---------- HABIT -> LABELS MAPPING ----------
-
 HABIT_LABEL_MAP: Dict[str, List[str]] = {
     # ---------------- MOVEMENT / FITNESS ----------------
     "pushups": [
@@ -349,32 +336,24 @@ HABIT_LABEL_MAP: Dict[str, List[str]] = {
 
 def get_habit_labels(habit_name: str) -> List[str]:
     key = habit_name.strip().lower()
-    # direct lookup using key from Node
     return HABIT_LABEL_MAP.get(key, [])
 
 def predict_image_labels(image_path: str, topk: int = 5) -> List[Tuple[str, float]]:
-    if not os.path.exists(image_path):
-        raise FileNotFoundError(f"Image not found at {image_path}")
-
     img = Image.open(image_path).convert("RGB")
     x = transform(img).unsqueeze(0).to(device)
-
     with torch.no_grad():
         logits = model(x)
         probs = torch.softmax(logits, dim=1)
-
     top_probs, top_idxs = probs.topk(topk, dim=1)
     top_probs = top_probs[0].cpu().numpy()
     top_idxs = top_idxs[0].cpu().numpy()
-
     top_labels = [idx_to_label.get(int(i), f"class_{int(i)}") for i in top_idxs]
-    return list(zip(top_labels, top_probs))  # [(label, prob), ...]
+    return list(zip(top_labels, top_probs))
 
 def compute_habit_score(habit_name: str, predictions: List[Tuple[str, float]]) -> float:
     habit_labels = get_habit_labels(habit_name)
     if not habit_labels:
         return 0.0
-
     score = 0.0
     for label, prob in predictions:
         for h_label in habit_labels:
@@ -382,39 +361,38 @@ def compute_habit_score(habit_name: str, predictions: List[Tuple[str, float]]) -
                 score += float(prob)
     return float(min(score, 1.0))
 
+# ---------- VERIFY ENDPOINT ----------
 @app.post("/verify")
-async def verify_proof(data: ProofInput):
-    image_path = data.imageUrl
+async def verify_proof_ai(
+    habitName: str = Form(...), 
+    image: UploadFile = File(...)
+):
+    temp_dir = "temp_uploads"
+    os.makedirs(temp_dir, exist_ok=True)
+    temp_path = os.path.join(temp_dir, image.filename)
 
     try:
-        preds = predict_image_labels(image_path, topk=5)
-        score = compute_habit_score(data.habitName, preds)
+        # Save temporarily
+        with open(temp_path, "wb") as f:
+            f.write(await image.read())
 
+        # Process
+        preds = predict_image_labels(temp_path, topk=5)
+        score = compute_habit_score(habitName, preds)
         threshold = 0.3
         is_verified = score >= threshold
 
-        top_predictions = [
-            {"label": label, "probability": float(prob)}
-            for (label, prob) in preds
-        ]
+        top_predictions = [{"label": label, "probability": float(prob)} for label, prob in preds]
 
         return {
             "verified": is_verified,
             "score": round(score, 3),
             "top_predictions": top_predictions,
         }
-    except FileNotFoundError as e:
-        return {
-            "verified": False,
-            "score": 0.0,
-            "error": str(e),
-        }
-    except Exception as e:
-        return {
-            "verified": False,
-            "score": 0.0,
-            "error": f"Model inference failed: {e}",
-        }
+    finally:
+        # Delete temp file
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
 
 if __name__ == "__main__":
     import uvicorn
