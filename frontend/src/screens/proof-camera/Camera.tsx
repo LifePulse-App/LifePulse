@@ -45,7 +45,6 @@ const GLASS_BORDER = 'rgba(148, 163, 184, 0.35)';
 
 const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const authContext = useContext(AuthContext);
-  console.log(authContext);
   
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
