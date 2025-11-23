@@ -1,5 +1,4 @@
 from fastapi import FastAPI, UploadFile, File, Form
-from pydantic import BaseModel
 from typing import Dict, List, Tuple
 import torch
 import torchvision.transforms as T
@@ -19,9 +18,10 @@ model.to(device)
 # ---------- IMAGENET LABELS ----------
 IMAGENET_LABELS_PATH = "imagenet_class_index.json"
 if os.path.exists(IMAGENET_LABELS_PATH):
-    with open(IMAGENET_LABELS_PATH, "r") as f:
+    with open(IMAGENET_LABELS_PATH, "r", encoding="utf-8") as f:
         idx_to_label_raw = json.load(f)
-    idx_to_label: Dict[int, str] = {int(k): v[1] for k, v in idx_to_label_raw.items()}
+    # Ensure all labels are strings
+    idx_to_label: Dict[int, str] = {int(k): str(v[1]) for k, v in idx_to_label_raw.items()}
 else:
     idx_to_label = {i: f"class_{i}" for i in range(1000)}
 
@@ -37,6 +37,7 @@ transform = T.Compose([
 ])
 
 # ---------- HABIT -> LABELS MAPPING ----------
+# Keep your existing HABIT_LABEL_MAP here
 HABIT_LABEL_MAP: Dict[str, List[str]] = {
     # ---------------- MOVEMENT / FITNESS ----------------
     "pushups": [
@@ -335,8 +336,7 @@ HABIT_LABEL_MAP: Dict[str, List[str]] = {
 }
 
 def get_habit_labels(habit_name: str) -> List[str]:
-    key = habit_name.strip().lower()
-    return HABIT_LABEL_MAP.get(key, [])
+    return HABIT_LABEL_MAP.get(habit_name.strip().lower(), [])
 
 def predict_image_labels(image_path: str, topk: int = 5) -> List[Tuple[str, float]]:
     img = Image.open(image_path).convert("RGB")
@@ -347,7 +347,7 @@ def predict_image_labels(image_path: str, topk: int = 5) -> List[Tuple[str, floa
     top_probs, top_idxs = probs.topk(topk, dim=1)
     top_probs = top_probs[0].cpu().numpy()
     top_idxs = top_idxs[0].cpu().numpy()
-    top_labels = [idx_to_label.get(int(i), f"class_{int(i)}") for i in top_idxs]
+    top_labels = [str(idx_to_label.get(int(i), f"class_{int(i)}")) for i in top_idxs]  # ensure string
     return list(zip(top_labels, top_probs))
 
 def compute_habit_score(habit_name: str, predictions: List[Tuple[str, float]]) -> float:
@@ -382,11 +382,15 @@ async def verify_proof_ai(
         threshold = 0.3
         is_verified = score >= threshold
 
-        top_predictions = [{"label": label, "probability": float(prob)} for label, prob in preds]
+        # Make sure everything is JSON-safe
+        top_predictions = [
+            {"label": str(label), "probability": float(prob)} 
+            for label, prob in preds
+        ]
 
         return {
-            "verified": is_verified,
-            "score": round(score, 3),
+            "verified": bool(is_verified),
+            "score": round(float(score), 3),
             "top_predictions": top_predictions,
         }
     finally:
