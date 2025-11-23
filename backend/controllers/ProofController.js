@@ -3,6 +3,9 @@ import Habit from "../models/HabitSchema.js";
 import axios from "axios";
 import { recalculateXp } from "./XpController.js";
 import { getTimeSlotForDate } from "../utils/timeSlotCheck.js";
+import fs from "fs";
+import FormData from "form-data"; // also import FormData
+
 
 // Submit a habit proof (image + AI verification)
 export const submitProof = async (req, res) => {
