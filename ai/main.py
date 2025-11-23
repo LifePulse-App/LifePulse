@@ -5,7 +5,7 @@ import torchvision.transforms as T
 from torchvision import models
 from PIL import Image
 import json
-import os
+import io
 
 app = FastAPI()
 
@@ -20,7 +20,6 @@ IMAGENET_LABELS_PATH = "imagenet_class_index.json"
 if os.path.exists(IMAGENET_LABELS_PATH):
     with open(IMAGENET_LABELS_PATH, "r", encoding="utf-8") as f:
         idx_to_label_raw = json.load(f)
-    # Ensure all labels are strings
     idx_to_label: Dict[int, str] = {int(k): str(v[1]) for k, v in idx_to_label_raw.items()}
 else:
     idx_to_label = {i: f"class_{i}" for i in range(1000)}
@@ -37,7 +36,6 @@ transform = T.Compose([
 ])
 
 # ---------- HABIT -> LABELS MAPPING ----------
-# Keep your existing HABIT_LABEL_MAP here
 HABIT_LABEL_MAP: Dict[str, List[str]] = {
     # ---------------- MOVEMENT / FITNESS ----------------
     "pushups": [
@@ -316,6 +314,8 @@ HABIT_LABEL_MAP: Dict[str, List[str]] = {
     ],
 
     # ---------------- COMMUTE / ERRANDS ----------------
+
+
     "bike to work": [
         "bicycle-built-for-two", "mountain_bike", "road_bike"
     ],
@@ -336,10 +336,10 @@ HABIT_LABEL_MAP: Dict[str, List[str]] = {
 }
 
 def get_habit_labels(habit_name: str) -> List[str]:
-    return HABIT_LABEL_MAP.get(habit_name.strip().lower(), [])
+    return [str(l) for l in HABIT_LABEL_MAP.get(habit_name.strip().lower(), [])]
 
-def predict_image_labels(image_path: str, topk: int = 5) -> List[Tuple[str, float]]:
-    img = Image.open(image_path).convert("RGB")
+def predict_image_labels(img_bytes: bytes, topk: int = 5) -> List[Tuple[str, float]]:
+    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     x = transform(img).unsqueeze(0).to(device)
     with torch.no_grad():
         logits = model(x)
@@ -347,7 +347,7 @@ def predict_image_labels(image_path: str, topk: int = 5) -> List[Tuple[str, floa
     top_probs, top_idxs = probs.topk(topk, dim=1)
     top_probs = top_probs[0].cpu().numpy()
     top_idxs = top_idxs[0].cpu().numpy()
-    top_labels = [str(idx_to_label.get(int(i), f"class_{int(i)}")) for i in top_idxs]  # ensure string
+    top_labels = [idx_to_label.get(int(i), f"class_{int(i)}") for i in top_idxs]
     return list(zip(top_labels, top_probs))
 
 def compute_habit_score(habit_name: str, predictions: List[Tuple[str, float]]) -> float:
@@ -356,6 +356,7 @@ def compute_habit_score(habit_name: str, predictions: List[Tuple[str, float]]) -
         return 0.0
     score = 0.0
     for label, prob in predictions:
+        label = str(label)
         for h_label in habit_labels:
             if h_label.lower() in label.lower():
                 score += float(prob)
@@ -367,36 +368,20 @@ async def verify_proof_ai(
     habitName: str = Form(...), 
     image: UploadFile = File(...)
 ):
-    temp_dir = "temp_uploads"
-    os.makedirs(temp_dir, exist_ok=True)
-    temp_path = os.path.join(temp_dir, image.filename)
+    img_bytes = await image.read()
 
-    try:
-        # Save temporarily
-        with open(temp_path, "wb") as f:
-            f.write(await image.read())
+    preds = predict_image_labels(img_bytes, topk=5)
+    score = compute_habit_score(habitName, preds)
+    threshold = 0.3
+    is_verified = score >= threshold
 
-        # Process
-        preds = predict_image_labels(temp_path, topk=5)
-        score = compute_habit_score(habitName, preds)
-        threshold = 0.3
-        is_verified = score >= threshold
+    top_predictions = [{"label": str(label), "probability": float(prob)} for label, prob in preds]
 
-        # Make sure everything is JSON-safe
-        top_predictions = [
-            {"label": str(label), "probability": float(prob)} 
-            for label, prob in preds
-        ]
-
-        return {
-            "verified": bool(is_verified),
-            "score": round(float(score), 3),
-            "top_predictions": top_predictions,
-        }
-    finally:
-        # Delete temp file
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+    return {
+        "verified": is_verified,
+        "score": round(score, 3),
+        "top_predictions": top_predictions,
+    }
 
 if __name__ == "__main__":
     import uvicorn
