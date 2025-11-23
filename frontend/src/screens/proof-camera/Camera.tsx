@@ -25,8 +25,8 @@ type Habit = {
   habitName: string;
   label?: string;
   icon?: string;
-  time?: string; // defaultTime from backend
-  group?: string; // e.g. "Movement / Fitness"
+  time?: string;   // defaultTime from backend
+  group?: string;  // e.g. "Movement / Fitness"
 };
 
 type HabitSection = {
@@ -43,6 +43,7 @@ const GLASS_BG = 'rgba(15, 23, 42, 0.65)';
 const GLASS_BORDER = 'rgba(148, 163, 184, 0.35)';
 
 const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -80,14 +81,22 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
     fetchHabits('');
   }, []);
 
+  useEffect(() => {
+    if (habitModalVisible) {
+      fetchHabits(search);  // auto refresh list on modal open
+    }
+  }, [habitModalVisible]);
+  
+
   const groupHabits = (items: Habit[]): HabitSection[] => {
+    console.log('groupHabits items.length:', items.length);
     const byGroup: Record<string, Habit[]> = {};
     items.forEach(h => {
       const groupName = h.group || 'Other';
       if (!byGroup[groupName]) byGroup[groupName] = [];
       byGroup[groupName].push(h);
     });
-    return Object.keys(byGroup)
+    const sections = Object.keys(byGroup)
       .sort()
       .map(title => ({
         title,
@@ -95,22 +104,30 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
           (a.label || a.habitName).localeCompare(b.label || b.habitName),
         ),
       }));
+    console.log(
+      'groupHabits sections:',
+      sections.map(s => ({ title: s.title, count: s.data.length })),
+    );
+    return sections;
   };
 
   const fetchHabits = async (query: string) => {
     setHabitsLoading(true);
     try {
+      console.log('fetchHabits query:', query);
       const res = await ProofApi.GetHabits(query || undefined);
-      console.log(res);
-      
+      console.log('fetchHabits raw res.data:', (res as any).data);
       const data = (res as any).data?.habits ?? (res as any).habits ?? [];
+      console.log('fetchHabits data.length:', data.length);
+
       const normalized: Habit[] = data.map((h: any) => ({
         id: h.id || h._id?.toString(),
         habitName: h.habitName,
         label: h.habitName,
         icon: h.icon,
-        group: h.group, // optional, backend should provide
+        group: h.group, // backend provides this
       }));
+
       setHabits(normalized);
       setHabitSections(groupHabits(normalized));
 
@@ -131,8 +148,16 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleSearchHabit = (txt: string) => {
     setSearch(txt);
-    fetchHabits(txt);
+  
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
+    }
+  
+    searchTimeout.current = setTimeout(() => {
+      fetchHabits(txt);
+    }, 400);
   };
+  
 
   const uploadProof = async (uri: string, habitId: string) => {
     try {
@@ -209,7 +234,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
   }
 
   const selectedLabel =
-    selectedHabit?.label || selectedHabit?.habitName || 'Tap to select a activity';
+    selectedHabit?.habitName || 'Tap to select a activity';
 
   // Modal for habit selection (glassy + grouped)
   const renderHabitList = () => (
