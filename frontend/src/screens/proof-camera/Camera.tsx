@@ -1,5 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Alert, Modal, FlatList, TextInput } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  Modal,
+  SectionList,
+  TextInput,
+  Platform,
+} from 'react-native';
 import {
   Camera,
   useCameraDevices,
@@ -9,14 +18,20 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AppActivityIndicator from '../../components/Layout/AppActivityIndicator/AppActivityIndicator';
 import AppText from '../../components/Layout/AppText/AppText';
 import colors from '../../shared/styling/lightModeColors';
-import api from '../../shared/services/shared-api';
+import ProofApi from './api_camera';
 
 type Habit = {
-  id: string;              // from getTodayHabits or mapped _id
+  id: string;
   habitName: string;
   label?: string;
   icon?: string;
-  time?: string;
+  time?: string; // defaultTime from backend
+  group?: string; // e.g. "Movement / Fitness"
+};
+
+type HabitSection = {
+  title: string;
+  data: Habit[];
 };
 
 type Props = {
@@ -24,14 +39,20 @@ type Props = {
   route: { params?: { habitId?: string | null } };
 };
 
+const GLASS_BG = 'rgba(15, 23, 42, 0.65)';
+const GLASS_BORDER = 'rgba(148, 163, 184, 0.35)';
+
 const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [uploading, setUploading] = useState(false);
 
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [habitSections, setHabitSections] = useState<HabitSection[]>([]);
   const [habitId, setHabitId] = useState<string | null>(
     route.params?.habitId ?? null
   );
+  const [selectedHabit, setSelectedHabit] = useState<Habit | null>(null);
+
   const [habitModalVisible, setHabitModalVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [habitsLoading, setHabitsLoading] = useState(false);
@@ -59,26 +80,50 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
     fetchHabits('');
   }, []);
 
+  const groupHabits = (items: Habit[]): HabitSection[] => {
+    const byGroup: Record<string, Habit[]> = {};
+    items.forEach(h => {
+      const groupName = h.group || 'Other';
+      if (!byGroup[groupName]) byGroup[groupName] = [];
+      byGroup[groupName].push(h);
+    });
+    return Object.keys(byGroup)
+      .sort()
+      .map(title => ({
+        title,
+        data: byGroup[title].sort((a, b) =>
+          (a.label || a.habitName).localeCompare(b.label || b.habitName),
+        ),
+      }));
+  };
+
   const fetchHabits = async (query: string) => {
     setHabitsLoading(true);
     try {
-      const res = await api.get('/api/habits', {
-        params: query ? { search: query } : {},
-      });
-      // Backend returns { success, habits }
-      const data = res.data?.habits ?? [];
-      // Normalize id
+      const res = await ProofApi.GetHabits(query || undefined);
+      const data = (res as any).data?.habits ?? (res as any).habits ?? [];
       const normalized: Habit[] = data.map((h: any) => ({
         id: h.id || h._id?.toString(),
         habitName: h.habitName,
-        label: h.label,
+        label: h.label || h.habitName,
         icon: h.icon,
         time: h.time,
+        group: h.group, // optional, backend should provide
       }));
       setHabits(normalized);
+      setHabitSections(groupHabits(normalized));
+
+      // If we came with a preset habitId from route, set selectedHabit
+      if (!selectedHabit && habitId) {
+        const found = normalized.find(h => h.id === habitId);
+        if (found) {
+          setSelectedHabit(found);
+        }
+      }
     } catch (err) {
       console.error('Failed to load habits:', err);
       setHabits([]);
+      setHabitSections([]);
     }
     setHabitsLoading(false);
   };
@@ -88,9 +133,43 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
     fetchHabits(txt);
   };
 
+  const uploadProof = async (uri: string, habitId: string) => {
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('proof', {
+        uri,
+        name: 'proof.jpg',
+        type: 'image/jpeg',
+      } as any);
+      formData.append('habitId', habitId);
+
+      const res = await ProofApi.SubmitProof(formData);
+
+      if ((res as any).data?.success) {
+        const reason = (res as any).data?.reason;
+        if (reason) {
+          Alert.alert('Notice', reason);
+        } else {
+          Alert.alert('Success', 'Proof uploaded!');
+        }
+        navigation.goBack();
+      } else {
+        Alert.alert(
+          'Upload failed',
+          (res as any).data?.message || 'Please try again.',
+        );
+      }
+    } catch (err) {
+      console.error('Upload error:', err);
+      Alert.alert('Error', 'Server error while uploading proof.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleTakePhoto = async () => {
     if (!habitId) {
-      // force user to choose habit before capture
       setHabitModalVisible(true);
       return;
     }
@@ -107,36 +186,6 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
     } catch (err) {
       console.error('Capture error:', err);
       Alert.alert('Error', 'Failed to capture photo.');
-    }
-  };
-
-  const uploadProof = async (uri: string, habitId: string) => {
-    try {
-      setUploading(true);
-      const formData = new FormData();
-      formData.append('proof', {
-        uri,
-        name: 'proof.jpg',
-        type: 'image/jpeg',
-      } as any);
-      formData.append('habitId', habitId);
-
-      const res = await api.post('/api/proofs', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      if (res.data?.success) {
-        Alert.alert('Success', 'Proof uploaded!', [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
-      } else {
-        Alert.alert('Upload failed', res.data?.message || 'Please try again.');
-      }
-    } catch (err) {
-      console.error('Upload error:', err);
-      Alert.alert('Error', 'Server error while uploading proof.');
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -158,47 +207,74 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   }
 
-  // Modal for habit selection
+  const selectedLabel =
+    selectedHabit?.label || selectedHabit?.habitName || 'Tap to select a habit';
+
+  // Modal for habit selection (glassy + grouped)
   const renderHabitList = () => (
     <Modal visible={habitModalVisible} transparent animationType="slide">
       <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <AppText style={{ fontSize: 18, fontWeight: '600', marginBottom: 8 }}>
-            Select Habit
-          </AppText>
-          <TextInput
-            style={styles.searchBar}
-            value={search}
-            onChangeText={handleSearchHabit}
-            placeholder="Search habits…"
-            placeholderTextColor="#6B7280"
-            autoFocus
-          />
+        <View style={styles.modalGlassCard}>
+          <AppText style={styles.modalTitle}>Select Habit</AppText>
+
+          <View style={styles.searchWrapper}>
+            <Icon
+              name="magnify"
+              size={18}
+              color="#6B7280"
+              style={{ marginRight: 6 }}
+            />
+            <TextInput
+              style={styles.searchBar}
+              value={search}
+              onChangeText={handleSearchHabit}
+              placeholder="Search habits…"
+              placeholderTextColor="#6B7280"
+              autoFocus
+            />
+          </View>
+
           {habitsLoading ? (
-            <AppActivityIndicator visible={true} />
+            <View style={styles.modalLoading}>
+              <AppActivityIndicator visible={true} />
+              <AppText style={{ marginTop: 8, color: '#9CA3AF' }}>
+                Loading habits…
+              </AppText>
+            </View>
           ) : (
-            <FlatList
-              data={habits}
+            <SectionList
+              sections={habitSections}
               keyExtractor={item => item.id}
+              renderSectionHeader={({ section }) => (
+                <View style={styles.sectionHeader}>
+                  <AppText style={styles.sectionHeaderText}>
+                    {section.title}
+                  </AppText>
+                </View>
+              )}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.habitItem}
                   onPress={() => {
                     setHabitId(item.id);
+                    setSelectedHabit(item);
                     setHabitModalVisible(false);
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Icon
-                      name={item.icon || 'check'}
-                      size={20}
-                      color={colors.primary}
-                      style={{ marginRight: 8 }}
-                    />
-                    <View>
-                      <AppText>{item.label || item.habitName}</AppText>
+                    <View style={styles.habitIconCircle}>
+                      <Icon
+                        name={item.icon || 'check'}
+                        size={20}
+                        color="#C4B5FD"
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <AppText style={styles.habitNameText}>
+                        {item.label || item.habitName}
+                      </AppText>
                       {item.time ? (
-                        <AppText style={{ fontSize: 12, color: '#6B7280' }}>
+                        <AppText style={styles.habitTimeText}>
                           {item.time}
                         </AppText>
                       ) : null}
@@ -206,16 +282,17 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
                   </View>
                 </TouchableOpacity>
               )}
-              contentContainerStyle={{ paddingBottom: 20 }}
+              contentContainerStyle={{ paddingBottom: 12 }}
+              stickySectionHeadersEnabled={false}
+              showsVerticalScrollIndicator={false}
             />
           )}
+
           <TouchableOpacity
             style={styles.modalClose}
             onPress={() => setHabitModalVisible(false)}
           >
-            <AppText style={{ fontWeight: 'bold', color: colors.primary }}>
-              Cancel
-            </AppText>
+            <AppText style={styles.modalCloseText}>Cancel</AppText>
           </TouchableOpacity>
         </View>
       </View>
@@ -223,8 +300,14 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={styles.root}>
+      {/* Background glow to match dashboard vibe */}
+      <View style={styles.baseBackground} />
+      <View style={styles.glowTop} />
+      <View style={styles.glowBottom} />
+
       <AppActivityIndicator visible={uploading} />
+
       <Camera
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
@@ -233,24 +316,64 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
         photo={true}
       />
 
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Icon name="arrow-left" size={24} color="#F9FAFB" />
-        </TouchableOpacity>
-        <AppText style={styles.title}>Capture Habit Proof</AppText>
-      </View>
+      {/* Overlay */}
+      <View style={styles.overlay}>
+        {/* Top bar glass */}
+        <View style={styles.topBar}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.iconGlass}
+          >
+            <Icon name="arrow-left" size={22} color="#E5E7EB" />
+          </TouchableOpacity>
+          <AppText style={styles.title}>Capture Habit Proof</AppText>
+          <View style={{ width: 40 }} />
+        </View>
 
-      <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={styles.shutterButtonOuter}
-          onPress={handleTakePhoto}
-          disabled={uploading}
-        >
-          <View style={styles.shutterButtonInner} />
-        </TouchableOpacity>
+        {/* Selected habit glass pill */}
+        <View style={styles.selectedHabitBar}>
+          <TouchableOpacity
+            style={styles.selectedHabitButton}
+            onPress={() => setHabitModalVisible(true)}
+            activeOpacity={0.9}
+          >
+            <View style={styles.selectedHabitIconWrap}>
+              <Icon
+                name={selectedHabit?.icon || 'check'}
+                size={22}
+                color="#C4B5FD"
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppText style={styles.selectedHabitLabel} numberOfLines={1}>
+                {selectedLabel}
+              </AppText>
+              {selectedHabit?.time && (
+                <AppText style={styles.selectedHabitTime}>
+                  {selectedHabit.time}
+                </AppText>
+              )}
+            </View>
+            <Icon
+              name="chevron-up"
+              size={22}
+              color="#9CA3AF"
+              style={{ marginLeft: 4 }}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Shutter glass ring */}
+        <View style={styles.bottomBar}>
+          <TouchableOpacity
+            style={styles.shutterOuterGlass}
+            onPress={handleTakePhoto}
+            disabled={uploading}
+            activeOpacity={0.8}
+          >
+            <View style={styles.shutterInner} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {renderHabitList()}
@@ -259,28 +382,102 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: 'black' },
+  root: { flex: 1, backgroundColor: '#020617' },
+  baseBackground: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#020617',
+  },
+  glowTop: {
+    position: 'absolute',
+    top: -120,
+    left: -40,
+    width: 260,
+    height: 260,
+    borderRadius: 260,
+    backgroundColor: 'rgba(59, 130, 246, 0.35)',
+  },
+  glowBottom: {
+    position: 'absolute',
+    bottom: -140,
+    right: -40,
+    width: 260,
+    height: 260,
+    borderRadius: 260,
+    backgroundColor: 'rgba(168, 85, 247, 0.35)',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    paddingTop: Platform.OS === 'android' ? 40 : 60,
+    paddingHorizontal: 20,
+  },
   center: {
     flex: 1,
     backgroundColor: '#020617',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // Top bar
   topBar: {
-    position: 'absolute',
-    top: 40,
-    left: 16,
-    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  backButton: {
-    padding: 6,
-    marginRight: 8,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+  iconGlass: {
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 16,
+    elevation: 6,
   },
   title: { color: '#F9FAFB', fontSize: 16, fontWeight: '600' },
+
+  // Selected habit pill
+  selectedHabitBar: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 120,
+  },
+  selectedHabitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: GLASS_BG,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
+  },
+  selectedHabitIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 999,
+    backgroundColor: 'rgba(55, 65, 81, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  selectedHabitLabel: {
+    color: '#E5E7EB',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectedHabitTime: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    marginTop: 2,
+  },
+
+  // Shutter
   bottomBar: {
     position: 'absolute',
     bottom: 40,
@@ -288,47 +485,118 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
   },
-  shutterButtonOuter: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 4,
-    borderColor: '#F9FAFB',
+  shutterOuterGlass: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    borderWidth: 3,
+    borderColor: 'rgba(191, 219, 254, 0.8)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    shadowColor: '#60A5FA',
+    shadowOpacity: 0.6,
+    shadowOffset: { width: 0, height: 12 },
+    shadowRadius: 24,
+    elevation: 10,
   },
-  shutterButtonInner: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  shutterInner: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: '#F9FAFB',
   },
+
+  // Modal
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 16,
   },
-  modalContent: {
-    width: '88%',
-    maxHeight: '70%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+  modalGlassCard: {
+    width: '100%',
+    maxHeight: '75%',
+    borderRadius: 20,
+    padding: 14,
+    backgroundColor: GLASS_BG,
+    borderWidth: 1,
+    borderColor: GLASS_BORDER,
   },
-  modalClose: { alignSelf: 'flex-end', marginTop: 6 },
-  habitItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray200,
+  modalTitle: {
+    color: '#F9FAFB',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(15,23,42,0.9)',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.6)',
+    marginBottom: 10,
   },
   searchBar: {
-    backgroundColor: colors.gray100,
-    marginBottom: 8,
-    padding: 8,
-    borderRadius: 6,
-    color: '#111827',
+    flex: 1,
+    color: '#F9FAFB',
+    fontSize: 14,
+    paddingVertical: 4,
+  },
+  modalLoading: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  sectionHeader: {
+    paddingVertical: 6,
+  },
+  sectionHeaderText: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  habitItem: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(31, 41, 55, 0.8)',
+  },
+  habitIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(55,65,81,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  habitNameText: {
+    color: '#E5E7EB',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  habitTimeText: {
+    color: '#9CA3AF',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  modalClose: {
+    marginTop: 10,
+    alignSelf: 'flex-end',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(191, 219, 254, 0.6)',
+  },
+  modalCloseText: {
+    color: '#E5E7EB',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

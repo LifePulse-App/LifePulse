@@ -70,19 +70,20 @@ export const listHabits = async (req, res) => {
     }
 
     const habits = await Habit.find(query)
-      .select("habitName label icon defaultTime key timeSlot")
-      .limit(200)
-      .lean();
+  .select("habitName label icon defaultTime key timeSlot group")
+  .limit(200)
+  .lean();
 
-    const mapped = habits.map((h) => ({
-      id: h._id.toString(),
-      habitName: h.habitName,
-      label: h.label,
-      icon: h.icon,
-      time: h.defaultTime,
-      key: h.key,
-      timeSlot: h.timeSlot,
-    }));
+const mapped = habits.map((h) => ({
+  id: h._id.toString(),
+  habitName: h.habitName,
+  label: h.label,
+  icon: h.icon,
+  time: h.defaultTime,
+  key: h.key,
+  timeSlot: h.timeSlot,
+  group: h.group,
+}));
 
     res.status(200).json({ success: true, habits: mapped });
   } catch (error) {
