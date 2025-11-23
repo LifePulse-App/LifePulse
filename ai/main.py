@@ -8,7 +8,6 @@ import json
 import io
 import os
 
-
 app = FastAPI()
 
 # ---------- MODEL LOADING ----------
@@ -336,11 +335,10 @@ HABIT_LABEL_MAP: Dict[str, List[str]] = {
         "book_jacket", "library"
     ],
 }
-
 def get_habit_labels(habit_name: str) -> List[str]:
     return [str(l) for l in HABIT_LABEL_MAP.get(habit_name.strip().lower(), [])]
 
-def predict_image_labels(img_bytes: bytes, topk: int = 5) -> List[Tuple[str, float]]:
+def predict_image_labels(img_bytes: bytes, topk: int = 10) -> List[Tuple[str, float]]:
     img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
     x = transform(img).unsqueeze(0).to(device)
     with torch.no_grad():
@@ -353,15 +351,23 @@ def predict_image_labels(img_bytes: bytes, topk: int = 5) -> List[Tuple[str, flo
     return list(zip(top_labels, top_probs))
 
 def compute_habit_score(habit_name: str, predictions: List[Tuple[str, float]]) -> float:
+    """
+    Compute habit score using weighted top predictions.
+    Higher rank predictions get higher weight.
+    """
     habit_labels = get_habit_labels(habit_name)
     if not habit_labels:
         return 0.0
+
     score = 0.0
-    for label, prob in predictions:
-        label = str(label)
+    topk = len(predictions)
+    
+    for rank, (label, prob) in enumerate(predictions):
         for h_label in habit_labels:
             if h_label.lower() in label.lower():
-                score += float(prob)
+                weight = (topk - rank) / topk  # Top prediction gets highest weight
+                score += prob * weight
+
     return float(min(score, 1.0))
 
 # ---------- VERIFY ENDPOINT ----------
@@ -371,10 +377,9 @@ async def verify_proof_ai(
     image: UploadFile = File(...)
 ):
     img_bytes = await image.read()
-
-    preds = predict_image_labels(img_bytes, topk=5)
+    preds = predict_image_labels(img_bytes, topk=10)
     score = compute_habit_score(habitName, preds)
-    threshold = 0.3
+    threshold = 0.05
     is_verified = score >= threshold
 
     top_predictions = [{"label": str(label), "probability": float(prob)} for label, prob in preds]
