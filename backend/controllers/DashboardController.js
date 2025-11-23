@@ -92,7 +92,7 @@ export const getDashboard = async (req, res) => {
       const type = habit.habitName.toLowerCase();
       const proof = await Proof.findOne({
         user: userId,
-        habitId: habit._id,
+        habit: habit._id,   // change from habitId to habit
         verified: true,
       });
 
