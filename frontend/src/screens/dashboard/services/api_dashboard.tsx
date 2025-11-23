@@ -7,7 +7,7 @@ import { DashboardStudentSummaryResponse } from "../models/dashboard/DashboardSt
 const endpoint = '/dashboard';
 
 const GetDashboardSummary = () => client.get<DashboardResponse>(endpoint);
-const GetTodayHabits = () => client.get<GetTodayHabitsResponse>('/habit/getToday');
+const GetTodayHabits = () => client.get<GetTodayHabitsResponse>('/habit/today');
 
 // // getDashboardEmployeeSummary API
 // const getDashboardEmployeeSummary = (instituteId: number, branchIds: string) =>

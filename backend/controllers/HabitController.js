@@ -1,58 +1,56 @@
 import Habit from "../models/HabitSchema.js";
 import Proof from "../models/ProofSchema.js";
 
-export const getTodayHabits = async (req, res, next) => {
+export const getTodayHabits = async (req, res) => {
   try {
     const userId = req.user._id;
 
+    // 1) Compute today's date range (00:00–23:59)
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
+    const endOfToday = new Date(startOfToday);
+    endOfToday.setDate(endOfToday.getDate() + 1);
 
-    const todaysProofs = await Proof.find({
-      user: userId,
-      createdAt: { $gte: startOfToday, $lte: endOfToday },
-    }).lean();
+    // 2) Get all active habits (global catalog)
+    // If you later want per-timeslot: filter by `timeSlot`
+    const habits = await Habit.find({ active: true }).sort({ createdAt: 1 });
 
-    const habitIds = todaysProofs.map((p) => p.habit);
+    // 3) For each habit, find today's proof for this user
+    const todayHabits = await Promise.all(
+      habits.map(async (habit) => {
+        const todayProof = await Proof.findOne({
+          user: userId,
+          habit: habit._id,
+          createdAt: { $gte: startOfToday, $lt: endOfToday },
+        }).sort({ createdAt: -1 });
 
-    const habits = await Habit.find({
-      _id: { $in: habitIds },
-      active: true,
-    }).lean();
+        let status= "pending" | "verified" | "rejected";
+        if (todayProof) {
+          if (todayProof.status === "verified") status = "verified";
+          else if (todayProof.status === "rejected") status = "rejected";
+          else status = "pending"
+        }
 
-    // plain JS object, no TS cast
-    const proofByHabit = todaysProofs.reduce((acc, proof) => {
-      acc[proof.habit.toString()] = proof;
-      return acc;
-    }, {});
+        return {
+          id: habit._id.toString(),
+          icon: habit.icon || null,
+          label: habit.label || habit.habitName,
+          habitName: habit.habitName,
+          time: habit.defaultTime || "",
+          status,
+        };
+      })
+    );
 
-    const result = habits.map((habit) => {
-      const proof = proofByHabit[habit._id.toString()];
-      let status = "pending";
-      if (proof?.status) {
-        status = proof.status;
-      } else if (proof) {
-        status = proof.verified ? "verified" : "pending";
-      }
-      return {
-        id: habit._id.toString(),
-        habitName: habit.habitName,
-        icon: habit.icon || "check",
-        label: habit.label || habit.habitName,
-        time: habit.defaultTime || "",
-        status,
-      };
-    });
-
-    return res.status(200).json({
+    return res.json({
       success: true,
-      habits: result,
+      habits: todayHabits,
     });
-  } catch (error) {
-    console.error("Get Today Habits Error:", error);
-    next(error);
+  } catch (err) {
+    console.error("GetTodayHabits error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load today habits" });
   }
 };
 
