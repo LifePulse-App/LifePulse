@@ -7,6 +7,7 @@ import { getTimeSlotForDate } from "../utils/timeSlotCheck.js";
 // Submit a habit proof (with image + AI check and time-slot validation)
 export const submitProof = async (req, res) => {
   try {
+    console.log(req);
     const { habitId } = req.body; // predefined Habit _id
     const userId = req.user._id;
 

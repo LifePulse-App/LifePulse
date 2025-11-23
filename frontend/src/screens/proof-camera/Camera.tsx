@@ -114,11 +114,8 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const fetchHabits = async (query: string) => {
     setHabitsLoading(true);
     try {
-      console.log('fetchHabits query:', query);
       const res = await ProofApi.GetHabits(query || undefined);
-      console.log('fetchHabits raw res.data:', (res as any).data);
       const data = (res as any).data?.habits ?? (res as any).habits ?? [];
-      console.log('fetchHabits data.length:', data.length);
 
       const normalized: Habit[] = data.map((h: any) => ({
         id: h.id || h._id?.toString(),
@@ -139,7 +136,6 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
         }
       }
     } catch (err) {
-      console.error('Failed to load habits:', err);
       setHabits([]);
       setHabitSections([]);
     }
@@ -171,6 +167,8 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
       formData.append('habitId', habitId);
 
       const res = await ProofApi.SubmitProof(formData);
+      console.log(res);
+      
 
       if ((res as any).data?.success) {
         const reason = (res as any).data?.reason;
@@ -328,8 +326,6 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={styles.glowTop} />
       <View style={styles.glowBottom} />
 
-      <AppActivityIndicator visible={uploading} />
-
       <Camera
         ref={cameraRef}
         style={StyleSheet.absoluteFill}
@@ -449,7 +445,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 16,
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    backgroundColor: 'rgba(15, 23, 42, 0.3)',
     borderWidth: 1,
     borderColor: 'rgba(148, 163, 184, 0.4)',
     justifyContent: 'center',
@@ -460,14 +456,14 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 6,
   },
-  title: { color: '#F9FAFB', fontSize: 16, fontWeight: '600' },
+  title: { color: '#F9FAFB', fontSize: 16, fontWeight: '700' },
 
   // Selected habit pill
   selectedHabitBar: {
     position: 'absolute',
     left: 20,
     right: 20,
-    bottom: 120,
+    bottom: 130,
   },
   selectedHabitButton: {
     flexDirection: 'row',
@@ -536,6 +532,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
     paddingHorizontal: 16,
+    marginBottom: 100
   },
   modalGlassCard: {
     width: '100%',
