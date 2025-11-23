@@ -8,6 +8,7 @@ import AnnualItemDetails from '../../screens/student/components/overdues/AnnualI
 import Overdues from '../../screens/student/components/overdues/Overdues';
 import UserNavigator from '../user/UserNavigator';
 import MoodScreen from '../../screens/moodscreen/comp/component/MoodScreen';
+import ProofVisionCameraScreen from '../../screens/proof-camera/Camera';
 
 const Stack = createNativeStackNavigator();
 
@@ -18,7 +19,7 @@ const MainNavigator = () => (
     <Stack.Screen name="Student" component={StudentList} />
     <Stack.Screen name="EmployeeList" component={EmployeeList} />
     <Stack.Screen name="User" component={UserNavigator} />
-
+    <Stack.Screen name="ProofCamera" component={ProofVisionCameraScreen} />
     <Stack.Screen name="UserList" component={UserList} />
     <Stack.Screen name="AnnualItemDetails" component={AnnualItemDetails} />
   </Stack.Navigator>

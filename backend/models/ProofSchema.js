@@ -2,18 +2,15 @@ import mongoose from "mongoose";
 
 const proofSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-  habitId: { type: mongoose.Schema.Types.ObjectId, ref: "Habit", required: true },
-
-  // status: "pending" | "verified" | "rejected"
+  habit: { type: mongoose.Schema.Types.ObjectId, ref: "Habit", required: true },
+  imageUrl: { type: String, required: true },
   status: {
     type: String,
-    enum: ["pending", "verified", "rejected"],
-    default: "pending",
+    enum: ['submitted', 'verified', 'rejected'],
+    default: 'submitted'
   },
-
-  // Or your existing flag:
-  verified: { type: Boolean, default: false },
-
+  points: { type: Number, default: 1 },
+  aiScore: Number, // returned by model
 }, { timestamps: true });
 
 export default mongoose.model("Proof", proofSchema);

@@ -1,13 +1,19 @@
 import express from "express";
-import { isAuthenticatedUser } from "../middlewares/auth.js";
-import { completeHabit, createHabit, deleteHabit, getTodayHabits, updateHabit } from "../controllers/HabitController.js";
-
+import {
+  createHabit,
+  listHabits,
+  getTodayHabits,
+  updateHabit,
+  deleteHabit,
+  completeHabit,
+} from "../controllers/HabitController.js";
 const router = express.Router();
 
-router.post("/add", isAuthenticatedUser, createHabit);
-router.get("/getToday", isAuthenticatedUser, getTodayHabits);
-router.put("/update/:id", isAuthenticatedUser, updateHabit);
-router.delete("/delete/:id", isAuthenticatedUser, deleteHabit);
-router.post("/complete/:id", isAuthenticatedUser, completeHabit);
+router.get("/", listHabits);
+router.post("/", createHabit);
+router.get("/today", getTodayHabits);
+router.patch("/:id", updateHabit);
+router.delete("/:id", deleteHabit);
+router.post("/:id/complete", completeHabit);
 
 export default router;

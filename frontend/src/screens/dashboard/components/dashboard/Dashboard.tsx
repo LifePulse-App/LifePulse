@@ -442,16 +442,13 @@ const Dashboard = ({ navigation }: any) => {
             <View style={{ height: 40 }} />
           </ScrollView>
                   {/* Floating Camera Button */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.floatingCameraButton}
-          onPress={() => {
-            // TODO: open camera screen / modal
-            Alert.alert("Camera", "Open camera to capture a habit proof.");
-          }}
-        >
-          <Icon name="camera-outline" size={26} color="#F9FAFB" />
-        </TouchableOpacity>
+                  <TouchableOpacity
+      activeOpacity={0.8}
+      style={styles.floatingCameraButton}
+      onPress={() => navigation.navigate('ProofCamera', { habitId: null })}
+    >
+      <Icon name="camera-outline" size={26} color="#F9FAFB" />
+    </TouchableOpacity>
         </View>
       </AppScreen>
     </MainLayout>

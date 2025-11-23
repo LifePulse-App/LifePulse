@@ -51,7 +51,7 @@
     "react-native-loader-kit": "^3.0.0",
     "react-native-make": "^1.0.1",
     "react-native-network-logger": "^2.0.1",
-    "react-native-pager-view": "^6.8.1",
+    "react-native-pager-view": "^6.9.1",
     "react-native-paper": "^5.14.5",
     "react-native-progress": "^5.0.1",
     "react-native-reanimated": "^3.19.0",
@@ -63,6 +63,7 @@
     "react-native-toast-message": "^2.3.3",
     "react-native-user-inactivity": "^1.2.0",
     "react-native-vector-icons": "^10.2.0",
+    "react-native-vision-camera": "^4.7.3",
     "react-native-wheel-picker-expo": "^0.5.4",
     "yup": "^1.6.1"
   },

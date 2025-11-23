@@ -6,6 +6,7 @@ import StudentList from '../../screens/student/components/studentlist/StudentLis
 import EmployeeList from '../../screens/employee/components/employee-list/EmployeeList';
 import UserList from '../../screens/user/components/UserList/UserList';
 import CustomBottomNav from '../../shared/components/LowNavBar';
+import ProofVisionCameraScreen from '../../screens/proof-camera/Camera';
 
 const Tab = createBottomTabNavigator();
 
@@ -16,6 +17,7 @@ const MainTabs = () => {
     tabBar={(props) => <CustomBottomNav {...props} />}
   >
     <Tab.Screen name="Student" component={StudentList} />
+    <Stack.Screen name="ProofCamera" component={ProofVisionCameraScreen} />
     <Tab.Screen name="Dashboard" component={Dashboard} />
     <Tab.Screen name="Add" component={() => null} />
     <Tab.Screen name="EmployeeList" component={EmployeeList} />

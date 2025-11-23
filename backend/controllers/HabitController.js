@@ -1,30 +1,24 @@
-// controllers/habitController.js
 import Habit from "../models/HabitSchema.js";
 import User from "../models/UserSchema.js";
 import Proof from "../models/ProofSchema.js";
 
+// Create new habit for current user
 export const createHabit = async (req, res) => {
   try {
-    const { habitName } = req.body;
+    const { habitName, icon, label, time } = req.body;
 
-    // Step 1: Create Habit
     const habit = await Habit.create({
       user: req.user._id,
       habitName,
+      icon,
+      label,
+      time,
+      completions: [], // initialize if using completions
     });
 
-    // Step 2: Create Proof linked to Habit
-    const proof = await Proof.create({
-      user: req.user._id,
-      habitId: habit._id, // Link habit here
-      verified: false,  // default
-    });
-
-    // Step 3: Send response
     res.status(201).json({
       success: true,
       habit,
-      proof,
     });
   } catch (error) {
     console.error("Create Habit Error:", error);
@@ -32,19 +26,36 @@ export const createHabit = async (req, res) => {
   }
 };
 
+// List habits for user, with optional search for UI search bar
+export const listHabits = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const search = req.query.search || "";
+    const query = { user: userId };
+    if (search) {
+      // Search on habitName and label (case-insensitive)
+      query.$or = [
+        { habitName: { $regex: search, $options: "i" } },
+        { label: { $regex: search, $options: "i" } },
+      ];
+    }
+    const habits = await Habit.find(query).limit(50);
+    res.status(200).json({ success: true, habits });
+  } catch (error) {
+    console.error("List Habits Error:", error);
+    res.status(500).json({ success: false, message: "Failed to list habits" });
+  }
+};
 
 export const getTodayHabits = async (req, res, next) => {
   try {
     const userId = req.user._id;
 
-    // Start & end of "today"
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
-
     const endOfToday = new Date();
     endOfToday.setHours(23, 59, 59, 999);
 
-    // Find proofs created today for this user
     const todaysProofs = await Proof.find({
       user: userId,
       createdAt: { $gte: startOfToday, $lte: endOfToday },
@@ -52,13 +63,11 @@ export const getTodayHabits = async (req, res, next) => {
 
     const habitIds = todaysProofs.map((p) => p.habitId);
 
-    // Get the matching habits
     const habits = await Habit.find({
       _id: { $in: habitIds },
       user: userId,
     }).lean();
 
-    // Build map habitId -> proof
     const proofByHabit = todaysProofs.reduce((acc, proof) => {
       acc[proof.habitId.toString()] = proof;
       return acc;
@@ -66,24 +75,19 @@ export const getTodayHabits = async (req, res, next) => {
 
     const result = habits.map((habit) => {
       const proof = proofByHabit[habit._id.toString()];
-
-      // Normalize status
       let status = "pending";
       if (proof?.status) {
-        status = proof.status; // "pending" | "verified" | "rejected"
+        status = proof.status;
       } else if (proof) {
-        // Fallback if you only have `verified` flag
         status = proof.verified ? "verified" : "pending";
       }
-
       return {
         id: habit._id.toString(),
         habitName: habit.habitName,
-        icon: habit.icon || "check",     // default icon if not set
+        icon: habit.icon || "check",
         label: habit.label || habit.habitName,
         time: habit.time || "",
-
-        status, // "pending" | "verified" | "rejected"
+        status,
       };
     });
 
@@ -129,11 +133,12 @@ export const completeHabit = async (req, res, next) => {
     const habit = await Habit.findOne({ _id: id, user: req.user._id });
     if (!habit) return res.status(404).json({ success: false, message: "Habit not found" });
 
+    if (!habit.completions) habit.completions = [];
     habit.completions.push({ date: new Date() });
     await habit.save();
 
     const user = await User.findById(req.user._id);
-    user.xp += 10;
+    user.xp = (user.xp || 0) + 10;
     await user.save();
 
     res.status(200).json({ success: true, habit, xp: user.xp });
