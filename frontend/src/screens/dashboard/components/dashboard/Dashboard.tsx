@@ -108,8 +108,10 @@ const Dashboard = ({ navigation }: any) => {
     const fetchTodayHabits = async () => {
       try {
         const res = await DashboardService.GetTodayHabits(); // adjust base url
+        console.log(res?.data.habits);
+        
         if (res.data?.success) {
-          setHabits(res.data.habits);
+          setHabits(res?.data.habits);
         }
       } catch (err: any) {
         console.log("Error loading today habits", err);
@@ -139,8 +141,6 @@ const Dashboard = ({ navigation }: any) => {
       
       
       const responseData = (res as any).data ?? res;
-      console.log(responseData);
-
       if (!responseData.success) {
         throw new Error(responseData.message || "Failed to load dashboard");
       }

@@ -23,10 +23,9 @@ export const getTodayHabits = async (req, res) => {
     }
 
     // 3) Get unique habitIds from these proofs (one habit per user)
-    const uniqueHabitIdsSet = new Set(
-      recentProofs.map((p) => p.habit.toString())
-    );
-    const uniqueHabitIds = Array.from(uniqueHabitIdsSet);
+    const uniqueHabitIds = [
+      ...new Set(recentProofs.map((p) => p.habit.toString())),
+    ];
 
     // 4) Fetch those habits from global catalog
     const habits = await Habit.find({
@@ -34,38 +33,38 @@ export const getTodayHabits = async (req, res) => {
       active: true,
     });
 
-    // Map for quick lookup
-    const habitMap = new Map(
-      habits.map((h) => [h._id.toString(), h])
-    );
+    const habitMap = new Map(habits.map((h) => [h._id.toString(), h]));
 
-    // 5) Build todayHabits list:
-    //    for each unique habitId, find the most recent proof (already sorted),
-    //    derive status from that proof, and attach habit info
-    const todayHabits = uniqueHabitIds.map((habitId) => {
-      const habit = habitMap.get(habitId);
-      if (!habit) return null;
+    // 5) Build todayHabits list
+    const todayHabits = uniqueHabitIds
+      .map((habitId) => {
+        const habit = habitMap.get(habitId);
+        if (!habit) return null;
 
-      const proofForHabit = recentProofs.find(
-        (p) => p.habit.toString() === habitId
-      );
+        const proofForHabit = recentProofs.find(
+          (p) => p.habit.toString() === habitId
+        );
 
-      let status= "pending" | "verified" | "rejected";
-      if (proofForHabit) {
-        if (proofForHabit.status === "verified") status = "verified";
-        else if (proofForHabit.status === "rejected") status = "rejected";
-        else status = "pending";
-      }
+        // default: pending
+        let status= "pending" | "verified" | "rejected";
+        if (proofForHabit) {
+          if (proofForHabit.status === "verified") status = "verified";
+          else if (proofForHabit.status === "rejected") status = "rejected";
+        }
 
-      return {
-        id: habit._id.toString(),
-        icon: habit.icon || null,
-        label: habit.label || habit.habitName,
-        habitName: habit.habitName,
-        time: habit.defaultTime || "",
-        status,
-      };
-    }).filter(Boolean); // remove any nulls (if habit not found)
+        // use proof timeSlotAtProof as time; fallback to habit.defaultTime
+        const timeFromProof = proofForHabit?.timeSlotAtProof || "";
+
+        return {
+          id: habit._id.toString(),
+          icon: habit.icon || null,
+          label: habit.label || habit.habitName,
+          habitName: habit.habitName,
+          time: timeFromProof || "",
+          status,
+        };
+      })
+      .filter(Boolean);
 
     return res.json({
       success: true,
