@@ -8,35 +8,25 @@ import json
 import io
 import os
 
+
 app = FastAPI()
 
-print("🔥 Starting server...")
-
-# ---------------- DEVICE ----------------
+# ---------- MODEL LOADING ----------
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Device =", device)
-
-# ---------------- MODEL ----------------
-print("Loading model...")
 model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
 model.eval()
 model.to(device)
-print("Model loaded successfully")
 
-# ---------------- IMAGENET LABELS ----------------
+# ---------- IMAGENET LABELS ----------
 IMAGENET_LABELS_PATH = "imagenet_class_index.json"
-
 if os.path.exists(IMAGENET_LABELS_PATH):
-    print("Loading ImageNet labels...")
     with open(IMAGENET_LABELS_PATH, "r", encoding="utf-8") as f:
         idx_to_label_raw = json.load(f)
     idx_to_label: Dict[int, str] = {int(k): str(v[1]) for k, v in idx_to_label_raw.items()}
-    print("ImageNet labels loaded")
 else:
-    print("❌ imagenet_class_index.json NOT FOUND — using fallback labels")
     idx_to_label = {i: f"class_{i}" for i in range(1000)}
 
-# ---------------- TRANSFORMS ----------------
+# ---------- TRANSFORMS ----------
 transform = T.Compose([
     T.Resize(256),
     T.CenterCrop(224),
@@ -47,7 +37,7 @@ transform = T.Compose([
     ),
 ])
 
-# ---------------- HABIT LABEL MAP ----------------
+# ---------- HABIT -> LABELS MAPPING ----------
 HABIT_LABEL_MAP: Dict[str, List[str]] = {
     # ---------------- MOVEMENT / FITNESS ----------------
     "pushups": [
@@ -352,67 +342,49 @@ def get_habit_labels(habit_name: str) -> List[str]:
 
 def predict_image_labels(img_bytes: bytes, topk: int = 5) -> List[Tuple[str, float]]:
     img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-
     x = transform(img).unsqueeze(0).to(device)
-
     with torch.no_grad():
         logits = model(x)
         probs = torch.softmax(logits, dim=1)
-
     top_probs, top_idxs = probs.topk(topk, dim=1)
     top_probs = top_probs[0].cpu().numpy()
     top_idxs = top_idxs[0].cpu().numpy()
-
     top_labels = [idx_to_label.get(int(i), f"class_{int(i)}") for i in top_idxs]
-
     return list(zip(top_labels, top_probs))
 
 def compute_habit_score(habit_name: str, predictions: List[Tuple[str, float]]) -> float:
     habit_labels = get_habit_labels(habit_name)
     if not habit_labels:
         return 0.0
-
     score = 0.0
     for label, prob in predictions:
+        label = str(label)
         for h_label in habit_labels:
             if h_label.lower() in label.lower():
                 score += float(prob)
-
     return float(min(score, 1.0))
 
-# ---------------- VERIFY ENDPOINT ----------------
+# ---------- VERIFY ENDPOINT ----------
 @app.post("/verify")
 async def verify_proof_ai(
-    habitName: str = Form(...),
+    habitName: str = Form(...), 
     image: UploadFile = File(...)
 ):
-    print("\n------------------------------")
-    print("VERIFY REQUEST RECEIVED")
-    print("Habit Name =", habitName)
-
     img_bytes = await image.read()
-    print("Image received:", len(img_bytes), "bytes")
 
     preds = predict_image_labels(img_bytes, topk=5)
-    print("Predictions:")
-    for lbl, prob in preds:
-        print(f"   {lbl}: {prob:.4f}")
-
     score = compute_habit_score(habitName, preds)
-    print("Computed Score =", score)
-    print("------------------------------\n")
+    threshold = 0.3
+    is_verified = score >= threshold
+
+    top_predictions = [{"label": str(label), "probability": float(prob)} for label, prob in preds]
 
     return {
-        "verified": score >= 0.3,
+        "verified": is_verified,
         "score": round(score, 3),
-        "top_predictions": [
-            {"label": lbl, "probability": float(prob)}
-            for lbl, prob in preds
-        ],
+        "top_predictions": top_predictions,
     }
 
-# ---------------- RUN SERVER ----------------
 if __name__ == "__main__":
     import uvicorn
-    print("🚀 Running on port 8000...")
     uvicorn.run("main:app", host="0.0.0.0", port=8000)
