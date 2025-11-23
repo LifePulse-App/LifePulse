@@ -105,9 +105,8 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
       const normalized: Habit[] = data.map((h: any) => ({
         id: h.id || h._id?.toString(),
         habitName: h.habitName,
-        label: h.label || h.habitName,
+        label: h.habitName,
         icon: h.icon,
-        time: h.time,
         group: h.group, // optional, backend should provide
       }));
       setHabits(normalized);
@@ -208,14 +207,14 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
   }
 
   const selectedLabel =
-    selectedHabit?.label || selectedHabit?.habitName || 'Tap to select a habit';
+    selectedHabit?.label || selectedHabit?.habitName || 'Tap to select a activity';
 
   // Modal for habit selection (glassy + grouped)
   const renderHabitList = () => (
     <Modal visible={habitModalVisible} transparent animationType="slide">
       <View style={styles.modalContainer}>
         <View style={styles.modalGlassCard}>
-          <AppText style={styles.modalTitle}>Select Habit</AppText>
+          <AppText style={styles.modalTitle}>Select Activity</AppText>
 
           <View style={styles.searchWrapper}>
             <Icon
@@ -228,7 +227,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
               style={styles.searchBar}
               value={search}
               onChangeText={handleSearchHabit}
-              placeholder="Search habits…"
+              placeholder="Search activity..."
               placeholderTextColor="#6B7280"
               autoFocus
             />
@@ -236,10 +235,6 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {habitsLoading ? (
             <View style={styles.modalLoading}>
-              <AppActivityIndicator visible={true} />
-              <AppText style={{ marginTop: 8, color: '#9CA3AF' }}>
-                Loading habits…
-              </AppText>
             </View>
           ) : (
             <SectionList
@@ -326,7 +321,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
           >
             <Icon name="arrow-left" size={22} color="#E5E7EB" />
           </TouchableOpacity>
-          <AppText style={styles.title}>Capture Habit Proof</AppText>
+          <AppText style={styles.title}>Capture Activity Proof</AppText>
           <View style={{ width: 40 }} />
         </View>
 
