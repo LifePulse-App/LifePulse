@@ -12,15 +12,26 @@ import colors from '../../shared/styling/lightModeColors';
 import api from '../../shared/services/shared-api';
 
 type Habit = {
-  id: string;
-  name: string;
+  id: string;              // from getTodayHabits or mapped _id
+  habitName: string;
+  label?: string;
+  icon?: string;
+  time?: string;
 };
 
-const ProofVisionCameraScreen = ({ navigation, route }) => {
+type Props = {
+  navigation: any;
+  route: { params?: { habitId?: string | null } };
+};
+
+const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [uploading, setUploading] = useState(false);
+
   const [habits, setHabits] = useState<Habit[]>([]);
-  const [habitId, setHabitId] = useState<string | null>(route.params?.habitId || null);
+  const [habitId, setHabitId] = useState<string | null>(
+    route.params?.habitId ?? null
+  );
   const [habitModalVisible, setHabitModalVisible] = useState(false);
   const [search, setSearch] = useState('');
   const [habitsLoading, setHabitsLoading] = useState(false);
@@ -43,7 +54,7 @@ const ProofVisionCameraScreen = ({ navigation, route }) => {
     })();
   }, []);
 
-  // Habits fetching
+  // Habits fetching (for picker)
   useEffect(() => {
     fetchHabits('');
   }, []);
@@ -51,8 +62,20 @@ const ProofVisionCameraScreen = ({ navigation, route }) => {
   const fetchHabits = async (query: string) => {
     setHabitsLoading(true);
     try {
-      const res = await api.get('/api/habits', { params: query ? { search: query } : {} });
-      setHabits(res.data); // expect: [{id, name}, ...]
+      const res = await api.get('/api/habits', {
+        params: query ? { search: query } : {},
+      });
+      // Backend returns { success, habits }
+      const data = res.data?.habits ?? [];
+      // Normalize id
+      const normalized: Habit[] = data.map((h: any) => ({
+        id: h.id || h._id?.toString(),
+        habitName: h.habitName,
+        label: h.label,
+        icon: h.icon,
+        time: h.time,
+      }));
+      setHabits(normalized);
     } catch (err) {
       console.error('Failed to load habits:', err);
       setHabits([]);
@@ -67,15 +90,18 @@ const ProofVisionCameraScreen = ({ navigation, route }) => {
 
   const handleTakePhoto = async () => {
     if (!habitId) {
+      // force user to choose habit before capture
       setHabitModalVisible(true);
       return;
     }
     if (!cameraRef.current) return;
+
     try {
       const photo = await cameraRef.current.takePhoto({
         qualityPrioritization: 'balanced',
         flash: 'off',
       });
+
       const filePath = `file://${photo.path}`;
       await uploadProof(filePath, habitId);
     } catch (err) {
@@ -93,7 +119,8 @@ const ProofVisionCameraScreen = ({ navigation, route }) => {
         name: 'proof.jpg',
         type: 'image/jpeg',
       } as any);
-      if (habitId) formData.append('habitId', habitId);
+      formData.append('habitId', habitId);
+
       const res = await api.post('/api/proofs', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
@@ -113,7 +140,7 @@ const ProofVisionCameraScreen = ({ navigation, route }) => {
     }
   };
 
-  // UI
+  // UI for loading / permission
   if (hasPermission === null || !device) {
     return (
       <View style={styles.center}>
@@ -136,12 +163,15 @@ const ProofVisionCameraScreen = ({ navigation, route }) => {
     <Modal visible={habitModalVisible} transparent animationType="slide">
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
-          <AppText style={{ fontSize: 18, fontWeight: '600', marginBottom: 8 }}>Select Habit</AppText>
+          <AppText style={{ fontSize: 18, fontWeight: '600', marginBottom: 8 }}>
+            Select Habit
+          </AppText>
           <TextInput
             style={styles.searchBar}
             value={search}
             onChangeText={handleSearchHabit}
             placeholder="Search habits…"
+            placeholderTextColor="#6B7280"
             autoFocus
           />
           {habitsLoading ? (
@@ -156,15 +186,36 @@ const ProofVisionCameraScreen = ({ navigation, route }) => {
                   onPress={() => {
                     setHabitId(item.id);
                     setHabitModalVisible(false);
-                  }}>
-                  <AppText>{item.name}</AppText>
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Icon
+                      name={item.icon || 'check'}
+                      size={20}
+                      color={colors.primary}
+                      style={{ marginRight: 8 }}
+                    />
+                    <View>
+                      <AppText>{item.label || item.habitName}</AppText>
+                      {item.time ? (
+                        <AppText style={{ fontSize: 12, color: '#6B7280' }}>
+                          {item.time}
+                        </AppText>
+                      ) : null}
+                    </View>
+                  </View>
                 </TouchableOpacity>
               )}
               contentContainerStyle={{ paddingBottom: 20 }}
             />
           )}
-          <TouchableOpacity style={styles.modalClose} onPress={() => setHabitModalVisible(false)}>
-            <AppText style={{ fontWeight: 'bold', color: colors.primary }}>Cancel</AppText>
+          <TouchableOpacity
+            style={styles.modalClose}
+            onPress={() => setHabitModalVisible(false)}
+          >
+            <AppText style={{ fontWeight: 'bold', color: colors.primary }}>
+              Cancel
+            </AppText>
           </TouchableOpacity>
         </View>
       </View>
@@ -181,12 +232,17 @@ const ProofVisionCameraScreen = ({ navigation, route }) => {
         isActive={!uploading}
         photo={true}
       />
+
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
           <Icon name="arrow-left" size={24} color="#F9FAFB" />
         </TouchableOpacity>
         <AppText style={styles.title}>Capture Habit Proof</AppText>
       </View>
+
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.shutterButtonOuter}
@@ -196,6 +252,7 @@ const ProofVisionCameraScreen = ({ navigation, route }) => {
           <View style={styles.shutterButtonInner} />
         </TouchableOpacity>
       </View>
+
       {renderHabitList()}
     </View>
   );
@@ -232,29 +289,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   shutterButtonOuter: {
-    width: 72, height: 72, borderRadius: 36, borderWidth: 4,
-    borderColor: '#F9FAFB', alignItems: 'center', justifyContent: 'center',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    borderColor: '#F9FAFB',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: 'rgba(15, 23, 42, 0.4)',
   },
   shutterButtonInner: {
-    width: 52, height: 52, borderRadius: 26, backgroundColor: '#F9FAFB',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#F9FAFB',
   },
   modalContainer: {
-    flex: 1, justifyContent: 'center', alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   modalContent: {
-    width: '88%', maxHeight: '70%', backgroundColor: '#fff',
-    borderRadius: 12, padding: 16,
+    width: '88%',
+    maxHeight: '70%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
   },
   modalClose: { alignSelf: 'flex-end', marginTop: 6 },
   habitItem: {
-    paddingVertical: 12, borderBottomWidth: 1,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
   },
   searchBar: {
-    backgroundColor: colors.gray100, marginBottom: 8,
-    padding: 8, borderRadius: 6,
+    backgroundColor: colors.gray100,
+    marginBottom: 8,
+    padding: 8,
+    borderRadius: 6,
+    color: '#111827',
   },
 });
 
