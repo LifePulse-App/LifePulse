@@ -6,6 +6,8 @@ from torchvision import models
 from PIL import Image
 import json
 import io
+import os
+
 
 app = FastAPI()
 
