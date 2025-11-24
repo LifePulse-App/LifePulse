@@ -1,11 +1,18 @@
 // User profile with optional fields
+export interface SearchUsersResponse {
+  user: UserProfile[];
+  filteredUsersCount: number;
+}
+
 export interface UserProfile {
-    _id: string;
-    username: string;
-    avatar: string;
-    bio?: string;
-    name?: string
-  }
+  _id: string;
+  username: string;
+  avatar: string;
+  bio?: string;
+  name?: string;
+  isFollowing?: boolean;
+  isRequestSent?: boolean;
+}
   
   // For follow status check
   export interface FollowStatusResponse {

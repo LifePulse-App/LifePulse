@@ -6,7 +6,8 @@ import {
   FollowingListResponse,
   FollowRequestsResponse,
   SuggestedUsersResponse,
-  GenericResponse
+  GenericResponse,
+  SearchUsersResponse
 } from '../models/FriendModel';
 
 // Follow a user
@@ -99,10 +100,9 @@ const getSpecificUser = async (id: string) => {
   }
 };
 
-// Search users
 const searchUsers = async (query: string) => {
   try {
-    return await client.get<UserProfile[]>(`/social/search${query ? `?${query}` : ''}`);
+    return await client.get<SearchUsersResponse>(`/social/search${query ? `?${query}` : ''}`);
   } catch (error: any) {
     if (!error.response) throw new Error('Server is offline, try again later.');
     throw error;

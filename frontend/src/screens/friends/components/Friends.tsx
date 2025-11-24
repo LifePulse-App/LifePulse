@@ -12,7 +12,6 @@ import {
 } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-
 import MainLayout from "../../../shared/components/MainLayout";
 import AppScreen from "../../../components/Layout/AppScreen/AppScreen";
 import socialApi from "../services/api_friends";
@@ -25,6 +24,8 @@ const ICON_GLASS_BG = "rgba(15, 23, 42, 0)";
 
 const Friends = ({ navigation }: any) => {
   const authContext = useContext(AuthContext);
+  const currentUserId = authContext?.User?.user?.id;
+
   const [search, setSearch] = useState("");
   const [suggestions, setSuggestions] = useState<UserProfile[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
@@ -32,122 +33,91 @@ const Friends = ({ navigation }: any) => {
   const [showAllRequests, setShowAllRequests] = useState(false);
   const [loadingActions, setLoadingActions] = useState<string | null>(null);
 
-  // You should get this from your auth context/store
-  const currentUserId = authContext?.User?.user?.id; // replace with real user id
-
   const isSearching = search.trim().length > 0;
 
-  // Fetch suggestions
-  useEffect(() => {
-    socialApi.getSuggestedUsers(10)
-      .then((res) => {
-        console.log("getSuggestedUsers", res.data);
-        setSuggestions(res.data.suggestions ?? []);
-      })
-      .catch((error) => {
-        setSuggestions([]);
-        console.log("Suggestion Error:", error);
-      });
-  }, []);
-
-  // Fetch friend requests
-  useEffect(() => {
-    socialApi.getFollowRequests()
-      .then((res) => {
-        console.log("getFollowRequests", res.data);
-        setFriendRequests(res.data.pendingRequests ?? []);
-      })
-      .catch((error) => {
-        setFriendRequests([]);
-        console.log("Requests Error:", error);
-      });
-  }, []);
-
-  // Search users
-  useEffect(() => {
-    if (isSearching) {
-      socialApi.searchUsers(`q=${encodeURIComponent(search)}`)
-        .then((res) => {
-          console.log("searchUsers", res.data);
-          setAllUsers(res.data.user ?? []);
-        })
-        .catch((error) => {
-          setAllUsers([]);
-          console.log("Search Error:", error);
-        });
-    } else {
+  // GETTERS WITH LOGGING
+  const fetchSuggestions = async () => {
+    try {
+      const res = await socialApi.getSuggestedUsers(10);
+      setSuggestions(res.data.suggestions ?? []);
+    } catch (e) {
+      setSuggestions([]);
+    }
+  };
+  const fetchSearch = async () => {
+    try {
+      const res = await socialApi.searchUsers(`q=${encodeURIComponent(search)}`);
+      setAllUsers(res.data.user ?? []);
+    } catch (e) {
       setAllUsers([]);
     }
+  };
+
+  // Initial fetches
+  useEffect(() => { fetchSuggestions(); }, []);
+  useEffect(() => {
+    socialApi.getFollowRequests()
+      .then((res) => setFriendRequests(res.data.pendingRequests ?? []))
+      .catch(() => setFriendRequests([]));
+  }, []);
+  useEffect(() => {
+    if (isSearching) { fetchSearch(); }
+    else { setAllUsers([]); }
   }, [search, isSearching]);
 
-  const searchResults = useMemo(() => {
-    return isSearching ? allUsers : [];
-  }, [allUsers, isSearching]);
+  const searchResults = useMemo(() => isSearching ? allUsers : [], [allUsers, isSearching]);
 
+  // HANDLERS — Always refetch after!
   const handleAddFriend = async (user: UserProfile) => {
     setLoadingActions(user._id);
     try {
       await socialApi.followUser(user._id, currentUserId);
       Alert.alert("Friend Request Sent", `Request sent to ${user.name}`);
-      console.log("Add Friend API called: user=", user._id, "currentUser=", currentUserId);
-    } catch (e) {
-      console.log("Add Friend Error:", e);
-      Alert.alert("Error", "Could not send friend request.");
-    }
+      isSearching ? await fetchSearch() : await fetchSuggestions();
+    } catch (e) { Alert.alert("Error", "Could not send friend request."); }
     setLoadingActions(null);
   };
-
+  const handleCancelRequest = async (user: UserProfile) => {
+    setLoadingActions(user._id);
+    try {
+      await socialApi.removeFollowRequest(user._id, currentUserId);
+      Alert.alert("Request Removed", `Removed your friend request to ${user.name}`);
+      isSearching ? await fetchSearch() : await fetchSuggestions();
+    } catch (e) { Alert.alert("Error", "Couldn't remove friend request."); }
+    setLoadingActions(null);
+  };
   const handleAcceptRequest = async (req: FollowRequest) => {
     setLoadingActions(req.user._id);
     try {
-      await socialApi.acceptFollowRequest(currentUserId, req.user._id); // userId = current, requester = request user
+      await socialApi.acceptFollowRequest(currentUserId, req.user._id);
       Alert.alert("Request Accepted", `Accepted request from ${req.user.name}`);
-      console.log("Accept API:", currentUserId, req.user._id);
-      // Remove locally
       setFriendRequests((prev) => prev.filter((r) => r.user._id !== req.user._id));
-    } catch (e) {
-      Alert.alert("Error", "Couldn't accept request.");
-      console.log("Accept Error:", e);
-    }
+      isSearching ? await fetchSearch() : await fetchSuggestions();
+    } catch (e) { Alert.alert("Error", "Couldn't accept request."); }
     setLoadingActions(null);
   };
-
   const handleRejectRequest = async (req: FollowRequest) => {
     setLoadingActions(req.user._id);
     try {
-      await socialApi.removeFollowRequest(currentUserId, req.user._id); // userId = current, requester = request user
+      await socialApi.removeFollowRequest(currentUserId, req.user._id);
       Alert.alert("Request Rejected", `Rejected request from ${req.user.name}`);
-      console.log("Reject API:", currentUserId, req.user._id);
       setFriendRequests((prev) => prev.filter((r) => r.user._id !== req.user._id));
-    } catch (e) {
-      Alert.alert("Error", "Couldn't reject request.");
-      console.log("Reject Error:", e);
-    }
+      isSearching ? await fetchSearch() : await fetchSuggestions();
+    } catch (e) { Alert.alert("Error", "Couldn't reject request."); }
     setLoadingActions(null);
   };
 
+  // UI rendering logic
   const renderUserItem = ({ item }: { item: UserProfile | FollowRequest }) => {
-    // For requests, item = FollowRequest { user: UserProfile }
-    const isRequest = !!(item as FollowRequest).requestedAt;
-    const user =
-      isRequest && (item as FollowRequest).user
-        ? (item as FollowRequest).user
-        : (item as UserProfile);
-    const initials =
-      user.name
-        ? user.name.split(" ").map((p) => p[0]).join("").toUpperCase().slice(0, 2)
-        : user.username[1].toUpperCase();
+    const isRequest = (item as FollowRequest).requestedAt !== undefined;
+    const user = isRequest ? (item as FollowRequest).user : (item as UserProfile);
+    const initials = user.name
+      ? user.name.split(" ").map((p) => p[0]).join("").toUpperCase().slice(0, 2)
+      : user.username[1].toUpperCase();
 
     return (
       <View style={styles.userCard}>
-        <View
-          style={[
-            styles.avatar,
-            {
-              backgroundColor: user?.avatarColor || "rgba(55, 65, 81, 0.9)",
-            },
-          ]}
-        >
+        <View style={[styles.avatar, { backgroundColor: user.avatarColor || "rgba(55, 65, 81, 0.9)" }]}>
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
         <View style={styles.userInfo}>
@@ -160,57 +130,64 @@ const Friends = ({ navigation }: any) => {
               activeOpacity={0.7}
               style={[
                 styles.addBtn,
-                {
-                  backgroundColor:
-                    loadingActions === user._id ? "#d1d5db" : "#22C55E",
-                  marginRight: 6,
-                },
+                { backgroundColor: loadingActions === user._id ? "#d1d5db" : "#22C55E", marginRight: 6 }
               ]}
               onPress={() => handleAcceptRequest(item as FollowRequest)}
               disabled={loadingActions === user._id}
             >
               <Icon name="check" size={18} color="#F9FAFB" />
-              <Text style={styles.addBtnText}>
-                {loadingActions === user._id ? "..." : "Accept"}
-              </Text>
+              <Text style={styles.addBtnText}>{loadingActions === user._id ? "..." : "Accept"}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               activeOpacity={0.7}
               style={[
                 styles.addBtn,
-                {
-                  backgroundColor:
-                    loadingActions === user._id ? "#d1d5db" : "#EF4444",
-                },
+                { backgroundColor: loadingActions === user._id ? "#d1d5db" : "#EF4444" }
               ]}
               onPress={() => handleRejectRequest(item as FollowRequest)}
               disabled={loadingActions === user._id}
             >
               <Icon name="close" size={18} color="#F9FAFB" />
-              <Text style={styles.addBtnText}>
-                {loadingActions === user._id ? "..." : "Reject"}
-              </Text>
+              <Text style={styles.addBtnText}>{loadingActions === user._id ? "..." : "Reject"}</Text>
             </TouchableOpacity>
           </View>
+        ) : user.isFollowing ? (
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: "#6366f1" }]}
+            activeOpacity={0.85}
+            onPress={() => Alert.alert("Chat", `Open chat with ${user.name}`)}
+          >
+            <Icon name="chat" size={18} color="#F9FAFB" />
+            <Text style={styles.addBtnText}>Chat</Text>
+          </TouchableOpacity>
+        ) : user.isRequestSent ? (
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: "#9CA3AF" }]}
+            activeOpacity={0.85}
+            onPress={() =>
+              Alert.alert(
+                "Cancel Request?",
+                `Do you want to remove your friend request to ${user.name}?`,
+                [
+                  { text: "No" },
+                  { text: "Remove", style: "destructive", onPress: () => handleCancelRequest(user) }
+                ]
+              )
+            }
+            disabled={loadingActions === user._id}
+          >
+            <Icon name="check" size={18} color="#F9FAFB" />
+            <Text style={styles.addBtnText}>{loadingActions === user._id ? "..." : "Added"}</Text>
+          </TouchableOpacity>
         ) : (
           <TouchableOpacity
             activeOpacity={0.85}
-            style={[
-              styles.addBtn,
-              {
-                backgroundColor:
-                  loadingActions === user._id
-                    ? "#d1d5db"
-                    : "rgba(30, 64, 175, 0.9)",
-              },
-            ]}
+            style={styles.addBtn}
             onPress={() => handleAddFriend(user)}
             disabled={loadingActions === user._id}
           >
             <Icon name="account-plus-outline" size={18} color="#F9FAFB" />
-            <Text style={styles.addBtnText}>
-              {loadingActions === user._id ? "..." : "Add"}
-            </Text>
+            <Text style={styles.addBtnText}>{loadingActions === user._id ? "..." : "Add"}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -242,10 +219,7 @@ const Friends = ({ navigation }: any) => {
             <Text style={styles.topTitle}>Add Friends</Text>
             <View style={styles.topRightSpacer} />
           </View>
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.searchCard}>
               <Icon name="magnify" size={20} color="#9CA3AF" style={{ marginRight: 8 }} />
               <TextInput
