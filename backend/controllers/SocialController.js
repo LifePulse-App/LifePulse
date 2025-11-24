@@ -147,18 +147,28 @@ export const specificuser = catchAsyncErrors(async (req, res, next) => {
 })
 
 export const search = catchAsyncErrors(async (req, res, next) => {
-    const apiFilters = new APIFilters(User, req.query).search().filters();  
+  const { q } = req.query;
+  const excludeId = req.user?.id;
 
-   apiFilters.query = apiFilters.query.find({ _id: { $ne: req.user.id } });
+  // If no q, return empty array
+  if (!q) {
+      return res.status(200).json({ user: [], filteredUsersCount: 0 });
+  }
 
-    let user = await apiFilters.query;
-    let filteredUsersCount = user.length;
-    user = await apiFilters.query.clone();
-
-    res.status(200).json({
-     user,
-     filteredUsersCount
-    });
+  // Build search
+  const searchRegex = new RegExp(q, 'i');
+  const user = await User.find({
+      _id: { $ne: excludeId },
+      $or: [
+          { username: searchRegex },
+          { name: searchRegex }
+      ],
+  });
+  const filteredUsersCount = user.length;
+  res.status(200).json({
+      user,
+      filteredUsersCount
+  });
 });
 
 export const followersList = async (req, res) => { 

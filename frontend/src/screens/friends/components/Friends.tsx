@@ -144,7 +144,7 @@ const Friends = ({ navigation }: any) => {
           style={[
             styles.avatar,
             {
-              backgroundColor: user.avatarColor || "rgba(55, 65, 81, 0.9)",
+              backgroundColor: user?.avatarColor || "rgba(55, 65, 81, 0.9)",
             },
           ]}
         >
