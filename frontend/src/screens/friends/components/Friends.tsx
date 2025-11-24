@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useContext } from "react";
 import {
   View,
   TextInput,
@@ -8,64 +8,135 @@ import {
   ScrollView,
   Platform,
   StatusBar,
+  Alert
 } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 
 import MainLayout from "../../../shared/components/MainLayout";
 import AppScreen from "../../../components/Layout/AppScreen/AppScreen";
+import socialApi from "../services/api_friends";
+import { UserProfile, FollowRequest } from "../models/FriendModel";
+import AuthContext from "../../../auth/user/UserContext";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
 const ICON_GLASS_BG = "rgba(15, 23, 42, 0)";
 
-type FriendUser = {
-  id: string;
-  name: string;
-  username: string;
-  avatarColor?: string;
-};
-
-const MOCK_SUGGESTIONS: FriendUser[] = [
-  { id: "1", name: "Alice Johnson", username: "@alice", avatarColor: "#F97316" },
-  { id: "2", name: "Mark Davis", username: "@mark", avatarColor: "#22C55E" },
-  { id: "3", name: "Sophia Lee", username: "@sophia", avatarColor: "#38BDF8" },
-];
-
-const MOCK_ALL_USERS: FriendUser[] = [
-  ...MOCK_SUGGESTIONS,
-  { id: "4", name: "John Doe", username: "@john" },
-  { id: "5", name: "Emily Parker", username: "@emily" },
-  { id: "6", name: "David Kim", username: "@david" },
-];
-
 const Friends = ({ navigation }: any) => {
+  const authContext = useContext(AuthContext);
   const [search, setSearch] = useState("");
+  const [suggestions, setSuggestions] = useState<UserProfile[]>([]);
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [friendRequests, setFriendRequests] = useState<FollowRequest[]>([]);
+  const [showAllRequests, setShowAllRequests] = useState(false);
+  const [loadingActions, setLoadingActions] = useState<string | null>(null);
+
+  // You should get this from your auth context/store
+  const currentUserId = authContext?.User?.user?.id; // replace with real user id
 
   const isSearching = search.trim().length > 0;
 
-  const searchResults = useMemo(() => {
-    if (!isSearching) return [];
-    const q = search.trim().toLowerCase();
-    return MOCK_ALL_USERS.filter(
-      (u) =>
-        u.name.toLowerCase().includes(q) ||
-        u.username.toLowerCase().includes(q)
-    );
+  // Fetch suggestions
+  useEffect(() => {
+    socialApi.getSuggestedUsers(10)
+      .then((res) => {
+        console.log("getSuggestedUsers", res.data);
+        setSuggestions(res.data.suggestions ?? []);
+      })
+      .catch((error) => {
+        setSuggestions([]);
+        console.log("Suggestion Error:", error);
+      });
+  }, []);
+
+  // Fetch friend requests
+  useEffect(() => {
+    socialApi.getFollowRequests()
+      .then((res) => {
+        console.log("getFollowRequests", res.data);
+        setFriendRequests(res.data.pendingRequests ?? []);
+      })
+      .catch((error) => {
+        setFriendRequests([]);
+        console.log("Requests Error:", error);
+      });
+  }, []);
+
+  // Search users
+  useEffect(() => {
+    if (isSearching) {
+      socialApi.searchUsers(`q=${encodeURIComponent(search)}`)
+        .then((res) => {
+          console.log("searchUsers", res.data);
+          setAllUsers(res.data.user ?? []);
+        })
+        .catch((error) => {
+          setAllUsers([]);
+          console.log("Search Error:", error);
+        });
+    } else {
+      setAllUsers([]);
+    }
   }, [search, isSearching]);
 
-  const handleAddFriend = (user: FriendUser) => {
-    // TODO: replace with your API call
-    console.log("Add friend:", user);
+  const searchResults = useMemo(() => {
+    return isSearching ? allUsers : [];
+  }, [allUsers, isSearching]);
+
+  const handleAddFriend = async (user: UserProfile) => {
+    setLoadingActions(user._id);
+    try {
+      await socialApi.followUser(user._id, currentUserId);
+      Alert.alert("Friend Request Sent", `Request sent to ${user.name}`);
+      console.log("Add Friend API called: user=", user._id, "currentUser=", currentUserId);
+    } catch (e) {
+      console.log("Add Friend Error:", e);
+      Alert.alert("Error", "Could not send friend request.");
+    }
+    setLoadingActions(null);
   };
 
-  const renderUserItem = ({ item }: { item: FriendUser }) => {
-    const initials = item.name
-      .split(" ")
-      .map((p) => p[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+  const handleAcceptRequest = async (req: FollowRequest) => {
+    setLoadingActions(req.user._id);
+    try {
+      await socialApi.acceptFollowRequest(currentUserId, req.user._id); // userId = current, requester = request user
+      Alert.alert("Request Accepted", `Accepted request from ${req.user.name}`);
+      console.log("Accept API:", currentUserId, req.user._id);
+      // Remove locally
+      setFriendRequests((prev) => prev.filter((r) => r.user._id !== req.user._id));
+    } catch (e) {
+      Alert.alert("Error", "Couldn't accept request.");
+      console.log("Accept Error:", e);
+    }
+    setLoadingActions(null);
+  };
+
+  const handleRejectRequest = async (req: FollowRequest) => {
+    setLoadingActions(req.user._id);
+    try {
+      await socialApi.removeFollowRequest(currentUserId, req.user._id); // userId = current, requester = request user
+      Alert.alert("Request Rejected", `Rejected request from ${req.user.name}`);
+      console.log("Reject API:", currentUserId, req.user._id);
+      setFriendRequests((prev) => prev.filter((r) => r.user._id !== req.user._id));
+    } catch (e) {
+      Alert.alert("Error", "Couldn't reject request.");
+      console.log("Reject Error:", e);
+    }
+    setLoadingActions(null);
+  };
+
+  const renderUserItem = ({ item }: { item: UserProfile | FollowRequest }) => {
+    // For requests, item = FollowRequest { user: UserProfile }
+    const isRequest = !!(item as FollowRequest).requestedAt;
+    const user =
+      isRequest && (item as FollowRequest).user
+        ? (item as FollowRequest).user
+        : (item as UserProfile);
+    const initials =
+      user.name
+        ? user.name.split(" ").map((p) => p[0]).join("").toUpperCase().slice(0, 2)
+        : user.username[1].toUpperCase();
 
     return (
       <View style={styles.userCard}>
@@ -73,50 +144,93 @@ const Friends = ({ navigation }: any) => {
           style={[
             styles.avatar,
             {
-              backgroundColor:
-                item.avatarColor ||
-                "rgba(55, 65, 81, 0.9)",
+              backgroundColor: user.avatarColor || "rgba(55, 65, 81, 0.9)",
             },
           ]}
         >
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
-
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>{item.name}</Text>
-          <Text style={styles.userUsername}>{item.username}</Text>
+          <Text style={styles.userName}>{user.name ?? user.username}</Text>
+          <Text style={styles.userUsername}>{user.username}</Text>
         </View>
-
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.addBtn}
-          onPress={() => handleAddFriend(item)}
-        >
-          <Icon name="account-plus-outline" size={18} color="#F9FAFB" />
-          <Text style={styles.addBtnText}>Add</Text>
-        </TouchableOpacity>
+        {isRequest ? (
+          <View style={{ flexDirection: "row" }}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[
+                styles.addBtn,
+                {
+                  backgroundColor:
+                    loadingActions === user._id ? "#d1d5db" : "#22C55E",
+                  marginRight: 6,
+                },
+              ]}
+              onPress={() => handleAcceptRequest(item as FollowRequest)}
+              disabled={loadingActions === user._id}
+            >
+              <Icon name="check" size={18} color="#F9FAFB" />
+              <Text style={styles.addBtnText}>
+                {loadingActions === user._id ? "..." : "Accept"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={[
+                styles.addBtn,
+                {
+                  backgroundColor:
+                    loadingActions === user._id ? "#d1d5db" : "#EF4444",
+                },
+              ]}
+              onPress={() => handleRejectRequest(item as FollowRequest)}
+              disabled={loadingActions === user._id}
+            >
+              <Icon name="close" size={18} color="#F9FAFB" />
+              <Text style={styles.addBtnText}>
+                {loadingActions === user._id ? "..." : "Reject"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={[
+              styles.addBtn,
+              {
+                backgroundColor:
+                  loadingActions === user._id
+                    ? "#d1d5db"
+                    : "rgba(30, 64, 175, 0.9)",
+              },
+            ]}
+            onPress={() => handleAddFriend(user)}
+            disabled={loadingActions === user._id}
+          >
+            <Icon name="account-plus-outline" size={18} color="#F9FAFB" />
+            <Text style={styles.addBtnText}>
+              {loadingActions === user._id ? "..." : "Add"}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
 
-  const listData = isSearching ? searchResults : MOCK_SUGGESTIONS;
+  const requestListToShow = showAllRequests
+    ? friendRequests
+    : friendRequests.slice(0, 3);
+
+  const listData = isSearching ? searchResults : suggestions;
 
   return (
     <MainLayout>
       <AppScreen style={styles.root}>
-        {/* Background (same as dashboard) */}
         <View style={styles.baseBackground} />
         <View style={styles.glowTop} />
         <View style={styles.glowBottom} />
-
-        <StatusBar
-          barStyle="light-content"
-          translucent
-          backgroundColor="transparent"
-        />
-
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
         <View style={styles.overlay}>
-          {/* Top bar */}
           <View style={styles.topBar}>
             <TouchableOpacity
               activeOpacity={0.8}
@@ -125,25 +239,15 @@ const Friends = ({ navigation }: any) => {
             >
               <Icon name="arrow-left" size={22} color="#E5E7EB" />
             </TouchableOpacity>
-
             <Text style={styles.topTitle}>Add Friends</Text>
-
-            {/* Right spacer to keep title centered */}
             <View style={styles.topRightSpacer} />
           </View>
-
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Search bar */}
             <View style={styles.searchCard}>
-              <Icon
-                name="magnify"
-                size={20}
-                color="#9CA3AF"
-                style={{ marginRight: 8 }}
-              />
+              <Icon name="magnify" size={20} color="#9CA3AF" style={{ marginRight: 8 }} />
               <TextInput
                 placeholder="Search users..."
                 placeholderTextColor="#6B7280"
@@ -152,8 +256,40 @@ const Friends = ({ navigation }: any) => {
                 style={styles.searchInput}
               />
             </View>
-
-            {/* Section title */}
+            {friendRequests.length > 0 && (
+              <View style={styles.userListCard}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>Friend Requests</Text>
+                  <Text style={styles.sectionHint}>Accept or ignore friend requests</Text>
+                </View>
+                <FlatList
+                  data={requestListToShow}
+                  keyExtractor={(item) => item.user._id}
+                  renderItem={renderUserItem}
+                  scrollEnabled={false}
+                  ItemSeparatorComponent={() => (
+                    <View style={styles.listSeparator} />
+                  )}
+                  ListFooterComponent={() =>
+                    friendRequests.length > 3 && (
+                      <TouchableOpacity
+                        onPress={() => setShowAllRequests((v) => !v)}
+                        style={{ alignItems: "center", marginTop: 10, paddingBottom: 2 }}
+                      >
+                        <Icon
+                          name={showAllRequests ? "chevron-up" : "chevron-down"}
+                          size={26}
+                          color="#94A3B8"
+                        />
+                        <Text style={{ color: "#94A3B8", fontSize: 12 }}>
+                          {showAllRequests ? "Show Less" : "Show All"}
+                        </Text>
+                      </TouchableOpacity>
+                    )
+                  }
+                />
+              </View>
+            )}
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>
                 {isSearching ? "Search results" : "Suggested for you"}
@@ -164,8 +300,6 @@ const Friends = ({ navigation }: any) => {
                 </Text>
               )}
             </View>
-
-            {/* Users list */}
             {listData.length === 0 ? (
               <View style={styles.emptyStateCard}>
                 <Icon name="account-search-outline" size={32} color="#6B7280" />
@@ -184,7 +318,7 @@ const Friends = ({ navigation }: any) => {
               <View style={styles.userListCard}>
                 <FlatList
                   data={listData}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={(item) => item._id}
                   renderItem={renderUserItem}
                   scrollEnabled={false}
                   ItemSeparatorComponent={() => (
@@ -193,7 +327,6 @@ const Friends = ({ navigation }: any) => {
                 />
               </View>
             )}
-
             <View style={{ height: 40 }} />
           </ScrollView>
         </View>

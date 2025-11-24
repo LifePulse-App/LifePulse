@@ -212,7 +212,7 @@ export const suggestedUsers = catchAsyncErrors(async (req, res, next) => {
     const users = await User.find({
       _id: { $nin: excludedUserIds }
     })
-      .select("username avatar bio") // select only necessary fields
+      .select("name username avatar bio") // select only necessary fields
       .limit(limit)
       .lean();
 

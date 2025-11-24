@@ -4,7 +4,7 @@ export interface UserProfile {
     username: string;
     avatar: string;
     bio?: string;
-    // Add more fields as needed
+    name?: string
   }
   
   // For follow status check

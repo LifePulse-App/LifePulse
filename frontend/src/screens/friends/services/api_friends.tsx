@@ -112,7 +112,7 @@ const searchUsers = async (query: string) => {
 // Get suggested users
 const getSuggestedUsers = async (limit = 6) => {
   try {
-    return await client.get<SuggestedUsersResponse>(`/social/suggested-users?limit=${limit}`);
+    return await client.get<SuggestedUsersResponse>(`/social/suggestion-users?limit=${limit}`);
   } catch (error: any) {
     if (!error.response) throw new Error('Server is offline, try again later.');
     throw error;
