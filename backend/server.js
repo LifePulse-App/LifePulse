@@ -38,6 +38,7 @@ import DashboardRoutes from "./routes/DashboardRoutes.js"
 import HabitRoutes from "./routes/HabitRoutes.js"
 import MoodRoutes from "./routes/MoodRoutes.js"
 import ProofRoutes from "./routes/ProofRoutes.js"
+import SocialRoutes from "./routes/SocialRoutes.js"
 
 // Middlewares
 app.use(cookieParser());
@@ -48,7 +49,7 @@ app.use("/api/auth", AuthRoutes);
 app.use("/api/dashboard", DashboardRoutes);
 app.use("/api/habit", HabitRoutes);
 app.use("/api/moods", MoodRoutes);
-app.use("/api/proofs", ProofRoutes);
+app.use("/api/social", SocialRoutes);
 app.use(errorMiddleware)
 
 

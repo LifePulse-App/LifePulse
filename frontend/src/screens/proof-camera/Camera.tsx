@@ -20,6 +20,7 @@ import AppText from '../../components/Layout/AppText/AppText';
 import colors from '../../shared/styling/lightModeColors';
 import ProofApi from './api_camera';
 import AuthContext from '../../auth/user/UserContext';
+import GlassyErrorModal from '../../shared/components/GlassyErrorModal';
 
 type Habit = {
   id: string;
@@ -65,6 +66,20 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const devices = useCameraDevices();
   const device: CameraDevice | undefined =
     devices.find(d => d.position === 'back') ?? devices[0];
+
+  // Glassy message modal (error / success)
+  const [modalMessage, setModalMessage] = useState<string | null>(null);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const showMessage = (msg: string) => {
+    setModalMessage(msg);
+    setModalVisible(true);
+  };
+
+  const hideMessage = () => {
+    setModalVisible(false);
+    setModalMessage(null);
+  };
 
   // Camera permissions
   useEffect(() => {
@@ -139,8 +154,10 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
         }
       }
     } catch (err) {
+      console.log('fetchHabits error:', err);
       setHabits([]);
       setHabitSections([]);
+      showMessage('Failed to load activities. Please try again.');
     }
     setHabitsLoading(false);
   };
@@ -173,24 +190,30 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
       const res = await ProofApi.SubmitProof(formData);
       console.log(res);
       
+      const data = (res as any).data ?? res;
 
-      if ((res as any).data?.success) {
-        const reason = (res as any).data?.reason;
+      if (data?.success) {
+        const reason = data.reason as string | undefined;
+
+        // Show a glassy success/notice card, then go back
         if (reason) {
-          Alert.alert('Notice', reason);
+          showMessage(reason);
+          // Optionally wait for user to close instead of auto-goBack
+          // Here we'll auto close + go back after a short delay
+          setTimeout(() => {
+            hideMessage();
+            navigation.goBack();
+          }, 1500);
         } else {
-          Alert.alert('Success', 'Proof uploaded!');
+
+            navigation.goBack();
         }
-        navigation.goBack();
       } else {
-        Alert.alert(
-          'Upload failed',
-          (res as any).data?.message || 'Please try again.',
-        );
+        showMessage(data?.message || 'Upload failed. Please try again.');
       }
     } catch (err) {
       console.error('Upload error:', err);
-      Alert.alert('Error', 'Server error while uploading proof.');
+      showMessage('Server error while uploading proof.');
     } finally {
       setUploading(false);
     }
@@ -198,6 +221,8 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const handleTakePhoto = async () => {
     if (!habitId) {
+      // Prompt user to select an activity, and open the picker
+      showMessage('Please select an activity before capturing proof.');
       setHabitModalVisible(true);
       return;
     }
@@ -213,7 +238,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
       await uploadProof(filePath, habitId);
     } catch (err) {
       console.error('Capture error:', err);
-      Alert.alert('Error', 'Failed to capture photo.');
+      showMessage('Failed to capture photo. Please try again.');
     }
   };
 
@@ -264,6 +289,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {habitsLoading ? (
             <View style={styles.modalLoading}>
+              <AppActivityIndicator visible />
             </View>
           ) : (
             <SectionList
@@ -332,7 +358,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <Camera
         ref={cameraRef}
-        style={StyleSheet.absoluteFill}
+        style={StyleSheet.absoluteFillObject}
         device={device}
         isActive={!uploading}
         photo={true}
@@ -399,6 +425,13 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
       </View>
 
       {renderHabitList()}
+
+      {/* Glassy message modal (error / success) */}
+      <GlassyErrorModal
+        visible={modalVisible}
+        message={modalMessage || ''}
+        onClose={hideMessage}
+      />
     </View>
   );
 };

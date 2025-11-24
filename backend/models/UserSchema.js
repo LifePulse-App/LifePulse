@@ -90,6 +90,30 @@ resetPasswordVerified: {
         expiresAt: { type: Date, required: true },
       },
     ],
+
+    isPublic: {
+      type: Boolean,
+      default: true
+  },
+  followers: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Store ObjectId inside `user`
+        followedAt: { type: Date, default: Date.now }
+      }
+    ],
+    following: [
+      {
+          user: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // Store ObjectId inside `user`
+          followedAt: { type: Date, default: Date.now }
+        }
+       
+    ],
+    followRequests: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        requestedAt: { type: Date, default: Date.now }, // Timestamp added for follow requests
+      },
+    ],
     
     avatar: {
       public_id: String,

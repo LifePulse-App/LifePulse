@@ -168,7 +168,6 @@ const Dashboard = ({ navigation }: any) => {
 
   useFocusEffect(
     useCallback(() => {
-      // Called every time Dashboard comes into focus
       fetchDashboard();
     }, [fetchDashboard])
   );
@@ -176,11 +175,6 @@ const Dashboard = ({ navigation }: any) => {
   const handleRetry = () => {
     fetchDashboard();
   };
-
-  const handleHabitPress = (habitId: string) => {
-    Alert.alert("Habit tapped", `Habit id: ${habitId}`);
-  };
-
   // Use skeleton instead of full-screen loader
   if (loading) {
     return <DashboardSkeleton />;
@@ -218,9 +212,9 @@ const Dashboard = ({ navigation }: any) => {
             </TouchableOpacity>
 
             <View style={styles.topBarRight}>
-              <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass}>
+              {/* <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass}>
                 <Icon name="magnify" size={22} color="#E5E7EB" />
-              </TouchableOpacity>
+              </TouchableOpacity> */}
               <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass}>
                 <Icon name="account-plus-outline" size={22} color="#E5E7EB" />
               </TouchableOpacity>
@@ -375,7 +369,7 @@ const Dashboard = ({ navigation }: any) => {
             {/* Habits list */}
             <View style={styles.card}>
   <View style={styles.cardHeaderRow}>
-    <Text style={styles.sectionTitle}>Today’s Habits</Text>
+    <Text style={styles.sectionTitle}>Today’s Activities</Text>
     <Text style={styles.sectionHint}>Verify and earn XP</Text>
   </View>
 
@@ -388,7 +382,7 @@ const Dashboard = ({ navigation }: any) => {
           textAlign: "center",
         }}
       >
-        No habits logged for today yet.
+        No activities updated for today yet.
       </Text>
     </View>
   ) : (
@@ -403,7 +397,6 @@ const Dashboard = ({ navigation }: any) => {
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.habitRow}
-          onPress={() => handleHabitPress(item.id)}
         >
           <View style={styles.habitLeft}>
             <View style={styles.habitIconWrap}>
