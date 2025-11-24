@@ -216,7 +216,9 @@ const Dashboard = ({ navigation }: any) => {
                 <Icon name="magnify" size={22} color="#E5E7EB" />
               </TouchableOpacity> */}
               <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass}>
-                <Icon name="account-plus-outline" size={22} color="#E5E7EB" />
+                <Icon name="account-plus-outline" size={22} color="#E5E7EB"  onPress={() => {
+    navigation.navigate("Friends");
+  }}/>
               </TouchableOpacity>
             </View>
           </View>

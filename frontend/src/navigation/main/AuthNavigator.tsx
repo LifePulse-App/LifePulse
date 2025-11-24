@@ -17,6 +17,7 @@ import { setAuthHeaders, setSecretKey } from '../../auth/api-client/api_client';
 import MoodScreen from '../../screens/moodscreen/comp/component/MoodScreen';
 import Dashboard from '../../screens/dashboard/components/dashboard/Dashboard';
 import ProofVisionCameraScreen from '../../screens/proof-camera/Camera';
+import Friends from '../../screens/friends/components/Friends';
 
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');
@@ -244,6 +245,7 @@ const AuthNavigator = () => {
       <Stack.Screen name="Drawer" component={DrawerNavigator} />
       <Stack.Screen name="MoodScreen" component={MoodScreen} />
       <Stack.Screen name="ProofCamera" component={ProofVisionCameraScreen} />
+      <Stack.Screen name="Friends" component={Friends} />
     </Stack.Navigator>
   );
 };

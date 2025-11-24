@@ -190,3 +190,37 @@ export const followingList = catchAsyncErrors(async (req, res, next) => {
     res.status(500).json({ message: "Server error" });
 }
 })
+
+// Suggest users for current user (excluding current user and users they already follow)
+export const suggestedUsers = catchAsyncErrors(async (req, res, next) => {
+  /**
+   * Params: req.user.id      // current logged-in user ID
+   * Optional Query: limit    // eg: /api/suggested-users?limit=5
+   */
+  try {
+    const limit = parseInt(req.query.limit) || 20; // default 6 suggestions
+
+    // Fetch current user and their following list
+    const currentUser = await User.findById(req.user.id, "following");
+
+    if (!currentUser) return res.status(404).json({ message: "User not found" });
+
+    // List of user IDs to exclude (current user + already following)
+    const excludedUserIds = [req.user.id, ...currentUser.following.map(f => f.user.toString())];
+
+    // Query for users not in excludedUserIds, and optionally public only, e.g. isPublic: true
+    const users = await User.find({
+      _id: { $nin: excludedUserIds }
+    })
+      .select("username avatar bio") // select only necessary fields
+      .limit(limit)
+      .lean();
+
+    // Optionally, shuffle results for random suggestions
+    const shuffled = users.sort(() => 0.5 - Math.random());
+
+    res.status(200).json({ suggestions: shuffled });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});

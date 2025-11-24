@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
   moodGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginHorizontal: -6,
+    marginHorizontal: -10,
   },
   moodItem: {
     width: "31%",
