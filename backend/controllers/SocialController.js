@@ -1,8 +1,6 @@
-import User from "../backend/models/user.js"
-import ErrorHandler from "../backend/utils/errorHandler.js"
-import catchAsyncErrors from "../backend/middlewares/catchAsyncErrors.js"
-import APIFilters from "../backend/utils/apiFilters.js";
-
+import User from "../models/UserSchema.js"
+import catchAsyncErrors from "../utils/catchAsyncErrors.js"
+import APIFilters from "../utils/apiFilters.js"
 export const follow = catchAsyncErrors(async (req, res, next) => {
   const { userId, currentUserId } = req.params;
   const user = await User.findById(userId);
