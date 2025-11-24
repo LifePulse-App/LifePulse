@@ -1,6 +1,6 @@
 import express from "express";
 const router = express.Router();
-import {isAuthenticatedUser } from "../backend/middlewares/auth.js"
+import {isAuthenticatedUser } from "../middlewares/auth.js"
 import { follow, followAccept, followStatus, followersList, followingList, getFollowRequests, removeRequest, search, specificuser, unfollow } from "../controllers/SocialController.js";
 
 router.route("/follow/:userId/:currentUserId").post(isAuthenticatedUser, follow)
