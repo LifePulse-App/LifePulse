@@ -189,7 +189,15 @@ export const login = catchAsyncErrors(async (req, res, next) => {
     if (!isMatch) return next(new ErrorHandler("Invalid credentials", 401));
 
     const tokens = await sendTokens(res, user, deviceId);
-    await updateDeviceLogin(user, deviceId, deviceName, deviceModel, deviceBrand);
+    let device = user.deviceInfo.find(d => d.deviceId === deviceId);
+    if (device) {
+      device.deviceName = deviceName;
+      device.deviceModel = deviceModel;
+      device.deviceBrand = deviceBrand;
+      device.lastLogin = Date.now();
+    } else {
+      user.deviceInfo.push({ deviceId, deviceName, deviceModel, deviceBrand, lastLogin: Date.now() });
+    }
     res.status(200).json({ success: true, ...tokens });
   } catch (err) {
     return next(new ErrorHandler("Server error", 500));

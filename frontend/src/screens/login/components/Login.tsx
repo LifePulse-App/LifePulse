@@ -140,9 +140,9 @@ const Login = ({ navigation }: any) => {
     try {
       setSecretKey();
       const deviceId = await DeviceInfo.getUniqueId();
-const deviceName = await DeviceInfo.getDeviceName();
-const deviceModel = DeviceInfo.getModel();
-const deviceBrand = DeviceInfo.getBrand();
+      const deviceName = await DeviceInfo.getDeviceName();
+      const deviceModel = DeviceInfo.getModel();
+      const deviceBrand = DeviceInfo.getBrand();
       const response = await api_Login.getLogin(
         values.username,
         values.password,
