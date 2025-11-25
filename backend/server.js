@@ -49,6 +49,7 @@ app.use("/api/auth", AuthRoutes);
 app.use("/api/dashboard", DashboardRoutes);
 app.use("/api/habit", HabitRoutes);
 app.use("/api/moods", MoodRoutes);
+app.use("/api/proofs", ProofRoutes);
 app.use("/api/social", SocialRoutes);
 app.use(errorMiddleware)
 
