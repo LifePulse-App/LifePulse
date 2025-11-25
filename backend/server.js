@@ -39,6 +39,7 @@ import HabitRoutes from "./routes/HabitRoutes.js"
 import MoodRoutes from "./routes/MoodRoutes.js"
 import ProofRoutes from "./routes/ProofRoutes.js"
 import SocialRoutes from "./routes/SocialRoutes.js"
+import ProfileRoutes from "./routes/ProfileRoutes.js"
 
 // Middlewares
 app.use(cookieParser());
@@ -51,6 +52,7 @@ app.use("/api/habit", HabitRoutes);
 app.use("/api/moods", MoodRoutes);
 app.use("/api/proofs", ProofRoutes);
 app.use("/api/social", SocialRoutes);
+app.use("/api/profile", ProfileRoutes);
 app.use(errorMiddleware)
 
 

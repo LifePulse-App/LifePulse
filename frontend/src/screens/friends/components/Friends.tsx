@@ -17,6 +17,7 @@ import socialApi from "../services/api_friends";
 import { UserProfile, FollowRequest } from "../models/FriendModel";
 import AuthContext from "../../../auth/user/UserContext";
 
+
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
 const ICON_GLASS_BG = "rgba(15, 23, 42, 0)";
@@ -409,12 +410,21 @@ const Friends = ({ navigation }: any) => {
             </View>
             {friendRequests.length > 0 && (
               <View style={styles.userListCard}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>Friend Requests</Text>
-                  <Text style={styles.sectionHint}>
-                    Accept or ignore friend requests
-                  </Text>
-                </View>
+               <View style={styles.sectionHeader}>
+  <View style={{ flexDirection: "row", alignItems: "center" }}>
+    <Text style={styles.sectionTitle}>
+      Friend Requests
+    </Text>
+    {friendRequests.length > 0 && (
+      <View style={styles.badgeBubbleSection}>
+        <Text style={styles.badgeText}>{friendRequests.length}</Text>
+      </View>
+    )}
+  </View>
+  <Text style={styles.sectionHint}>
+    Accept or ignore friend requests
+  </Text>
+</View>
                 <FlatList
                   data={requestListToShow}
                   keyExtractor={(item) => item.user._id}
@@ -532,6 +542,24 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     justifyContent: "center",
     alignItems: "center",
+  },
+  badgeBubbleSection: {
+    backgroundColor: "#EF4444",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    marginLeft: 10,
+    marginTop: 2,
+    alignSelf: "flex-start",
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
   },
   modalCard: {
     backgroundColor: GLASS_BG,
@@ -667,6 +695,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 14 },
     shadowRadius: 24,
     elevation: 8,
+    marginBottom: 15
   },
   listSeparator: {
     height: 1,

@@ -16,6 +16,7 @@ import Dashboard from '../dashboard/components/dashboard/Dashboard';
 import StudentNavigator from '../../navigation/student/StudentNavigator';
 import EmployeeNavigator from '../../navigation/employee/EmployeeNavigator';
 import UserNavigator from '../../navigation/user/UserNavigator';
+import ChatScreen from '../chat/components/Chat';
 import ProfileScreen from '../profile/components/Profile';
 
 
@@ -31,6 +32,7 @@ const DrawerNavigator = () => (
     <Drawer.Screen name="Student" component={StudentNavigator} options={{headerShown: false}} />
     <Drawer.Screen name="Employee" component={EmployeeNavigator} options={{headerShown: false}} />
     <Drawer.Screen name="User" component={UserNavigator} options={{headerShown: false}} />
+    <Drawer.Screen name="Chat" component={ChatScreen} options={{headerShown: false}} />
     <Drawer.Screen name="Profile" component={ProfileScreen} options={{headerShown: false}} />
   </Drawer.Navigator>
 );

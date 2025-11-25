@@ -14,7 +14,7 @@ const LowNavBAr = () => {
     { key: 'attendance', title: 'Map', icon: { active: 'map-marker', inactive: 'map-marker-outline' }, },
     { key: 'home', title: 'Home',icon: { active: 'home', inactive: 'home-outline' }, },
     { key: 'results', title: 'LeaderBoard', icon: { active: 'chart-box', inactive: 'chart-box-outline' }, },
-    { key: 'settings', title: 'Chat', icon: { active: 'chat', inactive: 'chat-outline' }, },
+    { key: 'chat', title: 'Chat', icon: { active: 'chat', inactive: 'chat-outline' }, },
   ];
 
   // match actual screen names here
@@ -23,7 +23,7 @@ const LowNavBAr = () => {
       case 'StudentList': return 0;
       case 'Dashboard': return 1;
       case 'EmployeeList': return 2;
-      case 'Profile': return 3;
+      case 'Chat': return 3;
       default: return 1;
     }
   };
@@ -45,8 +45,8 @@ const LowNavBAr = () => {
       case 'results':
         navigation.navigate('Employee')
         break;
-      case 'settings':
-        navigation.navigate('Profile');
+      case 'chat':
+        navigation.navigate('Chat');
         break;
     }
   };

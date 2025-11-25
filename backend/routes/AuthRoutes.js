@@ -10,6 +10,7 @@ import {
   resendVerificationOtp,
   resetPasswordVerifyOtp,
   resetPasswordSetNew,
+  getLoginActivity,
 } from "../controllers/AuthController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 import { verifyEmail } from "../controllers/OtpController.js";
@@ -27,5 +28,6 @@ router.post("/reset-password/verify-otp", resetPasswordVerifyOtp);
 router.post("/reset-password/verified-otp", resetPasswordSetNew);
 router.post("/logout", isAuthenticatedUser, logout);
 router.get("/me", isAuthenticatedUser, me);
+router.get("/login-activity", isAuthenticatedUser, getLoginActivity);
 
 export default router;

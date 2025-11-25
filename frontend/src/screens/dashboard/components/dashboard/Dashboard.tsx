@@ -19,6 +19,7 @@ import NetInfo from "@react-native-community/netinfo";
 import MainLayout from "../../../../shared/components/MainLayout";
 import AppScreen from "../../../../components/Layout/AppScreen/AppScreen";
 import DashboardService from "../../services/api_dashboard";
+import socialApi from "../../../friends/services/api_friends";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
@@ -62,6 +63,7 @@ const Dashboard = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [friendReqCount, setFriendReqCount] = useState(0);
 
   const [profile, setProfile] = useState<{
     name: string;
@@ -102,6 +104,12 @@ const Dashboard = ({ navigation }: any) => {
     return () => {
       unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    socialApi.getFollowRequests()
+      .then((res) => setFriendReqCount(res.data?.pendingRequests?.length || 0))
+      .catch(() => setFriendReqCount(0));
   }, []);
 
   const fetchTodayHabits = useCallback(async () => {
@@ -209,18 +217,21 @@ const Dashboard = ({ navigation }: any) => {
           {/* Top bar */}
           <View style={styles.topBar}>
             <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass}>
-              <Icon name="account-circle-outline" size={26} color="#E5E7EB" />
+              <Icon name="account-circle-outline" size={26} color="#E5E7EB" onPress={() => navigation.navigate("Profile")}/>
             </TouchableOpacity>
 
             <View style={styles.topBarRight}>
               {/* <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass}>
                 <Icon name="magnify" size={22} color="#E5E7EB" />
               </TouchableOpacity> */}
-              <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass}>
-                <Icon name="account-plus-outline" size={22} color="#E5E7EB"  onPress={() => {
-    navigation.navigate("Friends");
-  }}/>
-              </TouchableOpacity>
+              <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass} onPress={() => navigation.navigate("Friends")}>
+  <Icon name="account-plus-outline" size={22} color="#E5E7EB" />
+  {friendReqCount > 0 && (
+    <View style={styles.badgeBubble}>
+      <Text style={styles.badgeText}>{friendReqCount}</Text>
+    </View>
+  )}
+</TouchableOpacity>
             </View>
           </View>
 
@@ -1076,6 +1087,24 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowRadius: 18,
     elevation: 10,
+  },
+  badgeBubble: {
+    position: "absolute",
+    top: -10,
+    right: -5.5,
+    backgroundColor: "#EF4444",
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
   },
 });
 

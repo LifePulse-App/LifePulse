@@ -33,7 +33,7 @@ const unfollowUser = async (userId: string, currentUserId: string) => {
 // Accept follow request
 const acceptFollowRequest = async (userId: string, requesterId: string) => {
   try {
-    return await client.post<GenericResponse>(`/social/follow-accept/${userId}/${requesterId}`);
+    return await client.post<GenericResponse>(`/social/accept-request/${userId}/${requesterId}`);
   } catch (error: any) {
     if (!error.response) throw new Error('Server is offline, try again later.');
     throw error;

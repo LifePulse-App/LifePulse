@@ -1,176 +1,185 @@
-import React, { useContext, useState, useEffect } from 'react';
-import { View, Image, Pressable, Alert, Switch } from 'react-native';
-import AppText from '../../../components/Layout/AppText/AppText';
+// ProfileScreen.js
+import React, { useContext } from "react";
+import { View, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import { Text } from "@rneui/themed";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import MainLayout from "../../../shared/components/MainLayout";
 import AuthContext from '../../../auth/user/UserContext';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import styles from './Profilestyles';
-import MainLayout from '../../../shared/components/MainLayout';
-import colors from '../../../shared/styling/lightModeColors';
-import LogoutConfirmationModal from '../../logout-popup/components/LogoutConfirmationModal';
-import sharedApi from '../../../shared/services/shared-api';
-import UserStorage from '../../../auth/user/UserStorage';
-import { CommonActions } from '@react-navigation/native';
-import AppActivityIndicator from '../../../components/Layout/AppActivityIndicator/AppActivityIndicator';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import ReactNativeBiometrics from 'react-native-biometrics';
-import { checkBiometricAvailability } from '../../../shared/services/biometrichelper';
 
-const rnBiometrics = new ReactNativeBiometrics();
+const settingSections = [
+  {
+    title: "Account",
+    items: [
+      { icon: "account-edit", label: "Edit Profile", route: "EditProfile" },
+      { icon: "key", label: "Change Password", route: "ChangePassword" },
+      { icon: "phone", label: "Change Number", route: "ChangeNumber" },
+      { icon: "link", label: "Manage Linked Accounts", route: "LinkedAccounts" },
+    ],
+  },
+  {
+    title: "Privacy & Security",
+    items: [
+      { icon: "security", label: "Two-factor Authentication", route: "TwoFactor" },
+      { icon: "history", label: "Login Activity", route: "LoginHistory" },
+      { icon: "devices", label: "Authorized Devices", route: "Devices" },
+    ],
+  },
+  {
+    title: "Notifications",
+    items: [
+      { icon: "bell-outline", label: "Push Notifications", route: "PushNotifications" },
+    ],
+  },
+  {
+    title: "App Settings",
+    items: [
+      { icon: "translate", label: "Language", route: "LanguageSettings" },
+      { icon: "earth", label: "Region", route: "RegionSettings" },
+      { icon: "flash", label: "Data Saver", route: "DataSaver" },
+      { icon: "cog-outline", label: "Advanced", route: "AdvancedSettings" },
+    ],
+  },
+  {
+    title: "Help & Support",
+    items: [
+      { icon: "help-circle-outline", label: "FAQ & Help", route: "HelpSupport" },
+      { icon: "alert-octagon-outline", label: "Report a Problem", route: "ReportProblem" },
+      { icon: "file-document-outline", label: "Legal & Policy", route: "LegalPolicy" },
+    ],
+  },
+];
 
 const ProfileScreen = ({ navigation }: any) => {
-  const authContext = useContext(AuthContext);
-
-  const id = authContext?.User?.user?.id
-  const refreshToken = authContext?.User?.refreshToken
-
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  // New biometric toggle state
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
-  
-
-  // Load saved setting
-  useEffect(() => {
-    (async () => {
-      const saved = await AsyncStorage.getItem('biometricEnabled');
-      if (saved === 'true') setBiometricEnabled(true);
-    })();
-  }, []);
-
-  const toggleBiometric = async (value: boolean) => {
-    if (value) {
-      const { available, biometryType } = await checkBiometricAvailability();
-      
-
-      if (!available) {
-        Alert.alert('Not Supported', 'Your device does not support biometrics.');
-        return;
-      }
-
-      Alert.alert(
-        'Enable Biometrics',
-        `Do you want to enable ${biometryType === 'FaceID' ? 'Face ID' : 'Fingerprint'} login?`,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Enable',
-            onPress: async () => {
-              setBiometricEnabled(true);
-              await AsyncStorage.setItem('biometricEnabled', 'true');
-            },
-          },
-        ]
-      );
-    } else {
-      setBiometricEnabled(false);
-      await AsyncStorage.setItem('biometricEnabled', 'false');
-    }
-  };
-
-  const renderAvatar = () => {
-    const baseURL = authContext?.User?.ImagePath;
-
-    if (authContext?.User?.ImagePath) {
-      return <Image source={{ uri: baseURL }} style={styles.image} />;
-    } else {
-      return (
-        <Image
-          source={require('../../../shared/assets/default-logo.jpg')}
-          style={styles.image}
-          resizeMode="cover"
-        />
-      );
-    }
-  };
-
-  const logoutHandler = () => {
-    setShowLogoutModal(true);
-  };
+    const authContext = useContext(AuthContext);
+  const user = authContext?.User?.user ?? {};
 
   return (
     <MainLayout>
-      {isLoggingOut && <AppActivityIndicator visible={true} />}
-      <View style={styles.container}>
-        <View style={styles.uppercontainer}>
-          <AppText
-            style={{
-              textAlign: 'start',
-              color: 'white',
-              fontWeight: 'bold',
-              fontSize: 18,
-              marginLeft: '6%',
-            }}
-          >
-            Privacy & Settings
-          </AppText>
+        <View style={styles.topBar}>
+  <TouchableOpacity
+    activeOpacity={0.8}
+    style={styles.iconGlass}
+    onPress={() => navigation.goBack()}
+  >
+    <Icon name="arrow-left" size={24} color="#E5E7EB" />
+  </TouchableOpacity>
+  <Text style={styles.pageTitle}>Profile</Text>
+  <View style={styles.rightSpacer} />
+</View>
+      <ScrollView style={styles.overlay}>
+        {/* Profile Card */}
+        <View style={styles.mainCard}>
+          <View style={styles.avatarWrap}>
+            <View style={styles.avatarCircle}>
+              {user?.bitmoji ? (
+                <BitmojiFace data={user.bitmoji} previewOnly />
+              ) : (
+                <Icon name="account-circle-outline" size={70} color="#6366f1" />
+              )}
+              <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate("BitmojiFace")}>
+                <Icon name="pencil" size={17} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.userName}>{user.name || user.username}</Text>
+            <Text style={styles.userUsername}>@{user.username}</Text>
+          </View>
+          {/* Stats Row */}
+          <View style={styles.statRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{user.level || 1}</Text>
+              <Text style={styles.statLabel}>Level</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{user.streak || 0}</Text>
+              <Text style={styles.statLabel}>Streak</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statValue}>{user.friendsCount || 0}</Text>
+              <Text style={styles.statLabel}>Friends</Text>
+            </View>
+          </View>
         </View>
-
-        {/* Biometric Toggle */}
-        <View style={styles.settingRow}>
-          <AppText style={styles.settingText}>Enable Biometric Login</AppText>
-          <Switch
-            value={biometricEnabled}
-            onValueChange={toggleBiometric}
-            trackColor={{ false: '#ccc', true: colors.primary }}
-            thumbColor={biometricEnabled ? colors.primary : '#f4f3f4'}
-          />
-        </View>
-
-        {/* Developer Info Button */}
-<Pressable
-  style={styles.devButton}
-  onPress={() =>
-    Alert.alert(
-      "Developer Info",
-      "Developed by Syed Ali Asghar\n\n  AI Student at NUST (NBC)",
-      [{ text: "OK" }]
-    )
-  }
->
-  <Icon name="information-outline" size={20} color={colors.primary} style={{ marginRight: 8 }} />
-  <AppText style={styles.devText}>About Developer</AppText>
-</Pressable>
-
-
-        {/* Logout Button */}
-        <Pressable style={styles.devButton} onPress={logoutHandler}>
-          <Icon name="logout" size={20} color={colors.primary} style={{ marginRight: 8 }} />
-          <AppText style={styles.logoutText}>Logout</AppText>
-        </Pressable>
-      </View>
-
-      {/* Logout Modal */}
-      <LogoutConfirmationModal
-        visible={showLogoutModal}
-        onClose={() => setShowLogoutModal(false)}
-        onConfirm={async () => {
-          try {
-            setIsLoggingOut(true); // show loader
-            await sharedApi.LogoutUser(id, refreshToken);
-            
-            UserStorage.deleteUser();
-            setShowLogoutModal(false);
-
-            navigation.dispatch(
-              CommonActions.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-              })
-            );
-          } catch (error) {
-            console.error('Logout failed:', error);
-            Alert.alert('Error', 'Logout failed. Please try again.');
-          } finally {
-            setIsLoggingOut(false);
-          }
-        }}
-      />
+        {/* Settings Sections */}
+        {settingSections.map(section => (
+          <View key={section.title}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            {section.items.map(item => (
+              <TouchableOpacity key={item.route} style={styles.settingCard} onPress={() => navigation.navigate(item.route)}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Icon name={item.icon} size={24} color="#A855F7" />
+                  <Text style={styles.settingLabel}>{item.label}</Text>
+                </View>
+                <Icon name="chevron-right" size={22} color="#9CA3AF" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        ))}
+        {/* Logout & Delete */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={authContext?.logout}>
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.deleteBtn} onPress={() => {/* delete user API */}}>
+          <Text style={styles.deleteText}>Delete Account</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </MainLayout>
   );
 };
+
+const styles = StyleSheet.create({
+  // ...same glass styles as before
+  overlay: { flex:1, paddingTop:30, paddingHorizontal:18 },
+  mainCard: { backgroundColor: "rgba(15,23,42,0.65)", borderRadius: 22, padding:20, marginBottom:20, alignItems:"center" },
+  avatarWrap: { marginBottom:14, alignItems:"center" },
+  avatarCircle: { width:95, height:95, borderRadius:48, backgroundColor:"#F3F4F6", justifyContent:"center", alignItems:"center" },
+  editBtn: { position:"absolute", right:3, bottom:3, backgroundColor:"#6366f1", borderRadius:14, padding:7, zIndex:999 },
+  userName: { color:"#F9FAFB", fontWeight:"bold", fontSize:18, marginTop:6 },
+  userUsername: { color:"#9CA3AF", fontSize:13 },
+  statRow: { flexDirection:"row", justifyContent:'space-between', marginTop:6, marginBottom:7 },
+  statCard: { alignItems:'center', paddingHorizontal:12 },
+  statLabel: { color:"#9CA3AF", fontSize:13 },
+  statValue: { color:"#E5E7EB", fontWeight:"bold", fontSize:15 },
+  sectionTitle: { fontSize:16, fontWeight:'bold', color:"#F9FAFB", marginTop:16, marginBottom:5 },
+  settingCard: { backgroundColor:"rgba(15,23,42,0.34)", borderRadius:14, padding:13, marginBottom:7, flexDirection:"row", alignItems:"center", justifyContent:"space-between" },
+  settingLabel: { color:"#F9FAFB", fontWeight:"bold", fontSize:15, marginLeft:13 },
+  logoutBtn: { backgroundColor: "#ef4444", borderRadius:20, paddingVertical:11, alignItems:'center', marginTop:18, marginBottom: 10 },
+  logoutText: { color:"#fff", fontWeight:"bold", fontSize:15 },
+  deleteBtn: { backgroundColor: "#333", borderRadius:20, paddingVertical:10, alignItems:'center', marginTop:8, marginBottom: 60 },
+  deleteText: { color:"#fff", fontWeight:"bold", fontSize:14 },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 3,
+  },
+  iconGlass: {
+    width: 40,
+    height: 40,
+    borderRadius: 16,
+    backgroundColor: "rgba(15, 23, 42, 0.0)",
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 0,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 10,
+    elevation: 4,
+    marginLeft: 12,
+    marginTop: 5
+  },
+  pageTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#F9FAFB",
+  },
+  rightSpacer: {
+    width: 40, // matches icon width
+    height: 40,
+  },
+});
 
 export default ProfileScreen;

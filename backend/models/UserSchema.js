@@ -8,6 +8,29 @@ const streakSchema = new mongoose.Schema({
   lastUpdated: { type: Date, default: null },
 });
 
+const deviceInfoSchema = new mongoose.Schema({
+  deviceId: { type: String }, // unique per device
+  deviceName: { type: String },
+  deviceModel: { type: String },
+  deviceBrand: { type: String },
+  lastLogin: { type: Date, default: Date.now }
+}, { _id: false });
+
+// Notifications: pause chat/streak/Jabits reminders
+const notificationSchema = new mongoose.Schema({
+  push: { type: Boolean, default: true },
+  pauseStreak: { type: Boolean, default: false },
+  pauseChat: { type: Boolean, default: false },
+  pauseJabits: { type: Boolean, default: false },
+}, { _id: false });
+
+// Two Factor Auth
+const twoFactorSchema = new mongoose.Schema({
+  enabled: { type: Boolean, default: false },
+  secret: { type: String }, // for code generation (TOTP, etc.)
+  lastVerified: { type: Date }
+}, { _id: false });
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -62,13 +85,9 @@ const userSchema = new mongoose.Schema(
     },
     xp: { type: Number, default: 0 },
     streak: { type: streakSchema, default: () => ({}) },
-    deviceInfo: [
-      {
-        deviceName: { type: String },
-        deviceBrand: { type: String }, 
-        deviceModel: { type: String },
-      },
-    ],
+    deviceInfo: [deviceInfoSchema], // array of devices
+    notifications: notificationSchema,
+    twoFactor: twoFactorSchema,
     verificationCode: String,
     verificationCodeExpire: Date,
     otpResendCount: {
@@ -132,6 +151,9 @@ resetPasswordVerified: {
 // In your User schema
 resetPasswordCode: String,
 resetPasswordCodeExpire: Date,
+pendingEmail: { type: String },
+emailChangeOtp: { type: String },
+emailChangeOtpExpire: { type: Date },
   },
   
   { timestamps: true }
