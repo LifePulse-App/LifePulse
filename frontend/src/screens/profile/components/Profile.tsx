@@ -139,21 +139,21 @@ const ProfileScreen = ({ navigation } :any) => {
                 <Icon name="pencil" size={17} color="#fff" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.userName}>{user.name || user.username}</Text>
-            <Text style={styles.userUsername}>@{user.username}</Text>
+            <Text style={styles.userName}>{user?.name || user?.username}</Text>
+            <Text style={styles.userUsername}>@{user?.username}</Text>
           </View>
           {/* Stats Row */}
           <View style={styles.statRow}>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{user.level || 1}</Text>
+              <Text style={styles.statValue}>{user?.level || 1}</Text>
               <Text style={styles.statLabel}>Level</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{user.streak || 0}</Text>
+              <Text style={styles.statValue}>{user?.streak || 0}</Text>
               <Text style={styles.statLabel}>Streak</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statValue}>{user.friendsCount || 0}</Text>
+              <Text style={styles.statValue}>{user?.friendsCount || 0}</Text>
               <Text style={styles.statLabel}>Friends</Text>
             </View>
           </View>

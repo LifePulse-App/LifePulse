@@ -28,6 +28,20 @@ const sendTokens = async (res, user, deviceId) => {
   };
 };
 
+const updateDeviceLogin = async (user, deviceId, deviceName, deviceModel, deviceBrand) => {
+  let device = user.deviceInfo.find(d => d.deviceId === deviceId);
+  if (device) {
+    device.deviceName = deviceName;
+    device.deviceModel = deviceModel;
+    device.deviceBrand = deviceBrand;
+    device.lastLogin = Date.now();
+  } else {
+    user.deviceInfo.push({ deviceId, deviceName, deviceModel, deviceBrand, lastLogin: Date.now() });
+  }
+  await user.save();
+  return user;
+};
+
 // Registration
 export const register = catchAsyncErrors(async (req, res, next) => {
   try {
@@ -159,7 +173,7 @@ export const resendVerificationOtp = catchAsyncErrors(async (req, res, next) => 
 // Login
 export const login = catchAsyncErrors(async (req, res, next) => {
   try {
-    const { identifier, password, deviceId } = req.body;
+    const { identifier, password, deviceId, deviceName, deviceModel, deviceBrand } = req.body;
 
     if (!identifier || !password) {
       return next(new ErrorHandler("Credentials Missing", 400));
@@ -175,6 +189,7 @@ export const login = catchAsyncErrors(async (req, res, next) => {
     if (!isMatch) return next(new ErrorHandler("Invalid credentials", 401));
 
     const tokens = await sendTokens(res, user, deviceId);
+    await updateDeviceLogin(user, deviceId, deviceName, deviceModel, deviceBrand);
     res.status(200).json({ success: true, ...tokens });
   } catch (err) {
     return next(new ErrorHandler("Server error", 500));
