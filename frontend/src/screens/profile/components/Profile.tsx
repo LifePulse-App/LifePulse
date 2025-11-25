@@ -107,9 +107,9 @@ const ProfileScreen = ({ navigation } :any) => {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   const confirmLogout = async () => {
-    setLogoutModalVisible(false);
     await logout(userId);
     authContext?.setUser(null);
+    setLogoutModalVisible(false);
   };
 
   return (

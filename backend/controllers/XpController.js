@@ -126,8 +126,7 @@ export const recalculateXp = async (userId) => {
 
   let totalXp = 0;
 
-  // 1) XP from proofs + habits (using global Habit catalog)
-  //    We look at all verified proofs for this user and derive XP from the linked Habit.
+  // 1) XP from proofs + habits
   const verifiedProofs = await Proof.find({
     user: objectId,
     verified: true,
@@ -136,20 +135,17 @@ export const recalculateXp = async (userId) => {
   for (const proof of verifiedProofs) {
     const habit = proof.habit;
     if (!habit) continue;
-
     const type = (habit.habitName || "").trim().toLowerCase();
-
     if (HABIT_XP[type]) {
       totalXp += HABIT_XP[type].base + HABIT_XP[type].verified;
     } else {
-      // fallback XP when habitName not in HABIT_XP
       totalXp += 10;
     }
   }
 
-  // 2) XP from moods – distinct days
+  // 2) XP from mood, once per calendar day after midnight
   const moodDayAgg = await Mood.aggregate([
-    { $match: { user: objectId } },
+    { $match: { user: objectId }},
     {
       $group: {
         _id: {
@@ -157,14 +153,16 @@ export const recalculateXp = async (userId) => {
           month: { $month: "$createdAt" },
           day: { $dayOfMonth: "$createdAt" },
         },
-      },
-    },
+        firstMood: { $min: "$createdAt" }
+      }
+    }
   ]);
 
+  // Each unique (year, month, day) is a calendar day where user set a mood
   const uniqueMoodDays = moodDayAgg.length;
   totalXp += uniqueMoodDays * 10;
 
-  // 3) Save on user
+  // 3) Save total XP to User
   const user = await User.findById(objectId);
   if (user) {
     user.xp = totalXp;

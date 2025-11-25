@@ -19,6 +19,7 @@ import UserStorage from './src/auth/user/UserStorage';
 import sharedApi from './src/shared/services/shared-api';
 import apiClient from './src/auth/api-client/api_client';
 import { setSecretKey } from './src/auth/api-client/api_client';
+import { navigationRef } from './src/navigation/main/RootNavigation';
 
 const App = () => {
   const [User, setUser] = useState<user | undefined>();
@@ -29,7 +30,6 @@ const App = () => {
   const countdownRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const navigationRef = useRef<any>(null);
   const colorScheme = useColorScheme();
 
   const [isBiometricVerified, setIsBiometricVerified] = useState(false);
