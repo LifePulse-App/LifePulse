@@ -4,12 +4,15 @@ import { DashboardResponse } from '../../dashboard/models/dashboard/DashboardRes
 import { UserLoginResponse } from '../../user/models/UserLoginResponse';
 
 // Login API
-const getLogin = async (identifier: string, password: string, deviceId: string) => {
+const getLogin = async (identifier: string, password: string, deviceId: string, deviceName: string, deviceModel: string, deviceBrand: string) => {
   try {
     return await client.post<object>('/auth/login', {
       identifier,
       password,
-      deviceId
+      deviceId,
+      deviceName,
+      deviceModel,
+      deviceBrand
     });
   } catch (error: any) {
     if (!error.response) {

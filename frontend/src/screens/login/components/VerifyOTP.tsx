@@ -156,11 +156,11 @@ const VerifyOtp = ({ navigation, route }: any) => {
         return;
       }
 
-      const user = response.data as UserLoginResponse;
-      setAuthHeaders(user.accessToken);
-      authContext?.setUser(user);
+      // const user = response.data as UserLoginResponse;
+      // setAuthHeaders(user.accessToken);
+      // authContext?.setUser(user);
 
-      navigation.navigate('Drawer');
+      navigation.navigate('Login');
     } catch (e) {
       showError('Unexpected error while verifying OTP');
     } finally {
