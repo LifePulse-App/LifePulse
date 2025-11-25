@@ -193,6 +193,7 @@ export const login = catchAsyncErrors(async (req, res, next) => {
     const tokens = await sendTokens(res, user, deviceId);
     res.status(200).json({ success: true, ...tokens });
   } catch (err) {
+    console.log(err);
     return next(new ErrorHandler("Server error", 500));
   }
 });

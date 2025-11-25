@@ -1,10 +1,76 @@
-// ProfileScreen.js
-import React, { useContext } from "react";
+import React, { useContext, useState } from "react";
 import { View, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import MainLayout from "../../../shared/components/MainLayout";
 import AuthContext from '../../../auth/user/UserContext';
+import { logout } from "../../../navigation/main/RootNavigation";
+
+// Simple Glassy Confirmation Modal
+const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }) => {
+  if (!visible) return null;
+  return (
+    <View style={modalStyles.modalOverlay}>
+      <View style={modalStyles.glassyModal}>
+        <Text style={modalStyles.confirmText}>{message}</Text>
+        <View style={modalStyles.modalBtns}>
+          <TouchableOpacity style={modalStyles.cancelBtn} onPress={onCancel}>
+            <Text style={{ color: "#374151", fontWeight: "bold" }}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={modalStyles.confirmBtn} onPress={onConfirm}>
+            <Text style={{ color: "#fff", fontWeight: "bold" }}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+const modalStyles = StyleSheet.create({
+  modalOverlay: {
+    position: 'absolute', left: 0, top: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(30,41,59,0.7)",
+    justifyContent: "center", alignItems: "center", zIndex: 1000,
+  },
+  glassyModal: {
+    backgroundColor: "rgba(15,23,42,0.82)",
+    borderColor: "white",
+    borderWidth: 1,
+    borderRadius: 28,
+    padding: 26,
+    alignItems: "center",
+    width: 280,
+    shadowColor: "#000",
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 18,
+  },
+  confirmText: {
+    color: "#F9FAFB",
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 22,
+    textAlign: "center",
+  },
+  modalBtns: {
+    flexDirection: "row",
+    justifyContent: "space-evenly",
+    width: '100%',
+  },
+  cancelBtn: {
+    backgroundColor: "rgba(228,227,236,1)",
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 23,
+    marginRight: 10,
+  },
+  confirmBtn: {
+    backgroundColor: "#ef4444",
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 23,
+  },
+});
 
 const settingSections = [
   {
@@ -13,30 +79,14 @@ const settingSections = [
       { icon: "account-edit", label: "Edit Profile", route: "EditProfile" },
       { icon: "key", label: "Change Password", route: "ChangePassword" },
       { icon: "phone", label: "Change Number", route: "ChangeNumber" },
-      { icon: "link", label: "Manage Linked Accounts", route: "LinkedAccounts" },
+      { icon: "link", label: "Manage Linked Account", route: "LinkedAccount" },
     ],
   },
   {
     title: "Privacy & Security",
     items: [
       { icon: "security", label: "Two-factor Authentication", route: "TwoFactor" },
-      { icon: "history", label: "Login Activity", route: "LoginHistory" },
       { icon: "devices", label: "Authorized Devices", route: "Devices" },
-    ],
-  },
-  {
-    title: "Notifications",
-    items: [
-      { icon: "bell-outline", label: "Push Notifications", route: "PushNotifications" },
-    ],
-  },
-  {
-    title: "App Settings",
-    items: [
-      { icon: "translate", label: "Language", route: "LanguageSettings" },
-      { icon: "earth", label: "Region", route: "RegionSettings" },
-      { icon: "flash", label: "Data Saver", route: "DataSaver" },
-      { icon: "cog-outline", label: "Advanced", route: "AdvancedSettings" },
     ],
   },
   {
@@ -49,23 +99,32 @@ const settingSections = [
   },
 ];
 
-const ProfileScreen = ({ navigation }: any) => {
-    const authContext = useContext(AuthContext);
-  const user = authContext?.User?.user ?? {};
+const ProfileScreen = ({ navigation } :any) => {
+  const authContext = useContext(AuthContext);
+  const user = authContext?.User?.user;
+  const userId = user?.id;
+
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+
+  const confirmLogout = async () => {
+    setLogoutModalVisible(false);
+    await logout(userId);
+    authContext?.setUser(null);
+  };
 
   return (
     <MainLayout>
-        <View style={styles.topBar}>
-  <TouchableOpacity
-    activeOpacity={0.8}
-    style={styles.iconGlass}
-    onPress={() => navigation.goBack()}
-  >
-    <Icon name="arrow-left" size={24} color="#E5E7EB" />
-  </TouchableOpacity>
-  <Text style={styles.pageTitle}>Profile</Text>
-  <View style={styles.rightSpacer} />
-</View>
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={styles.iconGlass}
+          onPress={() => navigation.goBack()}
+        >
+          <Icon name="arrow-left" size={24} color="#E5E7EB" />
+        </TouchableOpacity>
+        <Text style={styles.pageTitle}>Profile</Text>
+        <View style={styles.rightSpacer} />
+      </View>
       <ScrollView style={styles.overlay}>
         {/* Profile Card */}
         <View style={styles.mainCard}>
@@ -114,14 +173,28 @@ const ProfileScreen = ({ navigation }: any) => {
             ))}
           </View>
         ))}
-        {/* Logout & Delete */}
-        <TouchableOpacity style={styles.logoutBtn} onPress={authContext?.logout}>
+
+        {/* Glassy Logout Card */}
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={() => setLogoutModalVisible(true)}
+          activeOpacity={0.86}
+        >
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
+
+        {/* Delete Account */}
         <TouchableOpacity style={styles.deleteBtn} onPress={() => {/* delete user API */}}>
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
       </ScrollView>
+      {/* Glassy Confirm Modal for Logout */}
+      <GlassyConfirmModal
+        visible={logoutModalVisible}
+        message="Are you sure you want to logout?"
+        onConfirm={confirmLogout}
+        onCancel={() => setLogoutModalVisible(false)}
+      />
     </MainLayout>
   );
 };
