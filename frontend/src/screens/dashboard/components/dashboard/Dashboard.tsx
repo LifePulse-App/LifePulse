@@ -104,26 +104,21 @@ const Dashboard = ({ navigation }: any) => {
     };
   }, []);
 
-  useEffect(() => {
-    const fetchTodayHabits = async () => {
-      try {
-        const res = await DashboardService.GetTodayHabits(); // adjust base url
-        console.log(res?.data.habits);
-        
-        if (res.data?.success) {
-          setHabits(res?.data.habits);
-        }
-      } catch (err: any) {
-        console.log("Error loading today habits", err);
-        const msg =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to load dashboard";
-      setError(msg);
+  const fetchTodayHabits = useCallback(async () => {
+    try {
+      const res = await DashboardService.GetTodayHabits(); // adjust base url
+      
+      if (res.data?.success) {
+        setHabits(res?.data.habits);
       }
-    };
-  
-    fetchTodayHabits();
+    } catch (err: any) {
+      console.log("Error loading today habits", err);
+      const msg =
+      err?.response?.data?.message ||
+      err?.message ||
+      "Failed to load dashboard";
+    setError(msg);
+    }
   }, []);
 
   const fetchDashboard = useCallback(async () => {
@@ -145,6 +140,9 @@ const Dashboard = ({ navigation }: any) => {
         throw new Error(responseData.message || "Failed to load dashboard");
       }
 
+     console.log(responseData.data);
+     
+
       const { profile, secondaryCards, currentMood } = responseData.data;
       setProfile(profile);
       setSecondaryCards(secondaryCards || null);
@@ -162,18 +160,21 @@ const Dashboard = ({ navigation }: any) => {
     }
   }, [offline]);
 
-  useEffect(() => {
-    fetchDashboard();
-  }, [fetchDashboard]);
-
   useFocusEffect(
     useCallback(() => {
       fetchDashboard();
     }, [fetchDashboard])
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchTodayHabits();
+    }, [fetchTodayHabits])
+  );
+
   const handleRetry = () => {
     fetchDashboard();
+    fetchTodayHabits()
   };
   // Use skeleton instead of full-screen loader
   if (loading) {

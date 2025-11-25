@@ -180,7 +180,7 @@ export const getDashboard = async (req, res) => {
           },
         },
       ]),
-      Promise.resolve(0),
+      Proof.countDocuments({ user: userId }),
     ]);
 
     const reflectionCount = reflectionDayAgg.length;
