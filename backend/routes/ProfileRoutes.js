@@ -22,6 +22,7 @@ const router = express.Router();
 router.get("/", isAuthenticatedUser, getProfile);
 router.put("/", isAuthenticatedUser, editProfile);
 router.post("/change-password", isAuthenticatedUser, changePassword);
+router.post("/change-password-otp", isAuthenticatedUser, requestPasswordChangeOtp);
 router.post("/change-number", isAuthenticatedUser, changeNumber);
 
 // Linked Accounts and Secure Email Change

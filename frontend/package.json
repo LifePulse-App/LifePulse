@@ -50,6 +50,7 @@
     "react-native-keychain": "^10.0.0",
     "react-native-loader-kit": "^3.0.0",
     "react-native-make": "^1.0.1",
+    "react-native-modal": "^14.0.0-rc.1",
     "react-native-network-logger": "^2.0.1",
     "react-native-pager-view": "^6.9.1",
     "react-native-paper": "^5.14.5",

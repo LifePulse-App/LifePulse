@@ -1,7 +1,7 @@
 import React from "react";
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 
-const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }) => (
+const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }: any) => (
   <Modal transparent visible={visible} animationType="fade">
     <View style={styles.modalOverlay}>
       <View style={styles.glassyModal}>

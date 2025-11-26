@@ -18,6 +18,7 @@ import MoodScreen from '../../screens/moodscreen/comp/component/MoodScreen';
 import Dashboard from '../../screens/dashboard/components/dashboard/Dashboard';
 import ProofVisionCameraScreen from '../../screens/proof-camera/Camera';
 import Friends from '../../screens/friends/components/Friends';
+import EditProfileScreen from '../../screens/profile/components/EditProfile';
 
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');
@@ -246,6 +247,7 @@ const AuthNavigator = () => {
       <Stack.Screen name="MoodScreen" component={MoodScreen} />
       <Stack.Screen name="ProofCamera" component={ProofVisionCameraScreen} />
       <Stack.Screen name="Friends" component={Friends} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
     </Stack.Navigator>
   );
 };

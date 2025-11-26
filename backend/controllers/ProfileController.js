@@ -30,14 +30,51 @@ export const editProfile = catchAsyncErrors(async (req, res, next) => {
   res.status(200).json({ success: true, user });
 });
 
-// Change password
-export const changePassword = catchAsyncErrors(async (req, res, next) => {
-  const { oldPassword, newPassword } = req.body;
+// Request password change OTP
+export const requestPasswordChangeOtp = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  // Generate OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashed = crypto.createHash("sha256").update(otp).digest("hex");
+
+  user.passwordChangeOtp = hashed;
+  user.passwordChangeOtpExpire = Date.now() + 2 * 60 * 1000; // 15 minutes
+
+  await sendVerificationEmail(user.email, otp);
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: "OTP sent to your registered email address."
+  });
+});
+
+// Change password WITH OTP verification
+export const changePasswordWithOtp = catchAsyncErrors(async (req, res, next) => {
+  const { oldPassword, newPassword, otp } = req.body;
   const user = await User.findById(req.user._id).select("+password");
   if (!user) return next(new ErrorHandler("User not found", 404));
+  if (!otp) return next(new ErrorHandler("OTP required", 400));
+  if (!user.passwordChangeOtp || !user.passwordChangeOtpExpire) {
+    return next(new ErrorHandler("No valid OTP found. Request a new OTP.", 400));
+  }
+  if (user.passwordChangeOtpExpire < Date.now()) {
+    user.passwordChangeOtp = undefined;
+    user.passwordChangeOtpExpire = undefined;
+    await user.save();
+    return next(new ErrorHandler("OTP expired. Request again.", 400));
+  }
   const isMatch = await user.comparePassword(oldPassword);
   if (!isMatch) return next(new ErrorHandler("Old password incorrect", 400));
+  const hashed = crypto.createHash("sha256").update(otp).digest("hex");
+  if (hashed !== user.passwordChangeOtp) {
+    return next(new ErrorHandler("Incorrect OTP", 400));
+  }
   user.password = newPassword;
+  user.passwordChangeOtp = undefined;
+  user.passwordChangeOtpExpire = undefined;
   await user.save();
   res.status(200).json({ success: true, message: "Password changed successfully" });
 });
