@@ -252,13 +252,13 @@ function ChangeNumberModal({ user, onClose, setResultCard }: any) {
 }
 function LinkedAccountModal({ onClose, onChange }: any) {
   const [email, setEmail] = useState("");
-  const [stage, setStage] = useState(1); // 1: request, 2: verify
+  const [stage, setStage] = useState(1); // 1: request, 2: verify OTP
   const [newEmail, setNewEmail] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState({ visible: false, type: "success", message: "" });
 
-  // Fetch registered email on mount
   useEffect(() => {
     (async () => {
       try {
@@ -270,11 +270,11 @@ function LinkedAccountModal({ onClose, onChange }: any) {
     })();
   }, []);
 
-  // Send OTP to new email
+  // Request OTP (verify password first!)
   const handleRequestOtp = async () => {
     setLoading(true);
     try {
-      await profileApi.requestEmailChange(newEmail);
+      await profileApi.requestEmailChange({ currentPassword, newEmail }); // Update API on frontend to send password!
       setLoading(false);
       setStage(2);
       setResult({ visible: true, type: "success", message: "OTP sent to new email!" });
@@ -292,10 +292,11 @@ function LinkedAccountModal({ onClose, onChange }: any) {
   const handleVerifyOtp = async () => {
     setLoading(true);
     try {
-      await profileApi.verifyEmailChange(newEmail, otp); // some backend expects (email, otp)
-      setEmail(newEmail); // update displayed
+      await profileApi.verifyEmailChange({ otp }); // Make sure this matches backend (only OTP needed)
+      setEmail(newEmail);
       setStage(1);
       setNewEmail("");
+      setCurrentPassword("");
       setOtp("");
       setLoading(false);
       setResult({ visible: true, type: "success", message: "Email successfully updated!" });
@@ -312,13 +313,21 @@ function LinkedAccountModal({ onClose, onChange }: any) {
 
   return (
     <View style={sheetStyles.glassyInner}>
-      <Text style={sheetStyles.sheetTitle}>Email Change & Linked Account</Text>
+      <Text style={sheetStyles.sheetTitle}>Change Email</Text>
       <Text style={{ color: "#fff", marginTop: 30, fontSize: 16, marginBottom: 20 }}>
         Registered Email: <Text style={{ fontWeight: "bold", color: "#6366f1" }}>{email}</Text>
       </Text>
 
       {stage === 1 ? (
         <>
+          <TextInput
+            style={sheetStyles.input}
+            placeholder="Current Password"
+            placeholderTextColor="#6366f1"
+            value={currentPassword}
+            secureTextEntry
+            onChangeText={setCurrentPassword}
+          />
           <TextInput
             style={sheetStyles.input}
             placeholder="Enter new email"
@@ -331,7 +340,7 @@ function LinkedAccountModal({ onClose, onChange }: any) {
           <TouchableOpacity
             style={sheetStyles.saveBtn}
             onPress={handleRequestOtp}
-            disabled={loading || !newEmail}
+            disabled={loading || !newEmail || !currentPassword}
           >
             <Text style={{ color: "#fff", fontWeight: "bold" }}>
               {loading ? "Requesting OTP..." : "Request OTP"}
@@ -362,11 +371,9 @@ function LinkedAccountModal({ onClose, onChange }: any) {
           </TouchableOpacity>
         </>
       )}
-      
       <TouchableOpacity style={sheetStyles.cancelBtn} onPress={onClose}>
         <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Close</Text>
       </TouchableOpacity>
-
       {result.visible && (
         <View style={{
           backgroundColor: "rgba(30,41,59,0.61)",

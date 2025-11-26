@@ -2,7 +2,6 @@ import express from "express";
 import {
   getProfile,
   editProfile,
-  changePassword,
   changeNumber,
   getLinkedAccounts,
   requestEmailChange,
@@ -12,7 +11,9 @@ import {
   updateNotifications,
   updateAppSettings,
   deleteAccount,
-  getLoginActivity
+  getLoginActivity,
+  changePasswordWithOtp,
+  requestPasswordChangeOtp
 } from "../controllers/ProfileController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 
@@ -21,7 +22,7 @@ const router = express.Router();
 // Profile Info
 router.get("/", isAuthenticatedUser, getProfile);
 router.put("/", isAuthenticatedUser, editProfile);
-router.post("/change-password", isAuthenticatedUser, changePassword);
+router.post("/change-password", isAuthenticatedUser, changePasswordWithOtp);
 router.post("/change-password-otp", isAuthenticatedUser, requestPasswordChangeOtp);
 router.post("/change-number", isAuthenticatedUser, changeNumber);
 

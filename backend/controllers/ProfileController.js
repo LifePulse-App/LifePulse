@@ -96,22 +96,27 @@ export const getLinkedAccounts = catchAsyncErrors(async (req, res, next) => {
   res.status(200).json({ success: true, email: user.email });
 });
 
-// Request email change (OTP to new email, store pending)
 export const requestEmailChange = catchAsyncErrors(async (req, res, next) => {
-  const { newEmail } = req.body;
+  const { currentPassword, newEmail } = req.body;
   if (!newEmail || !validator.isEmail(newEmail)) {
     return next(new ErrorHandler("Invalid email address", 400));
   }
   const exists = await User.findOne({ email: newEmail });
   if (exists) return next(new ErrorHandler("Email already exists", 400));
 
+  // Find user
+  const user = await User.findById(req.user._id).select("+password");
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  // Verify password
+  const isMatch = await user.comparePassword(currentPassword);
+  if (!isMatch) return next(new ErrorHandler("Password incorrect", 400));
+
   // Generate OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const hashed = crypto.createHash("sha256").update(otp).digest("hex");
-  const user = await User.findById(req.user._id);
-
   user.emailChangeOtp = hashed;
-  user.emailChangeOtpExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+  user.emailChangeOtpExpire = Date.now() + 2 * 60 * 1000; // 2 minutes
   user.pendingEmail = newEmail;
 
   await sendVerificationEmail(newEmail, otp);

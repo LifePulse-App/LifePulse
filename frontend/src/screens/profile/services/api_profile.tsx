@@ -75,20 +75,20 @@ const getLinkedAccounts = async () => {
   }
 };
 
-// Request Email Change (send OTP)
-const requestEmailChange = async (email: string) => {
+// Request Email Change
+const requestEmailChange = async (currentPassword: string, newEmail: string ) => {
   try {
-    return await client.post<object>('/profile/linked-accounts/request-email-change', { email });
+    return await client.post<object>('/profile/linked-accounts/request-email-change', { currentPassword, newEmail });
   } catch (error: any) {
     if (!error.response) throw new Error('Server is offline, try again later.');
     throw error;
   }
 };
 
-// Verify Email Change (verify OTP)
-const verifyEmailChange = async (email: string, otp: number) => {
+// Verify Email Change
+const verifyEmailChange = async ( otp: string ) => {
   try {
-    return await client.post<object>('/profile/linked-accounts/verify-email-change', { email, otp });
+    return await client.post<object>('/profile/linked-accounts/verify-email-change', { otp });
   } catch (error: any) {
     if (!error.response) throw new Error('Server is offline, try again later.');
     throw error;
