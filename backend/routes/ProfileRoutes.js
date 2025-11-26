@@ -19,8 +19,8 @@ import { isAuthenticatedUser } from "../middlewares/auth.js";
 const router = express.Router();
 
 // Profile Info
-router.get("/profile", isAuthenticatedUser, getProfile);
-router.put("/profile", isAuthenticatedUser, editProfile);
+router.get("/", isAuthenticatedUser, getProfile);
+router.put("/", isAuthenticatedUser, editProfile);
 router.post("/change-password", isAuthenticatedUser, changePassword);
 router.post("/change-number", isAuthenticatedUser, changeNumber);
 
