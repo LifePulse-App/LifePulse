@@ -70,8 +70,8 @@ app.get('/health', (req, res) => {
 
 // HTTPS options (Cloudflare origin certificate)
 const sslOptions = {
-  key: fs.readFileSync('C:/cloudflared/certs/key.pem'),
-  cert: fs.readFileSync('C:/cloudflared/certs/cert.pem'),
+  key: fs.readFileSync('./certs/key.pem'),
+  cert: fs.readFileSync('./certs/cert.pem'),
 };
 
 // Start HTTPS server
