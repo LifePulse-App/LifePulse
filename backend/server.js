@@ -91,6 +91,6 @@ process.on('uncaughtException', (err) => {
 });
 
 // Remove https and sslOptions
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://0.0.0.0:${PORT} in ${ENV} mode`);
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT} in ${ENV} mode`);
 });
