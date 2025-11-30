@@ -7,6 +7,7 @@ import MainLayout from "../../../shared/components/MainLayout";
 import AuthContext from '../../../auth/user/UserContext';
 import { logout } from "../../../navigation/main/RootNavigation";
 import profileApi from "../services/api_profile"; // Use your actual path!
+import { useFocusEffect } from "@react-navigation/native";
 
 // --- Glassy Confirm Modal Component ---
 const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }: any) => {
@@ -118,11 +119,6 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
       await profileApi.requestPasswordChangeOtp();
       setLoading(false);
       setStep(2);
-      setResultCard({
-        visible: true,
-        type: "success",
-        message: "OTP sent to your registered email address"
-      });
     } catch (err) {
       setLoading(false);
       setResultCard({
@@ -133,16 +129,19 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
     }
   };
 
-  // Step 2: Submit password change with OTP
   const changePasswordWithOtp = async () => {
     setLoading(true);
     try {
-      await profileApi.changePasswordWithOtp({
-        oldPassword,
-        newPassword,
-        otp,
-      });
-      setLoading(false);
+      const response = await profileApi.changePasswordWithOtp({ oldPassword, newPassword, otp });
+      if (!response.ok) {
+        setResultCard({
+          visible: true,
+          type: "error",
+          message: response.data?.message || "Error changing password."
+        });
+        onClose();
+        return;
+      }
       setResultCard({
         visible: true,
         type: "success",
@@ -151,12 +150,13 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
       onChange?.();
       onClose();
     } catch (err) {
-      setLoading(false);
       setResultCard({
         visible: true,
         type: "error",
-        message: "Error changing password."
+        message: err?.response?.data?.message || err?.message || "Error changing password."
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -274,10 +274,20 @@ function LinkedAccountModal({ onClose, onChange }: any) {
   const handleRequestOtp = async () => {
     setLoading(true);
     try {
-      await profileApi.requestEmailChange({ currentPassword, newEmail }); // Update API on frontend to send password!
+      
+      const response = await profileApi.requestEmailChange({ currentPassword, newEmail }); // Update API on frontend to send password!
+      
+      if (!response.ok) {  
+        setResult({
+          visible: true,
+          type: "error",
+          message: response?.data?.message || "Error changing password."
+        });
+        onClose();
+        return;
+      }
       setLoading(false);
       setStage(2);
-      setResult({ visible: true, type: "success", message: "OTP sent to new email!" });
     } catch (err: any) {
       setLoading(false);
       setResult({
@@ -292,7 +302,16 @@ function LinkedAccountModal({ onClose, onChange }: any) {
   const handleVerifyOtp = async () => {
     setLoading(true);
     try {
-      await profileApi.verifyEmailChange({ otp }); // Make sure this matches backend (only OTP needed)
+      const response = await profileApi.verifyEmailChange({ otp }); // Make sure this matches backend (only OTP needed)
+      if (!response.ok) {
+        setResult({
+          visible: true,
+          type: "error",
+          message: response.data?.message || "Error changing password."
+        });
+        onClose();
+        return;
+      }
       setEmail(newEmail);
       setStage(1);
       setNewEmail("");
@@ -513,7 +532,11 @@ const ProfileScreen = ({ navigation }: any) => {
     );
   };
 
-  useEffect(() => { fetchProfile(); }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchProfile();
+    }, [])
+  );
 
   return (
     <MainLayout>

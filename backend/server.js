@@ -6,6 +6,8 @@ import dotenv from "dotenv";
 import cookieParser from 'cookie-parser';
 import nodemailer from "nodemailer"
 import errorMiddleware from "./utils/errorMiddleware.js"
+import https from 'https';
+import fs from 'fs';
 
 const app = express();
 // Load environment based on NODE_ENV
@@ -65,20 +67,24 @@ app.get('/health', (req, res) => {
   res.send(`Backend API is running on ${PORT} in ${ENV} mode🚀`);
 });
 
-process.on("unhandledRejection", (err) => {
-  console.log(err);
-  console.log("Shutting down the server due to unhandledRejection");
-  server.close(() => {
-     process.exit(1);
-  });
+// HTTPS options (Cloudflare origin certificate)
+const sslOptions = {
+  key: fs.readFileSync('C:/cloudflared/certs/key.pem'),
+  cert: fs.readFileSync('C:/cloudflared/certs/cert.pem'),
+};
+
+// Start HTTPS server
+const server = https.createServer(sslOptions, app).listen(PORT, () => {
+  console.log(`Server running on https://localhost:${PORT} in ${ENV} mode`);
 });
 
-process.on("uncaughtException", (err) => {
-  console.log(err);
-  console.log("Shutting down due to uncaughtException");
-  process.exit(1);
-})
+// Graceful shutdown handlers
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection:', err);
+  server.close(() => process.exit(1));
+});
 
-app.listen(PORT, () => {
-  console.log(`Server running on ${PORT} in ${ENV} mode`);
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
 });
