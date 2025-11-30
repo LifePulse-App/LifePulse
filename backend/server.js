@@ -70,14 +70,14 @@ app.get('/health', (req, res) => {
 
 // HTTPS options (Cloudflare origin certificate)
 const sslOptions = {
-  key: fs.readFileSync('./certs/key.pem'),
-  cert: fs.readFileSync('./certs/cert.pem'),
+  key: fs.readFileSync('C:/cloudflared/certs/key.pem'),
+  cert: fs.readFileSync('C:/cloudflared/certs/cert.pem'),
 };
 
-// Start HTTPS server
-// const server = https.createServer(sslOptions, app).listen(PORT, '0.0.0.0', () => {
-//   console.log(`Server running on https://0.0.0.0:${PORT} in ${ENV} mode`);
-// });
+//Start HTTPS server
+const server = https.createServer(sslOptions, app).listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on https://0.0.0.0:${PORT} in ${ENV} mode`);
+});
 
 // Graceful shutdown handlers
 process.on('unhandledRejection', (err) => {
@@ -90,7 +90,7 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-// Remove https and sslOptions
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://0.0.0.0:${PORT} in ${ENV} mode`);
-});
+// // Remove https and sslOptions
+// app.listen(PORT, '0.0.0.0', () => {
+//   console.log(`Server running on http://0.0.0.0:${PORT} in ${ENV} mode`);
+// });
