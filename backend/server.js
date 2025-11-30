@@ -75,9 +75,9 @@ const sslOptions = {
 };
 
 // Start HTTPS server
-const server = https.createServer(sslOptions, app).listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on https://0.0.0.0:${PORT} in ${ENV} mode`);
-});
+// const server = https.createServer(sslOptions, app).listen(PORT, '0.0.0.0', () => {
+//   console.log(`Server running on https://0.0.0.0:${PORT} in ${ENV} mode`);
+// });
 
 // Graceful shutdown handlers
 process.on('unhandledRejection', (err) => {
@@ -88,4 +88,9 @@ process.on('unhandledRejection', (err) => {
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
   process.exit(1);
+});
+
+// Remove https and sslOptions
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on http://0.0.0.0:${PORT} in ${ENV} mode`);
 });
