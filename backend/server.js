@@ -42,6 +42,7 @@ import MoodRoutes from "./routes/MoodRoutes.js"
 import ProofRoutes from "./routes/ProofRoutes.js"
 import SocialRoutes from "./routes/SocialRoutes.js"
 import ProfileRoutes from "./routes/ProfileRoutes.js"
+import { log } from 'console';
 
 // Middlewares
 app.use(cookieParser());
@@ -72,6 +73,8 @@ const sslOptions = {
   key: fs.readFileSync('C:/cloudflared/certs/key.pem'),
   cert: fs.readFileSync('C:/cloudflared/certs/cert.pem'),
 };
+
+console.log(sslOptions);
 
 // Start HTTPS server
 const server = https.createServer(sslOptions, app).listen(PORT, () => {
