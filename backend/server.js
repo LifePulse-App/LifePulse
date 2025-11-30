@@ -74,11 +74,9 @@ const sslOptions = {
   cert: fs.readFileSync('C:/cloudflared/certs/cert.pem'),
 };
 
-console.log(sslOptions);
-
 // Start HTTPS server
-const server = https.createServer(sslOptions, app).listen(PORT, () => {
-  console.log(`Server running on https://localhost:${PORT} in ${ENV} mode`);
+const server = https.createServer(sslOptions, app).listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on https://0.0.0.0:${PORT} in ${ENV} mode`);
 });
 
 // Graceful shutdown handlers
