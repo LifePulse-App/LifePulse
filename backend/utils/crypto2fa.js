@@ -5,7 +5,8 @@ const KEY = Buffer.from("fh38F92ks9jLhgdshjgjhdh72889hjscnj9f0f1c2d3e4f506172839
 
 // 32 bytes key required for aes-256-gcm
 if (!KEY || KEY.length !== 32) {
-  console.log(KEY.length);
+  console.log(KEY);
+  console.log(KEY.length());
   throw new Error(
     "TOTP_SECRET_KEY must be a 64-char hex string (32 bytes) in env"
   );
