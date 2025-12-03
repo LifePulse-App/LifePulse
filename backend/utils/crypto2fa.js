@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
 const ALGO = "aes-256-gcm";
-const KEY = Buffer.from(process.env.TOTP_SECRET_KEY || "", "hex");
+const KEY = Buffer.from(process.env.TOTP_SECRET_KEY || "fh38F92ks9jLhgdshjgjhdh72889hjscnj9f0f1c2d3e4f506172839b3c4d5e6f708192a3b4c5d6e7hghjhjghjgjhgjhgjhx6ut76yu76yf76", "hex");
 
 // 32 bytes key required for aes-256-gcm
 if (!KEY || KEY.length !== 32) {
