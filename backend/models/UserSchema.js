@@ -24,14 +24,19 @@ const notificationSchema = new mongoose.Schema({
   pauseJabits: { type: Boolean, default: false },
 }, { _id: false });
 
-// ✅ Two Factor Auth + backup codes
 const twoFactorSchema = new mongoose.Schema(
   {
     enabled: { type: Boolean, default: false },
-    secret: { type: String }, // TOTP secret (store encrypted in production)
+
+    // encrypted TOTP secret
+    secret: {
+      iv: { type: String },
+      authTag: { type: String },
+      ciphertext: { type: String },
+    },
+
     lastVerified: { type: Date },
 
-    // backup codes: store hashed for security
     backupCodes: [
       {
         codeHash: { type: String, required: true },
