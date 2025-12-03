@@ -168,6 +168,21 @@ const confirm2fa = async (token: string) => {
   }
 };
 
+const disable2fa = async (password: string, code?: string, backupCode?: string) => {
+  try {
+    return await client.post<object>('/auth/2fa/disable', {
+      password,
+      code,
+      backupCode,
+    });
+  } catch (error: any) {
+    if (!error.response) {
+      throw new Error('Server is offline, try again later.');
+    }
+    throw error;
+  }
+};
+
 // GetProfile API
 const GetProfile = () =>
   client.get<DashboardResponse>('/auth/me');
@@ -184,5 +199,6 @@ export default {
   forgotPass,
   init2fa,
   confirm2fa,
-  verify2faLogin
+  verify2faLogin,
+  disable2fa
 };

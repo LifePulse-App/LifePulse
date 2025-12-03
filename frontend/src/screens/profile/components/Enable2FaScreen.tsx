@@ -35,6 +35,13 @@ const Enable2FAScreen = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorVisible, setErrorVisible] = useState(false);
 
+  // Disable 2FA state
+  const [disableMode, setDisableMode] = useState(false);
+  const [disablePassword, setDisablePassword] = useState('');
+  const [disableCode, setDisableCode] = useState('');
+  const [disableBackupCode, setDisableBackupCode] = useState('');
+  const [disableLoading, setDisableLoading] = useState(false);
+
   const showError = (message: string) => {
     setErrorMessage(message);
     setErrorVisible(true);
@@ -94,6 +101,39 @@ const Enable2FAScreen = () => {
     navigation.goBack();
   };
 
+  const handleDisable2FA = async () => {
+    Keyboard.dismiss();
+
+    if (!disablePassword) {
+      showError('Please enter your current password');
+      return;
+    }
+    if (!disableCode && !disableBackupCode) {
+      showError('Enter either 6-digit 2FA code or a backup code to disable');
+      return;
+    }
+
+    setDisableLoading(true);
+    try {
+      const res = await api_Login.disable2fa(
+        disablePassword,
+        disableCode || undefined,
+        disableBackupCode || undefined,
+      );
+
+      if (!res.ok) {
+        showError((res as any).data?.message || 'Failed to disable 2FA');
+        return;
+      }
+
+      navigation.goBack();
+    } catch {
+      showError('Failed to disable 2FA. Please try again.');
+    } finally {
+      setDisableLoading(false);
+    }
+  };
+
   if (initialLoading) {
     return (
       <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -110,7 +150,131 @@ const Enable2FAScreen = () => {
     );
   }
 
-  // When backup codes are generated
+  // Common header like ProfileScreen
+  const renderHeader = () => (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 20,
+        marginTop: 30,
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={{
+          width: 40,
+          height: 40,
+          borderRadius: 16,
+          backgroundColor: 'rgba(15,23,42,0.0)',
+          borderWidth: 1,
+          borderColor: 'rgba(148,163,184,0.4)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          marginLeft: 4,
+        }}
+        onPress={() => navigation.goBack()}
+      >
+        <Icon name="arrow-left" size={24} color="#E5E7EB" />
+      </TouchableOpacity>
+      <Text
+        style={{
+          flex: 1,
+          textAlign: 'center',
+          fontSize: 18,
+          fontWeight: '700',
+          color: '#F9FAFB',
+          marginRight: 40,
+        }}
+      >
+        Two-factor Auth
+      </Text>
+    </View>
+  );
+
+  // Disable 2FA section (reused in both views)
+  const renderDisableSection = () => (
+    <>
+      <TouchableOpacity
+        onPress={() => setDisableMode(!disableMode)}
+        style={[styles.secondaryButton, { marginTop: 16 }]}
+      >
+        <AppText style={styles.secondaryButtonText}>
+          {disableMode ? 'Cancel disable 2FA' : 'Disable 2FA'}
+        </AppText>
+      </TouchableOpacity>
+
+      {disableMode && (
+        <View style={{ marginTop: 10 }}>
+          <Text style={{ color: '#000', fontSize: 13, marginBottom: 6 }}>
+            To disable 2FA, confirm with your password and a 2FA code or backup code.
+          </Text>
+
+          <TextInput
+            label="Current Password"
+            value={disablePassword}
+            onChangeText={setDisablePassword}
+            style={styles.passwordInput}
+            mode="flat"
+            underlineColor="transparent"
+            activeUnderlineColor="transparent"
+            secureTextEntry
+            textColor="black"
+          />
+
+          <TextInput
+            label="6-digit 2FA code (optional)"
+            value={disableCode}
+            onChangeText={setDisableCode}
+            style={styles.passwordInput}
+            mode="flat"
+            underlineColor="transparent"
+            activeUnderlineColor="transparent"
+            keyboardType="numeric"
+            maxLength={6}
+            textColor="black"
+          />
+
+          <TextInput
+            label="Backup code (optional)"
+            value={disableBackupCode}
+            onChangeText={setDisableBackupCode}
+            style={styles.passwordInput}
+            mode="flat"
+            underlineColor="transparent"
+            activeUnderlineColor="transparent"
+            textColor="black"
+            placeholder="XXXX-XXXX-XX"
+            autoCapitalize="characters"
+          />
+
+          <TouchableOpacity
+            onPress={handleDisable2FA}
+            style={[
+              styles.primaryButton,
+              { backgroundColor: '#ef4444', marginTop: 8 },
+            ]}
+            disabled={disableLoading}
+          >
+            {disableLoading ? (
+              <LoaderKitView
+                style={{ width: 24, height: 24 }}
+                name={'BallSpinFadeLoader'}
+                animationSpeedMultiplier={1.0}
+                color={'#FFFFFF'}
+              />
+            ) : (
+              <AppText style={styles.primaryButtonText}>
+                Confirm Disable 2FA
+              </AppText>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </>
+  );
+
+  // When backup codes are generated (2FA enabled)
   if (backupCodes) {
     return (
       <>
@@ -123,38 +287,7 @@ const Enable2FAScreen = () => {
             style={styles.kbWrapper}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           >
-            {/* Header like ProfileScreen */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-              <TouchableOpacity
-                activeOpacity={0.8}
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 16,
-                  backgroundColor: 'rgba(15,23,42,0.0)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(148,163,184,0.4)',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginLeft: 4,
-                }}
-                onPress={() => navigation.goBack()}
-              >
-                <Icon name="arrow-left" size={24} color="#E5E7EB" />
-              </TouchableOpacity>
-              <Text
-                style={{
-                  flex: 1,
-                  textAlign: 'center',
-                  fontSize: 18,
-                  fontWeight: '700',
-                  color: '#F9FAFB',
-                  marginRight: 40,
-                }}
-              >
-                Two-factor Auth
-              </Text>
-            </View>
+            {renderHeader()}
 
             <View style={styles.glassWrapper}>
               <View style={styles.glassContent}>
@@ -165,7 +298,7 @@ const Enable2FAScreen = () => {
                 </Text>
 
                 <ScrollView
-                  style={{ maxHeight: 240, marginVertical: 10 }}
+                  style={{ maxHeight: 300, marginVertical: 10 }}
                   contentContainerStyle={{ paddingVertical: 4 }}
                 >
                   {backupCodes.map((bc, idx) => (
@@ -199,6 +332,8 @@ const Enable2FAScreen = () => {
                 <TouchableOpacity onPress={handleDone} style={styles.primaryButton}>
                   <AppText style={styles.primaryButtonText}>Done</AppText>
                 </TouchableOpacity>
+
+                {renderDisableSection()}
               </View>
             </View>
           </KeyboardAvoidingView>
@@ -213,7 +348,7 @@ const Enable2FAScreen = () => {
     );
   }
 
-  // Default view: QR + manual key + 6-digit code input
+  // Default view: QR + manual key + 6-digit code input (before 2FA is enabled)
   return (
     <>
       <View style={styles.root}>
@@ -225,38 +360,7 @@ const Enable2FAScreen = () => {
           style={styles.kbWrapper}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          {/* Header like ProfileScreen */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginTop: 30 }}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 16,
-                backgroundColor: 'rgba(15,23,42,0.0)',
-                borderWidth: 1,
-                borderColor: 'rgba(148,163,184,0.4)',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginLeft: 4,
-              }}
-              onPress={() => navigation.goBack()}
-            >
-              <Icon name="arrow-left" size={24} color="#E5E7EB" />
-            </TouchableOpacity>
-            <Text
-              style={{
-                flex: 1,
-                textAlign: 'center',
-                fontSize: 18,
-                fontWeight: '700',
-                color: '#F9FAFB',
-                marginRight: 40,
-              }}
-            >
-              Two-factor Auth
-            </Text>
-          </View>
+          {renderHeader()}
 
           <View style={styles.glassWrapper}>
             <View style={styles.glassContent}>
@@ -344,6 +448,9 @@ const Enable2FAScreen = () => {
                   <AppText style={styles.primaryButtonText}>Confirm & Enable</AppText>
                 </TouchableOpacity>
               )}
+
+              {/* Optionally allow disabling here too if backend says 2FA already enabled and user just reopened screen */}
+              {renderDisableSection()}
             </View>
           </View>
         </KeyboardAvoidingView>

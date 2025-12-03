@@ -498,6 +498,12 @@ export const resetPasswordSetNew = catchAsyncErrors(async (req, res, next) => {
     user.resetPasswordCodeExpire = undefined;
     user.resetPasswordVerified = false; // reset flag
 
+        // 4) Disable 2FA and clear secrets/codes
+        user.twoFactor.enabled = false;
+        user.twoFactor.secret = undefined;
+        user.twoFactor.backupCodes = [];
+        user.twoFactor.lastVerified = undefined;
+
     await user.save();
 
     return res.status(200).json({
@@ -685,5 +691,69 @@ export const verify2FALogin = catchAsyncErrors(async (req, res, next) => {
   } catch (err) {
     console.error(err);
     return next(new ErrorHandler("Failed to verify 2FA", 500));
+  }
+});
+
+export const disable2FA = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { password, code, backupCode } = req.body;
+
+    const user = await User.findById(userId).select("+password");
+    if (!user) return next(new ErrorHandler("User not found", 404));
+
+    if (!user.twoFactor?.enabled) {
+      return next(new ErrorHandler("Two-factor authentication is not enabled", 400));
+    }
+
+    // 1) Confirm password
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return next(new ErrorHandler("Incorrect password", 401));
+    }
+
+    let verified = false;
+
+    // 2) Option A: verify with current 2FA code
+    if (code) {
+      const plainSecret = decryptTOTPSecret(user.twoFactor.secret);
+      if (!plainSecret) {
+        return next(new ErrorHandler("2FA secret is corrupted", 500));
+      }
+      verified = authenticator.verify({ token: code, secret: plainSecret });
+    }
+
+    // 3) Option B: backup code
+    if (!verified && backupCode) {
+      const hash = crypto.createHash("sha256").update(backupCode).digest("hex");
+      const backup = user.twoFactor.backupCodes?.find(
+        (b) => b.codeHash === hash && !b.used
+      );
+      if (backup) {
+        verified = true;
+        backup.used = true;
+        backup.usedAt = new Date();
+      }
+    }
+
+    if (!verified) {
+      return next(new ErrorHandler("Invalid 2FA code or backup code", 400));
+    }
+
+    // 4) Disable 2FA and clear secrets/codes
+    user.twoFactor.enabled = false;
+    user.twoFactor.secret = undefined;
+    user.twoFactor.backupCodes = [];
+    user.twoFactor.lastVerified = undefined;
+
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(200).json({
+      success: true,
+      message: "Two-factor authentication has been disabled",
+    });
+  } catch (err) {
+    console.error(err);
+    return next(new ErrorHandler("Failed to disable 2FA", 500));
   }
 });
