@@ -2,7 +2,7 @@ import crypto from "crypto";
 
 const ALGO = "aes-256-gcm";
 
-const hexKey = process.env.TOTP_SECRET_KEY || "";
+const hexKey = "7619a4070af21a4dad7954813a65c16feca3fc66c7c96f7915f26aeea3e0ea83";
 
 if (!hexKey) {
   throw new Error("TOTP_SECRET_KEY is not set in environment variables");
