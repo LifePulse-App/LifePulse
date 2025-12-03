@@ -8,7 +8,9 @@ import {
   TouchableOpacity,
   Keyboard,
 } from 'react-native';
-import { TextInput, Text } from 'react-native-paper';
+import { Text } from '@rneui/themed';
+import { TextInput } from 'react-native-paper';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
 
 import { loginStyles } from '../../login/components/Loginstyles';
@@ -21,8 +23,8 @@ const Enable2FAScreen = () => {
   const styles = loginStyles();
   const navigation = useNavigation<any>();
 
-  const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [manualKey, setManualKey] = useState<string | null>(null);
@@ -42,7 +44,6 @@ const Enable2FAScreen = () => {
     setErrorMessage(null);
   };
 
-  // Step 1: init 2FA (get QR + manual key)
   useEffect(() => {
     const init = async () => {
       try {
@@ -54,7 +55,7 @@ const Enable2FAScreen = () => {
         const data: any = res.data;
         setQrImage(data.qrImageDataUrl);
         setManualKey(data.manualKey);
-      } catch (e: any) {
+      } catch {
         showError('Unable to initialize 2FA. Please try again.');
       } finally {
         setInitialLoading(false);
@@ -82,7 +83,7 @@ const Enable2FAScreen = () => {
       if (data.backupCodes && Array.isArray(data.backupCodes)) {
         setBackupCodes(data.backupCodes);
       }
-    } catch (e: any) {
+    } catch {
       showError('Failed to confirm 2FA. Please try again.');
     } finally {
       setLoading(false);
@@ -90,7 +91,6 @@ const Enable2FAScreen = () => {
   };
 
   const handleDone = () => {
-    // You can simply go back or to settings
     navigation.goBack();
   };
 
@@ -103,12 +103,14 @@ const Enable2FAScreen = () => {
           animationSpeedMultiplier={1.0}
           color={'#FFFFFF'}
         />
-        <AppText style={{ marginTop: 12, color: '#FFFFFF' }}>Preparing 2FA setup...</AppText>
+        <AppText style={{ marginTop: 12, color: '#FFFFFF' }}>
+          Preparing 2FA setup...
+        </AppText>
       </View>
     );
   }
 
-  // If backup codes generated, show them and a "Done" button
+  // When backup codes are generated
   if (backupCodes) {
     return (
       <>
@@ -121,23 +123,52 @@ const Enable2FAScreen = () => {
             style={styles.kbWrapper}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           >
-            <View style={styles.appNameWrapper}>
-              <Text style={styles.appName}>StreakSphere</Text>
+            {/* Header like ProfileScreen */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 16,
+                  backgroundColor: 'rgba(15,23,42,0.0)',
+                  borderWidth: 1,
+                  borderColor: 'rgba(148,163,184,0.4)',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginLeft: 4,
+                }}
+                onPress={() => navigation.goBack()}
+              >
+                <Icon name="arrow-left" size={24} color="#E5E7EB" />
+              </TouchableOpacity>
+              <Text
+                style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  fontSize: 18,
+                  fontWeight: '700',
+                  color: '#F9FAFB',
+                  marginRight: 40,
+                }}
+              >
+                Two-factor Auth
+              </Text>
             </View>
 
             <View style={styles.glassWrapper}>
               <View style={styles.glassContent}>
                 <Text style={styles.mainTitle}>2FA Enabled</Text>
                 <Text style={styles.mainSubtitle}>
-                  Save these backup codes somewhere safe. Each code can be used once if you lose
-                  access to your authenticator app.
+                  Save these backup codes somewhere safe. Each code can be used
+                  once if you lose access to your authenticator app.
                 </Text>
 
                 <ScrollView
                   style={{ maxHeight: 240, marginVertical: 10 }}
                   contentContainerStyle={{ paddingVertical: 4 }}
                 >
-                  {backupCodes.map((code, idx) => (
+                  {backupCodes.map((bc, idx) => (
                     <View
                       key={idx}
                       style={{
@@ -148,13 +179,21 @@ const Enable2FAScreen = () => {
                         marginBottom: 6,
                       }}
                     >
-                      <Text style={{ color: '#000', fontSize: 15 }}>{code}</Text>
+                      <Text style={{ color: '#000', fontSize: 15 }}>{bc}</Text>
                     </View>
                   ))}
                 </ScrollView>
 
-                <Text style={{ color: '#000', fontSize: 12, textAlign: 'center', marginBottom: 10 }}>
-                  You will not be able to see these codes again. Store them in a secure place.
+                <Text
+                  style={{
+                    color: '#000',
+                    fontSize: 12,
+                    textAlign: 'center',
+                    marginBottom: 10,
+                  }}
+                >
+                  You will not be able to see these codes again. Store them in a
+                  secure place.
                 </Text>
 
                 <TouchableOpacity onPress={handleDone} style={styles.primaryButton}>
@@ -174,7 +213,7 @@ const Enable2FAScreen = () => {
     );
   }
 
-  // Default view: QR + manual key + code input
+  // Default view: QR + manual key + 6-digit code input
   return (
     <>
       <View style={styles.root}>
@@ -186,23 +225,57 @@ const Enable2FAScreen = () => {
           style={styles.kbWrapper}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View style={styles.appNameWrapper}>
-            <Text style={styles.appName}>StreakSphere</Text>
+          {/* Header like ProfileScreen */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginTop: 30 }}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 16,
+                backgroundColor: 'rgba(15,23,42,0.0)',
+                borderWidth: 1,
+                borderColor: 'rgba(148,163,184,0.4)',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginLeft: 4,
+              }}
+              onPress={() => navigation.goBack()}
+            >
+              <Icon name="arrow-left" size={24} color="#E5E7EB" />
+            </TouchableOpacity>
+            <Text
+              style={{
+                flex: 1,
+                textAlign: 'center',
+                fontSize: 18,
+                fontWeight: '700',
+                color: '#F9FAFB',
+                marginRight: 40,
+              }}
+            >
+              Two-factor Auth
+            </Text>
           </View>
 
           <View style={styles.glassWrapper}>
             <View style={styles.glassContent}>
               <Text style={styles.mainTitle}>Enable Two-Factor Auth</Text>
               <Text style={styles.mainSubtitle}>
-                Scan the QR code below with Google Authenticator, iOS Passwords, or another
-                authenticator app.
+                Scan the QR code below with Google Authenticator, iOS Passwords,
+                or another authenticator app.
               </Text>
 
               {qrImage && (
                 <View style={{ alignItems: 'center', marginVertical: 12 }}>
                   <Image
                     source={{ uri: qrImage }}
-                    style={{ width: 200, height: 200, borderRadius: 12, backgroundColor: '#fff' }}
+                    style={{
+                      width: 200,
+                      height: 200,
+                      borderRadius: 12,
+                      backgroundColor: '#fff',
+                    }}
                     resizeMode="contain"
                   />
                 </View>
@@ -217,7 +290,13 @@ const Enable2FAScreen = () => {
                     backgroundColor: 'rgba(255,255,255,0.9)',
                   }}
                 >
-                  <Text style={{ color: '#000', fontWeight: '600', marginBottom: 4 }}>
+                  <Text
+                    style={{
+                      color: '#000',
+                      fontWeight: '600',
+                      marginBottom: 4,
+                    }}
+                  >
                     Or enter this key manually:
                   </Text>
                   <Text selectable style={{ color: '#000', fontSize: 14 }}>
@@ -226,8 +305,15 @@ const Enable2FAScreen = () => {
                 </View>
               )}
 
-              <Text style={{ color: '#000', fontSize: 13, marginBottom: 6 }}>
-                After adding your account to the authenticator app, enter the 6-digit code it shows:
+              <Text
+                style={{
+                  color: '#000',
+                  fontSize: 13,
+                  marginBottom: 6,
+                }}
+              >
+                After adding your account to the authenticator app, enter the
+                6-digit code it shows:
               </Text>
 
               <TextInput
