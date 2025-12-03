@@ -562,12 +562,6 @@ export const enable2FAConfirm = catchAsyncErrors(async (req, res, next) => {
     const user = await User.findById(userId);
     if (!user) return next(new ErrorHandler("User not found", 404));
 
-    if (!user.twoFactor?.secret) {
-      return next(
-        new ErrorHandler("2FA is not initialized for this user", 400)
-      );
-    }
-
     // 🔐 decrypt the TOTP secret
     const plainSecret = decryptTOTPSecret(user.twoFactor.secret);
     if (!plainSecret) {
