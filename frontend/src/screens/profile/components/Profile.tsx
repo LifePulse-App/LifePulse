@@ -450,7 +450,7 @@ const settingSections = [
   {
     title: "Privacy & Security",
     items: [
-      { icon: "security", label: "Two-factor Authentication", route: "TwoFactor" },
+      { icon: "security", label: "Two-factor Authentication", route: "Enable2FA" },
       { icon: "devices", label: "Authorized Devices", route: "Devices" },
     ],
   },
@@ -566,19 +566,31 @@ const ProfileScreen = ({ navigation }: any) => {
           </View>
         </View>
         {settingSections.map(section => (
-          <View key={section.title}>
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            {section.items.map(item => (
-              <TouchableOpacity key={item.route} style={styles.settingCard} onPress={() => setActiveModal(item.route)}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Icon name={item.icon} size={24} color="#A855F7" />
-                  <Text style={styles.settingLabel}>{item.label}</Text>
-                </View>
-                <Icon name="chevron-right" size={22} color="#9CA3AF" />
-              </TouchableOpacity>
-            ))}
-          </View>
-        ))}
+  <View key={section.title}>
+    <Text style={styles.sectionTitle}>{section.title}</Text>
+    {section.items.map(item => (
+      <TouchableOpacity
+        key={item.route}
+        style={styles.settingCard}
+        onPress={() => {
+          if (item.route === 'Enable2FA') {
+            navigation.navigate('Enable2FA');   // push screen instead of modal
+          } else if (item.route === 'Devices') {
+            navigation.navigate('Devices');     // if you have that screen
+          } else {
+            setActiveModal(item.route as any); // use bottom sheet for others
+          }
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Icon name={item.icon} size={24} color="#A855F7" />
+          <Text style={styles.settingLabel}>{item.label}</Text>
+        </View>
+        <Icon name="chevron-right" size={22} color="#9CA3AF" />
+      </TouchableOpacity>
+    ))}
+  </View>
+))}
         <TouchableOpacity style={styles.logoutBtn} onPress={() => setLogoutModalVisible(true)} activeOpacity={0.86}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>

@@ -9,7 +9,10 @@ import {
   googleLogin,
   resendVerificationOtp,
   resetPasswordVerifyOtp,
-  resetPasswordSetNew
+  resetPasswordSetNew,
+  verify2FALogin,
+  enable2FAInit,
+  enable2FAConfirm
 } from "../controllers/AuthController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 import { verifyEmail } from "../controllers/OtpController.js";
@@ -20,6 +23,9 @@ router.post("/register", register);
 router.post("/verify-email", verifyEmail);
 router.post("/resend-otp", resendVerificationOtp);
 router.post("/login", login);
+router.post("/2fa/verify-login", verify2FALogin);
+router.post("/2fa/enable/init", isAuthenticatedUser, enable2FAInit);
+router.post("/2fa/enable/confirm", isAuthenticatedUser, enable2FAConfirm);
 router.post("/sso/google", googleLogin);
 router.post("/refresh-token", refreshToken);
 router.post("/forgot-password", forgotPassword);

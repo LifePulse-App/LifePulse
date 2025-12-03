@@ -129,6 +129,45 @@ const googleLogin = async (idToken: string, deviceId: string) => {
   }
 };
 
+// 2FA verify-login API
+const verify2faLogin = async (twoFaToken: string, code?: string, backupCode?: string) => {
+  try {
+    return await client.post<object>('/auth/2fa/verify-login', {
+      twoFaToken,
+      code,
+      backupCode,
+    });
+  } catch (error: any) {
+    if (!error.response) {
+      throw new Error('Server is offline, try again later.');
+    }
+    throw error;
+  }
+};
+
+const init2fa = async () => {
+  try {
+    return await client.post<object>('/auth/2fa/enable/init', {});
+  } catch (error: any) {
+    if (!error.response) {
+      throw new Error('Server is offline, try again later.');
+    }
+    throw error;
+  }
+};
+
+
+const confirm2fa = async (token: string) => {
+  try {
+    return await client.post<object>('/auth/2fa/enable/confirm', { token });
+  } catch (error: any) {
+    if (!error.response) {
+      throw new Error('Server is offline, try again later.');
+    }
+    throw error;
+  }
+};
+
 // GetProfile API
 const GetProfile = () =>
   client.get<DashboardResponse>('/auth/me');
@@ -142,5 +181,8 @@ export default {
   googleLogin,
   GetProfile,
   resetPassword,
-  forgotPass
+  forgotPass,
+  init2fa,
+  confirm2fa,
+  verify2faLogin
 };

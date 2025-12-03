@@ -7,10 +7,24 @@ import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import { sendResetPasswordEmail, sendVerificationEmail, verifyEmail } from "./OtpController.js";
 import { OAuth2Client } from "google-auth-library";
 import appleSignin from "apple-signin-auth";
+import { authenticator } from "otplib";
+import QRCode from "qrcode";
+import { decryptTOTPSecret, encryptTOTPSecret } from "../utils/crypto2fa.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Helper to send access + refresh tokens
+const generateBackupCodes = () => {
+  const codes = [];
+  for (let i = 0; i < 10; i++) {
+    // 10-character alphanumeric code, e.g. "AB7D-3F9K"
+    const plain = crypto.randomBytes(5).toString("hex").toUpperCase(); // 10 hex chars
+    const formatted = `${plain.slice(0, 4)}-${plain.slice(4, 8)}-${plain.slice(8)}`;
+    const codeHash = crypto.createHash("sha256").update(formatted).digest("hex");
+    codes.push({ plain: formatted, codeHash });
+  }
+  return codes;
+};
+
 const sendTokens = async (res, user, deviceId) => {                
   const accessToken = user.getJwtToken();
   const refreshToken = user.getRefreshToken(deviceId || "Unknown");
@@ -24,6 +38,7 @@ const sendTokens = async (res, user, deviceId) => {
       email: user.email,
       role: user.role,
       providers: user.providers,
+      twoFactorEnabled: user.twoFactor?.enabled || false,
     },
   };
 };
@@ -168,8 +183,6 @@ export const resendVerificationOtp = catchAsyncErrors(async (req, res, next) => 
 });
 
 
-
-
 // Login
 export const login = catchAsyncErrors(async (req, res, next) => {
   try {
@@ -188,18 +201,62 @@ export const login = catchAsyncErrors(async (req, res, next) => {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return next(new ErrorHandler("Invalid credentials", 401));
 
+    // If user has 2FA enabled → do not issue full tokens yet
+    if (user.twoFactor?.enabled && user.twoFactor.secret) {
+      const twoFaToken = Jwt.sign(
+        { id: user._id, stage: "2fa", deviceId },
+        process.env.JWT_SECRET,
+        { expiresIn: "5m" }
+      );
+
+      // Optionally register device now or after success; here we do it now
+      let device = user.deviceInfo.find((d) => d.deviceId === deviceId);
+      if (device) {
+        device.deviceName = deviceName;
+        device.deviceModel = deviceModel;
+        device.deviceBrand = deviceBrand;
+        device.lastLogin = Date.now();
+      } else {
+        user.deviceInfo.push({
+          deviceId,
+          deviceName,
+          deviceModel,
+          deviceBrand,
+          lastLogin: Date.now(),
+        });
+      }
+      await user.save({ validateBeforeSave: false });
+
+      return res.status(200).json({
+        success: true,
+        requires2fa: true,
+        twoFaToken,
+      });
+    }
+
+    // No 2FA: normal login
     const tokens = await sendTokens(res, user, deviceId);
-    let device = user.deviceInfo.find(d => d.deviceId === deviceId);
+
+    let device = user.deviceInfo.find((d) => d.deviceId === deviceId);
     if (device) {
       device.deviceName = deviceName;
       device.deviceModel = deviceModel;
       device.deviceBrand = deviceBrand;
       device.lastLogin = Date.now();
     } else {
-      user.deviceInfo.push({ deviceId, deviceName, deviceModel, deviceBrand, lastLogin: Date.now() });
+      user.deviceInfo.push({
+        deviceId,
+        deviceName,
+        deviceModel,
+        deviceBrand,
+        lastLogin: Date.now(),
+      });
     }
-    res.status(200).json({ success: true, ...tokens });
+    await user.save({ validateBeforeSave: false });
+
+    res.status(200).json({ success: true, requires2fa: false, ...tokens });
   } catch (err) {
+    console.error(err);
     return next(new ErrorHandler("Server error", 500));
   }
 });
@@ -450,5 +507,189 @@ export const resetPasswordSetNew = catchAsyncErrors(async (req, res, next) => {
   } catch (err) {
     console.error(err);
     return next(new ErrorHandler("Server error", 500));
+  }
+});
+
+export const enable2FAInit = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+
+    if (!user) return next(new ErrorHandler("User not found", 404));
+
+    if (user.twoFactor?.enabled) {
+      return next(
+        new ErrorHandler("Two-factor authentication is already enabled", 400)
+      );
+    }
+
+    // 1) Generate plain TOTP secret
+    const plainSecret = authenticator.generateSecret();
+
+    // 2) Encrypt secret before saving
+    const encryptedSecret = encryptTOTPSecret(plainSecret);
+    user.twoFactor.secret = encryptedSecret;
+    user.twoFactor.enabled = false;
+    await user.save({ validateBeforeSave: false });
+
+    // 3) Use plain secret to generate otpauth URL (not the encrypted one)
+    const issuer = "StreakSphere";
+    const otpauthUrl = authenticator.keyuri(user.email, issuer, plainSecret);
+
+    const qrImageDataUrl = await QRCode.toDataURL(otpauthUrl);
+
+    return res.status(200).json({
+      success: true,
+      qrImageDataUrl,
+      manualKey: plainSecret,
+      otpauthUrl,
+    });
+  } catch (err) {
+    console.error(err);
+    return next(new ErrorHandler("Failed to initialize 2FA", 500));
+  }
+});
+
+export const enable2FAConfirm = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { token } = req.body; // 6-digit code
+
+    if (!token) {
+      return next(new ErrorHandler("2FA code is required", 400));
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return next(new ErrorHandler("User not found", 404));
+
+    if (!user.twoFactor?.secret) {
+      return next(
+        new ErrorHandler("2FA is not initialized for this user", 400)
+      );
+    }
+
+    // 🔐 decrypt the TOTP secret
+    const plainSecret = decryptTOTPSecret(user.twoFactor.secret);
+    if (!plainSecret) {
+      return next(new ErrorHandler("2FA secret is corrupted", 500));
+    }
+
+    const isValid = authenticator.verify({
+      token,
+      secret: plainSecret,
+    });
+
+    if (!isValid) {
+      return next(new ErrorHandler("Invalid 2FA code", 400));
+    }
+
+    // generate backup codes
+    const generated = generateBackupCodes();
+    user.twoFactor.backupCodes = generated.map((c) => ({
+      codeHash: c.codeHash,
+      used: false,
+      usedAt: null,
+    }));
+    user.twoFactor.enabled = true;
+    user.twoFactor.lastVerified = new Date();
+
+    await user.save({ validateBeforeSave: false });
+
+    const plainCodes = generated.map((c) => c.plain);
+
+    return res.status(200).json({
+      success: true,
+      message: "Two-factor authentication enabled",
+      backupCodes: plainCodes,
+    });
+  } catch (err) {
+    console.error(err);
+    return next(new ErrorHandler("Failed to confirm 2FA", 500));
+  }
+});
+
+export const verify2FALogin = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const { twoFaToken, code, backupCode } = req.body;
+
+    if (!twoFaToken) {
+      return next(new ErrorHandler("Missing 2FA token", 400));
+    }
+    if (!code && !backupCode) {
+      return next(
+        new ErrorHandler("2FA code or backup code is required", 400)
+      );
+    }
+
+    let payload;
+    try {
+      payload = Jwt.verify(twoFaToken, process.env.JWT_SECRET);
+    } catch (err) {
+      return next(new ErrorHandler("Invalid or expired 2FA token", 401));
+    }
+
+    if (payload.stage !== "2fa") {
+      return next(new ErrorHandler("Invalid 2FA token stage", 400));
+    }
+
+    const user = await User.findById(payload.id);
+    if (!user) return next(new ErrorHandler("User not found", 404));
+    if (!user.twoFactor?.enabled || !user.twoFactor.secret) {
+      return next(new ErrorHandler("2FA not enabled for this user", 400));
+    }
+
+    // 🔐 decrypt TOTP secret
+    const plainSecret = decryptTOTPSecret(user.twoFactor.secret);
+    if (!plainSecret) {
+      return next(new ErrorHandler("2FA secret is corrupted", 500));
+    }
+
+    let isValid = false;
+    let usedBackup = false;
+
+    // 1) TOTP path
+    if (code) {
+      isValid = authenticator.verify({
+        token: code,
+        secret: plainSecret,
+      });
+    }
+
+    // 2) Backup code path
+    if (!isValid && backupCode) {
+      const hash = crypto
+        .createHash("sha256")
+        .update(backupCode)
+        .digest("hex");
+
+      const backup = user.twoFactor.backupCodes?.find(
+        (b) => b.codeHash === hash && !b.used
+      );
+
+      if (backup) {
+        isValid = true;
+        usedBackup = true;
+        backup.used = true;
+        backup.usedAt = new Date();
+      }
+    }
+
+    if (!isValid) {
+      return next(new ErrorHandler("Invalid 2FA code or backup code", 400));
+    }
+
+    user.twoFactor.lastVerified = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    const tokens = await sendTokens(res, user, payload.deviceId || "Unknown");
+
+    return res.status(200).json({
+      success: true,
+      usedBackupCode: usedBackup,
+      ...tokens,
+    });
+  } catch (err) {
+    console.error(err);
+    return next(new ErrorHandler("Failed to verify 2FA", 500));
   }
 });

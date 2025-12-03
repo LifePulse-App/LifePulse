@@ -19,6 +19,8 @@ import Dashboard from '../../screens/dashboard/components/dashboard/Dashboard';
 import ProofVisionCameraScreen from '../../screens/proof-camera/Camera';
 import Friends from '../../screens/friends/components/Friends';
 import EditProfileScreen from '../../screens/profile/components/EditProfile';
+import TwoFAScreen from '../../screens/login/components/TwoFAScreen';
+import Enable2FAScreen from '../../screens/profile/components/Enable2FaScreen';
 
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');
@@ -238,6 +240,7 @@ const AuthNavigator = () => {
       initialRouteName={initialRoute}
     >
       <Stack.Screen name="Login" component={Login} />
+      <Stack.Screen name="TwoFA" component={TwoFAScreen} />
       <Stack.Screen name="VerifyOtp" component={VerifyOtp} />
       <Stack.Screen name="ForgotPass" component={ForgotPass} />
       <Stack.Screen name="ResetPassVerifyOtp" component={ResetPassVerifyOTP} />
@@ -248,6 +251,7 @@ const AuthNavigator = () => {
       <Stack.Screen name="ProofCamera" component={ProofVisionCameraScreen} />
       <Stack.Screen name="Friends" component={Friends} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+      <Stack.Screen name="Enable2FA" component={Enable2FAScreen} />
     </Stack.Navigator>
   );
 };

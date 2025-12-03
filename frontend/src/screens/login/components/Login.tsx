@@ -122,74 +122,83 @@ const Login = ({ navigation }: any) => {
   }, []);
 
   // ---------- Email/Password login (ONLY here you hit API) ----------
-  const handleSubmit = async (values: { username: string; password: string }) => {
-    Keyboard.dismiss();
+const handleSubmit = async (values: { username: string; password: string }) => {
+  Keyboard.dismiss();
 
-    if (offline) {
-      showError("You’re offline. Please connect to the internet and try again.");
+  if (offline) {
+    showError("You’re offline. Please connect to the internet and try again.");
+    return;
+  }
+
+  if (!values.username || !values.password) {
+    showError('Email and Password are required!');
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    setSecretKey();
+    const deviceId = await DeviceInfo.getUniqueId();
+    const deviceName = await DeviceInfo.getDeviceName();
+    const deviceModel = DeviceInfo.getModel();
+    const deviceBrand = DeviceInfo.getBrand();
+    const response = await api_Login.getLogin(
+      values.username,
+      values.password,
+      deviceId,
+      deviceName,
+      deviceModel,
+      deviceBrand,
+    );
+
+    if (!response.ok) {
+      await UserStorage.deleteUser();
+      authContext?.setUser(null);
+      showError(response.data?.message || 'Login failed');
       return;
     }
 
-    if (!values.username || !values.password) {
-      showError('Email and Password are required!');
+    const data = response.data as any;
+
+    // CASE 1: 2FA required
+    if (data.requires2fa) {
+      // navigate to 2FA screen with the temporary token and identifier
+      navigation.navigate('TwoFA', {
+        twoFaToken: data.twoFaToken,
+        identifier: values.username,
+      });
       return;
     }
 
-    setLoading(true);
+    // CASE 2: no 2FA → normal login
+    const user = data as UserLoginResponse;
+    user.UserName = values.username;
+    user.Password = values.password;
 
-    try {
-      setSecretKey();
-      const deviceId = await DeviceInfo.getUniqueId();
-      const deviceName = await DeviceInfo.getDeviceName();
-      const deviceModel = DeviceInfo.getModel();
-      const deviceBrand = DeviceInfo.getBrand();
-      const response = await api_Login.getLogin(
-        values.username,
-        values.password,
-        deviceId,
-        deviceName,
-        deviceModel,
-        deviceBrand
-      );
-
-      if (!response.ok) {
-        await UserStorage.deleteUser();
-        authContext?.setUser(null);
-        showError(response.data?.message || 'Login failed');
-        return;
-      }
-
-      const user = response.data as UserLoginResponse;
-      user.UserName = values.username;
-      user.Password = values.password;
-
-      // 1) Set auth header for current session
     setAuthHeaders(user.accessToken);
-
-    // 2) Save full user for auto-login UI/context
     authContext?.setUser(user);
     await UserStorage.setUser(user);
 
-    // 3) Save tokens for interceptors
-if (user.accessToken) {
-  await UserStorage.setAccessToken(user.accessToken);
-}
-if (user.refreshToken) {
-  await UserStorage.setRefreshToken(user.refreshToken);
-}
-    
-navigation.dispatch(
-  CommonActions.reset({
-    index: 0,
-    routes: [{ name: 'Drawer' }],
-  }),
-);
-    } catch (e) {
-      showError('Unexpected error while logging in');
-    } finally {
-      setLoading(false);
+    if (user.accessToken) {
+      await UserStorage.setAccessToken(user.accessToken);
     }
-  };
+    if (user.refreshToken) {
+      await UserStorage.setRefreshToken(user.refreshToken);
+    }
+
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: 'Drawer' }],
+      }),
+    );
+  } catch (e) {
+    showError('Unexpected error while logging in');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Interpolated transforms for subtle motion
   const blob1Style = {

@@ -24,12 +24,24 @@ const notificationSchema = new mongoose.Schema({
   pauseJabits: { type: Boolean, default: false },
 }, { _id: false });
 
-// Two Factor Auth
-const twoFactorSchema = new mongoose.Schema({
-  enabled: { type: Boolean, default: false },
-  secret: { type: String }, // for code generation (TOTP, etc.)
-  lastVerified: { type: Date }
-}, { _id: false });
+// ✅ Two Factor Auth + backup codes
+const twoFactorSchema = new mongoose.Schema(
+  {
+    enabled: { type: Boolean, default: false },
+    secret: { type: String }, // TOTP secret (store encrypted in production)
+    lastVerified: { type: Date },
+
+    // backup codes: store hashed for security
+    backupCodes: [
+      {
+        codeHash: { type: String, required: true },
+        used: { type: Boolean, default: false },
+        usedAt: { type: Date },
+      },
+    ],
+  },
+  { _id: false }
+);
 
 const userSchema = new mongoose.Schema(
   {
@@ -87,7 +99,7 @@ const userSchema = new mongoose.Schema(
     streak: { type: streakSchema, default: () => ({}) },
     deviceInfo: [deviceInfoSchema], // array of devices
     notifications: notificationSchema,
-    twoFactor: twoFactorSchema,
+    twoFactor: { type: twoFactorSchema, default: () => ({}) },
     verificationCode: String,
     verificationCodeExpire: Date,
     otpResendCount: {
