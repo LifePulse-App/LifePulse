@@ -1,14 +1,19 @@
 import crypto from "crypto";
 
 const ALGO = "aes-256-gcm";
-const KEY = Buffer.from("fh38F92ks9jLhgdshjgjhdh72889hjscnj9f0f1c2d3e4f506172839b3c4d5e6f708192a3b4c5d6e7hghjhjghjgjhgjhgjhx6ut76yu76yf76", "hex");
+
+const hexKey = process.env.TOTP_SECRET_KEY || "";
+
+if (!hexKey) {
+  throw new Error("TOTP_SECRET_KEY is not set in environment variables");
+}
+
+const KEY = Buffer.from(hexKey, "hex");
 
 // 32 bytes key required for aes-256-gcm
-if (!KEY || KEY.length !== 32) {
-  console.log(KEY);
-  console.log(KEY.length());
+if (KEY.length !== 32) {
   throw new Error(
-    "TOTP_SECRET_KEY must be a 64-char hex string (32 bytes) in env"
+    "TOTP_SECRET_KEY must be a 64-char hex string (32 bytes)"
   );
 }
 
@@ -22,7 +27,6 @@ export const encryptTOTPSecret = (plainSecret) => {
   ]);
   const authTag = cipher.getAuthTag();
 
-  // store iv + authTag + ciphertext (all base64)
   return {
     iv: iv.toString("base64"),
     authTag: authTag.toString("base64"),
