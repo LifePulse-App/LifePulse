@@ -22,6 +22,9 @@ import EditProfileScreen from '../../screens/profile/components/EditProfile';
 import TwoFAScreen from '../../screens/login/components/TwoFAScreen';
 import Enable2FAScreen from '../../screens/profile/components/Enable2FaScreen';
 import DevicesScreen from '../../screens/profile/components/DevicesScreen';
+import HelpSupportScreen from '../../screens/profile/components/HelpSupportScreen';
+import ReportProblemScreen from '../../screens/profile/components/ReportProblemScreen';
+import LegalPolicyScreen from '../../screens/profile/components/LegalPolicyScreen';
 
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');
@@ -254,6 +257,9 @@ const AuthNavigator = () => {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="Enable2FA" component={Enable2FAScreen} />
       <Stack.Screen name="Devices" component={DevicesScreen} />
+      <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+<Stack.Screen name="ReportProblem" component={ReportProblemScreen} />
+<Stack.Screen name="LegalPolicy" component={LegalPolicyScreen} />
     </Stack.Navigator>
   );
 };

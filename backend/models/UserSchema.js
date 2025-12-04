@@ -56,6 +56,22 @@ const twoFactorSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const avatarConfigSchema = new mongoose.Schema(
+  {
+    skinTone: { type: String, default: 'skin_light' }, // keys, not raw colors
+    hairStyle: { type: String, default: 'hair_short_1' },
+    hairColor: { type: String, default: 'hair_black' },
+    eyeShape: { type: String, default: 'eye_round' },
+    eyeColor: { type: String, default: 'eye_brown' },
+    mouth: { type: String, default: 'mouth_smile' },
+    eyebrowStyle: { type: String, default: 'brow_soft' },
+    accessories: [{ type: String }], // e.g. ['glasses_round', 'hat_beanie']
+    outfit: { type: String, default: 'outfit_casual_1' },
+    backgroundColor: { type: String, default: '#E5E7EB' },
+  },
+  { _id: false },
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -172,6 +188,21 @@ resetPasswordVerified: {
     ],
     publicKey: {
       type: String,
+    },
+    avatarConfig: {
+      type: avatarConfigSchema,
+      default: () => ({
+        skinTone: 'skin_light',
+        hairStyle: 'hair_short_1',
+        hairColor: 'hair_black',
+        eyeShape: 'eye_round',
+        eyeColor: 'eye_brown',
+        mouth: 'mouth_smile',
+        eyebrowStyle: 'brow_soft',
+        accessories: [],
+        outfit: 'outfit_casual_1',
+        backgroundColor: '#E5E7EB',
+      }),
     },
 // In your User schema
 resetPasswordCode: String,

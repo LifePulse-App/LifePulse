@@ -24,6 +24,8 @@ type RouteParams = {
   pass?: string;
 };
 
+type Mode = 'totp' | 'backup';
+
 const TwoFAScreen = () => {
   const styles = loginStyles();
   const route = useRoute<any>();
@@ -32,6 +34,7 @@ const TwoFAScreen = () => {
 
   const { twoFaToken, identifier, pass } = route.params as RouteParams;
 
+  const [mode, setMode] = useState<Mode>('totp'); // 'totp' or 'backup'
   const [code, setCode] = useState('');
   const [backupCode, setBackupCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -52,8 +55,13 @@ const TwoFAScreen = () => {
   const handleVerify = async () => {
     Keyboard.dismiss();
 
-    if (!code && !backupCode) {
-      showError('Enter either your 6-digit code or a backup code');
+    const selectedCode = mode === 'totp' ? code : backupCode;
+    if (!selectedCode) {
+      showError(
+        mode === 'totp'
+          ? 'Please enter your 6-digit code.'
+          : 'Please enter your backup code.',
+      );
       return;
     }
 
@@ -61,7 +69,11 @@ const TwoFAScreen = () => {
     try {
       setSecretKey();
 
-      const response = await api_Login.verify2faLogin(twoFaToken, code || undefined, backupCode || undefined);
+      const response = await api_Login.verify2faLogin(
+        twoFaToken,
+        mode === 'totp' ? selectedCode : undefined,
+        mode === 'backup' ? selectedCode : undefined,
+      );
 
       if (!response.ok) {
         showError((response as any).data?.message || '2FA verification failed');
@@ -70,13 +82,11 @@ const TwoFAScreen = () => {
 
       const data: any = response.data;
 
-      // data contains: success, accessToken, refreshToken, user, usedBackupCode
       const user = data as any;
 
-      // attach identifier for UI if desired
       if (identifier) {
         user.UserName = identifier;
-        user.Password = pass
+        user.Password = pass;
       }
 
       if (user.accessToken) {
@@ -106,6 +116,65 @@ const TwoFAScreen = () => {
     }
   };
 
+  const renderModeToggle = () => (
+    <View
+      style={{
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginBottom: 12,
+        marginTop: 6,
+      }}
+    >
+      <TouchableOpacity
+        onPress={() => setMode('totp')}
+        style={{
+          paddingVertical: 6,
+          paddingHorizontal: 12,
+          borderTopLeftRadius: 999,
+          borderBottomLeftRadius: 999,
+          borderWidth: 1,
+          borderColor: mode === 'totp' ? '#111827' : 'rgba(148,163,184,1)',
+          backgroundColor:
+            mode === 'totp' ? '#111827' : 'rgba(148,163,184,0.15)',
+        }}
+      >
+        <Text
+          style={{
+            color: mode === 'totp' ? '#F9FAFB' : '#111827',
+            fontSize: 12,
+            fontWeight: '600',
+          }}
+        >
+          Use 2FA code
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => setMode('backup')}
+        style={{
+          paddingVertical: 6,
+          paddingHorizontal: 12,
+          borderTopRightRadius: 999,
+          borderBottomRightRadius: 999,
+          borderWidth: 1,
+          borderLeftWidth: 0,
+          borderColor: mode === 'backup' ? '#111827' : 'rgba(148,163,184,1)',
+          backgroundColor:
+            mode === 'backup' ? '#111827' : 'rgba(148,163,184,0.15)',
+        }}
+      >
+        <Text
+          style={{
+            color: mode === 'backup' ? '#F9FAFB' : '#111827',
+            fontSize: 12,
+            fontWeight: '600',
+          }}
+        >
+          Use backup code
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <>
       <View style={styles.root}>
@@ -125,44 +194,42 @@ const TwoFAScreen = () => {
             <View style={styles.glassContent}>
               <Text style={styles.mainTitle}>Two-Factor Authentication</Text>
               <Text style={styles.mainSubtitle}>
-                Enter the 6-digit code from your authenticator app or a backup code.
+                Enter your 6-digit authenticator code or use a backup code to continue.
               </Text>
 
-              <TextInput
-                label="6-digit 2FA code"
-                value={code}
-                onChangeText={setCode}
-                style={styles.input}
-                mode="flat"
-                underlineColor="transparent"
-                activeUnderlineColor="transparent"
-                keyboardType="numeric"
-                maxLength={6}
-                textColor="black"
-              />
+              {renderModeToggle()}
 
-              <Text
-                style={{
-                  textAlign: 'center',
-                  marginVertical: 8,
-                  color: 'black',
-                }}
-              >
-                OR
-              </Text>
-
-              <TextInput
-                label="Backup Code"
-                value={backupCode}
-                onChangeText={setBackupCode}
-                style={styles.passwordInput}
-                mode="flat"
-                underlineColor="transparent"
-                activeUnderlineColor="transparent"
-                textColor="black"
-                placeholder="XXXX-XXXX-XX"
-                autoCapitalize="characters"
-              />
+              {mode === 'totp' ? (
+                <>
+                  <TextInput
+                    label="6-digit 2FA code"
+                    value={code}
+                    onChangeText={setCode}
+                    style={styles.input}
+                    mode="flat"
+                    underlineColor="transparent"
+                    activeUnderlineColor="transparent"
+                    keyboardType="numeric"
+                    maxLength={6}
+                    textColor="black"
+                  />
+                </>
+              ) : (
+                <>
+                  <TextInput
+                    label="Backup Code"
+                    value={backupCode}
+                    onChangeText={setBackupCode}
+                    style={styles.passwordInput}
+                    mode="flat"
+                    underlineColor="transparent"
+                    activeUnderlineColor="transparent"
+                    textColor="black"
+                    placeholder="XXXX-XXXX-XX"
+                    autoCapitalize="characters"
+                  />
+                </>
+              )}
 
               {loading ? (
                 <View style={styles.loadingOverlay}>
@@ -181,9 +248,15 @@ const TwoFAScreen = () => {
               )}
 
               <View style={{ marginTop: 8, alignItems: 'center' }}>
-                <Text style={{ color: 'black', fontSize: 12 }}>
-                  Lost access to your authenticator app? Use one of your backup codes.
-                </Text>
+                {mode === 'totp' ? (
+                  <Text style={{ color: 'black', fontSize: 12 }}>
+                    Lost access to your authenticator app? Switch to backup code above.
+                  </Text>
+                ) : (
+                  <Text style={{ color: 'black', fontSize: 12 }}>
+                    Backup codes are one-time use. Keep them in a safe place.
+                  </Text>
+                )}
               </View>
             </View>
           </View>

@@ -13,7 +13,9 @@ import {
   deleteAccount,
   getLoginActivity,
   changePasswordWithOtp,
-  requestPasswordChangeOtp
+  requestPasswordChangeOtp,
+  getAvatarConfig,
+  updateAvatarConfig
 } from "../controllers/ProfileController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 
@@ -46,6 +48,9 @@ router.delete("/delete", isAuthenticatedUser, deleteAccount);
 
 // Login Activity
 router.get("/login-activity", isAuthenticatedUser, getLoginActivity);
+
+router.get('/me/avatar', isAuthenticatedUser, getAvatarConfig);
+router.post('/me/avatar', isAuthenticatedUser, updateAvatarConfig);
 
 
 export default router;

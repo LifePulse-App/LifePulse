@@ -221,3 +221,50 @@ export const getLoginActivity = catchAsyncErrors(async (req, res, next) => {
     }))
   });
 });
+
+// GET /api/me/avatar
+export const getAvatarConfig = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select('avatarConfig');
+  if (!user) return next(new ErrorHandler('User not found', 404));
+
+  res.status(200).json({
+    success: true,
+    avatarConfig: user.avatarConfig || null,
+  });
+});
+
+// POST /api/me/avatar
+export const updateAvatarConfig = catchAsyncErrors(async (req, res, next) => {
+  const allowedFields = [
+    'skinTone',
+    'hairStyle',
+    'hairColor',
+    'eyeShape',
+    'eyeColor',
+    'mouth',
+    'eyebrowStyle',
+    'accessories',
+    'outfit',
+    'backgroundColor',
+  ];
+
+  const updates = {};
+  for (const key of allowedFields) {
+    if (req.body[key] !== undefined) {
+      updates[`avatarConfig.${key}`] = req.body[key];
+    }
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    { $set: updates },
+    { new: true, runValidators: false },
+  ).select('avatarConfig');
+
+  if (!user) return next(new ErrorHandler('User not found', 404));
+
+  res.status(200).json({
+    success: true,
+    avatarConfig: user.avatarConfig,
+  });
+});

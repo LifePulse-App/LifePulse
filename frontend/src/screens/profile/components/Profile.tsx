@@ -574,11 +574,17 @@ const ProfileScreen = ({ navigation }: any) => {
         style={styles.settingCard}
         onPress={() => {
           if (item.route === 'Enable2FA') {
-            navigation.navigate('Enable2FA');   // push screen instead of modal
+            navigation.navigate('Enable2FA');
           } else if (item.route === 'Devices') {
-            navigation.navigate('Devices');     // if you have that screen
+            navigation.navigate('Devices');
+          } else if (item.route === 'HelpSupport') {
+            navigation.navigate('HelpSupport');
+          } else if (item.route === 'ReportProblem') {
+            navigation.navigate('ReportProblem');
+          } else if (item.route === 'LegalPolicy') {
+            navigation.navigate('LegalPolicy');
           } else {
-            setActiveModal(item.route as any); // use bottom sheet for others
+            setActiveModal(item.route as any);
           }
         }}
       >

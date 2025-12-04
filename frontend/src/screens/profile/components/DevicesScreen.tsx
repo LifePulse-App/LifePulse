@@ -82,10 +82,19 @@ const DevicesScreen = () => {
   const formatDateTime = (value?: string | Date) => {
     if (!value) return 'Unknown';
     const date = value instanceof Date ? value : new Date(value);
-    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], {
+    return `${date.toLocaleDateString()} • ${date.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
     })}`;
+  };
+
+  const formatLocation = (d: DeviceInfoItem) => {
+    if (d.location?.city || d.location?.country) {
+      const city = d.location.city || '';
+      const country = d.location.country || '';
+      return `${city}${city && country ? ', ' : ''}${country}`;
+    }
+    return 'Unknown location';
   };
 
   const renderHeader = () => (
@@ -93,7 +102,7 @@ const DevicesScreen = () => {
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 18,
         marginTop: 30,
       }}
     >
@@ -187,93 +196,183 @@ const DevicesScreen = () => {
 
           <View style={styles.glassWrapper}>
             <View style={styles.glassContent}>
+              {/* Section title / subtitle inside card */}
+              <View style={{ marginBottom: 10 }}>
+                <Text
+                  style={{
+                    color: '#020617',
+                    fontSize: 18,
+                    fontWeight: '700',
+                    marginBottom: 4,
+                  }}
+                >
+                  Your active sessions
+                </Text>
+                <Text
+                  style={{
+                    color: 'white',
+                    fontSize: 13,
+                  }}
+                >
+                  These devices are currently logged into your account.
+                </Text>
+              </View>
+
               {devices.length === 0 ? (
-                <Text style={{ color: '#000', textAlign: 'center' }}>
+                <Text style={{ color: '#000', textAlign: 'center', marginTop: 18 }}>
                   No devices found.
                 </Text>
               ) : (
                 <ScrollView
-                  style={{ maxHeight: 400 }}
+                  style={{ maxHeight: 420, marginTop: 10 }}
                   contentContainerStyle={{ paddingVertical: 4 }}
                 >
                   {devices.map((d, idx) => {
                     const isCurrent = d.deviceId === currentDeviceId;
-                    const locText =
-                      d.location?.city || d.location?.country
-                        ? `${d.location?.city || ''}${
-                            d.location?.city && d.location?.country ? ', ' : ''
-                          }${d.location?.country || ''}`
-                        : 'Unknown location';
+                    const locText = formatLocation(d);
 
                     return (
                       <View
                         key={d.deviceId || idx}
                         style={{
                           marginBottom: 10,
-                          padding: 12,
-                          borderRadius: 14,
+                          paddingVertical: 10,
+                          paddingHorizontal: 12,
+                          borderRadius: 16,
                           backgroundColor: isCurrent
-                            ? 'rgba(59,130,246,0.12)'
-                            : 'rgba(15,23,42,0.08)',
+                            ? 'rgba(191,219,254,0.8)'
+                            : 'rgba(248,250,252,0.9)',
                           borderWidth: 1,
                           borderColor: isCurrent
-                            ? 'rgba(59,130,246,0.8)'
-                            : 'rgba(148,163,184,0.5)',
+                            ? 'rgba(37,99,235,0.9)'
+                            : 'rgba(148,163,184,0.6)',
+                          shadowColor: '#000',
+                          shadowOpacity: 0.08,
+                          shadowRadius: 8,
+                          shadowOffset: { width: 0, height: 4 },
+                          elevation: 2,
                         }}
                       >
-                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            marginBottom: 4,
+                          }}
+                        >
                           <Icon
                             name={isCurrent ? 'cellphone' : 'tablet-cellphone'}
-                            size={28}
-                            color={isCurrent ? '#3B82F6' : '#9CA3AF'}
+                            size={26}
+                            color={isCurrent ? '#1D4ED8' : '#64748B'}
                           />
                           <View style={{ marginLeft: 10, flex: 1 }}>
-                            <Text
+                            <View
                               style={{
-                                color: '#000',
-                                fontWeight: '700',
-                                fontSize: 15,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                marginBottom: 2,
                               }}
                             >
-                              {d.deviceName || 'Unknown device'}
-                              {isCurrent ? ' (This device)' : ''}
-                            </Text>
-                            <Text style={{ color: '#4B5563', fontSize: 13 }}>
+                              <Text
+                                style={{
+                                  color: '#020617',
+                                  fontWeight: '700',
+                                  fontSize: 15,
+                                  flexShrink: 1,
+                                }}
+                              >
+                                {d.deviceName || 'Unknown device'}
+                              </Text>
+                              {isCurrent && (
+                                <View
+                                  style={{
+                                    marginLeft: 6,
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 2,
+                                    borderRadius: 999,
+                                    backgroundColor: '#1D4ED8',
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      color: '#F9FAFB',
+                                      fontSize: 10,
+                                      fontWeight: '700',
+                                    }}
+                                  >
+                                    THIS DEVICE
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text
+                              style={{
+                                color: '#4B5563',
+                                fontSize: 13,
+                                marginBottom: 2,
+                              }}
+                            >
                               {d.deviceBrand || ''} {d.deviceModel || ''}
                             </Text>
-                            <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 2 }}>
+                            <Text
+                              style={{
+                                color: '#6B7280',
+                                fontSize: 12,
+                              }}
+                            >
                               Last login: {formatDateTime(d.lastLogin)}
                             </Text>
-                            <Text style={{ color: '#6B7280', fontSize: 12 }}>
+                            <Text
+                              style={{
+                                color: '#6B7280',
+                                fontSize: 12,
+                                marginTop: 2,
+                              }}
+                            >
                               Location: {locText}
                             </Text>
                           </View>
                         </View>
 
+                        {/* Logout button for non-current devices */}
                         {!isCurrent && (
-                          <TouchableOpacity
-                            onPress={() => openLogoutConfirm(d.deviceId)}
+                          <View
                             style={{
-                              marginTop: 8,
-                              alignSelf: 'flex-end',
-                              paddingVertical: 6,
-                              paddingHorizontal: 12,
-                              borderRadius: 999,
-                              borderWidth: 1,
-                              borderColor: '#EF4444',
-                              backgroundColor: 'rgba(239,68,68,0.08)',
+                              flexDirection: 'row',
+                              justifyContent: 'flex-end',
+                              marginTop: 4,
                             }}
                           >
-                            <Text
+                            <TouchableOpacity
+                              onPress={() => openLogoutConfirm(d.deviceId)}
                               style={{
-                                color: '#EF4444',
-                                fontSize: 12,
-                                fontWeight: '600',
+                                paddingVertical: 6,
+                                paddingHorizontal: 12,
+                                borderRadius: 999,
+                                borderWidth: 1,
+                                borderColor: '#EF4444',
+                                backgroundColor: 'rgba(248,113,113,0.08)',
+                                flexDirection: 'row',
+                                alignItems: 'center',
                               }}
                             >
-                              Logout this device
-                            </Text>
-                          </TouchableOpacity>
+                              <Icon
+                                name="logout-variant"
+                                size={14}
+                                color="#EF4444"
+                                style={{ marginRight: 4 }}
+                              />
+                              <Text
+                                style={{
+                                  color: '#EF4444',
+                                  fontSize: 12,
+                                  fontWeight: '600',
+                                }}
+                              >
+                                Logout this device
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
                         )}
                       </View>
                     );
@@ -300,12 +399,12 @@ const DevicesScreen = () => {
         >
           <View
             style={{
-              width: 280,
-              borderRadius: 18,
-              backgroundColor: 'rgba(15,23,42,0.95)',
+              width: 290,
+              borderRadius: 20,
+              backgroundColor: 'rgba(15,23,42,0.97)',
               borderWidth: 1,
-              borderColor: '#E5E7EB',
-              padding: 20,
+              borderColor: 'rgba(148,163,184,0.6)',
+              padding: 22,
             }}
           >
             <Text
@@ -313,7 +412,7 @@ const DevicesScreen = () => {
                 color: '#F9FAFB',
                 fontSize: 16,
                 fontWeight: '700',
-                marginBottom: 12,
+                marginBottom: 8,
                 textAlign: 'center',
               }}
             >
@@ -323,7 +422,7 @@ const DevicesScreen = () => {
               style={{
                 color: '#E5E7EB',
                 fontSize: 13,
-                marginBottom: 16,
+                marginBottom: 18,
                 textAlign: 'center',
               }}
             >
@@ -345,9 +444,9 @@ const DevicesScreen = () => {
                 style={{
                   flex: 1,
                   marginRight: 6,
-                  paddingVertical: 8,
-                  borderRadius: 10,
-                  backgroundColor: 'rgba(148,163,184,0.25)',
+                  paddingVertical: 9,
+                  borderRadius: 12,
+                  backgroundColor: 'rgba(148,163,184,0.28)',
                   alignItems: 'center',
                 }}
               >
@@ -359,8 +458,8 @@ const DevicesScreen = () => {
                 style={{
                   flex: 1,
                   marginLeft: 6,
-                  paddingVertical: 8,
-                  borderRadius: 10,
+                  paddingVertical: 9,
+                  borderRadius: 12,
                   backgroundColor: '#EF4444',
                   alignItems: 'center',
                 }}
