@@ -478,6 +478,7 @@ const ProfileScreen = ({ navigation }: any) => {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [resultCard, setResultCard] = useState({ visible: false, type: "success", message: "" });
+  const avatarThumbnailUrl = (profile as any)?.avatarThumbnailUrl;
 
   // --- API Action Handlers ---
   const confirmLogout = async () => {
@@ -507,9 +508,16 @@ const ProfileScreen = ({ navigation }: any) => {
   };
   const fetchProfile = async () => {
     try {
-      const res = await profileApi.getProfile();
-      setProfile(res?.data?.user);
-    } catch (e) { }
+      const [profileRes, avatarRes] = await Promise.all([
+        profileApi.getProfile(),
+        profileApi.getAvatarUrl(),
+      ]);
+  
+      const user = profileRes?.data?.user;
+      const { avatarThumbnailUrl } = avatarRes.data || {};
+  
+      setProfile({ ...user, avatarThumbnailUrl });
+    } catch (e) {}
   };
 
   const renderActionModal = () => {
@@ -554,10 +562,11 @@ const ProfileScreen = ({ navigation }: any) => {
       <ScrollView style={styles.overlay}>
         <View style={styles.mainCard}>
           <View style={styles.avatarWrap}>
+
 <View style={styles.avatarCircle}>
-  {avatarUrl ? (
+  {avatarThumbnailUrl ? (
     <Image
-      source={{ uri: avatarUrl }}
+      source={{ uri: avatarThumbnailUrl }}
       style={{ width: 80, height: 80, borderRadius: 40 }}
       resizeMode="cover"
     />
