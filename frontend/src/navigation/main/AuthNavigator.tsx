@@ -25,6 +25,7 @@ import DevicesScreen from '../../screens/profile/components/DevicesScreen';
 import HelpSupportScreen from '../../screens/profile/components/HelpSupportScreen';
 import ReportProblemScreen from '../../screens/profile/components/ReportProblemScreen';
 import LegalPolicyScreen from '../../screens/profile/components/LegalPolicyScreen';
+import AvatarCustomizeScreen from '../../screens/profile/components/AvatarCustomizeScreen';
 
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');
@@ -260,6 +261,7 @@ const AuthNavigator = () => {
       <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
 <Stack.Screen name="ReportProblem" component={ReportProblemScreen} />
 <Stack.Screen name="LegalPolicy" component={LegalPolicyScreen} />
+<Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
     </Stack.Navigator>
   );
 };

@@ -51,6 +51,8 @@ router.get("/login-activity", isAuthenticatedUser, getLoginActivity);
 
 router.get('/me/avatar', isAuthenticatedUser, getAvatarConfig);
 router.post('/me/avatar', isAuthenticatedUser, updateAvatarConfig);
+router.get('/me/avatar-url', isAuthenticatedUser, getAvatarUrl);
+router.post('/me/avatar-url', isAuthenticatedUser, updateAvatarUrl);
 
 
 export default router;

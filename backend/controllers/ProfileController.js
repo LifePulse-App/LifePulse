@@ -268,3 +268,43 @@ export const updateAvatarConfig = catchAsyncErrors(async (req, res, next) => {
     avatarConfig: user.avatarConfig,
   });
 });
+
+// GET /api/me/avatar-url
+export const getAvatarUrl = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select('avatarUrl avatarMetadata');
+  if (!user) return next(new ErrorHandler('User not found', 404));
+
+  res.status(200).json({
+    success: true,
+    avatarUrl: user.avatarUrl || '',
+    avatarMetadata: user.avatarMetadata || {},
+  });
+});
+
+// POST /api/me/avatar-url
+export const updateAvatarUrl = catchAsyncErrors(async (req, res, next) => {
+  const { avatarUrl, avatarMetadata } = req.body;
+
+  if (!avatarUrl) {
+    return next(new ErrorHandler('avatarUrl is required', 400));
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        avatarUrl,
+        ...(avatarMetadata ? { avatarMetadata } : {}),
+      },
+    },
+    { new: true, runValidators: false },
+  ).select('avatarUrl avatarMetadata');
+
+  if (!user) return next(new ErrorHandler('User not found', 404));
+
+  res.status(200).json({
+    success: true,
+    avatarUrl: user.avatarUrl,
+    avatarMetadata: user.avatarMetadata || {},
+  });
+});

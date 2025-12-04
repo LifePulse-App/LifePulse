@@ -72,6 +72,8 @@ const avatarConfigSchema = new mongoose.Schema(
   { _id: false },
 );
 
+
+
 const userSchema = new mongoose.Schema(
   {
     name: {
@@ -203,6 +205,15 @@ resetPasswordVerified: {
         outfit: 'outfit_casual_1',
         backgroundColor: '#E5E7EB',
       }),
+    },
+    avatarUrl: {
+      type: String,
+      default: '',
+    }, // Ready Player Me avatar URL (e.g. https://models.readyplayer.me/xxxx.glb)
+    
+    avatarMetadata: {
+      type: Object,
+      default: {},
     },
 // In your User schema
 resetPasswordCode: String,

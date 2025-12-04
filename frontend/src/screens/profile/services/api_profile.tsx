@@ -155,6 +155,14 @@ const getLoginActivity = async () => {
   }
 };
 
+const getAvatar = async () => {
+  return client.get('/me/avatar');
+};
+
+const updateAvatar = async (config: any) => {
+  return client.post('/me/avatar', config);
+};
+
 export default {
   getProfile,
   editProfile,
@@ -170,4 +178,6 @@ export default {
   updateAppSettings,
   deleteAccount,
   getLoginActivity,
+  getAvatar,
+  updateAvatar
 };

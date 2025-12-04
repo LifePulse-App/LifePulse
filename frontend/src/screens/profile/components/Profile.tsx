@@ -8,6 +8,7 @@ import AuthContext from '../../../auth/user/UserContext';
 import { logout } from "../../../navigation/main/RootNavigation";
 import profileApi from "../services/api_profile"; // Use your actual path!
 import { useFocusEffect } from "@react-navigation/native";
+import BitmojiFace from "../../../shared/components/BitmojiFace";
 
 // --- Glassy Confirm Modal Component ---
 const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }: any) => {
@@ -551,16 +552,19 @@ const ProfileScreen = ({ navigation }: any) => {
       <ScrollView style={styles.overlay}>
         <View style={styles.mainCard}>
           <View style={styles.avatarWrap}>
-            <View style={styles.avatarCircle}>
-              {user?.bitmoji ? (
-                <BitmojiFace data={user.bitmoji} previewOnly />
-              ) : (
-                <Icon name="account-circle-outline" size={70} color="#6366f1" />
-              )}
-              <TouchableOpacity style={styles.editBtn} onPress={() => setActiveModal("EditProfile")}>
-                <Icon name="pencil" size={17} color="#fff" />
-              </TouchableOpacity>
-            </View>
+          <View style={styles.avatarCircle}>
+  {profile?.avatarConfig ? (
+    <BitmojiFace config={profile.avatarConfig} size={80} />
+  ) : (
+    <Icon name="account-circle-outline" size={70} color="#6366f1" />
+  )}
+  <TouchableOpacity
+    style={styles.editBtn}
+    onPress={() => navigation.navigate('AvatarCustomize')}
+  >
+    <Icon name="pencil" size={17} color="#fff" />
+  </TouchableOpacity>
+</View>
             <Text style={styles.userName}>{profile?.name}</Text>
             <Text style={styles.userUsername}>@{profile?.username}</Text>
           </View>
