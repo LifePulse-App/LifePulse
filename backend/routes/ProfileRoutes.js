@@ -15,7 +15,9 @@ import {
   changePasswordWithOtp,
   requestPasswordChangeOtp,
   getAvatarConfig,
-  updateAvatarConfig
+  updateAvatarConfig,
+  getAvatarUrl,
+  updateAvatarUrl
 } from "../controllers/ProfileController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 

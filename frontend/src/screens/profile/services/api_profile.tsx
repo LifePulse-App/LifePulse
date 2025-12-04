@@ -163,6 +163,14 @@ const updateAvatar = async (config: any) => {
   return client.post('/me/avatar', config);
 };
 
+const getAvatarUrl = async () => {
+  return client.get('/me/avatar-url');
+};
+
+const updateAvatarUrl = async (avatarUrl: string, avatarMetadata?: any) => {
+  return client.post('/me/avatar-url', { avatarUrl, avatarMetadata });
+};
+
 export default {
   getProfile,
   editProfile,
@@ -179,5 +187,7 @@ export default {
   deleteAccount,
   getLoginActivity,
   getAvatar,
-  updateAvatar
+  updateAvatar,
+  getAvatarUrl,
+  updateAvatarUrl
 };
