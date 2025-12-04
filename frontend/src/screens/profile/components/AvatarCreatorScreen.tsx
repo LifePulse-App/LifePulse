@@ -8,36 +8,65 @@ import LoaderKitView from 'react-native-loader-kit';
 
 import profileApi from '../services/api_profile';
 
-// TODO: Replace with your actual Ready Player Me URL
-const RPM_URL = 'https://your-subdomain.readyplayer.me/avatar?frameApi';
+const RPM_URL = 'https://streaksphere.readyplayer.me/avatar?frameApi';
 
 const AvatarCreatorScreen = () => {
   const navigation = useNavigation<any>();
-  const webViewRef = useRef(null);
+  const webViewRef = useRef<WebView | null>(null);
   const [loading, setLoading] = useState(true);
 
   const handleMessage = async (event: WebViewMessageEvent) => {
+    const raw = event.nativeEvent.data;
+    let parsed: any = null;
+
     try {
-      const data = JSON.parse(event.nativeEvent.data);
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = null;
+    }
 
-      // Ready Player Me sends various events; we care about avatar export
-      // See: https://docs.readyplayer.me/ for exact event format
-      if (data.eventName === 'v1.avatar.exported') {
-        const avatarUrl = data.data?.url || data.data?.avatarUrl;
+    // CASE 1: plain URL string (or quoted URL)
+    if (typeof parsed === 'string' || (typeof raw === 'string' && raw.startsWith('http'))) {
+      const url = typeof parsed === 'string' ? parsed : raw;
+      const cleanedUrl = url.replace(/^"|"$/g, '');
 
-        if (avatarUrl) {
-          // Save avatarUrl to backend
-          try {
-            await profileApi.updateAvatarUrl(avatarUrl, data.data || {});
-          } catch {
-            // handle error (toast etc.)
-          } finally {
-            navigation.goBack();
-          }
-        }
+      try {
+        await profileApi.updateAvatarUrl(cleanedUrl);
+      } catch {
+        // handle error (toast, etc.)
+      } finally {
+        navigation.goBack();
       }
-    } catch (e) {
-      // ignore malformed messages
+      return;
+    }
+
+    // CASE 2: structured event
+    const data = parsed;
+    if (!data || typeof data !== 'object') return;
+
+    if (data.source && data.source !== 'readyplayerme') return;
+
+    switch (data.eventName) {
+      case 'v1.frame.ready':
+        // Frame ready – could send queries if needed
+        break;
+
+      case 'v1.avatar.exported': {
+        const avatarUrl = data.data?.url;
+        if (!avatarUrl) return;
+
+        try {
+          await profileApi.updateAvatarUrl(avatarUrl, data.data || {});
+        } catch {
+          // handle error
+        } finally {
+          navigation.goBack();
+        }
+        break;
+      }
+
+      default:
+        break;
     }
   };
 

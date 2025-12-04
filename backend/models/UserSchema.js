@@ -215,6 +215,18 @@ resetPasswordVerified: {
       type: Object,
       default: {},
     },
+    avatarModelUrl: {
+      type: String,
+      default: '',
+    },
+    avatarThumbnailUrl: {
+      type: String,
+      default: '',
+    },
+    avatarMetadata: {
+      type: Object,
+      default: {},
+    },
 // In your User schema
 resetPasswordCode: String,
 resetPasswordCodeExpire: Date,

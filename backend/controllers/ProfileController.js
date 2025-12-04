@@ -5,6 +5,33 @@ import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import ErrorHandler from "../utils/errorHandler.js";
 import { sendVerificationEmail } from "./OtpController.js";
 
+// Helper: extract avatarId from a models.readyplayer.me GLB URL
+const extractAvatarId = (url) => {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.includes('models.readyplayer.me')) return null;
+    const parts = u.pathname.split('/');
+    const last = parts[parts.length - 1]; // e.g. "693...ead.glb"
+    const id = last.replace('.glb', '').replace('.json', '').replace('.png', '').replace('.jpg', '');
+    return id || null;
+  } catch {
+    return null;
+  }
+};
+
+// Helper: build 2D render url for PNG
+const buildAvatarThumbnailUrl = (modelUrl) => {
+  const avatarId = extractAvatarId(modelUrl);
+  if (!avatarId) return '';
+  // Tune params as you like
+  const size = 512;
+  const camera = 'portrait'; // 'portrait' | 'fullbody' | 'fit'
+  const expression = 'happy'; // 'happy' | 'lol' | ...
+  const pose = 'relaxed';     // 'power-stance' | 'thumbs-up' | ...
+
+  return `https://models.readyplayer.me/${avatarId}.png?size=${size}&camera=${camera}&expression=${expression}&pose=${pose}`;
+};
+
 // Get profile
 export const getProfile = catchAsyncErrors(async (req, res, next) => {
   const user = await User.findById(req.user._id)
@@ -271,12 +298,15 @@ export const updateAvatarConfig = catchAsyncErrors(async (req, res, next) => {
 
 // GET /api/me/avatar-url
 export const getAvatarUrl = catchAsyncErrors(async (req, res, next) => {
-  const user = await User.findById(req.user._id).select('avatarUrl avatarMetadata');
+  const user = await User.findById(req.user._id).select(
+    'avatarModelUrl avatarThumbnailUrl avatarMetadata',
+  );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
   res.status(200).json({
     success: true,
-    avatarUrl: user.avatarUrl || '',
+    avatarModelUrl: user.avatarModelUrl || '',
+    avatarThumbnailUrl: user.avatarThumbnailUrl || '',
     avatarMetadata: user.avatarMetadata || {},
   });
 });
@@ -284,27 +314,30 @@ export const getAvatarUrl = catchAsyncErrors(async (req, res, next) => {
 // POST /api/me/avatar-url
 export const updateAvatarUrl = catchAsyncErrors(async (req, res, next) => {
   const { avatarUrl, avatarMetadata } = req.body;
-
   if (!avatarUrl) {
     return next(new ErrorHandler('avatarUrl is required', 400));
   }
+
+  const thumbnailUrl = buildAvatarThumbnailUrl(avatarUrl);
 
   const user = await User.findByIdAndUpdate(
     req.user._id,
     {
       $set: {
-        avatarUrl,
+        avatarModelUrl: avatarUrl,
+        avatarThumbnailUrl: thumbnailUrl,
         ...(avatarMetadata ? { avatarMetadata } : {}),
       },
     },
     { new: true, runValidators: false },
-  ).select('avatarUrl avatarMetadata');
+  ).select('avatarModelUrl avatarThumbnailUrl avatarMetadata');
 
   if (!user) return next(new ErrorHandler('User not found', 404));
 
   res.status(200).json({
     success: true,
-    avatarUrl: user.avatarUrl,
-    avatarMetadata: user.avatarMetadata || {},
+    avatarModelUrl: user.avatarModelUrl,
+    avatarThumbnailUrl: user.avatarThumbnailUrl,
+    avatarMetadata: user.avatarMetadata,
   });
 });

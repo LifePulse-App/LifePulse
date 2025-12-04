@@ -156,19 +156,19 @@ const getLoginActivity = async () => {
 };
 
 const getAvatar = async () => {
-  return client.get('/me/avatar');
+  return client.get('/profile/me/avatar');
 };
 
 const updateAvatar = async (config: any) => {
-  return client.post('/me/avatar', config);
+  return client.post('/profile/me/avatar', config);
 };
 
 const getAvatarUrl = async () => {
-  return client.get('/me/avatar-url');
+  return client.get('/profile/me/avatar-url');
 };
 
 const updateAvatarUrl = async (avatarUrl: string, avatarMetadata?: any) => {
-  return client.post('/me/avatar-url', { avatarUrl, avatarMetadata });
+  return client.post('/profile/me/avatar-url', { avatarUrl, avatarMetadata });
 };
 
 export default {
