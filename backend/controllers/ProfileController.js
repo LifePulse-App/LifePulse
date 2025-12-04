@@ -24,7 +24,7 @@ const buildAvatarThumbnailUrl = (modelUrl) => {
   const avatarId = extractAvatarId(modelUrl);
   if (!avatarId) return '';
   // Tune params as you like
-  const size = 256;
+  const size = 1024;
   const camera = 'portrait'; // 'portrait' | 'fullbody' | 'fit'
   const expression = 'happy'; // 'happy' | 'lol' | ...
   const pose = 'relaxed';     // 'power-stance' | 'thumbs-up' | ...
