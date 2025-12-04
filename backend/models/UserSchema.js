@@ -8,13 +8,21 @@ const streakSchema = new mongoose.Schema({
   lastUpdated: { type: Date, default: null },
 });
 
-const deviceInfoSchema = new mongoose.Schema({
-  deviceId: { type: String }, // unique per device
-  deviceName: { type: String },
-  deviceModel: { type: String },
-  deviceBrand: { type: String },
-  lastLogin: { type: Date, default: Date.now }
-}, { _id: false });
+const deviceInfoSchema = new mongoose.Schema(
+  {
+    deviceId: { type: String }, // unique per device
+    deviceName: { type: String },
+    deviceModel: { type: String },
+    deviceBrand: { type: String },
+    lastLogin: { type: Date, default: Date.now },
+    location: {
+      city: { type: String },
+      country: { type: String },
+      ip: { type: String },
+    },
+  },
+  { _id: false }
+);
 
 // Notifications: pause chat/streak/Jabits reminders
 const notificationSchema = new mongoose.Schema({

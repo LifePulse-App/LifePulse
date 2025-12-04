@@ -10,8 +10,50 @@ import appleSignin from "apple-signin-auth";
 import { authenticator } from "otplib";
 import QRCode from "qrcode";
 import { decryptTOTPSecret, encryptTOTPSecret } from "../utils/crypto2fa.js";
+import { lookupIpLocation } from "../utils/geoip.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// 🔹 Helper: register/update device info with IP geo location
+const registerDeviceWithLocation = async ({
+  user,
+  deviceId,
+  deviceName,
+  deviceModel,
+  deviceBrand,
+  req,
+}) => {
+  if (!deviceId) return;
+
+  // Get IP from headers/socket
+  const forwarded = req.headers["x-forwarded-for"];
+  const ip = Array.isArray(forwarded)
+    ? forwarded[0]
+    : forwarded?.split(",")[0] || req.socket.remoteAddress || "";
+
+  const location = await lookupIpLocation(ip); // may be null
+  const now = new Date();
+
+  let device = user.deviceInfo.find((d) => d.deviceId === deviceId);
+  if (device) {
+    device.deviceName = deviceName || device.deviceName;
+    device.deviceModel = deviceModel || device.deviceModel;
+    device.deviceBrand = deviceBrand || device.deviceBrand;
+    device.lastLogin = now;
+    if (location) device.location = location;
+  } else {
+    user.deviceInfo.push({
+      deviceId,
+      deviceName,
+      deviceModel,
+      deviceBrand,
+      lastLogin: now,
+      location: location || undefined,
+    });
+  }
+
+  await user.save({ validateBeforeSave: false });
+};
 
 const generateBackupCodes = () => {
   const codes = [];
@@ -201,7 +243,7 @@ export const login = catchAsyncErrors(async (req, res, next) => {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return next(new ErrorHandler("Invalid credentials", 401));
 
-    // If user has 2FA enabled → do not issue full tokens yet
+    // If user has 2FA enabled → do not issue full tokens yet, and DO NOT fully register device here.
     if (user.twoFactor?.enabled && user.twoFactor.secret) {
       const twoFaToken = Jwt.sign(
         { id: user._id, stage: "2fa", deviceId },
@@ -209,24 +251,8 @@ export const login = catchAsyncErrors(async (req, res, next) => {
         { expiresIn: "5m" }
       );
 
-      // Optionally register device now or after success; here we do it now
-      let device = user.deviceInfo.find((d) => d.deviceId === deviceId);
-      if (device) {
-        device.deviceName = deviceName;
-        device.deviceModel = deviceModel;
-        device.deviceBrand = deviceBrand;
-        device.lastLogin = Date.now();
-      } else {
-        user.deviceInfo.push({
-          deviceId,
-          deviceName,
-          deviceModel,
-          deviceBrand,
-          lastLogin: Date.now(),
-        });
-      }
-      await user.save({ validateBeforeSave: false });
-
+      // Optionally you can do a light device registration here (without IP),
+      // but since you want it after 2FA verification, we skip.
       return res.status(200).json({
         success: true,
         requires2fa: true,
@@ -234,25 +260,17 @@ export const login = catchAsyncErrors(async (req, res, next) => {
       });
     }
 
-    // No 2FA: normal login
+    // No 2FA: normal login → register device + location here
     const tokens = await sendTokens(res, user, deviceId);
 
-    let device = user.deviceInfo.find((d) => d.deviceId === deviceId);
-    if (device) {
-      device.deviceName = deviceName;
-      device.deviceModel = deviceModel;
-      device.deviceBrand = deviceBrand;
-      device.lastLogin = Date.now();
-    } else {
-      user.deviceInfo.push({
-        deviceId,
-        deviceName,
-        deviceModel,
-        deviceBrand,
-        lastLogin: Date.now(),
-      });
-    }
-    await user.save({ validateBeforeSave: false });
+    await registerDeviceWithLocation({
+      user,
+      deviceId,
+      deviceName,
+      deviceModel,
+      deviceBrand,
+      req,
+    });
 
     res.status(200).json({ success: true, requires2fa: false, ...tokens });
   } catch (err) {
@@ -681,6 +699,18 @@ export const verify2FALogin = catchAsyncErrors(async (req, res, next) => {
     user.twoFactor.lastVerified = new Date();
     await user.save({ validateBeforeSave: false });
 
+    // 🔹 After successful 2FA, register device + geo location
+    await registerDeviceWithLocation({
+      user,
+      deviceId: payload.deviceId || "Unknown",
+      // We don't have deviceName/model/brand in the 2FA request body,
+      // so we keep existing values or just store deviceId + location.
+      deviceName: undefined,
+      deviceModel: undefined,
+      deviceBrand: undefined,
+      req,
+    });
+
     const tokens = await sendTokens(res, user, payload.deviceId || "Unknown");
 
     return res.status(200).json({
@@ -755,5 +785,68 @@ export const disable2FA = catchAsyncErrors(async (req, res, next) => {
   } catch (err) {
     console.error(err);
     return next(new ErrorHandler("Failed to disable 2FA", 500));
+  }
+});
+
+// List devices
+export const getDevices = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).select("deviceInfo");
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    return res.status(200).json({
+      success: true,
+      devices: user.deviceInfo || [],
+    });
+  } catch (err) {
+    console.error(err);
+    return next(new ErrorHandler("Failed to fetch devices", 500));
+  }
+});
+
+// Logout specific device
+export const logoutDevice = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { deviceId } = req.body;
+
+    if (!deviceId) {
+      return next(new ErrorHandler("Device ID is required", 400));
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return next(new ErrorHandler("User not found", 404));
+    }
+
+    const prevCount = user.refreshTokens.length;
+
+    // Remove all refresh tokens for that device
+    user.refreshTokens = user.refreshTokens.filter(
+      (t) => t.deviceId !== deviceId
+    );
+
+    // Optionally also remove deviceInfo entry
+    user.deviceInfo = user.deviceInfo.filter(
+      (d) => d.deviceId !== deviceId
+    );
+
+    const removedCount = prevCount - user.refreshTokens.length;
+
+    await user.save({ validateBeforeSave: false });
+
+    return res.status(200).json({
+      success: true,
+      message:
+        removedCount > 0
+          ? "Device logged out successfully."
+          : "No active sessions for this device (already logged out).",
+      removedSessions: removedCount,
+    });
+  } catch (err) {
+    console.error(err);
+    return next(new ErrorHandler("Failed to logout device", 500));
   }
 });

@@ -167,6 +167,7 @@ const handleSubmit = async (values: { username: string; password: string }) => {
       navigation.navigate('TwoFA', {
         twoFaToken: data.twoFaToken,
         identifier: values.username,
+        pass: values.password
       });
       return;
     }

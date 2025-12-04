@@ -21,6 +21,7 @@ import api_Login from '../services/api_Login';
 type RouteParams = {
   twoFaToken: string;
   identifier?: string;
+  pass?: string;
 };
 
 const TwoFAScreen = () => {
@@ -29,7 +30,7 @@ const TwoFAScreen = () => {
   const navigation = useNavigation<any>();
   const authContext = useContext(AuthContext);
 
-  const { twoFaToken, identifier } = route.params as RouteParams;
+  const { twoFaToken, identifier, pass } = route.params as RouteParams;
 
   const [code, setCode] = useState('');
   const [backupCode, setBackupCode] = useState('');
@@ -75,6 +76,7 @@ const TwoFAScreen = () => {
       // attach identifier for UI if desired
       if (identifier) {
         user.UserName = identifier;
+        user.Password = pass
       }
 
       if (user.accessToken) {

@@ -13,7 +13,9 @@ import {
   verify2FALogin,
   enable2FAInit,
   enable2FAConfirm,
-  disable2FA
+  disable2FA,
+  getDevices,
+  logoutDevice
 } from "../controllers/AuthController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 import { verifyEmail } from "../controllers/OtpController.js";
@@ -35,5 +37,7 @@ router.post("/reset-password/verify-otp", resetPasswordVerifyOtp);
 router.post("/reset-password/verified-otp", resetPasswordSetNew);
 router.post("/logout", isAuthenticatedUser, logout);
 router.get("/me", isAuthenticatedUser, me);
+router.get("/devices", isAuthenticatedUser, getDevices);
+router.post("/devices/logout", isAuthenticatedUser, logoutDevice);
 
 export default router;

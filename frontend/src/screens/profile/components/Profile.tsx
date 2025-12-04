@@ -451,7 +451,7 @@ const settingSections = [
     title: "Privacy & Security",
     items: [
       { icon: "security", label: "Two-factor Authentication", route: "Enable2FA" },
-      { icon: "devices", label: "Authorized Devices", route: "Devices" },
+      { icon: "devices", label: "Devices in which you are logged in", route: "Devices" },
     ],
   },
   {
