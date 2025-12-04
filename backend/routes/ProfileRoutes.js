@@ -30,7 +30,6 @@ router.post("/change-password", isAuthenticatedUser, changePasswordWithOtp);
 router.post("/change-password-otp", isAuthenticatedUser, requestPasswordChangeOtp);
 router.post("/change-number", isAuthenticatedUser, changeNumber);
 
-// Linked Accounts and Secure Email Change
 router.get("/linked-accounts", isAuthenticatedUser, getLinkedAccounts); // View registered email
 router.post("/linked-accounts/request-email-change", isAuthenticatedUser, requestEmailChange); // Start email change (send OTP)
 router.post("/linked-accounts/verify-email-change", isAuthenticatedUser, verifyEmailChange); // Complete email change (verify OTP)
@@ -48,9 +47,7 @@ router.post("/app-settings", isAuthenticatedUser, updateAppSettings);
 // Account Delete
 router.delete("/delete", isAuthenticatedUser, deleteAccount);
 
-// Login Activity
 router.get("/login-activity", isAuthenticatedUser, getLoginActivity);
-
 router.get('/me/avatar', isAuthenticatedUser, getAvatarConfig);
 router.post('/me/avatar', isAuthenticatedUser, updateAvatarConfig);
 router.get('/me/avatar-url', isAuthenticatedUser, getAvatarUrl);
