@@ -21,6 +21,7 @@ import Friends from '../../screens/friends/components/Friends';
 import EditProfileScreen from '../../screens/profile/components/EditProfile';
 import TwoFAScreen from '../../screens/login/components/TwoFAScreen';
 import Enable2FAScreen from '../../screens/profile/components/Enable2FaScreen';
+import DevicesScreen from '../../screens/profile/components/DevicesScreen';
 
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');
@@ -252,6 +253,7 @@ const AuthNavigator = () => {
       <Stack.Screen name="Friends" component={Friends} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="Enable2FA" component={Enable2FAScreen} />
+      <Stack.Screen name="Devices" component={DevicesScreen} />
     </Stack.Navigator>
   );
 };

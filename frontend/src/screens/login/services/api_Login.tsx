@@ -183,6 +183,28 @@ const disable2fa = async (password: string, code?: string, backupCode?: string) 
   }
 };
 
+const getDevices = async () => {
+  try {
+    return await client.get<object>('/auth/devices');
+  } catch (error: any) {
+    if (!error.response) {
+      throw new Error('Server is offline, try again later.');
+    }
+    throw error;
+  }
+};
+
+const logoutDevice = async (deviceId: string) => {
+  try {
+    return await client.post<object>('/auth/devices/logout', { deviceId });
+  } catch (error: any) {
+    if (!error.response) {
+      throw new Error('Server is offline, try again later.');
+    }
+    throw error;
+  }
+};
+
 // GetProfile API
 const GetProfile = () =>
   client.get<DashboardResponse>('/auth/me');
@@ -200,5 +222,7 @@ export default {
   init2fa,
   confirm2fa,
   verify2faLogin,
-  disable2fa
+  disable2fa,
+  getDevices,
+  logoutDevice
 };
