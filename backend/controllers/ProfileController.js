@@ -29,7 +29,7 @@ const buildAvatarThumbnailUrl = (modelUrl) => {
   const expression = 'happy'; // 'happy' | 'lol' | ...
   const pose = 'relaxed';     // 'power-stance' | 'thumbs-up' | ...
 
-  return `https://models.readyplayer.me/${avatarId}.png?size=${size}&camera=${camera}&expression=${expression}&pose=${pose}`;
+  return `https://models.readyplayer.me/${avatarId}.png?size=${size}&camera=${camera}`;
 };
 
 // Get profile
