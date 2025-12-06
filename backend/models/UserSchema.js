@@ -128,6 +128,24 @@ const userSchema = new mongoose.Schema(
     },
     xp: { type: Number, default: 0 },
     streak: { type: streakSchema, default: () => ({}) },
+    // 🔥 NEW: monthly leaderboard XP (resets each month)
+    monthlyXp: { type: Number, default: 0 },
+
+    // 🔥 NEW: lifetime XP for permanent leaderboard
+    totalXp: { type: Number, default: 0 },
+
+    // 🔥 NEW: lifetime level (you can compute from totalXp or manage separately)
+    level: { type: Number, default: 1 },
+
+    // 🔥 NEW: country / city for city/country leaderboards
+    country: { type: String, default: "" },
+    city: { type: String, default: "" },
+
+    // 🔥 NEW: restrict changing country/city for 30 days
+    locationLockUntil: { type: Date, default: null },
+
+    // 🔥 NEW: monthly reward currency balance (for redemption store)
+    rewardBalance: { type: Number, default: 0 },
     deviceInfo: [deviceInfoSchema], // array of devices
     notifications: notificationSchema,
     twoFactor: { type: twoFactorSchema, default: () => ({}) },

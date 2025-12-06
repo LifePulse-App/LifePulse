@@ -341,3 +341,32 @@ export const updateAvatarUrl = catchAsyncErrors(async (req, res, next) => {
     avatarMetadata: user.avatarMetadata,
   });
 });
+
+// POST /api/me/location
+export const updateLocation = catchAsyncErrors(async (req, res, next) => {
+  const { country, city } = req.body;
+  if (!country) {
+    return next(new ErrorHandler('Country is required', 400));
+  }
+
+  const user = await User.findById(req.user._id).select('country city locationLockUntil');
+  if (!user) return next(new ErrorHandler('User not found', 404));
+
+  const now = new Date();
+  if (user.locationLockUntil && user.locationLockUntil > now) {
+    const daysLeft = Math.ceil((user.locationLockUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    return next(new ErrorHandler(`You can change your location again in ${daysLeft} day(s).`, 403));
+  }
+
+  user.country = country;
+  user.city = city || '';
+  user.locationLockUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    country: user.country,
+    city: user.city,
+    locationLockUntil: user.locationLockUntil,
+  });
+});

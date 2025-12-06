@@ -124,9 +124,9 @@ const HABIT_XP = {
 export const recalculateXp = async (userId) => {
   const objectId = new mongoose.Types.ObjectId(userId);
 
+  // ----- TOTAL XP -----
   let totalXp = 0;
 
-  // 1) XP from proofs + habits
   const verifiedProofs = await Proof.find({
     user: objectId,
     verified: true,
@@ -143,9 +143,9 @@ export const recalculateXp = async (userId) => {
     }
   }
 
-  // 2) XP from mood, once per calendar day after midnight
+  // Mood XP (one per calendar day)
   const moodDayAgg = await Mood.aggregate([
-    { $match: { user: objectId }},
+    { $match: { user: objectId } },
     {
       $group: {
         _id: {
@@ -153,19 +153,62 @@ export const recalculateXp = async (userId) => {
           month: { $month: "$createdAt" },
           day: { $dayOfMonth: "$createdAt" },
         },
-        firstMood: { $min: "$createdAt" }
-      }
-    }
+        firstMood: { $min: "$createdAt" },
+      },
+    },
   ]);
+  totalXp += moodDayAgg.length * 10;
 
-  // Each unique (year, month, day) is a calendar day where user set a mood
-  const uniqueMoodDays = moodDayAgg.length;
-  totalXp += uniqueMoodDays * 10;
+  // ----- MONTHLY XP (same data scope) -----
+  const startOfMonth = new Date();
+  startOfMonth.setUTCDate(1);
+  startOfMonth.setUTCHours(0, 0, 0, 0);
 
-  // 3) Save total XP to User
+  let monthlyXp = 0;
+
+  const verifiedProofsMonth = await Proof.find({
+    user: objectId,
+    verified: true,
+    createdAt: { $gte: startOfMonth },
+  }).populate("habit");
+
+  for (const proof of verifiedProofsMonth) {
+    const habit = proof.habit;
+    if (!habit) continue;
+    const type = (habit.habitName || "").trim().toLowerCase();
+    if (HABIT_XP[type]) {
+      monthlyXp += HABIT_XP[type].base + HABIT_XP[type].verified;
+    } else {
+      monthlyXp += 10;
+    }
+  }
+
+  const moodDayAggMonth = await Mood.aggregate([
+    { $match: { user: objectId, createdAt: { $gte: startOfMonth } } },
+    {
+      $group: {
+        _id: {
+          year: { $year: "$createdAt" },
+          month: { $month: "$createdAt" },
+          day: { $dayOfMonth: "$createdAt" },
+        },
+        firstMood: { $min: "$createdAt" },
+      },
+    },
+  ]);
+  monthlyXp += moodDayAggMonth.length * 10;
+
+  // ----- Save to User -----
   const user = await User.findById(objectId);
   if (user) {
-    user.xp = totalXp;
+    user.totalXp = totalXp;
+    user.monthlyXp = monthlyXp;
+    user.xp = totalXp; // legacy field if you still use it
+
+    const { level, title } = calculateXpProgress(totalXp);
+    user.level = level;
+    user.currentTitle = title;
+
     await user.save();
   }
 

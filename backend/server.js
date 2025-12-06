@@ -8,6 +8,7 @@ import nodemailer from "nodemailer"
 import errorMiddleware from "./utils/errorMiddleware.js"
 import https from 'https';
 import fs from 'fs';
+import cron from 'node-cron';
 
 const app = express();
 // Load environment based on NODE_ENV
@@ -42,7 +43,7 @@ import MoodRoutes from "./routes/MoodRoutes.js"
 import ProofRoutes from "./routes/ProofRoutes.js"
 import SocialRoutes from "./routes/SocialRoutes.js"
 import ProfileRoutes from "./routes/ProfileRoutes.js"
-import { log } from 'console';
+import LeaderboardRoutes from "./routes/LeaderboardRoutes.js"
 
 // Middlewares
 app.use(cookieParser());
@@ -56,6 +57,7 @@ app.use("/api/moods", MoodRoutes);
 app.use("/api/proofs", ProofRoutes);
 app.use("/api/social", SocialRoutes);
 app.use("/api/profile", ProfileRoutes);
+app.use("/api/leaderboard", LeaderboardRoutes);
 app.use(errorMiddleware)
 
 
@@ -78,6 +80,20 @@ app.get('/health', (req, res) => {
 // const server = https.createServer(sslOptions, app).listen(PORT, '0.0.0.0', () => {
 //   console.log(`Server running on https://0.0.0.0:${PORT} in ${ENV} mode`);
 // });
+
+import { runMonthlyReset } from './helpers/monthlyReset.js'; // adjust path
+
+cron.schedule('0 0 0 1 * *', async () => {
+  console.log('[cron] Monthly reset started (PKT midnight)');
+  try {
+    await runMonthlyReset();
+    console.log('[cron] Monthly reset finished');
+  } catch (err) {
+    console.error('[cron] Monthly reset failed:', err);
+  }
+}, {
+  timezone: 'UTC',
+});
 
 // Graceful shutdown handlers
 process.on('unhandledRejection', (err) => {

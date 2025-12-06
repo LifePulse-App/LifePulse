@@ -17,7 +17,8 @@ import {
   getAvatarConfig,
   updateAvatarConfig,
   getAvatarUrl,
-  updateAvatarUrl
+  updateAvatarUrl,
+  updateLocation
 } from "../controllers/ProfileController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 
@@ -52,6 +53,7 @@ router.get('/me/avatar', isAuthenticatedUser, getAvatarConfig);
 router.post('/me/avatar', isAuthenticatedUser, updateAvatarConfig);
 router.get('/me/avatar-url', isAuthenticatedUser, getAvatarUrl);
 router.post('/me/avatar-url', isAuthenticatedUser, updateAvatarUrl);
+router.post('/me/location', isAuthenticatedUser, updateLocation);
 
 
 export default router;

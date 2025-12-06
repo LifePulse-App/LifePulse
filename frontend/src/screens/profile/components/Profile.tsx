@@ -563,13 +563,15 @@ const ProfileScreen = ({ navigation }: any) => {
         <View style={styles.mainCard}>
           <View style={styles.avatarWrap}>
 
-<View style={styles.avatarCircle}>
+          <View style={styles.avatarCircle}>
   {avatarThumbnailUrl ? (
-    <Image
-      source={{ uri: avatarThumbnailUrl }}
-      style={{ width: 80, height: 80, borderRadius: 40 }}
-      resizeMode="cover"
-    />
+    <View style={styles.avatarMask}>
+      <Image
+        source={{ uri: avatarThumbnailUrl }}
+        style={styles.avatarImageZoomed}
+        resizeMode="cover"
+      />
+    </View>
   ) : (
     <Icon name="account-circle-outline" size={70} color="#6366f1" />
   )}
@@ -683,7 +685,7 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, paddingTop: 30, paddingHorizontal: 18 },
   mainCard: { backgroundColor: "rgba(15,23,42,0.65)", borderRadius: 22, padding: 20, marginBottom: 20, alignItems: "center" },
   avatarWrap: { marginBottom: 14, alignItems: "center" },
-  avatarCircle: { width: 95, height: 95, borderRadius: 48, backgroundColor: "#F3F4F6", justifyContent: "center", alignItems: "center" },
+  avatarCircles: { width: 95, height: 95, borderRadius: 48, backgroundColor: "#F3F4F6", justifyContent: "center", alignItems: "center" },
   editBtn: { position: "absolute", right: 3, bottom: 3, backgroundColor: "#6366f1", borderRadius: 14, padding: 7, zIndex: 999 },
   userName: { color: "#F9FAFB", fontWeight: "bold", fontSize: 18, marginTop: 6 },
   userUsername: { color: "#9CA3AF", fontSize: 13 },
@@ -709,6 +711,37 @@ const styles = StyleSheet.create({
   },
   pageTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "700", color: "#F9FAFB" },
   rightSpacer: { width: 40, height: 40 },
+  avatarImage: {
+    width: 95,
+    height: 95,
+    borderRadius: 48,
+  },
+  avatarCircle: {
+    width: 95,
+    height: 95,
+    borderRadius: 48,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  
+  // circular mask
+  avatarMask: {
+    width: 95,
+    height: 95,
+    borderRadius: 48,
+    overflow: 'hidden',       // critical: crops the image to the circle
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  // zoomed face image
+  avatarImageZoomed: {
+    width: 110,               // > 95 so it zooms in
+    height: 110,
+    borderRadius: 65,
+    // Move image up so face is centered; tweak these two lines to taste:         // negative to push face up
+  },
 });
 
 export default ProfileScreen;
