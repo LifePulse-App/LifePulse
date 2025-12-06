@@ -31,6 +31,7 @@
     "@rneui/themed": "^4.0.0-rc.8",
     "apisauce": "^3.2.0",
     "axios": "^1.10.0",
+    "country-state-city": "^3.2.1",
     "dayjs": "^1.11.13",
     "expo-linear-gradient": "^15.0.7",
     "formik": "^2.4.6",

@@ -370,3 +370,28 @@ export const updateLocation = catchAsyncErrors(async (req, res, next) => {
     locationLockUntil: user.locationLockUntil,
   });
 });
+
+// controllers/locationController.js (add this alongside updateLocation)
+export const getLocationLockStatus = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select('locationLockUntil country city');
+  if (!user) return next(new ErrorHandler('User not found', 404));
+
+  const now = new Date();
+  const lockUntil = user.locationLockUntil;
+  let locked = false;
+  let daysLeft = 0;
+
+  if (lockUntil && lockUntil > now) {
+    locked = true;
+    daysLeft = Math.ceil((lockUntil.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  res.status(200).json({
+    success: true,
+    locked,
+    daysLeft,
+    locationLockUntil: lockUntil,
+    country: user.country,
+    city: user.city,
+  });
+});
