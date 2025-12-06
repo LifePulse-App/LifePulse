@@ -9,19 +9,80 @@ const buildScopeFilter = (scope, user, query) => {
     case 'country':
       return { country: query.country || user.country };
     case 'world':
+      return {};
+    case 'friends':
     default:
       return {};
   }
 };
 
-// GET /api/leaderboard/monthly?scope=world|country|city&country=XX&city=YY
+// Friends = following + self. If you want mutuals, intersect followers/following here.
+const getFriendIds = (userDoc) => {
+  const ids = new Set();
+  ids.add(String(userDoc._id));
+  (userDoc.following || []).forEach((f) => {
+    if (f?.user) ids.add(String(f.user));
+  });
+  return Array.from(ids);
+};
+
+// MONTHLY
 export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => {
   const scope = req.query.scope || 'world';
   const user = await User.findById(req.user._id).select(
-    'monthlyXp totalXp level currentTitle country city username name avatarThumbnailUrl'
+    'monthlyXp totalXp level currentTitle country city username name avatarThumbnailUrl following'
   );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
+  if (scope === 'friends') {
+    const friendIds = getFriendIds(user);
+
+    const topPlayers = await User.find(
+      { _id: { $in: friendIds } },
+      'username name monthlyXp level currentTitle country city avatarThumbnailUrl'
+    )
+      .sort({ monthlyXp: -1, _id: 1 })
+      .limit(100)
+      .lean();
+
+    const higherCount = await User.countDocuments({
+      _id: { $in: friendIds },
+      monthlyXp: { $gt: user.monthlyXp },
+    });
+    const userRank = user.monthlyXp > 0 ? higherCount + 1 : null;
+
+    return res.status(200).json({
+      success: true,
+      scope,
+      filter: { friends: friendIds.length },
+      leaderboard: topPlayers.map((u, idx) => ({
+        rank: idx + 1,
+        userId: u._id,
+        username: u.username,
+        name: u.name,
+        monthlyXp: u.monthlyXp,
+        level: u.level,
+        title: u.currentTitle,
+        country: u.country,
+        city: u.city,
+        avatarThumbnailUrl: u.avatarThumbnailUrl,
+      })),
+      currentUser: {
+        userId: user._id,
+        username: user.username,
+        name: user.name,
+        monthlyXp: user.monthlyXp,
+        rank: userRank,
+        level: user.level,
+        title: user.currentTitle,
+        country: user.country,
+        city: user.city,
+        avatarThumbnailUrl: user.avatarThumbnailUrl,
+      },
+    });
+  }
+
+  // World / Country / City
   const scopeFilter = buildScopeFilter(scope, user, req.query);
 
   const topPlayers = await User.find(
@@ -69,14 +130,63 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
   });
 });
 
-// Optional permanent leaderboard (totalXp)
+// PERMANENT
 export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) => {
   const scope = req.query.scope || 'world';
   const user = await User.findById(req.user._id).select(
-    'totalXp level currentTitle country city username name avatarThumbnailUrl'
+    'totalXp level currentTitle country city username name avatarThumbnailUrl following'
   );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
+  if (scope === 'friends') {
+    const friendIds = getFriendIds(user);
+
+    const topPlayers = await User.find(
+      { _id: { $in: friendIds } },
+      'username name totalXp level currentTitle country city avatarThumbnailUrl'
+    )
+      .sort({ totalXp: -1, _id: 1 })
+      .limit(100)
+      .lean();
+
+    const higherCount = await User.countDocuments({
+      _id: { $in: friendIds },
+      totalXp: { $gt: user.totalXp },
+    });
+    const userRank = user.totalXp > 0 ? higherCount + 1 : null;
+
+    return res.status(200).json({
+      success: true,
+      scope,
+      filter: { friends: friendIds.length },
+      leaderboard: topPlayers.map((u, idx) => ({
+        rank: idx + 1,
+        userId: u._id,
+        username: u.username,
+        name: u.name,
+        xp: u.totalXp,
+        level: u.level,
+        title: u.currentTitle,
+        country: u.country,
+        city: u.city,
+        avatarThumbnailUrl: u.avatarThumbnailUrl,
+      })),
+      currentUser: {
+        userId: user._id,
+        username: user.username,
+        name: user.name,
+        xp: user.totalXp,
+        rank: userRank,
+        level: user.level,
+        title: user.currentTitle,
+        country: user.country,
+        city: user.city,
+        avatarThumbnailUrl: user.avatarThumbnailUrl,
+      },
+    });
+  }
+
+  // World / Country / City
   const scopeFilter = buildScopeFilter(scope, user, req.query);
 
   const topPlayers = await User.find(

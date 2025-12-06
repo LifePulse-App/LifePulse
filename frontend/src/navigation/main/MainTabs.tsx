@@ -3,7 +3,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Dashboard from '../../screens/dashboard/components/dashboard/Dashboard';
 import StudentList from '../../screens/student/components/studentlist/StudentList';
-import EmployeeList from '../../screens/employee/components/employee-list/EmployeeList';
+import EmployeeList from '../../screens/leaderboard/components/leaderboard/leaderboard';
 import UserList from '../../screens/user/components/UserList/UserList';
 import CustomBottomNav from '../../shared/components/LowNavBar';
 import ProofVisionCameraScreen from '../../screens/proof-camera/Camera';

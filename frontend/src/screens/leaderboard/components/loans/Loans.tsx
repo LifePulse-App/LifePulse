@@ -8,7 +8,7 @@ import styles from './Loansstyles';
 import AppScreen from '../../../../components/Layout/AppScreen/AppScreen';
 import AppText from '../../../../components/Layout/AppText/AppText';
 import AppActivityIndicator from '../../../../components/Layout/AppActivityIndicator/AppActivityIndicator';
-import api_Employee from '../../services/api_Employee';
+import api_Employee from '../../services/api_leaderboard';
 import { EmployeeLoanResponse } from '../../models/EmployeeLoanResponse';
 import colors from '../../../../shared/styling/lightModeColors';
 
