@@ -6,6 +6,7 @@ import {
   FlatList,
   ActivityIndicator,
   Platform,
+  Modal,
 } from "react-native";
 import { Text } from "@rneui/themed";
 import { useFocusEffect } from "@react-navigation/native";
@@ -16,7 +17,7 @@ import {
   getMonthlyLeaderboard,
   getPermanentLeaderboard,
   updateLocation,
-  getLocationLockStatus
+  getLocationLockStatus,
 } from "../../services/api_leaderboard";
 import MainLayout from "../../../../shared/components/MainLayout";
 
@@ -53,6 +54,16 @@ const LeaderboardScreen = () => {
     daysLeft: number;
     locationLockUntil: string | null;
   }>({ locked: false, daysLeft: 0, locationLockUntil: null });
+
+  // Confirmation modal
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  // Rules modal
+  const [showRules, setShowRules] = useState(false);
+
+  // Monthly reset countdown
+  const [timeLeft, setTimeLeft] = useState<string>("--:--:--");
+  const [daysLeftUntilReset, setDaysLeftUntilReset] = useState<number>(0);
 
   // Derived lock state
   const isLocationLocked = !!lockStatus.locked;
@@ -105,15 +116,12 @@ const LeaderboardScreen = () => {
     try {
       const res = await getLocationLockStatus();
       const payload = res.data;
-      console.log(payload);
-      
       setLockStatus({
         locked: !!payload.locked,
         daysLeft: payload.daysLeft ?? 0,
         locationLockUntil: payload.locationLockUntil || null,
       });
-    } catch (e) {
-      // silently ignore; fallback to unlocked
+    } catch {
       setLockStatus({ locked: false, daysLeft: 0, locationLockUntil: null });
     }
   }, []);
@@ -123,7 +131,6 @@ const LeaderboardScreen = () => {
     setErrorMsg(null);
     try {
       const api = tab === "monthly" ? getMonthlyLeaderboard : getPermanentLeaderboard;
-      // Rely on saved user location; no per-request filters
       const res = await api(scope);
       setData(res.data);
     } catch (e: any) {
@@ -138,7 +145,6 @@ const LeaderboardScreen = () => {
     useCallback(() => {
       setData(null);
       setErrorMsg(null);
-      // First get lock status, then leaderboard
       (async () => {
         await loadLockStatus();
         await load();
@@ -146,7 +152,33 @@ const LeaderboardScreen = () => {
     }, [load, loadLockStatus])
   );
 
-  const handleSaveLocation = async () => {
+  // Monthly reset countdown (UTC)
+  useEffect(() => {
+    if (tab !== "monthly") return;
+    const calc = () => {
+      const now = new Date();
+      const year = now.getUTCFullYear();
+      const month = now.getUTCMonth();
+      const nextReset = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0)); // 1st of next month 00:00 UTC
+      let diff = nextReset.getTime() - now.getTime();
+      if (diff < 0) diff = 0;
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const mins = Math.floor((diff / (1000 * 60)) % 60);
+      const secs = Math.floor((diff / 1000) % 60);
+
+      const pad = (n: number) => n.toString().padStart(2, "0");
+      setTimeLeft(`${pad(hours)}:${pad(mins)}:${pad(secs)} UTC`);
+      setDaysLeftUntilReset(days);
+    };
+
+    calc();
+    const id = setInterval(calc, 1000);
+    return () => clearInterval(id);
+  }, [tab]);
+
+  const handleSaveLocationConfirmed = async () => {
     if (isLocationLocked) {
       setErrorMsg(lockMessage || "Location change is locked.");
       return;
@@ -162,13 +194,26 @@ const LeaderboardScreen = () => {
         countryOptions.find((c) => c.value === selectedCountryCode)?.label || "";
       await updateLocation(countryName, selectedCity);
       setEditLocation(false);
+      setShowConfirm(false);
       await loadLockStatus();
-      await load(); // refresh leaderboard with new saved location
+      await load();
     } catch (e: any) {
       setErrorMsg(e?.response?.data?.message || e?.message || "Failed to update location");
     } finally {
       setSavingLocation(false);
     }
+  };
+
+  const onPressSave = () => {
+    if (isLocationLocked) {
+      setErrorMsg(lockMessage || "Location change is locked.");
+      return;
+    }
+    if (!selectedCountryCode) {
+      setErrorMsg("Please select a country.");
+      return;
+    }
+    setShowConfirm(true);
   };
 
   const renderRow = ({ item }: any) => (
@@ -202,7 +247,12 @@ const LeaderboardScreen = () => {
         <View style={styles.glowBottom} />
 
         <View style={styles.container}>
-          <Text style={styles.header}>Leaderboard</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.header}>Leaderboard</Text>
+            <TouchableOpacity onPress={() => setShowRules(true)} style={styles.infoBtn}>
+              <Icon name="information-outline" size={20} color="#E5E7EB" />
+            </TouchableOpacity>
+          </View>
 
           {/* Tabs */}
           <View style={styles.tabs}>
@@ -236,6 +286,14 @@ const LeaderboardScreen = () => {
             ))}
           </View>
 
+          {/* Monthly reset info */}
+          {tab === "monthly" && (
+            <View style={styles.resetCard}>
+              <Text style={styles.resetTitle}>Monthly reset timer (UTC 00:00)</Text>
+              <Text style={styles.resetSub}>{daysLeftUntilReset} day(s) left until reset</Text>
+            </View>
+          )}
+
           {/* Location setup / display */}
           <View style={styles.locationCard}>
             <View style={styles.locationHeaderRow}>
@@ -246,13 +304,10 @@ const LeaderboardScreen = () => {
                 <TouchableOpacity
                   onPress={() => {
                     if (isLocationLocked) return;
-                    prefillFromCurrentUser(); // ensure dropdowns default to current values
+                    prefillFromCurrentUser();
                     setEditLocation(true);
                   }}
-                  style={[
-                    styles.switchIconBtn,
-                    isLocationLocked && { opacity: 0.4 },
-                  ]}
+                  style={[styles.switchIconBtn, isLocationLocked && { opacity: 0.4 }]}
                   disabled={isLocationLocked}
                 >
                   <Icon name="swap-horizontal" size={18} color="#E5E7EB" />
@@ -266,9 +321,7 @@ const LeaderboardScreen = () => {
 
             {editLocation ? (
               <>
-                {isLocationLocked && (
-                  <Text style={styles.lockText}>{lockMessage}</Text>
-                )}
+                {isLocationLocked && <Text style={styles.lockText}>{lockMessage}</Text>}
 
                 {/* Country dropdown */}
                 <View style={styles.dropdownRow}>
@@ -326,12 +379,10 @@ const LeaderboardScreen = () => {
                     styles.applyBtn,
                     (savingLocation || !selectedCountryCode || isLocationLocked) && { opacity: 0.7 },
                   ]}
-                  onPress={handleSaveLocation}
+                  onPress={onPressSave}
                   disabled={savingLocation || !selectedCountryCode || isLocationLocked}
                 >
-                  <Text style={styles.applyText}>
-                    {savingLocation ? "Saving..." : "Save"}
-                  </Text>
+                  <Text style={styles.applyText}>{savingLocation ? "Saving..." : "Save"}</Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -386,6 +437,59 @@ const LeaderboardScreen = () => {
             />
           )}
         </View>
+
+        {/* Confirmation Modal */}
+        <Modal transparent visible={showConfirm} animationType="fade" onRequestClose={() => setShowConfirm(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Confirm Location Change</Text>
+              <Text style={styles.modalText}>
+                You won’t be able to change this for 30 days. Continue?
+              </Text>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalCancel]}
+                  onPress={() => setShowConfirm(false)}
+                  disabled={savingLocation}
+                >
+                  <Text style={styles.modalBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalConfirm]}
+                  onPress={handleSaveLocationConfirmed}
+                  disabled={savingLocation}
+                >
+                  <Text style={styles.modalBtnText}>Confirm</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Rules Modal */}
+        <Modal transparent visible={showRules} animationType="fade" onRequestClose={() => setShowRules(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Leaderboard Rules</Text>
+              <Text style={styles.modalText}>
+                • Monthly leaderboard resets at 00:00 UTC on the 1st of each month.{'\n'}
+                • Location changes are locked for 30 days after each update.{'\n'}
+                • Points shown are XP: Monthly XP (monthly tab) and Total XP (all-time tab).{'\n'}
+                • S Points will be rewarded on the basis 500 to 1st, 250 to 2nd & 100 to 3-100.{'\n'}
+                • S Points can be used in redeem store.{'\n'}
+                • Timer shown is based on UTC.
+              </Text>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalConfirm]}
+                  onPress={() => setShowRules(false)}
+                >
+                  <Text style={styles.modalBtnText}>Got it</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </MainLayout>
   );
@@ -413,7 +517,18 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(168, 85, 247, 0.35)",
   },
   container: { flex: 1, paddingTop: Platform.OS === "android" ? "3%" : "5%", paddingHorizontal: 16 },
-  header: { color: "#fff", fontSize: 20, fontWeight: "700", marginBottom: 12 },
+  headerRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
+  header: { color: "#fff", fontSize: 20, fontWeight: "700", marginRight: 8 },
+  infoBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
 
   tabs: { flexDirection: "row", marginBottom: 10 },
   tabBtn: {
@@ -428,6 +543,17 @@ const styles = StyleSheet.create({
   tabBtnActive: { backgroundColor: "#6366f1" },
   tabText: { color: "#cbd5e1", fontWeight: "700", fontSize: 15 },
   tabTextActive: { color: "#fff" },
+
+  resetCard: {
+    backgroundColor: "rgba(31, 41, 55, 0.8)",
+    borderColor: "rgba(148, 163, 184, 0.35)",
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 10,
+  },
+  resetTitle: { color: "#e5e7eb", fontWeight: "700", fontSize: 13, marginBottom: 6 },
+  resetSub: { color: "#cbd5e1", fontSize: 12, marginTop: 2 },
 
   scopes: { flexDirection: "row", flexWrap: "wrap", marginBottom: 12 },
   scopeBtn: {
@@ -533,6 +659,41 @@ const styles = StyleSheet.create({
   sub: { color: "#94a3b8", fontSize: 12 },
   xpLabel: { color: "#94a3b8", fontSize: 11 },
   xpValue: { color: "#fff", fontSize: 15, fontWeight: "700" },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  modalCard: {
+    width: "100%",
+    backgroundColor: "rgba(17, 24, 39, 0.9)",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.4)",
+  },
+  modalTitle: { color: "#fff", fontSize: 16, fontWeight: "800", marginBottom: 8 },
+  modalText: { color: "#cbd5e1", fontSize: 14, marginBottom: 16 },
+  modalButtons: { flexDirection: "row", justifyContent: "flex-end" },
+  modalBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  modalCancel: {
+    borderColor: "rgba(148, 163, 184, 0.5)",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    marginRight: 10,
+  },
+  modalConfirm: {
+    borderColor: "rgba(99, 102, 241, 0.6)",
+    backgroundColor: "rgba(99, 102, 241, 0.25)",
+  },
+  modalBtnText: { color: "#fff", fontWeight: "700" },
 });
 
 export default LeaderboardScreen;

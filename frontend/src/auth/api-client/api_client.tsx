@@ -6,9 +6,6 @@ import { resetToLogin } from '../../navigation/main/RootNavigation';
 let isRefreshing = false;
 let failedQueue: any[] = [];
 
-// =============================
-// QUEUE PROCESSOR
-// =============================
 const processQueue = (error: any, token: string | null = null) => {
   console.log('[QUEUE] Processing queue. Error:', !!error, 'Token present:', !!token);
   failedQueue.forEach(prom => {
@@ -18,62 +15,58 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-// =============================
-// API CLIENT
-// =============================
 const apiClient = create({
   baseURL: 'https://api-dev.streaksphere.app/api',
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Set static secret key
 export const setSecretKey = () => {
   apiClient.setHeader('api-key', HTTP_Headers['key']);
 };
-
-// Manually set token (optional)
 export const setAuthHeaders = async (token: string) => {
   apiClient.setHeader('Authorization', `Bearer ${token}`);
 };
+export const clearAuthHeaders = () => {
+  apiClient.deleteHeader('Authorization');
+};
 
-// =============================
+// Treat these as auth endpoints (no auth header, no refresh)
+const isAuthEndpoint = (url: string) =>
+  url.includes('/auth/login') ||
+  url.includes('/auth/register') ||
+  url.includes('/auth/forgot') ||
+  url.includes('/auth/verify') ||
+  url.includes('/auth/reset');
+
 // REQUEST INTERCEPTOR
-// =============================
 apiClient.axiosInstance.interceptors.request.use(async config => {
   const token = await UserStorage.getAccessToken();
   const url = config.url || '';
 
   console.log('[REQ] ->', url, '| hasAccessToken:', !!token);
 
-  // Skip attaching Authorization header for refresh request
-  if (!url.includes('/auth/refresh-token')) {
-    if (token) {
-      (config.headers as any)['Authorization'] = `Bearer ${token}`;
-      console.log('[REQ] Attached Authorization header for', url);
-    } else {
-      console.log('[REQ] No access token, not attaching Authorization for', url);
-    }
+  // Skip attaching Authorization for auth endpoints and refresh-token
+  if (isAuthEndpoint(url) || url.includes('/auth/refresh-token')) {
+    console.log('[REQ] Skipping Authorization header for', url);
+    return config;
+  }
+
+  if (token) {
+    (config.headers as any)['Authorization'] = `Bearer ${token}`;
+    console.log('[REQ] Attached Authorization header for', url);
   } else {
-    console.log('[REQ] Skipping Authorization header for refresh-token endpoint');
+    console.log('[REQ] No access token, not attaching Authorization for', url);
   }
 
   return config;
 });
 
-// =============================
 // RESPONSE INTERCEPTOR
-// =============================
 apiClient.axiosInstance.interceptors.response.use(
   response => {
-    console.log(
-      '[RES] <-',
-      response.config?.url,
-      '| status:',
-      response.status,
-    );
+    console.log('[RES] <-', response.config?.url, '| status:', response.status);
     return response;
   },
-
   async error => {
     const originalRequest = error.config;
     const status = error.response?.status;
@@ -82,10 +75,14 @@ apiClient.axiosInstance.interceptors.response.use(
     console.log('[RES-ERR]', status, 'for', url);
     console.log('[RES-ERR] Full error response data:', error.response?.data);
 
-    // ✅ If no accessToken exists → user NOT logged in → DO NOT refresh
+    // If it's an auth endpoint, surface the error (e.g., invalid credentials)
+    if (isAuthEndpoint(url)) {
+      return Promise.reject(error);
+    }
+
+    // No access token? nothing to refresh
     const accessToken = await UserStorage.getAccessToken();
     console.log('[AUTH] Current accessToken exists:', !!accessToken);
-
     if (!accessToken) {
       console.log('[AUTH] No access token in storage, skipping refresh logic');
       return Promise.reject(error);
@@ -94,11 +91,12 @@ apiClient.axiosInstance.interceptors.response.use(
     if (status === 401 && !originalRequest._retry) {
       console.log('[AUTH] 401 detected for', url);
 
-      // ✅ If refresh-token route itself failed → logout user
+      // If refresh-token route failed -> logout
       if (url.includes('/auth/refresh-token')) {
         console.log('[AUTH] 401 on /auth/refresh-token, logging out user');
         await UserStorage.clearTokens();
         await UserStorage.deleteUser();
+        clearAuthHeaders();
         resetToLogin();
         return Promise.reject(error);
       }
@@ -110,8 +108,7 @@ apiClient.axiosInstance.interceptors.response.use(
         })
           .then(token => {
             console.log('[AUTH] Retrying queued request with new token for', url);
-            (originalRequest.headers as any)['Authorization'] =
-              'Bearer ' + token;
+            (originalRequest.headers as any)['Authorization'] = 'Bearer ' + token;
             return apiClient.axiosInstance(originalRequest);
           })
           .catch(err => {
@@ -134,29 +131,13 @@ apiClient.axiosInstance.interceptors.response.use(
           token: refreshToken,
         });
 
-        console.log(
-          '[AUTH] Refresh response status:',
-          refreshResponse.status,
-          '| data:',
-          refreshResponse.data,
-        );
+        console.log('[AUTH] Refresh response status:', refreshResponse.status, '| data:', refreshResponse.data);
 
-        // ⚠️ Adjust this destructure to match your backend response shape
-        const {
-          accessToken: newAccessToken,
-          refreshToken: newRefreshToken,
-        } = refreshResponse.data;
+        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = refreshResponse.data;
 
-        console.log(
-          '[AUTH] Parsed tokens from refresh -> newAccessToken:',
-          !!newAccessToken,
-          '| newRefreshToken:',
-          !!newRefreshToken,
-        );
+        console.log('[AUTH] Parsed tokens -> newAccessToken:', !!newAccessToken, '| newRefreshToken:', !!newRefreshToken);
 
-        if (!newAccessToken) {
-          throw new Error('No new access token returned from refresh');
-        }
+        if (!newAccessToken) throw new Error('No new access token returned from refresh');
 
         if (newAccessToken) {
           await UserStorage.setAccessToken(newAccessToken);
@@ -170,8 +151,7 @@ apiClient.axiosInstance.interceptors.response.use(
         processQueue(null, newAccessToken);
         isRefreshing = false;
 
-        (originalRequest.headers as any)['Authorization'] =
-          `Bearer ${newAccessToken}`;
+        (originalRequest.headers as any)['Authorization'] = `Bearer ${newAccessToken}`;
         console.log('[AUTH] Retrying original request after refresh for', url);
         return apiClient.axiosInstance(originalRequest);
       } catch (refreshError) {
@@ -181,18 +161,14 @@ apiClient.axiosInstance.interceptors.response.use(
 
         await UserStorage.clearTokens();
         await UserStorage.deleteUser();
+        clearAuthHeaders();
         resetToLogin();
 
         return Promise.reject(refreshError);
       }
     }
 
-    console.log(
-      '[RES-ERR] Non-401 or already retried. Status:',
-      status,
-      'URL:',
-      url,
-    );
+    console.log('[RES-ERR] Non-401 or already retried. Status:', status, 'URL:', url);
     return Promise.reject(error);
   },
 );

@@ -1,176 +1,109 @@
-import React, { useContext, useState, useEffect } from 'react';
-import { View, Image, Pressable, Alert, Switch } from 'react-native';
-import AppText from '../../../components/Layout/AppText/AppText';
-import AuthContext from '../../../auth/user/UserContext';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import styles from './ChatStyles';
-import MainLayout from '../../../shared/components/MainLayout';
-import colors from '../../../shared/styling/lightModeColors';
-import LogoutConfirmationModal from '../../logout-popup/components/LogoutConfirmationModal';
-import sharedApi from '../../../shared/services/shared-api';
-import UserStorage from '../../../auth/user/UserStorage';
-import { CommonActions } from '@react-navigation/native';
-import AppActivityIndicator from '../../../components/Layout/AppActivityIndicator/AppActivityIndicator';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import ReactNativeBiometrics from 'react-native-biometrics';
-import { checkBiometricAvailability } from '../../../shared/services/biometrichelper';
+import React, { useEffect, useState, useCallback } from "react";
+import { View, FlatList, TouchableOpacity, StyleSheet, TextInput } from "react-native";
+import { Text } from "@rneui/themed";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import NetInfo from "@react-native-community/netinfo";
+import { fetchConversations } from "../services/api_e2ee";
+import MainLayout from "../../../shared/components/MainLayout";
 
-const rnBiometrics = new ReactNativeBiometrics();
+export default function ChatListScreen({ navigation }: any) {
+  const [search, setSearch] = useState("");
+  const [convos, setConvos] = useState<any[]>([]);
+  const [offline, setOffline] = useState(false);
 
-const ChatScreen = ({ navigation }: any) => {
-  const authContext = useContext(AuthContext);
-
-  const id = authContext?.User?.user?.id
-  const refreshToken = authContext?.User?.refreshToken
-
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  // New biometric toggle state
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
-  
-
-  // Load saved setting
-  useEffect(() => {
-    (async () => {
-      const saved = await AsyncStorage.getItem('biometricEnabled');
-      if (saved === 'true') setBiometricEnabled(true);
-    })();
+  const load = useCallback(async () => {
+    try {
+      const { data } = await fetchConversations();
+      setConvos(data.conversations || []);
+    } catch (e) {
+      console.log("load convos error", e);
+    }
   }, []);
 
-  const toggleBiometric = async (value: boolean) => {
-    if (value) {
-      const { available, biometryType } = await checkBiometricAvailability();
-      
+  useEffect(() => {
+    const unsub = navigation.addListener("focus", load);
+    return unsub;
+  }, [navigation, load]);
 
-      if (!available) {
-        Alert.alert('Not Supported', 'Your device does not support biometrics.');
-        return;
-      }
+  useEffect(() => {
+    const unsub = NetInfo.addEventListener((state) => {
+      const isOffline = !state.isConnected || state.isInternetReachable === false;
+      setOffline(isOffline);
+    });
+    return () => unsub();
+  }, []);
 
-      Alert.alert(
-        'Enable Biometrics',
-        `Do you want to enable ${biometryType === 'FaceID' ? 'Face ID' : 'Fingerprint'} login?`,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Enable',
-            onPress: async () => {
-              setBiometricEnabled(true);
-              await AsyncStorage.setItem('biometricEnabled', 'true');
-            },
-          },
-        ]
-      );
-    } else {
-      setBiometricEnabled(false);
-      await AsyncStorage.setItem('biometricEnabled', 'false');
-    }
-  };
-
-  const renderAvatar = () => {
-    const baseURL = authContext?.User?.ImagePath;
-
-    if (authContext?.User?.ImagePath) {
-      return <Image source={{ uri: baseURL }} style={styles.image} />;
-    } else {
-      return (
-        <Image
-          source={require('../../../shared/assets/default-logo.jpg')}
-          style={styles.image}
-          resizeMode="cover"
-        />
-      );
-    }
-  };
-
-  const logoutHandler = () => {
-    setShowLogoutModal(true);
-  };
+  const filtered = convos.filter((c) =>
+    (c._id?.peerName || c._id?.peer || "").toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <MainLayout>
-      {isLoggingOut && <AppActivityIndicator visible={true} />}
-      <View style={styles.container}>
-        <View style={styles.uppercontainer}>
-          <AppText
-            style={{
-              textAlign: 'start',
-              color: 'white',
-              fontWeight: 'bold',
-              fontSize: 18,
-              marginLeft: '6%',
-            }}
-          >
-            Privacy & Settings
-          </AppText>
-        </View>
+      <View style={styles.root}>
+        <View style={styles.baseBackground} />
+        <View style={styles.glowTop} />
+        <View style={styles.glowBottom} />
 
-        {/* Biometric Toggle */}
-        <View style={styles.settingRow}>
-          <AppText style={styles.settingText}>Enable Biometric Login</AppText>
-          <Switch
-            value={biometricEnabled}
-            onValueChange={toggleBiometric}
-            trackColor={{ false: '#ccc', true: colors.primary }}
-            thumbColor={biometricEnabled ? colors.primary : '#f4f3f4'}
+        <View style={{ flex: 1 }}>
+          <View style={styles.topBar}>
+            <View>
+              <Text style={styles.title}>Chats</Text>
+              <Text style={[styles.netStatus, offline ? styles.netOffline : styles.netOnline]}>
+                {offline ? "Connecting..." : "Online"}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate("NewChat")}>
+              <Icon name="plus" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.searchBox}>
+            <Icon name="magnify" size={20} color="#94a3b8" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search"
+              placeholderTextColor="#94a3b8"
+              value={search}
+              onChangeText={setSearch}
+            />
+          </View>
+
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => item._id.peer}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() =>
+                  navigation.navigate("Chat", { peerUserId: item._id.peer, peerName: item._id.peerName || "Friend" })
+                }
+              >
+                <Text style={styles.peer}>{item._id.peerName || "Friend"}</Text>
+                <Text style={styles.snippet}>{item.lastMessage?.ciphertext ? "Encrypted message" : ""}</Text>
+              </TouchableOpacity>
+            )}
+            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           />
         </View>
-
-        {/* Developer Info Button */}
-<Pressable
-  style={styles.devButton}
-  onPress={() =>
-    Alert.alert(
-      "Developer Info",
-      "Developed by Syed Ali Asghar\n\n  AI Student at NUST (NBC)",
-      [{ text: "OK" }]
-    )
-  }
->
-  <Icon name="information-outline" size={20} color={colors.primary} style={{ marginRight: 8 }} />
-  <AppText style={styles.devText}>About Developer</AppText>
-</Pressable>
-
-
-        {/* Logout Button */}
-        <Pressable style={styles.devButton} onPress={logoutHandler}>
-          <Icon name="logout" size={20} color={colors.primary} style={{ marginRight: 8 }} />
-          <AppText style={styles.logoutText}>Logout</AppText>
-        </Pressable>
       </View>
-
-      {/* Logout Modal */}
-      <LogoutConfirmationModal
-        visible={showLogoutModal}
-        onClose={() => setShowLogoutModal(false)}
-        onConfirm={async () => {
-          try {
-            setIsLoggingOut(true); // show loader
-            await sharedApi.LogoutUser(id, refreshToken);
-            
-            UserStorage.deleteUser();
-            setShowLogoutModal(false);
-
-            navigation.dispatch(
-              CommonActions.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-              })
-            );
-          } catch (error) {
-            console.error('Logout failed:', error);
-            Alert.alert('Error', 'Logout failed. Please try again.');
-          } finally {
-            setIsLoggingOut(false);
-          }
-        }}
-      />
     </MainLayout>
   );
-};
+}
 
-export default ChatScreen;
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: "#0f172a", padding: 12 },
+  baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: "#020617" },
+  glowTop: { position: "absolute", top: -120, left: -40, width: 220, height: 220, borderRadius: 220, backgroundColor: "rgba(59, 130, 246, 0.28)" },
+  glowBottom: { position: "absolute", bottom: -140, right: -40, width: 220, height: 220, borderRadius: 220, backgroundColor: "rgba(168, 85, 247, 0.28)" },
+  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+  title: { color: "#fff", fontSize: 20, fontWeight: "800" },
+  netStatus: { fontSize: 12, marginTop: 2 },
+  netOnline: { color: "#22c55e" },
+  netOffline: { color: "#f97316" },
+  iconBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#6366f1", alignItems: "center", justifyContent: "center" },
+  searchBox: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12, paddingHorizontal: 10, marginBottom: 10, borderWidth: 1, borderColor: "rgba(148,163,184,0.3)" },
+  searchInput: { flex: 1, color: "#fff", paddingVertical: 8, marginLeft: 6 },
+  row: { backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12 },
+  peer: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  snippet: { color: "#94a3b8", marginTop: 4 },
+});

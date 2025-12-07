@@ -20,6 +20,7 @@ import sharedApi from './src/shared/services/shared-api';
 import apiClient from './src/auth/api-client/api_client';
 import { setSecretKey } from './src/auth/api-client/api_client';
 import { navigationRef } from './src/navigation/main/RootNavigation';
+import 'react-native-get-random-values';
 
 const App = () => {
   const [User, setUser] = useState<user | undefined>();

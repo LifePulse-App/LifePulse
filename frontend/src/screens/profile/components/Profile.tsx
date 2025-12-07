@@ -10,6 +10,7 @@ import profileApi from "../services/api_profile"; // Use your actual path!
 import { useFocusEffect } from "@react-navigation/native";
 import BitmojiFace from "../../../shared/components/BitmojiFace";
 import { Image } from 'react-native';
+import UserStorage from "../../../auth/user/UserStorage";
 
 // --- Glassy Confirm Modal Component ---
 const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }: any) => {
@@ -486,6 +487,8 @@ const ProfileScreen = ({ navigation }: any) => {
     authContext?.setUser(null);
     setLogoutModalVisible(false);
     setResultCard({ visible: true, type: "success", message: "Logged out!" });
+    UserStorage.clearTokens();
+    UserStorage.deleteUser();
     setTimeout(() => {
       setResultCard({ ...resultCard, visible: false });
       navigation.replace("Login");
@@ -499,6 +502,7 @@ const ProfileScreen = ({ navigation }: any) => {
       setTimeout(() => {
         setResultCard({ ...resultCard, visible: false });
         authContext?.setUser(null);
+        UserStorage.clearTokens();
         navigation.replace("Login");
       }, 1400);
     } catch (error) {

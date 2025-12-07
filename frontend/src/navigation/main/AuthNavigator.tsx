@@ -27,6 +27,8 @@ import ReportProblemScreen from '../../screens/profile/components/ReportProblemS
 import LegalPolicyScreen from '../../screens/profile/components/LegalPolicyScreen';
 import AvatarCustomizeScreen from '../../screens/profile/components/AvatarCustomizeScreen';
 import AvatarCreatorScreen from '../../screens/profile/components/AvatarCreatorScreen';
+import NewChatScreen from '../../screens/chat/components/NewChatScreen';
+import ChatScreen from '../../screens/chat/components/ChatScreen';
 
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');
@@ -264,6 +266,8 @@ const AuthNavigator = () => {
 <Stack.Screen name="LegalPolicy" component={LegalPolicyScreen} />
 <Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
 <Stack.Screen name="AvatarCreator" component={AvatarCreatorScreen} />
+<Stack.Screen name="NewChat" component={NewChatScreen} />
+<Stack.Screen name="chat" component={ChatScreen} />
     </Stack.Navigator>
   );
 };
