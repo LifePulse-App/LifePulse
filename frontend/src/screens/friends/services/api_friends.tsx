@@ -1,134 +1,110 @@
-import client from '../../../auth/api-client/api_client';
-import {
-  UserProfile,
-  FollowStatusResponse,
-  FollowersListResponse,
-  FollowingListResponse,
-  FollowRequestsResponse,
-  SuggestedUsersResponse,
-  GenericResponse,
-  SearchUsersResponse
-} from '../models/FriendModel';
+import client from "../../../auth/api-client/api_client";
 
-// Follow a user
-const followUser = async (userId: string, currentUserId: string) => {
+type GenericResponse = { message?: string; [k: string]: any };
+type FriendStatusResponse = { isFriend: boolean; requestSent?: boolean; requestIncoming?: boolean };
+type FriendsListResponse = { friends: Array<{ _id: string; name: string; username?: string; avatar?: any; since?: string }> };
+type PendingRequestsResponse = { requests: Array<{ _id: string; name: string; username?: string; avatar?: any; requestedAt?: string }> };
+type SearchUsersResponse = { user: Array<{ _id: string; name: string; username?: string; avatar?: any; isFriend?: boolean; requestSent?: boolean; requestIncoming?: boolean }>; filteredUsersCount: number };
+type SuggestedUsersResponse = { suggestions: Array<{ _id: string; name: string; username?: string; avatar?: any; isFriend?: boolean; requestSent?: boolean; requestIncoming?: boolean }> };
+
+// Send a friend request
+const sendFriendRequest = async (targetUserId: string) => {
   try {
-    return await client.post<GenericResponse>(`/social/follow/${userId}/${currentUserId}`);
+    return await client.post<GenericResponse>(`/friends/request/${targetUserId}`);
   } catch (error: any) {
-    if (!error.response) throw new Error('Server is offline, try again later.');
+    if (!error.response) throw new Error("Server is offline, try again later.");
     throw error;
   }
 };
 
-// Unfollow a user
-const unfollowUser = async (userId: string, currentUserId: string) => {
+// Accept a friend request (requesterId -> me)
+const acceptFriendRequest = async (requesterId: string) => {
   try {
-    return await client.post<GenericResponse>(`/social/unfollow/${userId}/${currentUserId}`);
+    return await client.post<GenericResponse>(`/friends/accept/${requesterId}`);
   } catch (error: any) {
-    if (!error.response) throw new Error('Server is offline, try again later.');
+    if (!error.response) throw new Error("Server is offline, try again later.");
     throw error;
   }
 };
 
-// Accept follow request
-const acceptFollowRequest = async (userId: string, requesterId: string) => {
+// Remove/decline/cancel a pending request
+const removeFriendRequest = async (requesterId: string) => {
   try {
-    return await client.post<GenericResponse>(`/social/accept-request/${userId}/${requesterId}`);
+    return await client.post<GenericResponse>(`/friends/remove/${requesterId}`);
   } catch (error: any) {
-    if (!error.response) throw new Error('Server is offline, try again later.');
+    if (!error.response) throw new Error("Server is offline, try again later.");
     throw error;
   }
 };
 
-// Remove follow request
-const removeFollowRequest = async (userId: string, requesterId: string) => {
+// Unfriend
+const unfriend = async (userId: string) => {
   try {
-    return await client.post<GenericResponse>(`/social/remove-request/${userId}/${requesterId}`);
+    return await client.post<GenericResponse>(`/friends/unfriend/${userId}`);
   } catch (error: any) {
-    if (!error.response) throw new Error('Server is offline, try again later.');
+    if (!error.response) throw new Error("Server is offline, try again later.");
     throw error;
   }
 };
 
-// Get follow requests for current user
-const getFollowRequests = async () => {
+// Friend status
+const getFriendStatus = async (userId: string) => {
   try {
-    return await client.get<FollowRequestsResponse>('/social/follow-requests');
+    return await client.get<FriendStatusResponse>(`/friends/status/${userId}`);
   } catch (error: any) {
-    if (!error.response) throw new Error('Server is offline, try again later.');
+    if (!error.response) throw new Error("Server is offline, try again later.");
     throw error;
   }
 };
 
-// Get follow status
-const getFollowStatus = async (userId: string, currentUserId: string) => {
+// My friends list
+const getFriends = async () => {
   try {
-    return await client.get<FollowStatusResponse>(`/social/follow-status/${userId}/${currentUserId}`);
+    return await client.get<FriendsListResponse>(`/friends/list`);
   } catch (error: any) {
-    if (!error.response) throw new Error('Server is offline, try again later.');
+    if (!error.response) throw new Error("Server is offline, try again later.");
     throw error;
   }
 };
 
-// Get followers list
-const getFollowersList = async (userId: string) => {
+// Incoming pending requests
+const getPendingFriendRequests = async () => {
   try {
-    return await client.get<FollowersListResponse>(`/social/followers/${userId}`);
+    return await client.get<PendingRequestsResponse>(`/friends/pending`);
   } catch (error: any) {
-    if (!error.response) throw new Error('Server is offline, try again later.');
+    if (!error.response) throw new Error("Server is offline, try again later.");
     throw error;
   }
 };
 
-// Get following list
-const getFollowingList = async (userId: string) => {
-  try {
-    return await client.get<FollowingListResponse>(`/social/following/${userId}`);
-  } catch (error: any) {
-    if (!error.response) throw new Error('Server is offline, try again later.');
-    throw error;
-  }
-};
-
-// Get specific user profile
-const getSpecificUser = async (id: string) => {
-  try {
-    return await client.get<UserProfile>(`/social/user/${id}`);
-  } catch (error: any) {
-    if (!error.response) throw new Error('Server is offline, try again later.');
-    throw error;
-  }
-};
-
+// Search users (with friend flags)
 const searchUsers = async (query: string) => {
   try {
-    return await client.get<SearchUsersResponse>(`/social/search${query ? `?${query}` : ''}`);
+    return await client.get<SearchUsersResponse>(`/friends/search${query ? `?${query}` : ""}`);
   } catch (error: any) {
-    if (!error.response) throw new Error('Server is offline, try again later.');
+    if (!error.response) throw new Error("Server is offline, try again later.");
     throw error;
   }
 };
 
-// Get suggested users
+// Suggested users (not yet friends)
 const getSuggestedUsers = async (limit = 6) => {
   try {
-    return await client.get<SuggestedUsersResponse>(`/social/suggestion-users?limit=${limit}`);
+    return await client.get<SuggestedUsersResponse>(`/friends/suggested?limit=${limit}`);
   } catch (error: any) {
-    if (!error.response) throw new Error('Server is offline, try again later.');
+    if (!error.response) throw new Error("Server is offline, try again later.");
     throw error;
   }
 };
 
 export default {
-  followUser,
-  unfollowUser,
-  acceptFollowRequest,
-  removeFollowRequest,
-  getFollowRequests,
-  getFollowStatus,
-  getFollowersList,
-  getFollowingList,
-  getSpecificUser,
+  sendFriendRequest,
+  acceptFriendRequest,
+  removeFriendRequest,
+  unfriend,
+  getFriendStatus,
+  getFriends,
+  getPendingFriendRequests,
   searchUsers,
   getSuggestedUsers,
 };

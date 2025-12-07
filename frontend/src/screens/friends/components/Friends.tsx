@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useContext } from "react";
+import React, { useState, useEffect, useMemo, useContext, useCallback } from "react";
 import {
   View,
   TextInput,
@@ -14,24 +14,18 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import MainLayout from "../../../shared/components/MainLayout";
 import AppScreen from "../../../components/Layout/AppScreen/AppScreen";
 import socialApi from "../services/api_friends";
-import { UserProfile, FollowRequest } from "../models/FriendModel";
 import AuthContext from "../../../auth/user/UserContext";
-
+import { UserProfile, FollowRequest } from "../models/FriendModel";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
 const ICON_GLASS_BG = "rgba(15, 23, 42, 0)";
 
-// Glass notification card component
 const GlassNotification = ({ visible, type, message, onDismiss }: any) => {
   if (!visible) return null;
   return (
     <View style={styles.notificationCard}>
-      <Icon
-        name={type === "success" ? "check-circle" : "close-circle"}
-        size={20}
-        color="#fff"
-      />
+      <Icon name={type === "success" ? "check-circle" : "close-circle"} size={20} color="#fff" />
       <Text style={styles.notificationText}>{message}</Text>
       <TouchableOpacity onPress={onDismiss}>
         <Icon name="close" size={21} color="#F9FAFB" style={{ marginLeft: 8 }} />
@@ -40,7 +34,6 @@ const GlassNotification = ({ visible, type, message, onDismiss }: any) => {
   );
 };
 
-// Glass confirmation modal
 const GlassConfirmModal = ({
   visible,
   message,
@@ -65,10 +58,7 @@ const GlassConfirmModal = ({
           >
             <Text style={styles.modalBtnText}>Keep</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.modalBtn, { backgroundColor: "#EF4444" }]}
-            onPress={onRemove}
-          >
+          <TouchableOpacity style={[styles.modalBtn, { backgroundColor: "#EF4444" }]} onPress={onRemove}>
             <Text style={styles.modalBtnText}>Remove</Text>
           </TouchableOpacity>
         </View>
@@ -87,13 +77,10 @@ const Friends = ({ navigation }: any) => {
   const [friendRequests, setFriendRequests] = useState<FollowRequest[]>([]);
   const [showAllRequests, setShowAllRequests] = useState(false);
   const [loadingActions, setLoadingActions] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
-
-  // For modal "added" cancel/keep
+  const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showRemoveModal, setShowRemoveModal] = useState<{ user: UserProfile | null } | null>(null);
+
+  const isSearching = search.trim().length > 0;
 
   useEffect(() => {
     if (notification) {
@@ -102,58 +89,55 @@ const Friends = ({ navigation }: any) => {
     }
   }, [notification]);
 
-  const isSearching = search.trim().length > 0;
-
-  // GETTERS
-  const fetchSuggestions = async () => {
+  const fetchSuggestions = useCallback(async () => {
     try {
       const res = await socialApi.getSuggestedUsers(10);
       setSuggestions(res.data.suggestions ?? []);
-    } catch (e) {
+    } catch {
       setSuggestions([]);
     }
-  };
+  }, []);
 
-  const fetchSearch = async () => {
+  const fetchSearch = useCallback(async () => {
     try {
       const res = await socialApi.searchUsers(`q=${encodeURIComponent(search)}`);
       setAllUsers(res.data.user ?? []);
-    } catch (e) {
+    } catch {
       setAllUsers([]);
     }
-  };
+  }, [search]);
 
-  useEffect(() => { fetchSuggestions(); }, []);
-  useEffect(() => {
-    socialApi
-      .getFollowRequests()
-      .then((res) => setFriendRequests(res.data.pendingRequests ?? []))
-      .catch(() => setFriendRequests([]));
+  const fetchRequests = useCallback(async () => {
+    try {
+      const res = await socialApi.getPendingFriendRequests();
+      setFriendRequests(res.data.requests ?? []);
+    } catch {
+      setFriendRequests([]);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchSuggestions();
+    fetchRequests();
+  }, [fetchSuggestions, fetchRequests]);
+
   useEffect(() => {
     if (isSearching) {
       fetchSearch();
     } else {
       setAllUsers([]);
     }
-  }, [search, isSearching]);
+  }, [search, isSearching, fetchSearch]);
 
-  const searchResults = useMemo(
-    () => (isSearching ? allUsers : []),
-    [allUsers, isSearching]
-  );
+  const searchResults = useMemo(() => (isSearching ? allUsers : []), [allUsers, isSearching]);
 
-  // Action handlers
   const handleAddFriend = async (user: UserProfile) => {
     setLoadingActions(user._id);
     try {
-      await socialApi.followUser(user._id, currentUserId);
-      setNotification({
-        type: "success",
-        message: `Request sent to ${user.name}`,
-      });
+      await socialApi.sendFriendRequest(user._id);
+      setNotification({ type: "success", message: `Request sent to ${user.name || user.username}` });
       isSearching ? await fetchSearch() : await fetchSuggestions();
-    } catch (e) {
+    } catch {
       setNotification({ type: "error", message: "Could not send friend request." });
     }
     setLoadingActions(null);
@@ -162,13 +146,10 @@ const Friends = ({ navigation }: any) => {
   const handleCancelRequest = async (user: UserProfile) => {
     setLoadingActions(user._id);
     try {
-      await socialApi.removeFollowRequest(user._id, currentUserId);
-      setNotification({
-        type: "success",
-        message: `Removed your friend request to ${user.name}`,
-      });
+      await socialApi.removeFriendRequest(user._id);
+      setNotification({ type: "success", message: `Removed request to ${user.name || user.username}` });
       isSearching ? await fetchSearch() : await fetchSuggestions();
-    } catch (e) {
+    } catch {
       setNotification({ type: "error", message: "Couldn't remove friend request." });
     }
     setLoadingActions(null);
@@ -178,14 +159,11 @@ const Friends = ({ navigation }: any) => {
   const handleAcceptRequest = async (req: FollowRequest) => {
     setLoadingActions(req.user._id);
     try {
-      await socialApi.acceptFollowRequest(currentUserId, req.user._id);
-      setNotification({
-        type: "success",
-        message: `Accepted request from ${req.user.name}`,
-      });
+      await socialApi.acceptFriendRequest(req.user._id);
+      setNotification({ type: "success", message: `Accepted request from ${req.user.name}` });
       setFriendRequests((prev) => prev.filter((r) => r.user._id !== req.user._id));
       isSearching ? await fetchSearch() : await fetchSuggestions();
-    } catch (e) {
+    } catch {
       setNotification({ type: "error", message: "Couldn't accept request." });
     }
     setLoadingActions(null);
@@ -194,115 +172,68 @@ const Friends = ({ navigation }: any) => {
   const handleRejectRequest = async (req: FollowRequest) => {
     setLoadingActions(req.user._id);
     try {
-      await socialApi.removeFollowRequest(currentUserId, req.user._id);
-      setNotification({
-        type: "success",
-        message: `Rejected request from ${req.user.name}`,
-      });
+      await socialApi.removeFriendRequest(req.user._id);
+      setNotification({ type: "success", message: `Rejected request from ${req.user.name}` });
       setFriendRequests((prev) => prev.filter((r) => r.user._id !== req.user._id));
       isSearching ? await fetchSearch() : await fetchSuggestions();
-    } catch (e) {
+    } catch {
       setNotification({ type: "error", message: "Couldn't reject request." });
     }
     setLoadingActions(null);
   };
 
-  // Rendering: main user card
   const renderUserItem = ({ item }: { item: UserProfile | FollowRequest }) => {
     const isRequest = (item as FollowRequest).requestedAt !== undefined;
     const user = isRequest ? (item as FollowRequest).user : (item as UserProfile);
     const initials =
-      user.name
-        ? user.name.split(" ").map((p) => p[0]).join("").toUpperCase().slice(0, 2)
-        : user.username[1].toUpperCase();
-
-    // If this user has sent *me* a request, don't show Add/Added/Chat (handled in friendRequests)
-    if (!isRequest && user.hasRequestedMe) {
-      return (
-        <View style={styles.userCard}>
-          <View
-            style={[
-              styles.avatar,
-              { backgroundColor: user.avatarColor || "rgba(55, 65, 81, 0.9)" },
-            ]}
-          >
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user.name ?? user.username}</Text>
-            <Text style={styles.userUsername}>{user.username}</Text>
-          </View>
-        </View>
-      );
-    }
+      user.name?.split(" ").map((p) => p[0]).join("").toUpperCase().slice(0, 2) ||
+      user.username?.slice(0, 2)?.toUpperCase() ||
+      "?";
 
     return (
       <View style={styles.userCard}>
-        <View
-          style={[
-            styles.avatar,
-            { backgroundColor: user.avatarColor || "rgba(55, 65, 81, 0.9)" },
-          ]}
-        >
+        <View style={[styles.avatar, { backgroundColor: user.avatarColor || "rgba(55, 65, 81, 0.9)" }]}>
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{user.name ?? user.username}</Text>
           <Text style={styles.userUsername}>{user.username}</Text>
         </View>
+
         {isRequest ? (
           <View style={{ flexDirection: "row" }}>
             <TouchableOpacity
               activeOpacity={0.7}
               style={[
                 styles.addBtn,
-                {
-                  backgroundColor:
-                    loadingActions === user._id ? "#d1d5db" : "#22C55E",
-                  marginRight: 6,
-                },
+                { backgroundColor: loadingActions === user._id ? "#d1d5db" : "#22C55E", marginRight: 6 },
               ]}
               onPress={() => handleAcceptRequest(item as FollowRequest)}
               disabled={loadingActions === user._id}
             >
               <Icon name="check" size={18} color="#F9FAFB" />
-              <Text style={styles.addBtnText}>
-                {loadingActions === user._id ? "..." : "Accept"}
-              </Text>
+              <Text style={styles.addBtnText}>{loadingActions === user._id ? "..." : "Accept"}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               activeOpacity={0.7}
-              style={[
-                styles.addBtn,
-                {
-                  backgroundColor:
-                    loadingActions === user._id ? "#d1d5db" : "#EF4444",
-                },
-              ]}
+              style={[styles.addBtn, { backgroundColor: loadingActions === user._id ? "#d1d5db" : "#EF4444" }]}
               onPress={() => handleRejectRequest(item as FollowRequest)}
               disabled={loadingActions === user._id}
             >
               <Icon name="close" size={18} color="#F9FAFB" />
-              <Text style={styles.addBtnText}>
-                {loadingActions === user._id ? "..." : "Reject"}
-              </Text>
+              <Text style={styles.addBtnText}>{loadingActions === user._id ? "..." : "Reject"}</Text>
             </TouchableOpacity>
           </View>
-        ) : user.isFollowing ? (
+        ) : user.isFriend ? (
           <TouchableOpacity
             style={[styles.addBtn, { backgroundColor: "#6366f1" }]}
             activeOpacity={0.85}
-            onPress={() =>
-              setNotification({
-                type: "success",
-                message: `Open chat with ${user.name}`,
-              })
-            }
+            onPress={() => setNotification({ type: "success", message: `Open chat with ${user.name || user.username}` })}
           >
             <Icon name="chat" size={18} color="#F9FAFB" />
             <Text style={styles.addBtnText}>Chat</Text>
           </TouchableOpacity>
-        ) : user.isRequestSent ? (
+        ) : user.requestSent ? (
           <TouchableOpacity
             style={[styles.addBtn, { backgroundColor: "#9CA3AF" }]}
             activeOpacity={0.85}
@@ -310,9 +241,22 @@ const Friends = ({ navigation }: any) => {
             disabled={loadingActions === user._id}
           >
             <Icon name="check" size={18} color="#F9FAFB" />
-            <Text style={styles.addBtnText}>
-              {loadingActions === user._id ? "..." : "Added"}
-            </Text>
+            <Text style={styles.addBtnText}>{loadingActions === user._id ? "..." : "Added"}</Text>
+          </TouchableOpacity>
+        ) : user.requestIncoming ? (
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: "#22C55E" }]}
+            activeOpacity={0.85}
+            onPress={() =>
+              handleAcceptRequest({
+                user: user as any,
+                requestedAt: new Date().toISOString(),
+              } as FollowRequest)
+            }
+            disabled={loadingActions === user._id}
+          >
+            <Icon name="account-arrow-left" size={18} color="#F9FAFB" />
+            <Text style={styles.addBtnText}>{loadingActions === user._id ? "..." : "Accept"}</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -322,24 +266,17 @@ const Friends = ({ navigation }: any) => {
             disabled={loadingActions === user._id}
           >
             <Icon name="account-plus-outline" size={18} color="#F9FAFB" />
-            <Text style={styles.addBtnText}>
-              {loadingActions === user._id ? "..." : "Add"}
-            </Text>
+            <Text style={styles.addBtnText}>{loadingActions === user._id ? "..." : "Add"}</Text>
           </TouchableOpacity>
         )}
       </View>
     );
   };
 
-  const requestListToShow = showAllRequests
-    ? friendRequests
-    : friendRequests.slice(0, 3);
-
+  const requestListToShow = showAllRequests ? friendRequests : friendRequests.slice(0, 3);
   const listData = isSearching ? searchResults : suggestions;
 
-  // Modal logic for Added/cancel
   const handleRemoveModalCancel = () => setShowRemoveModal(null);
-
   const handleRemoveModalRemove = async () => {
     if (showRemoveModal?.user) {
       await handleCancelRequest(showRemoveModal.user);
@@ -349,19 +286,13 @@ const Friends = ({ navigation }: any) => {
   return (
     <MainLayout>
       <AppScreen style={styles.root}>
-        {/* Glass confirm modal (centered) */}
         <GlassConfirmModal
           visible={!!showRemoveModal?.user}
-          message={
-            showRemoveModal?.user
-              ? `Remove friend request to ${showRemoveModal.user.name}?`
-              : ""
-          }
+          message={showRemoveModal?.user ? `Remove friend request to ${showRemoveModal.user.name || showRemoveModal.user.username}?` : ""}
           onCancel={handleRemoveModalCancel}
           onRemove={handleRemoveModalRemove}
         />
 
-        {/* Glass notification card (top toast) */}
         <GlassNotification
           visible={!!notification}
           type={notification?.type}
@@ -372,34 +303,18 @@ const Friends = ({ navigation }: any) => {
         <View style={styles.baseBackground} />
         <View style={styles.glowTop} />
         <View style={styles.glowBottom} />
-        <StatusBar
-          barStyle="light-content"
-          translucent
-          backgroundColor="transparent"
-        />
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
         <View style={styles.overlay}>
           <View style={styles.topBar}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              style={styles.iconGlass}
-              onPress={() => navigation.goBack()}
-            >
+            <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass} onPress={() => navigation.goBack()}>
               <Icon name="arrow-left" size={22} color="#E5E7EB" />
             </TouchableOpacity>
             <Text style={styles.topTitle}>Add Friends</Text>
             <View style={styles.topRightSpacer} />
           </View>
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
             <View style={styles.searchCard}>
-              <Icon
-                name="magnify"
-                size={20}
-                color="#9CA3AF"
-                style={{ marginRight: 8 }}
-              />
+              <Icon name="magnify" size={20} color="#9CA3AF" style={{ marginRight: 8 }} />
               <TextInput
                 placeholder="Search users..."
                 placeholderTextColor="#6B7280"
@@ -410,44 +325,30 @@ const Friends = ({ navigation }: any) => {
             </View>
             {friendRequests.length > 0 && (
               <View style={styles.userListCard}>
-               <View style={styles.sectionHeader}>
-  <View style={{ flexDirection: "row", alignItems: "center" }}>
-    <Text style={styles.sectionTitle}>
-      Friend Requests
-    </Text>
-    {friendRequests.length > 0 && (
-      <View style={styles.badgeBubbleSection}>
-        <Text style={styles.badgeText}>{friendRequests.length}</Text>
-      </View>
-    )}
-  </View>
-  <Text style={styles.sectionHint}>
-    Accept or ignore friend requests
-  </Text>
-</View>
+                <View style={styles.sectionHeader}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={styles.sectionTitle}>Friend Requests</Text>
+                    {friendRequests.length > 0 && (
+                      <View style={styles.badgeBubbleSection}>
+                        <Text style={styles.badgeText}>{friendRequests.length}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.sectionHint}>Accept or ignore friend requests</Text>
+                </View>
                 <FlatList
                   data={requestListToShow}
                   keyExtractor={(item) => item.user._id}
                   renderItem={renderUserItem}
                   scrollEnabled={false}
-                  ItemSeparatorComponent={() => (
-                    <View style={styles.listSeparator} />
-                  )}
+                  ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
                   ListFooterComponent={() =>
                     friendRequests.length > 3 && (
                       <TouchableOpacity
                         onPress={() => setShowAllRequests((v) => !v)}
-                        style={{
-                          alignItems: "center",
-                          marginTop: 10,
-                          paddingBottom: 2,
-                        }}
+                        style={{ alignItems: "center", marginTop: 10, paddingBottom: 2 }}
                       >
-                        <Icon
-                          name={showAllRequests ? "chevron-up" : "chevron-down"}
-                          size={26}
-                          color="#94A3B8"
-                        />
+                        <Icon name={showAllRequests ? "chevron-up" : "chevron-down"} size={26} color="#94A3B8" />
                         <Text style={{ color: "#94A3B8", fontSize: 12 }}>
                           {showAllRequests ? "Show Less" : "Show All"}
                         </Text>
@@ -457,32 +358,20 @@ const Friends = ({ navigation }: any) => {
                 />
               </View>
             )}
+
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>
-                {isSearching ? "Search results" : "Suggested for you"}
-              </Text>
-              {!isSearching && (
-                <Text style={styles.sectionHint}>
-                  People you may want to add as friends
-                </Text>
-              )}
+              <Text style={styles.sectionTitle}>{isSearching ? "Search results" : "Suggested for you"}</Text>
+              {!isSearching && <Text style={styles.sectionHint}>People you may want to add as friends</Text>}
             </View>
+
             {listData.length === 0 ? (
               <View style={styles.emptyStateCard}>
-                <Icon
-                  name="account-search-outline"
-                  size={32}
-                  color="#6B7280"
-                />
+                <Icon name="account-search-outline" size={32} color="#6B7280" />
                 <Text style={styles.emptyTitle}>No users found</Text>
                 {isSearching ? (
-                  <Text style={styles.emptyText}>
-                    Try a different name or username.
-                  </Text>
+                  <Text style={styles.emptyText}>Try a different name or username.</Text>
                 ) : (
-                  <Text style={styles.emptyText}>
-                    We’ll show suggestions here when they’re available.
-                  </Text>
+                  <Text style={styles.emptyText}>We’ll show suggestions here when they’re available.</Text>
                 )}
               </View>
             ) : (
@@ -492,9 +381,7 @@ const Friends = ({ navigation }: any) => {
                   keyExtractor={(item) => item._id}
                   renderItem={renderUserItem}
                   scrollEnabled={false}
-                  ItemSeparatorComponent={() => (
-                    <View style={styles.listSeparator} />
-                  )}
+                  ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
                 />
               </View>
             )}
@@ -590,13 +477,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 14,
   },
-  root: {
-    flex: 1,
-  },
-  baseBackground: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#020617",
-  },
+  root: { flex: 1 },
+  baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: "#020617" },
   glowTop: {
     position: "absolute",
     top: -120,
@@ -615,19 +497,9 @@ const styles = StyleSheet.create({
     borderRadius: 260,
     backgroundColor: "rgba(168, 85, 247, 0.35)",
   },
-  overlay: {
-    flex: 1,
-    paddingTop: Platform.OS === "android" ? "3%" : "5%",
-    paddingHorizontal: 20,
-  },
-  scrollContent: {
-    paddingTop: 8,
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
+  overlay: { flex: 1, paddingTop: Platform.OS === "android" ? "3%" : "5%", paddingHorizontal: 20 },
+  scrollContent: { paddingTop: 8 },
+  topBar: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
   iconGlass: {
     width: 40,
     height: 40,
@@ -644,17 +516,8 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 6,
   },
-  topTitle: {
-    flex: 1,
-    textAlign: "center",
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#F9FAFB",
-  },
-  topRightSpacer: {
-    width: 40,
-    height: 40,
-  },
+  topTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "700", color: "#F9FAFB" },
+  topRightSpacer: { width: 40, height: 40 },
   searchCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -666,24 +529,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginBottom: 18,
   },
-  searchInput: {
-    flex: 1,
-    color: "#E5E7EB",
-    fontSize: 14,
-  },
-  sectionHeader: {
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#F9FAFB",
-  },
-  sectionHint: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    marginTop: 2,
-  },
+  searchInput: { flex: 1, color: "#E5E7EB", fontSize: 14 },
+  sectionHeader: { marginBottom: 10 },
+  sectionTitle: { fontSize: 16, fontWeight: "700", color: "#F9FAFB" },
+  sectionHint: { fontSize: 12, color: "#9CA3AF", marginTop: 2 },
   userListCard: {
     backgroundColor: GLASS_BG,
     borderRadius: 20,
@@ -695,17 +544,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 14 },
     shadowRadius: 24,
     elevation: 8,
-    marginBottom: 15
+    marginBottom: 15,
   },
-  listSeparator: {
-    height: 1,
-    backgroundColor: "rgba(31, 41, 55, 0.9)",
-    marginVertical: 8,
-  },
-  userCard: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  listSeparator: { height: 1, backgroundColor: "rgba(31, 41, 55, 0.9)", marginVertical: 8 },
+  userCard: { flexDirection: "row", alignItems: "center" },
   avatar: {
     width: 40,
     height: 40,
@@ -714,23 +556,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 10,
   },
-  avatarText: {
-    color: "#0F172A",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#E5E7EB",
-  },
-  userUsername: {
-    fontSize: 12,
-    color: "#9CA3AF",
-  },
+  avatarText: { color: "#0F172A", fontSize: 14, fontWeight: "700" },
+  userInfo: { flex: 1 },
+  userName: { fontSize: 14, fontWeight: "600", color: "#E5E7EB" },
+  userUsername: { fontSize: 12, color: "#9CA3AF" },
   addBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -741,12 +570,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(191, 219, 254, 0.7)",
   },
-  addBtnText: {
-    color: "#F9FAFB",
-    fontSize: 12,
-    fontWeight: "600",
-    marginLeft: 4,
-  },
+  addBtnText: { color: "#F9FAFB", fontSize: 12, fontWeight: "600", marginLeft: 4 },
   emptyStateCard: {
     backgroundColor: GLASS_BG,
     borderRadius: 20,
@@ -755,18 +579,8 @@ const styles = StyleSheet.create({
     borderColor: GLASS_BORDER,
     alignItems: "center",
   },
-  emptyTitle: {
-    marginTop: 10,
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#E5E7EB",
-  },
-  emptyText: {
-    marginTop: 4,
-    fontSize: 12,
-    color: "#9CA3AF",
-    textAlign: "center",
-  },
+  emptyTitle: { marginTop: 10, fontSize: 15, fontWeight: "600", color: "#E5E7EB" },
+  emptyText: { marginTop: 4, fontSize: 12, color: "#9CA3AF", textAlign: "center" },
 });
 
 export default Friends;

@@ -107,8 +107,8 @@ const Dashboard = ({ navigation }: any) => {
   }, []);
 
   useEffect(() => {
-    socialApi.getFollowRequests()
-      .then((res) => setFriendReqCount(res.data?.pendingRequests?.length || 0))
+    socialApi.getPendingFriendRequests()
+      .then((res) => setFriendReqCount(res.data.requests?.length || 0))
       .catch(() => setFriendReqCount(0));
   }, []);
 
