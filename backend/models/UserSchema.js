@@ -224,6 +224,18 @@ resetPasswordVerified: {
         backgroundColor: '#E5E7EB',
       }),
     },
+    friendRequests: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        requestedAt: { type: Date, default: Date.now },
+      },
+    ],
+    friends: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        since: { type: Date, default: Date.now },
+      },
+    ],
     avatarUrl: {
       type: String,
       default: '',

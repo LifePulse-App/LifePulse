@@ -45,6 +45,7 @@ import SocialRoutes from "./routes/SocialRoutes.js"
 import ProfileRoutes from "./routes/ProfileRoutes.js"
 import LeaderboardRoutes from "./routes/LeaderboardRoutes.js"
 import E2EERoutes from "./routes/e2eeRoutes.js"
+import FriendRoutes from "./routes/FriendsRoutes.js"
 
 // Middlewares
 app.use(cookieParser());
@@ -60,6 +61,7 @@ app.use("/api/social", SocialRoutes);
 app.use("/api/profile", ProfileRoutes);
 app.use("/api/leaderboard", LeaderboardRoutes);
 app.use("/api/e2ee", E2EERoutes);
+app.use("/api/friends", FriendRoutes);
 app.use(errorMiddleware)
 
 

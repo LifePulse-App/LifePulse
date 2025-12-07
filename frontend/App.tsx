@@ -21,6 +21,9 @@ import apiClient from './src/auth/api-client/api_client';
 import { setSecretKey } from './src/auth/api-client/api_client';
 import { navigationRef } from './src/navigation/main/RootNavigation';
 import 'react-native-get-random-values';
+import { TextEncoder, TextDecoder } from 'text-encoding';
+(global as any).TextEncoder = TextEncoder;
+(global as any).TextDecoder = TextDecoder;
 
 const App = () => {
   const [User, setUser] = useState<user | undefined>();
