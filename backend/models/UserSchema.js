@@ -284,25 +284,32 @@ userSchema.methods.getJwtToken = function () {
   });
 };
 
-userSchema.methods.getRefreshToken = function (deviceId) {
-    const token = Jwt.sign({ id: this._id, deviceId }, process.env.REFRESH_SECRET, {
-      expiresIn: "60d",
-    });
+const REFRESH_LIFETIME_DAYS = 60;
+const MS_IN_DAY = 24 * 60 * 60 * 1000;
 
-      // Remove any old token for this device
-  this.refreshTokens = this.refreshTokens.filter(
-    (t) => t.deviceId !== deviceId
+userSchema.methods.getRefreshToken = async function (deviceId) {
+  if (!process.env.REFRESH_SECRET) throw new Error("REFRESH_SECRET not set");
+
+  const token = Jwt.sign(
+    { id: this._id, deviceId },
+    process.env.REFRESH_SECRET,
+    { expiresIn: `${REFRESH_LIFETIME_DAYS}d` }
   );
-  
-    this.refreshTokens.push({
-      token,
-      deviceId,
-      expiresAt: Date.now() + 60 * 24 * 60 * 60 * 1000, // 60 days
-    });
-  
-    this.save({ validateBeforeSave: false });
-    return token;
-  };
+
+  const now = Date.now();
+  this.refreshTokens = this.refreshTokens
+    // drop expired + replace same device
+    .filter(t => t.deviceId !== deviceId && t.expiresAt > now);
+
+  this.refreshTokens.push({
+    token,
+    deviceId,
+    expiresAt: new Date(now + REFRESH_LIFETIME_DAYS * MS_IN_DAY),
+  });
+
+  await this.save({ validateBeforeSave: false });
+  return token;
+};
   
 
 // 🔑 Password reset code

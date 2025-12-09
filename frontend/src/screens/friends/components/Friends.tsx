@@ -92,8 +92,11 @@ const Friends = ({ navigation }: any) => {
   const fetchSuggestions = useCallback(async () => {
     try {
       const res = await socialApi.getSuggestedUsers(10);
-      setSuggestions(res.data.suggestions ?? []);
-    } catch {
+      const data = (res?.data?.suggestions ?? []).filter((u: any) => u?._id);
+      console.log("[FRIENDS] fetched suggestions count:", data.length, "| sample:", data[0]);
+      setSuggestions(data);
+    } catch (e) {
+      console.log("[FRIENDS] fetchSuggestions error:", e);
       setSuggestions([]);
     }
   }, []);
@@ -101,8 +104,11 @@ const Friends = ({ navigation }: any) => {
   const fetchSearch = useCallback(async () => {
     try {
       const res = await socialApi.searchUsers(`q=${encodeURIComponent(search)}`);
-      setAllUsers(res.data.user ?? []);
-    } catch {
+      const data = (res?.data?.user ?? []).filter((u: any) => u?._id);
+      console.log("[FRIENDS] fetched search count:", data.length, "| sample:", data[0]);
+      setAllUsers(data);
+    } catch (e) {
+      console.log("[FRIENDS] fetchSearch error:", e);
       setAllUsers([]);
     }
   }, [search]);
@@ -110,8 +116,27 @@ const Friends = ({ navigation }: any) => {
   const fetchRequests = useCallback(async () => {
     try {
       const res = await socialApi.getPendingFriendRequests();
-      setFriendRequests(res.data.requests ?? []);
-    } catch {
+           const cleaned = (res?.data?.requests ?? [])
+             .map((r: any) => {
+               if (r?.user?._id) return r;
+               // normalize shape if API returns flat {_id, name, username, requestedAt}
+               return {
+                 ...r,
+                 user: {
+                   _id: r._id,
+                   name: r.name,
+                   username: r.username,
+                   avatarColor: r.avatarColor,
+                   isFriend: r.isFriend,
+                   requestSent: r.requestSent,
+                   requestIncoming: r.requestIncoming,
+                 },
+                 requestedAt: r.requestedAt,
+               };
+             })
+             .filter((r: any) => r?.user?._id);
+           setFriendRequests(cleaned);
+    } catch (e) {
       setFriendRequests([]);
     }
   }, []);
@@ -137,7 +162,8 @@ const Friends = ({ navigation }: any) => {
       await socialApi.sendFriendRequest(user._id);
       setNotification({ type: "success", message: `Request sent to ${user.name || user.username}` });
       isSearching ? await fetchSearch() : await fetchSuggestions();
-    } catch {
+    } catch (e) {
+      console.log("[FRIENDS] handleAddFriend error:", e);
       setNotification({ type: "error", message: "Could not send friend request." });
     }
     setLoadingActions(null);
@@ -149,7 +175,8 @@ const Friends = ({ navigation }: any) => {
       await socialApi.removeFriendRequest(user._id);
       setNotification({ type: "success", message: `Removed request to ${user.name || user.username}` });
       isSearching ? await fetchSearch() : await fetchSuggestions();
-    } catch {
+    } catch (e) {
+      console.log("[FRIENDS] handleCancelRequest error:", e);
       setNotification({ type: "error", message: "Couldn't remove friend request." });
     }
     setLoadingActions(null);
@@ -157,26 +184,38 @@ const Friends = ({ navigation }: any) => {
   };
 
   const handleAcceptRequest = async (req: FollowRequest) => {
-    setLoadingActions(req.user._id);
+    const id = req?.user?._id;
+    if (!id) {
+      console.log("[FRIENDS] handleAcceptRequest missing user._id", req);
+      return;
+    }
+    setLoadingActions(id);
     try {
-      await socialApi.acceptFriendRequest(req.user._id);
+      await socialApi.acceptFriendRequest(id);
       setNotification({ type: "success", message: `Accepted request from ${req.user.name}` });
-      setFriendRequests((prev) => prev.filter((r) => r.user._id !== req.user._id));
+      setFriendRequests((prev) => prev.filter((r) => r.user._id !== id));
       isSearching ? await fetchSearch() : await fetchSuggestions();
-    } catch {
+    } catch (e) {
+      console.log("[FRIENDS] handleAcceptRequest error:", e);
       setNotification({ type: "error", message: "Couldn't accept request." });
     }
     setLoadingActions(null);
   };
 
   const handleRejectRequest = async (req: FollowRequest) => {
-    setLoadingActions(req.user._id);
+    const id = req?.user?._id;
+    if (!id) {
+      console.log("[FRIENDS] handleRejectRequest missing user._id", req);
+      return;
+    }
+    setLoadingActions(id);
     try {
-      await socialApi.removeFriendRequest(req.user._id);
+      await socialApi.removeFriendRequest(id);
       setNotification({ type: "success", message: `Rejected request from ${req.user.name}` });
-      setFriendRequests((prev) => prev.filter((r) => r.user._id !== req.user._id));
+      setFriendRequests((prev) => prev.filter((r) => r.user._id !== id));
       isSearching ? await fetchSearch() : await fetchSuggestions();
-    } catch {
+    } catch (e) {
+      console.log("[FRIENDS] handleRejectRequest error:", e);
       setNotification({ type: "error", message: "Couldn't reject request." });
     }
     setLoadingActions(null);
@@ -185,6 +224,10 @@ const Friends = ({ navigation }: any) => {
   const renderUserItem = ({ item }: { item: UserProfile | FollowRequest }) => {
     const isRequest = (item as FollowRequest).requestedAt !== undefined;
     const user = isRequest ? (item as FollowRequest).user : (item as UserProfile);
+    if (!user || !user._id) {
+      console.log("[FRIENDS] renderUserItem skipped bad user:", item);
+      return null;
+    }
     const initials =
       user.name?.split(" ").map((p) => p[0]).join("").toUpperCase().slice(0, 2) ||
       user.username?.slice(0, 2)?.toUpperCase() ||
@@ -338,7 +381,9 @@ const Friends = ({ navigation }: any) => {
                 </View>
                 <FlatList
                   data={requestListToShow}
-                  keyExtractor={(item) => item.user._id}
+                  keyExtractor={(item) =>
+                    (item as any)?.user?._id || (item as any)?._id || Math.random().toString()
+                  }
                   renderItem={renderUserItem}
                   scrollEnabled={false}
                   ItemSeparatorComponent={() => <View style={styles.listSeparator} />}

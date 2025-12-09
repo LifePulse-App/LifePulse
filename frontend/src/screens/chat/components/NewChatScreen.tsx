@@ -1,20 +1,31 @@
-import React, { useState, useEffect } from "react";
-import { View, FlatList, TouchableOpacity, StyleSheet, TextInput } from "react-native";
+import React, { useState, useEffect, useCallback } from "react";
+import { View, FlatList, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import NetInfo from "@react-native-community/netinfo";
 import MainLayout from "../../../shared/components/MainLayout";
+import api from "../../friends/services/api_friends";
 
-const mockUsers = [
-  { _id: "u1", name: "Alice" },
-  { _id: "u2", name: "Bob" },
-  { _id: "u3", name: "Carol" },
-];
+type Friend = { _id: string; name: string; username?: string; avatar?: any };
 
 export default function NewChatScreen({ navigation }: any) {
   const [q, setQ] = useState("");
   const [offline, setOffline] = useState(false);
-  const filtered = mockUsers.filter((u) => u.name.toLowerCase().includes(q.toLowerCase()));
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadFriends = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await api.getFriends();
+      setFriends(res?.data?.friends || []);
+    } catch (e) {
+      console.log("friends load error", e);
+      setFriends([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
@@ -24,13 +35,21 @@ export default function NewChatScreen({ navigation }: any) {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    loadFriends();
+  }, [loadFriends]);
+
+  const filtered = friends.filter((u) =>
+    (u.name || "").toLowerCase().includes(q.toLowerCase()) ||
+    (u.username || "").toLowerCase().includes(q.toLowerCase())
+  );
+
   return (
     <MainLayout>
       <View style={styles.root}>
         <View style={styles.baseBackground} />
         <View style={styles.glowTop} />
         <View style={styles.glowBottom} />
-
         <View style={{ flex: 1 }}>
           <View style={styles.topBar}>
             <View>
@@ -48,26 +67,36 @@ export default function NewChatScreen({ navigation }: any) {
             <Icon name="magnify" size={20} color="#94a3b8" />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search users"
+              placeholder="Search friends"
               placeholderTextColor="#94a3b8"
               value={q}
               onChangeText={setQ}
             />
           </View>
 
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => item._id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => navigation.navigate("chat", { peerUserId: item._id, peerName: item.name })}
-              >
-                <Text style={styles.name}>{item.name}</Text>
-              </TouchableOpacity>
-            )}
-            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-          />
+          {loading ? (
+            <ActivityIndicator color="#fff" style={{ marginTop: 12 }} />
+          ) : (
+            <FlatList
+              data={filtered}
+              keyExtractor={(item) => item._id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.row}
+                  onPress={() => navigation.navigate("chat", { peerUserId: item._id, peerName: item.name })}
+                >
+                  <Text style={styles.name}>{item.name}</Text>
+                  {item.username ? <Text style={styles.sub}>{item.username}</Text> : null}
+                </TouchableOpacity>
+              )}
+              ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+              ListEmptyComponent={
+                <Text style={{ color: "#94a3b8", textAlign: "center", marginTop: 12 }}>
+                  No friends found.
+                </Text>
+              }
+            />
+          )}
         </View>
       </View>
     </MainLayout>
@@ -89,4 +118,5 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, color: "#fff", paddingVertical: 8, marginLeft: 6 },
   row: { backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12 },
   name: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  sub: { color: "#94a3b8", fontSize: 12, marginTop: 2 },
 });

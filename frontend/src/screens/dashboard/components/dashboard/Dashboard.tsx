@@ -106,11 +106,34 @@ const Dashboard = ({ navigation }: any) => {
     };
   }, []);
 
-  useEffect(() => {
-    socialApi.getPendingFriendRequests()
-      .then((res) => setFriendReqCount(res.data.requests?.length || 0))
-      .catch(() => setFriendReqCount(0));
-  }, []);
+  const refreshPendingCount = useCallback(async () => {
+      try {
+        const res = await socialApi.getPendingFriendRequests();
+        const cleaned = (res?.data?.requests ?? []).map((r: any) =>
+          r?.user?._id
+            ? r
+            : {
+                ...r,
+                user: {
+                  _id: r._id,
+                  name: r.name,
+                  username: r.username,
+                  avatarColor: r.avatarColor,
+                  isFriend: r.isFriend,
+                  requestSent: r.requestSent,
+                  requestIncoming: r.requestIncoming,
+                },
+                requestedAt: r.requestedAt,
+              }
+        ).filter((r: any) => r?.user?._id);
+        setFriendReqCount(cleaned.length);
+      } catch {
+        setFriendReqCount(0);
+      }
+    }, []);
+
+    useEffect(() => { refreshPendingCount(); }, [refreshPendingCount]);
+    useFocusEffect(useCallback(() => { refreshPendingCount(); }, [refreshPendingCount]));
 
   const fetchTodayHabits = useCallback(async () => {
     try {
@@ -171,7 +194,8 @@ const Dashboard = ({ navigation }: any) => {
   useFocusEffect(
     useCallback(() => {
       fetchDashboard();
-    }, [fetchDashboard])
+     refreshPendingCount();
+    }, [fetchDashboard, refreshPendingCount])
   );
 
   useFocusEffect(

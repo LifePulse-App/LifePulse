@@ -67,10 +67,9 @@ const generateBackupCodes = () => {
   return codes;
 };
 
-const sendTokens = async (res, user, deviceId) => {                
+const sendTokens = async (res, user, deviceId) => {
   const accessToken = user.getJwtToken();
-  const refreshToken = user.getRefreshToken(deviceId || "Unknown");
-
+  const refreshToken = await user.getRefreshToken(deviceId || "Unknown");
   return {
     accessToken,
     refreshToken,
@@ -355,25 +354,33 @@ const ssoLoginHandler = async (req, res, next, { provider, providerId, email, na
   }
 };
 
-// Refresh Token
 export const refreshToken = catchAsyncErrors(async (req, res, next) => {
   try {
     const { token } = req.body;
     if (!token) return next(new ErrorHandler("No refresh token provided", 401));
+    if (!process.env.REFRESH_SECRET) throw new Error("REFRESH_SECRET not set");
 
-    const decoded = Jwt.verify(token, process.env.REFRESH_SECRET);
-
+    const decoded = Jwt.verify(token, process.env.REFRESH_SECRET); // throws on exp/invalid
     const user = await User.findById(decoded.id);
     if (!user) return next(new ErrorHandler("User not found", 401));
 
+    const now = Date.now();
     const storedToken = user.refreshTokens.find((t) => t.token === token);
-    if (!storedToken) return next(new ErrorHandler("Invalid token", 401));
 
+    if (
+      !storedToken ||
+      storedToken.expiresAt <= now ||
+      storedToken.deviceId !== decoded.deviceId
+    ) {
+      return next(new ErrorHandler("Invalid or expired token", 401));
+    }
+
+    // rotate: remove the used token
     user.refreshTokens = user.refreshTokens.filter((t) => t.token !== token);
     await user.save({ validateBeforeSave: false });
 
     const tokens = await sendTokens(res, user, storedToken.deviceId);
-    res.status(200).json({ success: true, ...tokens });
+    return res.status(200).json({ success: true, ...tokens });
   } catch (err) {
     return next(new ErrorHandler("Invalid or expired token", 401));
   }
