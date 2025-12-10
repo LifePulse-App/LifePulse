@@ -1,4 +1,3 @@
-import { Request, Response } from "express";
 import E2EEDevice from "../models/E2EEDevice.js";
 import E2EEMessage from "../models/E2EEMessage.js";
 
