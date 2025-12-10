@@ -89,8 +89,10 @@ export const storeMessage = async (req, res) => {
  */
 export const pullMessages = async (req, res) => {
   try {
-    console.log(req);
-    const { deviceId } = req.query;
+    console.log(req.query);
+    const deviceId =
+  (req.query.deviceId ) ||
+  (req.query["params[deviceId]"]);
     if (!deviceId) return res.status(400).json({ message: "deviceId required" });
 
     const msgs = await E2EEMessage.find({
