@@ -6,7 +6,11 @@ const normalizeScope = (scope) => (scope || 'world').toString().trim().toLowerCa
 const normalizeLocation = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : v);
 
 // Read query params safely (flat or nested under params)
-const getQueryVal = (q, key) => q?.[key] ?? q?.params?.[key];
+// Read query params safely (flat, nested under params, or bracketed like params[scope])
+const getQueryVal = (q, key) =>
+  q?.[key] ??
+  q?.params?.[key] ??
+  q?.[`params[${key}]`];
 
 const buildScopeFilter = (scope, user, query) => {
   const userCountry = normalizeLocation(user.country);
