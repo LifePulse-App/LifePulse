@@ -2,29 +2,26 @@ import User from '../models/UserSchema.js';
 import ErrorHandler from '../utils/errorHandler.js';
 import catchAsyncErrors from '../utils/catchAsyncErrors.js';
 
-const normalizeScope = (scope) =>
-  (scope || 'world').toString().trim().toLowerCase();
-
-const normalizeLocation = (value) =>
-  typeof value === 'string' ? value.trim().toLowerCase() : value;
+const normalizeScope = (scope) => (scope || 'world').toString().trim().toLowerCase();
+const normalizeLocation = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : v);
 
 const buildScopeFilter = (scope, user, query) => {
   const userCountry = normalizeLocation(user.country);
   const userCity = normalizeLocation(user.city);
-  const queryCountry = normalizeLocation(query.country);
-  const queryCity = normalizeLocation(query.city);
+  const qCountry = normalizeLocation(query.country);
+  const qCity = normalizeLocation(query.city);
 
   switch (scope) {
     case 'city': {
-      const city = queryCity || userCity;
-      const country = queryCountry || userCountry;
-      if (!city || !country) {
+      const country = qCountry || userCountry;
+      const city = qCity || userCity;
+      if (!country || !city) {
         throw new ErrorHandler('City scope requires country and city (profile or query)', 400);
       }
       return { country, city };
     }
     case 'country': {
-      const country = queryCountry || userCountry;
+      const country = qCountry || userCountry;
       if (!country) {
         throw new ErrorHandler('Country scope requires country (profile or query)', 400);
       }
@@ -36,6 +33,7 @@ const buildScopeFilter = (scope, user, query) => {
   }
 };
 
+// Friends = following + self
 const getFriendIds = (userDoc) => {
   const ids = new Set();
   ids.add(String(userDoc._id));
@@ -68,6 +66,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
       _id: { $in: friendIds },
       monthlyXp: { $gt: user.monthlyXp },
     });
+
     const userRank = user.monthlyXp > 0 ? higherCount + 1 : null;
 
     return res.status(200).json({
@@ -107,7 +106,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
     { monthlyXp: { $gt: 0 }, ...scopeFilter },
     'username name monthlyXp level currentTitle country city avatarThumbnailUrl'
   )
-    .collation({ locale: 'en', strength: 2 }) // case-insensitive city/country
+    .collation({ locale: 'en', strength: 2 })
     .sort({ monthlyXp: -1, _id: 1 })
     .limit(100)
     .lean();
@@ -173,6 +172,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
       _id: { $in: friendIds },
       totalXp: { $gt: user.totalXp },
     });
+
     const userRank = user.totalXp > 0 ? higherCount + 1 : null;
 
     return res.status(200).json({
