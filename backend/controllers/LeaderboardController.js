@@ -5,7 +5,6 @@ import catchAsyncErrors from '../utils/catchAsyncErrors.js';
 const normalizeScope = (scope) => (scope || 'world').toString().trim().toLowerCase();
 const normalizeLocation = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : v);
 
-// Read query params safely (flat or nested under params)
 // Read query params safely (flat, nested under params, or bracketed like params[scope])
 const getQueryVal = (q, key) =>
   q?.[key] ??
@@ -67,10 +66,12 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
   const rawScope = getQueryVal(req.query, 'scope');
   const rawCountry = getQueryVal(req.query, 'country');
   const rawCity = getQueryVal(req.query, 'city');
+  console.log('[LB][monthly] raw query', req.query);
+  console.log('[LB][monthly] parsed', { rawScope, rawCountry, rawCity });
 
   const scope = normalizeScope(rawScope);
   const user = await User.findById(req.user._id).select(
-    'monthlyXp totalXp level currentTitle country city username name avatarThumbnailUrl following'
+    'monthlyXp totalXp level currentTitle country city username name avatarThumbnailUrl following friends'
   );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
@@ -125,6 +126,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
   }
 
   const scopeFilter = buildScopeFilter(scope, user, { country: rawCountry, city: rawCity });
+  console.log('[LB][monthly] scopeFilter', scopeFilter);
 
   const topPlayers = await User.find(
     { monthlyXp: { $gt: 0 }, ...scopeFilter },
@@ -178,10 +180,12 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
   const rawScope = getQueryVal(req.query, 'scope');
   const rawCountry = getQueryVal(req.query, 'country');
   const rawCity = getQueryVal(req.query, 'city');
+  console.log('[LB][permanent] raw query', req.query);
+  console.log('[LB][permanent] parsed', { rawScope, rawCountry, rawCity });
 
   const scope = normalizeScope(rawScope);
   const user = await User.findById(req.user._id).select(
-    'totalXp level currentTitle country city username name avatarThumbnailUrl following'
+    'totalXp level currentTitle country city username name avatarThumbnailUrl following friends'
   );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
