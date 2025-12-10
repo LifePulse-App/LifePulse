@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   StyleSheet,
@@ -71,6 +71,9 @@ const LeaderboardScreen = () => {
     ? `You can change your location again in ${lockStatus.daysLeft} day(s).`
     : null;
 
+  // Keep latest currentUser without re-rendering load callback
+  const currentUserRef = useRef<any>(null);
+
   // Load country list once
   useEffect(() => {
     const list = Country.getAllCountries().map((c) => ({
@@ -126,12 +129,40 @@ const LeaderboardScreen = () => {
     }
   }, []);
 
+  const resolveCountryCityParams = () => {
+    if (scope === "country" || scope === "city") {
+      const countryLabel =
+        countryOptions.find((c) => c.value === selectedCountryCode)?.label ||
+        currentUserRef.current?.country;
+      const cityValue =
+        scope === "city"
+          ? selectedCity || currentUserRef.current?.city
+          : undefined;
+      return { country: countryLabel, city: cityValue };
+    }
+    return { country: undefined, city: undefined };
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
     try {
       const api = tab === "monthly" ? getMonthlyLeaderboard : getPermanentLeaderboard;
-      const res = await api(scope);
+      const { country, city } = resolveCountryCityParams();
+
+      if ((scope === "country" || scope === "city") && !country) {
+        setErrorMsg("Please set your country first to view this leaderboard.");
+        setLoading(false);
+        return;
+      }
+      if (scope === "city" && !city) {
+        setErrorMsg("Please set your city to view the city leaderboard.");
+        setLoading(false);
+        return;
+      }
+
+      const res = await api(scope, country, city);
+      currentUserRef.current = res.data?.currentUser || null;
       setData(res.data);
     } catch (e: any) {
       setData(null);
@@ -139,7 +170,7 @@ const LeaderboardScreen = () => {
     } finally {
       setLoading(false);
     }
-  }, [tab, scope]);
+  }, [tab, scope, selectedCountryCode, selectedCity, countryOptions]);
 
   useFocusEffect(
     useCallback(() => {
@@ -152,6 +183,13 @@ const LeaderboardScreen = () => {
     }, [load, loadLockStatus])
   );
 
+  // Re-run when scope or tab changes
+  useEffect(() => {
+    (async () => {
+      await load();
+    })();
+  }, [scope, tab, load]);
+
   // Monthly reset countdown (UTC)
   useEffect(() => {
     if (tab !== "monthly") return;
@@ -159,7 +197,7 @@ const LeaderboardScreen = () => {
       const now = new Date();
       const year = now.getUTCFullYear();
       const month = now.getUTCMonth();
-      const nextReset = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0)); // 1st of next month 00:00 UTC
+      const nextReset = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0));
       let diff = nextReset.getTime() - now.getTime();
       if (diff < 0) diff = 0;
 
@@ -238,6 +276,11 @@ const LeaderboardScreen = () => {
 
   const currentUser = data?.currentUser;
 
+  const handleScopeSelect = (newScope: "world" | "country" | "city" | "friends") => {
+    setScope(newScope);
+    setErrorMsg(null);
+  };
+
   return (
     <MainLayout>
       <View style={styles.root}>
@@ -277,7 +320,7 @@ const LeaderboardScreen = () => {
               <TouchableOpacity
                 key={s.key}
                 style={[styles.scopeBtn, scope === s.key && styles.scopeBtnActive]}
-                onPress={() => setScope(s.key)}
+                onPress={() => handleScopeSelect(s.key)}
               >
                 <Text style={[styles.scopeText, scope === s.key && styles.scopeTextActive]}>
                   {s.label}
@@ -472,11 +515,11 @@ const LeaderboardScreen = () => {
             <View style={styles.modalCard}>
               <Text style={styles.modalTitle}>Leaderboard Rules</Text>
               <Text style={styles.modalText}>
-                • Monthly leaderboard resets at 00:00 UTC on the 1st of each month.{'\n'}
-                • Location changes are locked for 30 days after each update.{'\n'}
-                • Points shown are XP: Monthly XP (monthly tab) and Total XP (all-time tab).{'\n'}
-                • S Points will be rewarded on the basis 500 to 1st, 250 to 2nd & 100 to 3-100.{'\n'}
-                • S Points can be used in redeem store.{'\n'}
+                • Monthly leaderboard resets at 00:00 UTC on the 1st of each month.{"\n"}
+                • Location changes are locked for 30 days after each update.{"\n"}
+                • Points shown are XP: Monthly XP (monthly tab) and Total XP (all-time tab).{"\n"}
+                • S Points will be rewarded on the basis 500 to 1st, 250 to 2nd & 100 to 3-100.{"\n"}
+                • S Points can be used in redeem store.{"\n"}
                 • Timer shown is based on UTC.
               </Text>
               <View style={styles.modalButtons}>
@@ -585,7 +628,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.4)",
+    borderColor: "rgba(148, 163, 184, 0.4)",
   },
   locationTitle: { color: "#e5e7eb", fontWeight: "700", marginBottom: 8, fontSize: 13 },
   lockText: { color: "#f59e0b", fontSize: 12, marginBottom: 8 },

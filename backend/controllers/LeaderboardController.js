@@ -45,6 +45,7 @@ const getFriendIds = (userDoc) => {
 
 // MONTHLY
 export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => {
+  console.log(req);
   const scope = normalizeScope(req.query.scope);
   const user = await User.findById(req.user._id).select(
     'monthlyXp totalXp level currentTitle country city username name avatarThumbnailUrl following'
