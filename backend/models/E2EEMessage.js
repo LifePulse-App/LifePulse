@@ -1,20 +1,17 @@
-import mongoose from "mongoose";
+import { Schema, model } from "mongoose";
 
-const e2eeMessageSchema = new mongoose.Schema(
+const e2eeMessageSchema = new Schema(
   {
-    toUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true, required: true },
-    toDeviceId: { type: String, index: true, required: true },
-    fromUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    fromDeviceId: { type: String, required: true },
-    sessionId: { type: String, required: true },   // sender-side session identifier
-    header: { type: Object, required: true },      // ratchet header
-    ciphertext: { type: String, required: true },  // base64
-    delivered: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now, index: true },
+    toUserId: { type: Schema.Types.ObjectId, ref: "User", index: true },
+    toDeviceId: { type: String, index: true },   // string device id (matches deviceId in E2EEDevice)
+    fromUserId: { type: Schema.Types.ObjectId, ref: "User" },
+    fromDeviceId: { type: String },
+    sessionId: String,
+    header: Schema.Types.Mixed,
+    ciphertext: String,
+    delivered: { type: Boolean, default: false, index: true },
   },
   { timestamps: true }
 );
 
-e2eeMessageSchema.index({ toUserId: 1, toDeviceId: 1, delivered: 1 });
-
-export default mongoose.model("E2EEMessage", e2eeMessageSchema);
+export default model("E2EEMessage", e2eeMessageSchema);

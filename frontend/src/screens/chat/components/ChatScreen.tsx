@@ -16,34 +16,57 @@ import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { sendCipher, pullMessages, fetchDevices } from "../services/api_e2ee";
 import { SessionManager } from "../services/SessionManager";
+import { toDeviceRegistrationId } from "../services/deviceRegistrationId";
 import AuthContext from "../../../auth/user/UserContext";
 import DeviceInfo from "react-native-device-info";
 
 export default function ChatScreen({ route, navigation }: any) {
-  const user = useContext(AuthContext)  
-  const deviceId = DeviceInfo.getUniqueIdSync();
+  const user = useContext(AuthContext);
+  const deviceId = DeviceInfo.getUniqueIdSync(); // string for API and DB
+  const deviceRegId = toDeviceRegistrationId(deviceId); // numeric for Signal
   const { peerUserId, peerName } = route.params;
   const insets = useSafeAreaInsets();
-  const myUserId = user?.User?.user?.id;       
-  const [sessionManager] = useState(() => new SessionManager(myUserId, deviceId));
+  const myUserId = user?.User?.user?.id;
+
+  const [sessionManager] = useState(() =>
+    new SessionManager(myUserId, deviceRegId)
+  );
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const flatRef = useRef<FlatList>(null);
 
-  const scrollToBottom = () => requestAnimationFrame(() => flatRef.current?.scrollToEnd({ animated: true }));
+  const scrollToBottom = () =>
+    requestAnimationFrame(() => flatRef.current?.scrollToEnd({ animated: true }));
+
+  const msgKey = (m: any) =>
+    `${m.fromUserId}-${m.fromDeviceId}-${new Date(m.createdAt).getTime()}-${m.ciphertext ?? m.plaintext ?? ""}`;
 
   const loadIncoming = useCallback(async () => {
     try {
-      const { data } = await pullMessages(deviceId);
-      console.log(data);
-      
+      const { data } = await pullMessages(deviceId); // deviceId string
       const decrypted: any[] = [];
       for (const m of data.messages || []) {
-        const pt = await sessionManager.decrypt(m.fromUserId, m.fromDeviceId, { type: m.header?.t, body: m.ciphertext });
-        decrypted.push({ ...m, plaintext: pt });
+        const pt = await sessionManager.decrypt(
+          m.fromUserId,
+          toDeviceRegistrationId(String(m.fromDeviceId)), // ensure numeric
+          { type: m.header?.t, body: m.ciphertext }
+        );
+        decrypted.push({ ...m, plaintext: pt, createdAt: m.createdAt ?? new Date().toISOString() });
       }
       if (decrypted.length) {
-        setMessages((prev) => [...prev, ...decrypted].sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt)));
+        setMessages((prev) => {
+          const merged = [...prev, ...decrypted];
+          const seen = new Set<string>();
+          const unique = merged.filter((m) => {
+            const k = msgKey(m);
+            if (seen.has(k)) return false;
+            seen.add(k);
+            return true;
+          });
+          return unique.sort(
+            (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          );
+        });
         scrollToBottom();
       }
     } catch (e) {
@@ -53,32 +76,51 @@ export default function ChatScreen({ route, navigation }: any) {
 
   useEffect(() => {
     const unsub = navigation.addListener("focus", loadIncoming);
+    loadIncoming(); // initial
     return unsub;
   }, [navigation, loadIncoming]);
 
   useEffect(() => {
-    const show = Keyboard.addListener("keyboardWillShow", () => LayoutAnimation.easeInEaseOut());
-    const hide = Keyboard.addListener("keyboardWillHide", () => LayoutAnimation.easeInEaseOut());
-    return () => { show.remove(); hide.remove(); };
+    const show = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      () => LayoutAnimation.easeInEaseOut()
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => LayoutAnimation.easeInEaseOut()
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
   }, []);
 
   const send = useCallback(async () => {
     if (!input.trim()) return;
     try {
       const { data } = await fetchDevices(peerUserId);
+      const now = new Date().toISOString();
+
       for (const d of data.devices || []) {
-        await sessionManager.ensureSession(peerUserId, d.deviceId, d);
-        const cipherPayload = await sessionManager.encrypt(peerUserId, d.deviceId, input);
+        const peerRegId = toDeviceRegistrationId(String(d.deviceId));
+        await sessionManager.ensureSession(peerUserId, peerRegId, d);
+        const cipherPayload = await sessionManager.encrypt(peerUserId, peerRegId, input);
         await sendCipher({
           toUserId: peerUserId,
-          toDeviceId: d.deviceId,
-          fromDeviceId: deviceId,
+          toDeviceId: d.deviceId, // string stored in DB
+          fromDeviceId: deviceId, // string stored in DB
           sessionId: `sess-${peerUserId}-${d.deviceId}`,
           header: { t: cipherPayload.type },
           ciphertext: cipherPayload.body,
         });
       }
-      const outgoing = { fromUserId: myUserId, plaintext: input, createdAt: new Date() };
+
+      const outgoing = {
+        fromUserId: myUserId,
+        fromDeviceId: deviceId,
+        plaintext: input,
+        createdAt: now,
+      };
       setMessages((prev) => [...prev, outgoing]);
       setInput("");
       scrollToBottom();
@@ -114,7 +156,7 @@ export default function ChatScreen({ route, navigation }: any) {
               <FlatList
                 ref={flatRef}
                 data={messages}
-                keyExtractor={(_, i) => String(i)}
+                keyExtractor={msgKey}
                 contentContainerStyle={[styles.listContent, { paddingBottom: 90 + insets.bottom }]}
                 renderItem={({ item }) => (
                   <View style={[styles.bubble, item.fromUserId === myUserId && styles.bubbleMe]}>

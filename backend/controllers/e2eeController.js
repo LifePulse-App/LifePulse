@@ -1,19 +1,20 @@
+import { Request, Response } from "express";
 import E2EEDevice from "../models/E2EEDevice.js";
 import E2EEMessage from "../models/E2EEMessage.js";
 
 /**
- * Register or update a device bundle (public keys only)
+ * Register or update a device bundle (must include numeric registrationId)
  */
 export const registerDevice = async (req, res) => {
   try {
-    const { deviceId, identityPub, signedPrekeyPub, signedPrekeySig, oneTimePrekeys } = req.body;
-    if (!deviceId || !identityPub || !signedPrekeyPub || !signedPrekeySig || !Array.isArray(oneTimePrekeys)) {
+    const { deviceId, registrationId, identityPub, signedPrekeyPub, signedPrekeySig, signedPrekeyId, oneTimePrekeys } = req.body;
+    if (!deviceId || registrationId === undefined || !identityPub || !signedPrekeyPub || !signedPrekeySig || !Array.isArray(oneTimePrekeys)) {
       return res.status(400).json({ message: "Missing fields" });
     }
 
     await E2EEDevice.findOneAndUpdate(
       { userId: req.user._id, deviceId },
-      { identityPub, signedPrekeyPub, signedPrekeySig, oneTimePrekeys, lastPrekeyRefresh: new Date() },
+      { registrationId, identityPub, signedPrekeyPub, signedPrekeySig, signedPrekeyId, oneTimePrekeys, lastPrekeyRefresh: new Date() },
       { upsert: true, new: true }
     );
 
@@ -25,7 +26,7 @@ export const registerDevice = async (req, res) => {
 };
 
 /**
- * Fetch all device bundles for a user (for multi-device fan-out)
+ * Fetch all device bundles for a user
  */
 export const getDevices = async (req, res) => {
   try {
@@ -89,10 +90,9 @@ export const storeMessage = async (req, res) => {
  */
 export const pullMessages = async (req, res) => {
   try {
-    console.log(req.query);
     const deviceId =
-  (req.query.deviceId ) ||
-  (req.query["params[deviceId]"]);
+      (req.query.deviceId) ||
+      (req.query["params[deviceId]"] );
     if (!deviceId) return res.status(400).json({ message: "deviceId required" });
 
     const msgs = await E2EEMessage.find({
@@ -103,7 +103,12 @@ export const pullMessages = async (req, res) => {
       .sort({ createdAt: 1 })
       .lean();
 
-    await E2EEMessage.updateMany({ _id: { $in: msgs.map((m) => m._id) } }, { $set: { delivered: true } });
+    if (msgs.length) {
+      await E2EEMessage.updateMany(
+        { _id: { $in: msgs.map((m) => m._id) } },
+        { $set: { delivered: true } }
+      );
+    }
 
     res.json({ messages: msgs });
   } catch (err) {

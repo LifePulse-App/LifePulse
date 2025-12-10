@@ -1,24 +1,25 @@
-import mongoose from "mongoose";
+import { Schema, model } from "mongoose";
 
-const e2eeDeviceSchema = new mongoose.Schema(
+const e2eeDeviceSchema = new Schema(
   {
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true, required: true },
-    deviceId: { type: String, required: true, index: true }, // unique per device
-    identityPub: { type: String, required: true },
-    signedPrekeyPub: { type: String, required: true },
-    signedPrekeySig: { type: String, required: true },
+    userId: { type: Schema.Types.ObjectId, ref: "User", index: true },
+    deviceId: { type: String, index: true },            // string device id (e.g., DeviceInfo.getUniqueIdSync())
+    registrationId: { type: Number, required: true },   // numeric Signal registration id
+    identityPub: String,
+    signedPrekeyPub: String,
+    signedPrekeySig: String,
+    signedPrekeyId: { type: Number, default: 1 },
     oneTimePrekeys: [
       {
-        keyId: { type: String, required: true },
-        pubKey: { type: String, required: true },
-        used: { type: Boolean, default: false },
+        keyId: Number,
+        pubKey: String,
       },
     ],
-    lastPrekeyRefresh: { type: Date, default: Date.now },
+    lastPrekeyRefresh: Date,
   },
   { timestamps: true }
 );
 
-e2eeDeviceSchema.index({ userId: 1, deviceId: 1 }, { unique: true });
+E2EEDeviceSchema.index({ userId: 1, deviceId: 1 }, { unique: true });
 
-export default mongoose.model("E2EEDevice", e2eeDeviceSchema);
+export default model("E2EEDevice", e2eeDeviceSchema);

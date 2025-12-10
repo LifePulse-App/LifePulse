@@ -18,6 +18,7 @@ export class SignalStore {
   async storeIdentityKeyPair(pair: any) {
     await Keychain.setGenericPassword("id", JSON.stringify(pair), { service: SVC_ID });
   }
+
   async getLocalRegistrationId() {
     const creds = await Keychain.getGenericPassword({ service: `${SVC_ID}_REG` });
     return creds?.password ? JSON.parse(creds.password) : undefined;
