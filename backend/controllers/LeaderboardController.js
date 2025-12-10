@@ -5,6 +5,9 @@ import catchAsyncErrors from '../utils/catchAsyncErrors.js';
 const normalizeScope = (scope) => (scope || 'world').toString().trim().toLowerCase();
 const normalizeLocation = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : v);
 
+// Read query params safely (flat or nested under params)
+const getQueryVal = (q, key) => q?.[key] ?? q?.params?.[key];
+
 const buildScopeFilter = (scope, user, query) => {
   const userCountry = normalizeLocation(user.country);
   const userCity = normalizeLocation(user.city);
@@ -45,8 +48,7 @@ const getFriendIds = (userDoc) => {
 
 // MONTHLY
 export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => {
-  console.log(req);
-  const scope = normalizeScope(req.query.scope);
+  const scope = normalizeScope(getQueryVal(req.query, 'scope'));
   const user = await User.findById(req.user._id).select(
     'monthlyXp totalXp level currentTitle country city username name avatarThumbnailUrl following'
   );
@@ -101,7 +103,10 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
     });
   }
 
-  const scopeFilter = buildScopeFilter(scope, user, req.query);
+  const scopeFilter = buildScopeFilter(scope, user, {
+    country: getQueryVal(req.query, 'country'),
+    city: getQueryVal(req.query, 'city'),
+  });
 
   const topPlayers = await User.find(
     { monthlyXp: { $gt: 0 }, ...scopeFilter },
@@ -152,7 +157,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
 
 // PERMANENT
 export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) => {
-  const scope = normalizeScope(req.query.scope);
+  const scope = normalizeScope(getQueryVal(req.query, 'scope'));
   const user = await User.findById(req.user._id).select(
     'totalXp level currentTitle country city username name avatarThumbnailUrl following'
   );
@@ -207,7 +212,10 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
     });
   }
 
-  const scopeFilter = buildScopeFilter(scope, user, req.query);
+  const scopeFilter = buildScopeFilter(scope, user, {
+    country: getQueryVal(req.query, 'country'),
+    city: getQueryVal(req.query, 'city'),
+  });
 
   const topPlayers = await User.find(
     { totalXp: { $gt: 0 }, ...scopeFilter },
