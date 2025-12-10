@@ -40,13 +40,25 @@ const buildScopeFilter = (scope, user, query) => {
   }
 };
 
-// Friends = following + self
+// Friends = friends array + following + self
 const getFriendIds = (userDoc) => {
   const ids = new Set();
   ids.add(String(userDoc._id));
+
+  // friends may be an array of ObjectId or objects containing a user ref
+  (userDoc.friends || []).forEach((f) => {
+    if (f?.user) ids.add(String(f.user));
+    else if (f?._id) ids.add(String(f._id));
+    else if (typeof f === 'string' || typeof f === 'object') ids.add(String(f));
+  });
+
+  // following as before
   (userDoc.following || []).forEach((f) => {
     if (f?.user) ids.add(String(f.user));
+    else if (f?._id) ids.add(String(f._id));
+    else if (typeof f === 'string' || typeof f === 'object') ids.add(String(f));
   });
+
   return Array.from(ids);
 };
 
@@ -55,8 +67,6 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
   const rawScope = getQueryVal(req.query, 'scope');
   const rawCountry = getQueryVal(req.query, 'country');
   const rawCity = getQueryVal(req.query, 'city');
-  console.log('[LB][monthly] raw query', req.query);
-  console.log('[LB][monthly] parsed', { rawScope, rawCountry, rawCity });
 
   const scope = normalizeScope(rawScope);
   const user = await User.findById(req.user._id).select(
@@ -66,7 +76,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
 
   if (scope === 'friends') {
     const friendIds = getFriendIds(user);
-    console.log('[LB][monthly] scope=friends friendIds', friendIds);
+    
 
     const topPlayers = await User.find(
       { _id: { $in: friendIds } },
@@ -115,7 +125,6 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
   }
 
   const scopeFilter = buildScopeFilter(scope, user, { country: rawCountry, city: rawCity });
-  console.log('[LB][monthly] scopeFilter', scopeFilter);
 
   const topPlayers = await User.find(
     { monthlyXp: { $gt: 0 }, ...scopeFilter },
@@ -169,8 +178,6 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
   const rawScope = getQueryVal(req.query, 'scope');
   const rawCountry = getQueryVal(req.query, 'country');
   const rawCity = getQueryVal(req.query, 'city');
-  console.log('[LB][permanent] raw query', req.query);
-  console.log('[LB][permanent] parsed', { rawScope, rawCountry, rawCity });
 
   const scope = normalizeScope(rawScope);
   const user = await User.findById(req.user._id).select(
@@ -180,7 +187,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
 
   if (scope === 'friends') {
     const friendIds = getFriendIds(user);
-    console.log('[LB][permanent] scope=friends friendIds', friendIds);
+    
 
     const topPlayers = await User.find(
       { _id: { $in: friendIds } },
@@ -229,7 +236,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
   }
 
   const scopeFilter = buildScopeFilter(scope, user, { country: rawCountry, city: rawCity });
-  console.log('[LB][permanent] scopeFilter', scopeFilter);
+  
 
   const topPlayers = await User.find(
     { totalXp: { $gt: 0 }, ...scopeFilter },
