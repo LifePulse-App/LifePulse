@@ -1,5 +1,5 @@
-import E2EEDevice from "../models/E2EEDevice.js";
-import E2EEMessage from "../models/E2EEMessage.js";
+import e2eeDevice from "../models/E2EEDevice.js";
+import e2eeMessage from "../models/E2EEMessage.js";
 
 /**
  * Register or update a device bundle (must include numeric registrationId)
@@ -11,7 +11,7 @@ export const registerDevice = async (req, res) => {
       return res.status(400).json({ message: "Missing fields" });
     }
 
-    await E2EEDevice.findOneAndUpdate(
+    await e2eeDevice.findOneAndUpdate(
       { userId: req.user._id, deviceId },
       { registrationId, identityPub, signedPrekeyPub, signedPrekeySig, signedPrekeyId, oneTimePrekeys, lastPrekeyRefresh: new Date() },
       { upsert: true, new: true }
@@ -29,7 +29,7 @@ export const registerDevice = async (req, res) => {
  */
 export const getDevices = async (req, res) => {
   try {
-    const devices = await E2EEDevice.find({ userId: req.params.userId }).select("-__v -createdAt -updatedAt");
+    const devices = await e2eeDevice.find({ userId: req.params.userId }).select("-__v -createdAt -updatedAt");
     res.json({ devices });
   } catch (err) {
     console.error("[e2ee] getDevices error", err);
@@ -46,7 +46,7 @@ export const topupPrekeys = async (req, res) => {
     if (!deviceId || !Array.isArray(oneTimePrekeys)) {
       return res.status(400).json({ message: "Missing fields" });
     }
-    const doc = await E2EEDevice.findOne({ userId: req.user._id, deviceId });
+    const doc = await e2eeDevice.findOne({ userId: req.user._id, deviceId });
     if (!doc) return res.status(404).json({ message: "Device not found" });
 
     doc.oneTimePrekeys = oneTimePrekeys;
@@ -68,7 +68,7 @@ export const storeMessage = async (req, res) => {
     if (!toUserId || !toDeviceId || !fromDeviceId || !sessionId || !header || !ciphertext) {
       return res.status(400).json({ message: "Missing fields" });
     }
-    await E2EEMessage.create({
+    await e2eeMessage.create({
       toUserId,
       toDeviceId,
       fromUserId: req.user._id,
@@ -94,7 +94,7 @@ export const pullMessages = async (req, res) => {
       (req.query["params[deviceId]"] );
     if (!deviceId) return res.status(400).json({ message: "deviceId required" });
 
-    const msgs = await E2EEMessage.find({
+    const msgs = await e2eeMessage.find({
       toUserId: req.user._id,
       toDeviceId: deviceId,
       delivered: false,
@@ -103,7 +103,7 @@ export const pullMessages = async (req, res) => {
       .lean();
 
     if (msgs.length) {
-      await E2EEMessage.updateMany(
+      await e2eeMessage.updateMany(
         { _id: { $in: msgs.map((m) => m._id) } },
         { $set: { delivered: true } }
       );
@@ -140,7 +140,7 @@ export const getConversations = async (req, res) => {
       },
       { $sort: { "lastMessage.createdAt": -1 } },
     ];
-    const results = await E2EEMessage.aggregate(pipeline);
+    const results = await e2eeMessage.aggregate(pipeline);
     res.json({ conversations: results });
   } catch (err) {
     console.error("[e2ee] getConversations error", err);

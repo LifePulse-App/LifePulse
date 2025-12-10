@@ -14,4 +14,4 @@ const e2eeMessageSchema = new Schema(
   { timestamps: true }
 );
 
-export default model("E2EEMessage", e2eeMessageSchema);
+export default model("e2eeMessage", e2eeMessageSchema);

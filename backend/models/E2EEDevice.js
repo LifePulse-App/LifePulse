@@ -22,4 +22,4 @@ const e2eeDeviceSchema = new Schema(
 
 E2EEDeviceSchema.index({ userId: 1, deviceId: 1 }, { unique: true });
 
-export default model("E2EEDevice", e2eeDeviceSchema);
+export default model("e2eeDevice", e2eeDeviceSchema);
