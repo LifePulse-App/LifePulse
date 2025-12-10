@@ -366,21 +366,22 @@ export const refreshToken = catchAsyncErrors(async (req, res, next) => {
 
     const now = Date.now();
     const storedToken = user.refreshTokens.find((t) => t.token === token);
-
+    
     if (
       !storedToken ||
-      storedToken.expiresAt <= now ||
+      new Date(storedToken.expiresAt).getTime() <= now ||
       storedToken.deviceId !== decoded.deviceId
     ) {
       return next(new ErrorHandler("Invalid or expired token", 401));
     }
-
+    
     // rotate: remove the used token
     user.refreshTokens = user.refreshTokens.filter((t) => t.token !== token);
     await user.save({ validateBeforeSave: false });
-
+    
     const tokens = await sendTokens(res, user, storedToken.deviceId);
     return res.status(200).json({ success: true, ...tokens });
+
   } catch (err) {
     return next(new ErrorHandler("Invalid or expired token", 401));
   }

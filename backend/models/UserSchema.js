@@ -298,9 +298,8 @@ userSchema.methods.getRefreshToken = async function (deviceId) {
 
   const now = Date.now();
   this.refreshTokens = this.refreshTokens
-    // drop expired + replace same device
-    .filter(t => t.deviceId !== deviceId && t.expiresAt > now);
-
+    .filter((t) => t.deviceId !== deviceId && new Date(t.expiresAt).getTime() > now);
+  
   this.refreshTokens.push({
     token,
     deviceId,
