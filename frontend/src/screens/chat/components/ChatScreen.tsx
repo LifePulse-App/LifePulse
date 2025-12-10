@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useContext } from "react";
 import {
   View,
   FlatList,
@@ -16,13 +16,16 @@ import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { sendCipher, pullMessages, fetchDevices } from "../services/api_e2ee";
 import { SessionManager } from "../services/SessionManager";
+import AuthContext from "../../../auth/user/UserContext";
+import DeviceInfo from "react-native-device-info";
 
 export default function ChatScreen({ route, navigation }: any) {
+  const user = useContext(AuthContext)  
+  const deviceId = DeviceInfo.getUniqueIdSync();
   const { peerUserId, peerName } = route.params;
   const insets = useSafeAreaInsets();
-  const myUserId = "me";        // TODO: inject real user id
-  const myDeviceId = "device-1"; // TODO: inject real device id
-  const [sessionManager] = useState(() => new SessionManager(myUserId, myDeviceId));
+  const myUserId = user?.User?.user?.id;       
+  const [sessionManager] = useState(() => new SessionManager(myUserId, deviceId));
   const [messages, setMessages] = useState<any[]>([]);
   const [input, setInput] = useState("");
   const flatRef = useRef<FlatList>(null);
@@ -31,7 +34,9 @@ export default function ChatScreen({ route, navigation }: any) {
 
   const loadIncoming = useCallback(async () => {
     try {
-      const { data } = await pullMessages(myDeviceId);
+      const { data } = await pullMessages(deviceId);
+      console.log(data);
+      
       const decrypted: any[] = [];
       for (const m of data.messages || []) {
         const pt = await sessionManager.decrypt(m.fromUserId, m.fromDeviceId, { type: m.header?.t, body: m.ciphertext });
@@ -44,7 +49,7 @@ export default function ChatScreen({ route, navigation }: any) {
     } catch (e) {
       console.log("pull/decrypt error", e);
     }
-  }, [sessionManager, myDeviceId]);
+  }, [sessionManager, deviceId]);
 
   useEffect(() => {
     const unsub = navigation.addListener("focus", loadIncoming);
@@ -67,7 +72,7 @@ export default function ChatScreen({ route, navigation }: any) {
         await sendCipher({
           toUserId: peerUserId,
           toDeviceId: d.deviceId,
-          fromDeviceId: myDeviceId,
+          fromDeviceId: deviceId,
           sessionId: `sess-${peerUserId}-${d.deviceId}`,
           header: { t: cipherPayload.type },
           ciphertext: cipherPayload.body,
@@ -80,7 +85,7 @@ export default function ChatScreen({ route, navigation }: any) {
     } catch (e) {
       console.log("send error", e);
     }
-  }, [input, peerUserId, sessionManager, myDeviceId, myUserId]);
+  }, [input, peerUserId, sessionManager, deviceId, myUserId]);
 
   const keyboardOffset = (Platform.OS === "ios" ? 60 : 0) + insets.bottom;
 

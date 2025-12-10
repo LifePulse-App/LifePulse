@@ -89,6 +89,7 @@ export const storeMessage = async (req, res) => {
  */
 export const pullMessages = async (req, res) => {
   try {
+    console.log(req.params);
     const { deviceId } = req.query;
     if (!deviceId) return res.status(400).json({ message: "deviceId required" });
 
