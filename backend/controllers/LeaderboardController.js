@@ -76,7 +76,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
 
   if (scope === 'friends') {
     const friendIds = getFriendIds(user);
-    
+    console.log('[LB][monthly] scope=friends friendIds', friendIds);
 
     const topPlayers = await User.find(
       { _id: { $in: friendIds } },
@@ -187,7 +187,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
 
   if (scope === 'friends') {
     const friendIds = getFriendIds(user);
-    
+    console.log('[LB][permanent] scope=friends friendIds', friendIds);
 
     const topPlayers = await User.find(
       { _id: { $in: friendIds } },
@@ -236,7 +236,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
   }
 
   const scopeFilter = buildScopeFilter(scope, user, { country: rawCountry, city: rawCity });
-  
+  console.log('[LB][permanent] scopeFilter', scopeFilter);
 
   const topPlayers = await User.find(
     { totalXp: { $gt: 0 }, ...scopeFilter },
