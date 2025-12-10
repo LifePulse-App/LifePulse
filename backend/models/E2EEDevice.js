@@ -20,6 +20,6 @@ const e2eeDeviceSchema = new Schema(
   { timestamps: true }
 );
 
-E2EEDeviceSchema.index({ userId: 1, deviceId: 1 }, { unique: true });
+e2eeDeviceSchema.index({ userId: 1, deviceId: 1 }, { unique: true });
 
 export default model("e2eeDevice", e2eeDeviceSchema);
