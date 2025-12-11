@@ -4,6 +4,7 @@ import Habit from "../models/HabitSchema.js";
 import Proof from "../models/ProofSchema.js";
 import { LEVELS, calculateXpProgress } from "../helpers/levels.js";
 import { getStreakTitle } from "../helpers/streak.js";
+const toUtcMidnight = (d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 
 const MOTIVATIONAL_QUOTES = [
   "Believe in progress, not perfection.",
@@ -55,7 +56,7 @@ export const getDashboard = async (req, res) => {
     }
 
     const now = new Date();
-    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const startOfToday = toUtcMidnight(now);
     const endOfToday = new Date(startOfToday);
     endOfToday.setUTCDate(endOfToday.getUTCDate() + 1);
 
@@ -77,7 +78,7 @@ export const getDashboard = async (req, res) => {
       // first time using streak
       streakCount = hasTodayVerifiedProof ? 1 : 0;
     } else {
-      const startOfLast = new Date(lastUpdated);
+      const startOfLast = lastUpdated ? toUtcMidnight(lastUpdated) : null;
       startOfLast.setHours(0, 0, 0, 0);
 
        const daysDiff = Math.floor(
@@ -200,16 +201,12 @@ export const getDashboard = async (req, res) => {
     let currentMood = null;
     if (recentMood) {
       const moodDate = new Date(recentMood.createdAt);
-      const startOfMoodDay = new Date(moodDate);
-      startOfMoodDay.setHours(0, 0, 0, 0);
-
+      const startOfMoodDay = toUtcMidnight(moodDate);   // was local setHours
       if (startOfMoodDay.getTime() === startOfToday.getTime()) {
         currentMood = {
           mood: recentMood.mood,
           createdAt: recentMood.createdAt,
         };
-      } else {
-        currentMood = null;
       }
     }
 
