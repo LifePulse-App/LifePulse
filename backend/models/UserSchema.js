@@ -324,6 +324,11 @@ userSchema.methods.comparePassword = async function (enteredPassword) {
   if (!this.password) return false; // SSO user has no password
   return await bcrypt.compare(enteredPassword, this.password);
 };
+userSchema.index(
+  { verificationCodeExpire: 1 },
+  { expireAfterSeconds: 0, partialFilterExpression: { isVerified: false } }
+);
+
 
 // 🔹 Generate OTP
 userSchema.methods.generateVerificationCode = function () {

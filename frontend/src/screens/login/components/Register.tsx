@@ -167,9 +167,10 @@ const Register = ({ navigation }: any) => {
       <View style={styles.glowBottom} />
 
       <KeyboardAvoidingView
-        style={styles.kbWrapper}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+  style={[styles.kbWrapper, { flex: 1 }]}
+  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+>
 
           <View style={styles.appNameWrapper}>
             <Text style={styles.appName}>StreakSphere</Text>
