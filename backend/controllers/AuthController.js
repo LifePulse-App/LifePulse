@@ -119,6 +119,8 @@ export const register = catchAsyncErrors(async (req, res, next) => {
       return next(new ErrorHandler("Username already exists", 400));
     }
 
+    console.log(name, email, password, username, phone);
+
     const passwordRegex =
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()[\]{}_\-+=<>.,;:|/\\])[A-Za-z\d@$!%*?&#^()[\]{}_\-+=<>.,;:|/\\]{8,}$/;
 
