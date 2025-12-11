@@ -158,6 +158,7 @@ export const getDashboard = async (req, res) => {
     totalXp += uniqueMoodDays * 10;
 
     user.xp = totalXp;
+    await user.save();
 
   const xpProgress = calculateXpProgress(totalXp);
    user.level = xpProgress.level;
