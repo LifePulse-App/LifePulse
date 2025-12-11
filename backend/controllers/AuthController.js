@@ -119,17 +119,17 @@ export const register = catchAsyncErrors(async (req, res, next) => {
       return next(new ErrorHandler("Username already exists", 400));
     }
 
-    const passwordRegex =
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()[\]{}_\-+=<>.,;:|/\\])[A-Za-z\d@$!%*?&#^()[\]{}_\-+=<>.,;:|/\\]{8,}$/;
+    // const passwordRegex =
+    //   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()[\]{}_\-+=<>.,;:|/\\])[A-Za-z\d@$!%*?&#^()[\]{}_\-+=<>.,;:|/\\]{8,}$/;
 
-    if (!passwordRegex.test(password)) {
-      return next(
-        new ErrorHandler(
-          "Password must be at least 8 characters long and include one uppercase letter, one lowercase letter, one number, and one special character.",
-          400
-        )
-      );
-    }
+    // if (!passwordRegex.test(password)) {
+    //   return next(
+    //     new ErrorHandler(
+    //       "Password must be at least 8 characters long and include one uppercase letter, one lowercase letter, one number, and one special character.",
+    //       400
+    //     )
+    //   );
+    // }
 
     if (phone && (await User.findOne({ phone }))) {
       return next(new ErrorHandler("Phone number already exists", 400));
