@@ -167,10 +167,9 @@ const Register = ({ navigation }: any) => {
       <View style={styles.glowBottom} />
 
       <KeyboardAvoidingView
-  style={[styles.kbWrapper, { flex: 1 }]}
-  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-  keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
->
+        style={styles.kbWrapper}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
 
           <View style={styles.appNameWrapper}>
             <Text style={styles.appName}>StreakSphere</Text>
@@ -185,6 +184,7 @@ const Register = ({ navigation }: any) => {
 
               <TextInput
                 label="Name"
+                placeholder="Name"
                 value={name}
                 onChangeText={setName}
                 style={styles.input}
@@ -197,6 +197,7 @@ const Register = ({ navigation }: any) => {
 
               <TextInput
                 label="Username"
+                placeholder="Username"
                 value={username}
                 onChangeText={setUsername}
                 style={styles.input}
@@ -209,6 +210,7 @@ const Register = ({ navigation }: any) => {
 
               <TextInput
                 label="Email"
+                placeholder="Email"
                 value={identifier}
                 onChangeText={setIdentifier}
                 style={styles.input}

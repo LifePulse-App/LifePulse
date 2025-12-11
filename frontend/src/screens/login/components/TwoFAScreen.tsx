@@ -203,6 +203,7 @@ const TwoFAScreen = () => {
                 <>
                   <TextInput
                     label="6-digit 2FA code"
+                    placeholder="6-digit 2FA code"
                     value={code}
                     onChangeText={setCode}
                     style={styles.input}
@@ -218,6 +219,7 @@ const TwoFAScreen = () => {
                 <>
                   <TextInput
                     label="Backup Code"
+                    placeholder="Backup Code"
                     value={backupCode}
                     onChangeText={setBackupCode}
                     style={styles.passwordInput}

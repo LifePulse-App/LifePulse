@@ -219,6 +219,7 @@ const VerifyOtp = ({ navigation, route }: any) => {
 
               <TextInput
                 label="OTP"
+                placeholder="OTP"
                 value={otp}
                 onChangeText={setOtp}
                 style={styles.input}

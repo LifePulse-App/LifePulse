@@ -29,6 +29,7 @@ const Login = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false); // show characters by default
   const authContext = useContext(AuthContext);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -92,16 +93,12 @@ const Login = ({ navigation }: any) => {
       const creds = await UserStorage.getUser();
       if (!creds || !creds.username) return;
 
-      // creds.username is JSON.stringify(UserLoginResponse)
       const storedUser: UserLoginResponse = JSON.parse(creds.username);
 
-      // Prefill fields (optional)
       if (storedUser.UserName) setUsername(storedUser.UserName);
-      // creds.password is the saved password; you can prefill if you want
       if (creds.password) setPassword(creds.password);
 
       if (storedUser.accessToken) {
-        // Use existing token: set headers + context, then go in app
         setAuthHeaders(storedUser.accessToken);
         authContext?.setUser(storedUser);
         navigation.dispatch(
@@ -112,7 +109,6 @@ const Login = ({ navigation }: any) => {
         );
       }
     } catch (e) {
-      // Any error: clear stored user
       await UserStorage.deleteUser();
     }
   };
@@ -122,84 +118,81 @@ const Login = ({ navigation }: any) => {
   }, []);
 
   // ---------- Email/Password login (ONLY here you hit API) ----------
-const handleSubmit = async (values: { username: string; password: string }) => {
-  Keyboard.dismiss();
+  const handleSubmit = async (values: { username: string; password: string }) => {
+    Keyboard.dismiss();
 
-  if (offline) {
-    showError("You’re offline. Please connect to the internet and try again.");
-    return;
-  }
-
-  if (!values.username || !values.password) {
-    showError('Email and Password are required!');
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    setSecretKey();
-    const deviceId = await DeviceInfo.getUniqueId();
-    const deviceName = await DeviceInfo.getDeviceName();
-    const deviceModel = DeviceInfo.getModel();
-    const deviceBrand = DeviceInfo.getBrand();
-    const response = await api_Login.getLogin(
-      values.username,
-      values.password,
-      deviceId,
-      deviceName,
-      deviceModel,
-      deviceBrand,
-    );
-
-    if (!response.ok) {
-      await UserStorage.deleteUser();
-      authContext?.setUser(null);
-      showError(response.data?.message || 'Login failed');
+    if (offline) {
+      showError("You’re offline. Please connect to the internet and try again.");
       return;
     }
 
-    const data = response.data as any;
-
-    // CASE 1: 2FA required
-    if (data.requires2fa) {
-      // navigate to 2FA screen with the temporary token and identifier
-      navigation.navigate('TwoFA', {
-        twoFaToken: data.twoFaToken,
-        identifier: values.username,
-        pass: values.password
-      });
+    if (!values.username || !values.password) {
+      showError('Email and Password are required!');
       return;
     }
 
-    // CASE 2: no 2FA → normal login
-    const user = data as UserLoginResponse;
-    user.UserName = values.username;
-    user.Password = values.password;
+    setLoading(true);
 
-    setAuthHeaders(user.accessToken);
-    authContext?.setUser(user);
-    await UserStorage.setUser(user);
+    try {
+      setSecretKey();
+      const deviceId = await DeviceInfo.getUniqueId();
+      const deviceName = await DeviceInfo.getDeviceName();
+      const deviceModel = DeviceInfo.getModel();
+      const deviceBrand = DeviceInfo.getBrand();
+      const response = await api_Login.getLogin(
+        values.username,
+        values.password,
+        deviceId,
+        deviceName,
+        deviceModel,
+        deviceBrand,
+      );
 
-    if (user.accessToken) {
-      await UserStorage.setAccessToken(user.accessToken);
+      if (!response.ok) {
+        await UserStorage.deleteUser();
+        authContext?.setUser(null);
+        showError(response.data?.message || 'Login failed');
+        return;
+      }
+
+      const data = response.data as any;
+
+      if (data.requires2fa) {
+        navigation.navigate('TwoFA', {
+          twoFaToken: data.twoFaToken,
+          identifier: values.username,
+          pass: values.password
+        });
+        return;
+      }
+
+      const user = data as UserLoginResponse;
+      user.UserName = values.username;
+      user.Password = values.password;
+
+      setAuthHeaders(user.accessToken);
+      authContext?.setUser(user);
+      await UserStorage.setUser(user);
+
+      if (user.accessToken) {
+        await UserStorage.setAccessToken(user.accessToken);
+      }
+      if (user.refreshToken) {
+        await UserStorage.setRefreshToken(user.refreshToken);
+      }
+
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Drawer' }],
+        }),
+      );
+    } catch (e) {
+      showError('Unexpected error while logging in');
+    } finally {
+      setLoading(false);
     }
-    if (user.refreshToken) {
-      await UserStorage.setRefreshToken(user.refreshToken);
-    }
-
-    navigation.dispatch(
-      CommonActions.reset({
-        index: 0,
-        routes: [{ name: 'Drawer' }],
-      }),
-    );
-  } catch (e) {
-    showError('Unexpected error while logging in');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   // Interpolated transforms for subtle motion
   const blob1Style = {
@@ -256,22 +249,19 @@ const handleSubmit = async (values: { username: string; password: string }) => {
   return (
     <>
       <View style={styles.root}>
-      {/* Dashboard-like background */}
-      <View style={styles.baseBackground} />
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
+        <View style={styles.baseBackground} />
+        <View style={styles.glowTop} />
+        <View style={styles.glowBottom} />
 
-      <KeyboardAvoidingView
-        style={styles.kbWrapper}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+        <KeyboardAvoidingView
+          style={styles.kbWrapper}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
 
-          {/* Top app name */}
           <View style={styles.appNameWrapper}>
             <Text style={styles.appName}>StreakSphere</Text>
           </View>
 
-          {/* Glassy card */}
           <View style={styles.glassWrapper}>
             <View style={styles.glassContent}>
               <Text style={styles.mainTitle}>Welcome Back</Text>
@@ -279,9 +269,11 @@ const handleSubmit = async (values: { username: string; password: string }) => {
                 To Login, Enter Credentials Below...
               </Text>
 
-              {/* Identifier */}
               <TextInput
                 label="Username or Email"
+                placeholder="Username or Email"
+                autoCapitalize="none"
+                autoCorrect={false}
                 value={username}
                 onChangeText={setUsername}
                 style={styles.input}
@@ -292,22 +284,30 @@ const handleSubmit = async (values: { username: string; password: string }) => {
                 placeholderTextColor="#9CA3AF"
               />
 
-              {/* Password */}
               <TextInput
                 label="Password"
                 placeholder="Password"
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
+                secureTextEntry={!showPassword}   // keep visible when showPassword is true
+                autoCorrect={false}
+                autoCapitalize="none"
+                textContentType="password"
+                autoComplete="password"
                 style={styles.passwordInput}
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
                 textColor="black"
                 placeholderTextColor="#9CA3AF"
+                right={
+                  <TextInput.Icon
+                    icon={showPassword ? 'eye-off' : 'eye'}
+                    onPress={() => setShowPassword((prev) => !prev)}
+                  />
+                }
               />
 
-              {/* Loader or primary button */}
               {loading ? (
                 <View style={styles.loadingOverlay}>
                   <LoaderKitView
@@ -359,7 +359,6 @@ const handleSubmit = async (values: { username: string; password: string }) => {
                 </Text>
               </View>
 
-              {/* Terms */}
               <Text style={styles.termsText}>
                 By logging in or continuing, you agree to our Terms of Service
                 and Privacy Policy
@@ -369,7 +368,6 @@ const handleSubmit = async (values: { username: string; password: string }) => {
         </KeyboardAvoidingView>
       </View>
 
-      {/* Glassy error box – also used for offline */}
       <GlassyErrorModal
         visible={errorVisible || offline}
         message={

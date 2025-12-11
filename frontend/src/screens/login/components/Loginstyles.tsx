@@ -113,7 +113,7 @@ export const loginStyles = () => {
 
     // Glass card near bottom
     glassWrapper: {
-      flex: 3,
+      flex: 4,
       justifyContent: 'flex-start',
       alignItems: 'center',
       paddingBottom: 16,

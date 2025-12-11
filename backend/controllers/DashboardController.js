@@ -54,12 +54,10 @@ export const getDashboard = async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
-    // ---- Date helpers ----
     const now = new Date();
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
+    const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const endOfToday = new Date(startOfToday);
-    endOfToday.setDate(endOfToday.getDate() + 1);
+    endOfToday.setUTCDate(endOfToday.getUTCDate() + 1);
 
     // ---- Check if user has at least one verified proof TODAY ----
     const hasTodayVerifiedProof = await Proof.exists({
@@ -82,9 +80,9 @@ export const getDashboard = async (req, res) => {
       const startOfLast = new Date(lastUpdated);
       startOfLast.setHours(0, 0, 0, 0);
 
-      const daysDiff =
-        (startOfToday.getTime() - startOfLast.getTime()) /
-        (1000 * 60 * 60 * 24);
+       const daysDiff = Math.floor(
+           (startOfToday.getTime() - startOfLast.getTime()) / (1000 * 60 * 60 * 24)
+         );
 
       if (daysDiff === 0) {
         // same calendar day
@@ -108,8 +106,13 @@ export const getDashboard = async (req, res) => {
       }
     }
 
-    user.streak = { count: streakCount, lastUpdated: now };
-    await user.save();
+      if (hasTodayVerifiedProof) {
+          user.streak = { count: streakCount, lastUpdated: now };
+          await user.save();
+        } else {
+          // preserve lastUpdated and streakCount if no proof today
+          user.streak = { count: streakCount, lastUpdated: user.streak?.lastUpdated || null };
+        }
 
     // ---- Calculate XP (single source of truth here) ----
     let totalXp = 0;
@@ -120,7 +123,8 @@ export const getDashboard = async (req, res) => {
       verified: true,
     }).populate("habit");
 
-    for (const proof of verifiedProofs) {
+      let rewardEarned = 0;
+      for (const proof of verifiedProofs) {
       const habit = proof.habit;
       if (!habit) continue;
 
@@ -128,10 +132,14 @@ export const getDashboard = async (req, res) => {
 
       if (HABIT_XP[type]) {
         totalXp += HABIT_XP[type].base + HABIT_XP[type].verified;
+        rewardEarned += 5; 
       } else {
         totalXp += 10;
+        rewardEarned += 2
       }
     }
+
+    user.rewardBalance = (user.rewardBalance || 0) + rewardEarned;
 
     // 2) Mood XP based on DISTINCT days with at least one mood
     const moodDayAgg = await Mood.aggregate([
@@ -150,9 +158,11 @@ export const getDashboard = async (req, res) => {
     totalXp += uniqueMoodDays * 10;
 
     user.xp = totalXp;
-    await user.save();
 
-    const xpProgress = calculateXpProgress(totalXp);
+  const xpProgress = calculateXpProgress(totalXp);
+   user.level = xpProgress.level;
+  user.currentTitle = xpProgress.title;
+  await user.save();
 
     // ---- Streak title ----
     const streakTitle = getStreakTitle(streakCount);

@@ -188,6 +188,7 @@ const ForgotPass = ({ navigation, route }: any) => {
 
               <TextInput
                 value={identifier}
+                placeholder='Identifier'
                 onChangeText={setIdentifier}
                 style={styles.input}
                 mode="flat"
