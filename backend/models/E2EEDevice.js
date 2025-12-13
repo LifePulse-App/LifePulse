@@ -2,24 +2,24 @@ import { Schema, model } from "mongoose";
 
 const e2eeDeviceSchema = new Schema(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", index: true },
-    deviceId: { type: String, index: true },            // string device id (e.g., DeviceInfo.getUniqueIdSync())
-    registrationId: { type: Number, required: true },   // numeric Signal registration id
-    identityPub: String,
-    signedPrekeyPub: String,
-    signedPrekeySig: String,
+    userId: { type: Schema.Types.ObjectId, ref: "User", index: true, required: true },
+    deviceId: { type: String, index: true, required: true },
+    registrationId: { type: Number, required: true },
+    identityPub: { type: String, required: true },
+    signedPrekeyPub: { type: String, required: true },
+    signedPrekeySig: { type: String, required: true },
     signedPrekeyId: { type: Number, default: 1 },
     oneTimePrekeys: [
       {
-        keyId: Number,
-        pubKey: String,
+        keyId: { type: Number, required: true },
+        pubKey: { type: String, required: true },
       },
     ],
-    lastPrekeyRefresh: Date,
+    lastPrekeyRefresh: { type: Date },
   },
   { timestamps: true }
 );
 
 e2eeDeviceSchema.index({ userId: 1, deviceId: 1 }, { unique: true });
 
-export default model("e2eeDevice", e2eeDeviceSchema);
+export default model("E2EEDevice", e2eeDeviceSchema, "e2eeDevices");

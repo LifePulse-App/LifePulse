@@ -1,19 +1,43 @@
-import e2eeDevice from "../models/E2EEDevice.js";
-import e2eeMessage from "../models/E2EEMessage.js";
+import E2EEDevice from "../models/E2EEDevice.js";
+import E2EEMessage from "../models/E2EEMessage.js";
 
 /**
- * Register or update a device bundle (must include numeric registrationId)
+ * Register or update a device bundle
  */
 export const registerDevice = async (req, res) => {
   try {
-    const { deviceId, registrationId, identityPub, signedPrekeyPub, signedPrekeySig, signedPrekeyId, oneTimePrekeys } = req.body;
-    if (!deviceId || registrationId === undefined || !identityPub || !signedPrekeyPub || !signedPrekeySig || !Array.isArray(oneTimePrekeys)) {
+    const {
+      deviceId,
+      registrationId,
+      identityPub,
+      signedPrekeyPub,
+      signedPrekeySig,
+      signedPrekeyId,
+      oneTimePrekeys,
+    } = req.body;
+
+    if (
+      !deviceId ||
+      registrationId === undefined ||
+      !identityPub ||
+      !signedPrekeyPub ||
+      !signedPrekeySig ||
+      !Array.isArray(oneTimePrekeys)
+    ) {
       return res.status(400).json({ message: "Missing fields" });
     }
 
-    await e2eeDevice.findOneAndUpdate(
+    await E2EEDevice.findOneAndUpdate(
       { userId: req.user._id, deviceId },
-      { registrationId, identityPub, signedPrekeyPub, signedPrekeySig, signedPrekeyId, oneTimePrekeys, lastPrekeyRefresh: new Date() },
+      {
+        registrationId,
+        identityPub,
+        signedPrekeyPub,
+        signedPrekeySig,
+        signedPrekeyId,
+        oneTimePrekeys,
+        lastPrekeyRefresh: new Date(),
+      },
       { upsert: true, new: true }
     );
 
@@ -25,14 +49,29 @@ export const registerDevice = async (req, res) => {
 };
 
 /**
- * Fetch all device bundles for a user
+ * Fetch devices by userId (for sending) or by deviceId (for your own device)
  */
-export const getDevices = async (req, res) => {
+export const getDevicesByUser = async (req, res) => {
   try {
-    const devices = await e2eeDevice.find({ userId: req.params.userId }).select("-__v -createdAt -updatedAt");
+    const { userId } = req.params;
+    const devices = await E2EEDevice.find({ userId }).select("-__v -createdAt -updatedAt");
     res.json({ devices });
   } catch (err) {
-    console.error("[e2ee] getDevices error", err);
+    console.error("[e2ee] getDevicesByUser error", err);
+    res.status(500).json({ message: "Internal error" });
+  }
+};
+
+export const getDeviceById = async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const device = await E2EEDevice.findOne({ userId: req.user._id, deviceId }).select(
+      "-__v -createdAt -updatedAt"
+    );
+    if (!device) return res.status(404).json({ message: "Device not found" });
+    res.json({ device });
+  } catch (err) {
+    console.error("[e2ee] getDeviceById error", err);
     res.status(500).json({ message: "Internal error" });
   }
 };
@@ -46,7 +85,7 @@ export const topupPrekeys = async (req, res) => {
     if (!deviceId || !Array.isArray(oneTimePrekeys)) {
       return res.status(400).json({ message: "Missing fields" });
     }
-    const doc = await e2eeDevice.findOne({ userId: req.user._id, deviceId });
+    const doc = await E2EEDevice.findOne({ userId: req.user._id, deviceId });
     if (!doc) return res.status(404).json({ message: "Device not found" });
 
     doc.oneTimePrekeys = oneTimePrekeys;
@@ -60,24 +99,55 @@ export const topupPrekeys = async (req, res) => {
 };
 
 /**
- * Store encrypted message
+ * Store encrypted message.
+ * If toDeviceId is provided -> store single.
+ * If targetDeviceIds is provided -> fan-out to those.
+ * If neither is provided -> fan-out to all receiver devices.
  */
 export const storeMessage = async (req, res) => {
   try {
-    const { toUserId, toDeviceId, fromDeviceId, sessionId, header, ciphertext } = req.body;
-    if (!toUserId || !toDeviceId || !fromDeviceId || !sessionId || !header || !ciphertext) {
+    const {
+      toUserId,
+      toDeviceId,          // optional single target
+      targetDeviceIds,     // optional array of deviceIds
+      fromDeviceId,
+      sessionId,
+      header,
+      ciphertext,
+    } = req.body;
+
+    if (!toUserId || !fromDeviceId || !sessionId || !header || !ciphertext) {
       return res.status(400).json({ message: "Missing fields" });
     }
-    await e2eeMessage.create({
+
+    let deviceIds = [];
+
+    if (toDeviceId) {
+      deviceIds = [toDeviceId];
+    } else if (Array.isArray(targetDeviceIds) && targetDeviceIds.length) {
+      deviceIds = targetDeviceIds;
+    } else {
+      // Fan-out to all devices of the recipient
+      const devices = await E2EEDevice.find({ userId: toUserId }).select("deviceId");
+      deviceIds = devices.map((d) => d.deviceId);
+    }
+
+    if (!deviceIds.length) {
+      return res.status(400).json({ message: "No target devices found for recipient" });
+    }
+
+    const docs = deviceIds.map((devId) => ({
       toUserId,
-      toDeviceId,
+      toDeviceId: devId,
       fromUserId: req.user._id,
       fromDeviceId,
       sessionId,
       header,
       ciphertext,
-    });
-    res.json({ success: true });
+    }));
+
+    const inserted = await E2EEMessage.insertMany(docs);
+    res.json({ success: true, count: inserted.length, ids: inserted.map((d) => d._id) });
   } catch (err) {
     console.error("[e2ee] storeMessage error", err);
     res.status(500).json({ message: "Internal error" });
@@ -89,12 +159,10 @@ export const storeMessage = async (req, res) => {
  */
 export const pullMessages = async (req, res) => {
   try {
-    const deviceId =
-      (req.query.deviceId) ||
-      (req.query["params[deviceId]"] );
+    const deviceId = req.query.deviceId || req.query["params[deviceId]"];
     if (!deviceId) return res.status(400).json({ message: "deviceId required" });
 
-    const msgs = await e2eeMessage.find({
+    const msgs = await E2EEMessage.find({
       toUserId: req.user._id,
       toDeviceId: deviceId,
       delivered: false,
@@ -103,7 +171,7 @@ export const pullMessages = async (req, res) => {
       .lean();
 
     if (msgs.length) {
-      await e2eeMessage.updateMany(
+      await E2EEMessage.updateMany(
         { _id: { $in: msgs.map((m) => m._id) } },
         { $set: { delivered: true } }
       );
@@ -128,11 +196,7 @@ export const getConversations = async (req, res) => {
         $group: {
           _id: {
             peer: {
-              $cond: [
-                { $eq: ["$toUserId", req.user._id] },
-                "$fromUserId",
-                "$toUserId",
-              ],
+              $cond: [{ $eq: ["$toUserId", req.user._id] }, "$fromUserId", "$toUserId"],
             },
           },
           lastMessage: { $first: "$$ROOT" },
@@ -140,7 +204,7 @@ export const getConversations = async (req, res) => {
       },
       { $sort: { "lastMessage.createdAt": -1 } },
     ];
-    const results = await e2eeMessage.aggregate(pipeline);
+    const results = await E2EEMessage.aggregate(pipeline);
     res.json({ conversations: results });
   } catch (err) {
     console.error("[e2ee] getConversations error", err);
