@@ -19,6 +19,7 @@ import { SessionManager } from "../services/SessionManager";
 import { toDeviceRegistrationId } from "../services/deviceRegistrationId";
 import AuthContext from "../../../auth/user/UserContext";
 import DeviceInfo from "react-native-device-info";
+import { ensureDeviceKeys } from "../services/bootstrap";
 
 export default function ChatScreen({ route, navigation }: any) {
   const user = useContext(AuthContext);
@@ -95,10 +96,25 @@ export default function ChatScreen({ route, navigation }: any) {
     };
   }, []);
 
+  useEffect(() => {
+    const bootstrap = async () => {
+      try {
+        const deviceId = DeviceInfo.getUniqueIdSync();
+        await ensureDeviceKeys(deviceId);
+      } catch (e) {
+        console.log("ensureDeviceKeys error", e);
+      }
+    };
+    bootstrap();
+  }, []);
+
   const send = useCallback(async () => {
     if (!input.trim()) return;
     try {
       const { data } = await fetchDevices(peerUserId);
+      console.log(data);
+      
+      
       const now = new Date().toISOString();
 
       for (const d of data.devices || []) {

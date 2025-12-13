@@ -20,6 +20,8 @@ import MainLayout from "../../../../shared/components/MainLayout";
 import AppScreen from "../../../../components/Layout/AppScreen/AppScreen";
 import DashboardService from "../../services/api_dashboard";
 import socialApi from "../../../friends/services/api_friends";
+import DeviceInfo from "react-native-device-info";
+import { ensureDeviceKeys } from "../../../chat/services/bootstrap"; // adjust path
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
@@ -133,6 +135,17 @@ const Dashboard = ({ navigation }: any) => {
     }, []);
 
     useEffect(() => { refreshPendingCount(); }, [refreshPendingCount]);
+    useEffect(() => {
+      const bootstrapKeys = async () => {
+        try {
+          const deviceId = DeviceInfo.getUniqueIdSync();
+          await ensureDeviceKeys(deviceId);
+        } catch (e) {
+          console.log("ensureDeviceKeys error", e);
+        }
+      };
+      bootstrapKeys();
+    }, []);
     useFocusEffect(useCallback(() => { refreshPendingCount(); }, [refreshPendingCount]));
 
   const fetchTodayHabits = useCallback(async () => {

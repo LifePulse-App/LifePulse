@@ -53,6 +53,7 @@ export const registerDevice = async (req, res) => {
  */
 export const getDevicesByUser = async (req, res) => {
   try {
+    console.log(req);
     const { userId } = req.params;
     const devices = await E2EEDevice.find({ userId }).select("-__v -createdAt -updatedAt");
     res.json({ devices });

@@ -34,7 +34,9 @@ export default function ChatListScreen({ navigation }: any) {
   }, []);
 
   const filtered = convos.filter((c) =>
-    (c._id?.peerName || c._id?.peer || "").toLowerCase().includes(search.toLowerCase())
+    ((c._id?.peerName || c._id?.peer || "") as string)
+      .toLowerCase()
+      .includes(search.toLowerCase())
   );
 
   return (
@@ -68,22 +70,27 @@ export default function ChatListScreen({ navigation }: any) {
             />
           </View>
 
-          <FlatList
-            data={filtered}
-            keyExtractor={(item) => item._id.peer}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() =>
-                  navigation.navigate("Chat", { peerUserId: item._id.peer, peerName: item._id.peerName || "Friend" })
-                }
-              >
-                <Text style={styles.peer}>{item._id.peerName || "Friend"}</Text>
-                <Text style={styles.snippet}>{item.lastMessage?.ciphertext ? "Encrypted message" : ""}</Text>
-              </TouchableOpacity>
-            )}
-            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-          />
+<FlatList
+  data={filtered}
+  keyExtractor={(item) => item._id?.peer ?? item._id?.peerName ?? Math.random().toString()}
+  renderItem={({ item }) => (
+    <TouchableOpacity
+      style={styles.row}
+      onPress={() =>
+        navigation.navigate("Chat", {
+          peerUserId: item._id?.peer,
+          peerName: item._id?.peerName || "Friend",
+        })
+      }
+    >
+      <Text style={styles.peer}>{item._id?.peerName || "Friend"}</Text>
+      <Text style={styles.snippet}>
+        {item.lastMessage?.ciphertext ? "Encrypted message" : ""}
+      </Text>
+    </TouchableOpacity>
+  )}
+  ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+/>
         </View>
       </View>
     </MainLayout>
