@@ -27,6 +27,7 @@ export const registerDevice = async (req, res) => {
       return res.status(400).json({ message: "Missing fields" });
     }
 
+    // Ensure device is scoped per user
     await E2EEDevice.findOneAndUpdate(
       { userId: req.user._id, deviceId },
       {
@@ -49,14 +50,14 @@ export const registerDevice = async (req, res) => {
 };
 
 /**
- * Fetch devices by userId (for sending) or by deviceId (for your own device)
+ * Fetch devices by userId (for sending messages)
  */
 export const getDevicesByUser = async (req, res) => {
   try {
-    console.log(req.params.userId);
     const userId = req.params.userId;
-    console.log(userId);
-    const devices = await E2EEDevice.find({ userId }).select("-__v -createdAt -updatedAt");
+    const devices = await E2EEDevice.find({ userId }).select(
+      "-__v -createdAt -updatedAt"
+    );
     res.json({ devices });
   } catch (err) {
     console.error("[e2ee] getDevicesByUser error", err);
@@ -64,12 +65,16 @@ export const getDevicesByUser = async (req, res) => {
   }
 };
 
+/**
+ * Fetch a device by deviceId (only for your own devices)
+ */
 export const getDeviceById = async (req, res) => {
   try {
     const deviceId = req.params.deviceId;
-    const device = await E2EEDevice.findOne({ userId: req.user._id, deviceId }).select(
-      "-__v -createdAt -updatedAt"
-    );
+    const device = await E2EEDevice.findOne({
+      userId: req.user._id,
+      deviceId,
+    }).select("-__v -createdAt -updatedAt");
     if (!device) return res.status(404).json({ message: "Device not found" });
     res.json({ device });
   } catch (err) {
@@ -79,7 +84,7 @@ export const getDeviceById = async (req, res) => {
 };
 
 /**
- * Top up one-time prekeys
+ * Top up one-time prekeys for a device
  */
 export const topupPrekeys = async (req, res) => {
   try {
@@ -87,12 +92,16 @@ export const topupPrekeys = async (req, res) => {
     if (!deviceId || !Array.isArray(oneTimePrekeys)) {
       return res.status(400).json({ message: "Missing fields" });
     }
-    const doc = await E2EEDevice.findOne({ userId: req.user._id, deviceId });
-    if (!doc) return res.status(404).json({ message: "Device not found" });
+    const device = await E2EEDevice.findOne({
+      userId: req.user._id,
+      deviceId,
+    });
+    if (!device) return res.status(404).json({ message: "Device not found" });
 
-    doc.oneTimePrekeys = oneTimePrekeys;
-    doc.lastPrekeyRefresh = new Date();
-    await doc.save();
+    device.oneTimePrekeys = oneTimePrekeys;
+    device.lastPrekeyRefresh = new Date();
+    await device.save();
+
     res.json({ success: true });
   } catch (err) {
     console.error("[e2ee] topupPrekeys error", err);
@@ -101,17 +110,14 @@ export const topupPrekeys = async (req, res) => {
 };
 
 /**
- * Store encrypted message.
- * If toDeviceId is provided -> store single.
- * If targetDeviceIds is provided -> fan-out to those.
- * If neither is provided -> fan-out to all receiver devices.
+ * Store encrypted messages
  */
 export const storeMessage = async (req, res) => {
   try {
     const {
       toUserId,
-      toDeviceId,          // optional single target
-      targetDeviceIds,     // optional array of deviceIds
+      toDeviceId,
+      targetDeviceIds,
       fromDeviceId,
       sessionId,
       header,
@@ -123,24 +129,25 @@ export const storeMessage = async (req, res) => {
     }
 
     let deviceIds = [];
-
-    if (toDeviceId) {
-      deviceIds = [toDeviceId];
-    } else if (Array.isArray(targetDeviceIds) && targetDeviceIds.length) {
+    if (toDeviceId) deviceIds = [toDeviceId];
+    else if (Array.isArray(targetDeviceIds) && targetDeviceIds.length)
       deviceIds = targetDeviceIds;
-    } else {
-      // Fan-out to all devices of the recipient
-      const devices = await E2EEDevice.find({ userId: toUserId }).select("deviceId");
+    else {
+      const devices = await E2EEDevice.find({ userId: toUserId }).select(
+        "deviceId"
+      );
       deviceIds = devices.map((d) => d.deviceId);
     }
 
     if (!deviceIds.length) {
-      return res.status(400).json({ message: "No target devices found for recipient" });
+      return res
+        .status(400)
+        .json({ message: "No target devices found for recipient" });
     }
 
-    const docs = deviceIds.map((devId) => ({
+    const messages = deviceIds.map((id) => ({
       toUserId,
-      toDeviceId: devId,
+      toDeviceId: id,
       fromUserId: req.user._id,
       fromDeviceId,
       sessionId,
@@ -148,8 +155,12 @@ export const storeMessage = async (req, res) => {
       ciphertext,
     }));
 
-    const inserted = await E2EEMessage.insertMany(docs);
-    res.json({ success: true, count: inserted.length, ids: inserted.map((d) => d._id) });
+    const inserted = await E2EEMessage.insertMany(messages);
+    res.json({
+      success: true,
+      count: inserted.length,
+      ids: inserted.map((m) => m._id),
+    });
   } catch (err) {
     console.error("[e2ee] storeMessage error", err);
     res.status(500).json({ message: "Internal error" });
@@ -157,14 +168,14 @@ export const storeMessage = async (req, res) => {
 };
 
 /**
- * Fetch undelivered messages for this user/device
+ * Pull undelivered messages for this device
  */
 export const pullMessages = async (req, res) => {
   try {
     const deviceId = req.query.deviceId || req.query["params[deviceId]"];
     if (!deviceId) return res.status(400).json({ message: "deviceId required" });
 
-    const msgs = await E2EEMessage.find({
+    const messages = await E2EEMessage.find({
       toUserId: req.user._id,
       toDeviceId: deviceId,
       delivered: false,
@@ -172,14 +183,14 @@ export const pullMessages = async (req, res) => {
       .sort({ createdAt: 1 })
       .lean();
 
-    if (msgs.length) {
+    if (messages.length) {
       await E2EEMessage.updateMany(
-        { _id: { $in: msgs.map((m) => m._id) } },
+        { _id: { $in: messages.map((m) => m._id) } },
         { $set: { delivered: true } }
       );
     }
 
-    res.json({ messages: msgs });
+    res.json({ messages });
   } catch (err) {
     console.error("[e2ee] pullMessages error", err);
     res.status(500).json({ message: "Internal error" });
@@ -187,18 +198,26 @@ export const pullMessages = async (req, res) => {
 };
 
 /**
- * Conversation list (last message per peer user)
+ * Get conversation list (last message per peer)
  */
 export const getConversations = async (req, res) => {
   try {
     const pipeline = [
-      { $match: { $or: [{ toUserId: req.user._id }, { fromUserId: req.user._id }] } },
+      {
+        $match: {
+          $or: [{ toUserId: req.user._id }, { fromUserId: req.user._id }],
+        },
+      },
       { $sort: { createdAt: -1 } },
       {
         $group: {
           _id: {
             peer: {
-              $cond: [{ $eq: ["$toUserId", req.user._id] }, "$fromUserId", "$toUserId"],
+              $cond: [
+                { $eq: ["$toUserId", req.user._id] },
+                "$fromUserId",
+                "$toUserId",
+              ],
             },
           },
           lastMessage: { $first: "$$ROOT" },
@@ -206,6 +225,7 @@ export const getConversations = async (req, res) => {
       },
       { $sort: { "lastMessage.createdAt": -1 } },
     ];
+
     const results = await E2EEMessage.aggregate(pipeline);
     res.json({ conversations: results });
   } catch (err) {

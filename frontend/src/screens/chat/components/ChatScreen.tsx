@@ -20,6 +20,14 @@ import { toDeviceRegistrationId } from "../services/deviceRegistrationId";
 import AuthContext from "../../../auth/user/UserContext";
 import DeviceInfo from "react-native-device-info";
 import { ensureDeviceKeys } from "../services/bootstrap";
+import { Buffer } from "buffer";
+
+const b64ToAB = (b64?: string) => {
+  if (!b64) return undefined;
+  const buf = Buffer.from(b64, "base64");
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+};
+const asNum = (v: any) => (typeof v === "string" ? parseInt(v, 10) : v);
 
 export default function ChatScreen({ route, navigation }: any) {
   const user = useContext(AuthContext);
@@ -96,40 +104,81 @@ export default function ChatScreen({ route, navigation }: any) {
     };
   }, []);
 
-  useEffect(() => {
-    const bootstrap = async () => {
-      try {
-        const deviceId = DeviceInfo.getUniqueIdSync();
-        await ensureDeviceKeys(deviceId);
-      } catch (e) {
-        console.log("ensureDeviceKeys error", e);
-      }
-    };
-    bootstrap();
-  }, []);
+  // useEffect(() => {
+  //   const bootstrap = async () => {
+  //     try {
+  //       const deviceId = DeviceInfo.getUniqueIdSync();
+  //       await ensureDeviceKeys(deviceId);
+  //     } catch (e) {
+  //       console.log("ensureDeviceKeys error", e);
+  //     }
+  //   };
+  //   bootstrap();
+  // }, []);
 
   const send = useCallback(async () => {
     if (!input.trim()) return;
     try {
       const { data } = await fetchDevices(peerUserId);
-      console.log(data);
-      
-      
       const now = new Date().toISOString();
 
       for (const d of data.devices || []) {
-        const peerRegId = toDeviceRegistrationId(String(d.deviceId));
-        await sessionManager.ensureSession(peerUserId, peerRegId, d);
-        const cipherPayload = await sessionManager.encrypt(peerUserId, peerRegId, input);
+        console.log(d);
+        
+        const peerRegId = d.registrationId ?? toDeviceRegistrationId(String(d.deviceId));
+
+        const identityBuf = d.identityKey?.publicKey || d.identityPub;
+        const spkPub = d.signedPrekeyPub || d.signedPreKeyPub;
+        const spkSig = d.signedPrekeySig || d.signedPreKeySig;
+        const otp = d.oneTimePrekeys?.[0];
+        const preKeyPub = otp ? otp.publicKey || otp.pubKey : undefined;
+
+        if (!identityBuf || !spkPub || !spkSig || !preKeyPub) {
+          console.warn("[send] skipping device missing required keys", d.deviceId, {
+            hasIdentity: !!identityBuf,
+            hasSpkPub: !!spkPub,
+            hasSpkSig: !!spkSig,
+            hasPreKey: !!preKeyPub,
+          });
+          continue;
+        }
+
+        const deviceBundle = {
+          registrationId: peerRegId,
+          identityKey: identityBuf,
+          signedPreKey: {
+            keyId: asNum(d.signedPrekeyId ?? d.signedPreKeyId ?? 1),
+            publicKey: spkPub,
+            signature: spkSig,
+          },
+          preKey: {
+            keyId: asNum(otp.keyId ?? otp.id ?? 2),
+            publicKey: preKeyPub,
+          },
+        };
+        
+
+        await sessionManager.ensureSession(peerUserId, deviceBundle);
+        console.log("yes");
+        
+        let cipherPayload;
+        try {
+          cipherPayload = await sessionManager.encrypt(peerUserId, peerRegId, input);
+        } catch (e) {
+          console.log("[send] encrypt failed, rebuilding session and retrying", e);
+          await sessionManager.ensureSession(peerUserId, peerRegId, deviceBundle);
+          cipherPayload = await sessionManager.encrypt(peerUserId, peerRegId, input);
+        }
+
         await sendCipher({
           toUserId: peerUserId,
-          toDeviceId: d.deviceId, // string stored in DB
-          fromDeviceId: deviceId, // string stored in DB
+          toDeviceId: d.deviceId,
+          fromDeviceId: deviceId,
           sessionId: `sess-${peerUserId}-${d.deviceId}`,
-          header: { t: cipherPayload.type },
+          header: { t: cipherPayload.type, fromRegId: deviceRegId },
           ciphertext: cipherPayload.body,
         });
-      }
+      } // <-- close the for-loop
 
       const outgoing = {
         fromUserId: myUserId,
