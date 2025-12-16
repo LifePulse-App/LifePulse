@@ -9,8 +9,8 @@ import { Buffer } from "buffer";
 export class SessionManager {
   private store: SignalStore;
 
-  constructor(private userId: string) {
-    this.store = new SignalStore(userId);
+  constructor(private myUserId: string) {
+    this.store = new SignalStore(myUserId);
   }
 
   async ensureSession(peerUserId: string, bundle: any) {

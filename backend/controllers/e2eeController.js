@@ -5,6 +5,7 @@ import E2EEMessage from "../models/E2EEMessage.js";
  * Register or update a device bundle
  */
 export const registerDevice = async (req, res) => {
+  console.log(req.body);
   try {
     const {
       deviceId,
