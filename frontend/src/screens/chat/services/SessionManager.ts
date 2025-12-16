@@ -27,7 +27,7 @@ export class SessionManager {
         signature: b64ToArrayBuffer(bundle.signedPreKey.signature),
       },
       preKey: {
-        keyId: bundle.preKey.keyId,
+        keyId: bundle.preKey.keyId, 
         publicKey: b64ToArrayBuffer(bundle.preKey.publicKey),
       },
     } as any);

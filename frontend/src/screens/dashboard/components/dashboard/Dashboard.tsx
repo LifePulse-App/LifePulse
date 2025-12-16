@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useContext } from "react";
 import {
   ScrollView,
   View,
@@ -22,6 +22,7 @@ import DashboardService from "../../services/api_dashboard";
 import socialApi from "../../../friends/services/api_friends";
 import DeviceInfo from "react-native-device-info";
 import { ensureDeviceKeys } from "../../../chat/services/bootstrap"; // adjust path
+import AuthContext from "../../../../auth/user/UserContext";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
@@ -66,6 +67,8 @@ const Dashboard = ({ navigation }: any) => {
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [friendReqCount, setFriendReqCount] = useState(0);
+  const user = useContext(AuthContext);
+  const myUserId = user?.User?.user?.id;
 
   const [profile, setProfile] = useState<{
     name: string;
@@ -139,7 +142,7 @@ const Dashboard = ({ navigation }: any) => {
       const bootstrapKeys = async () => {
         try {
           const deviceId = DeviceInfo.getUniqueIdSync();
-          await ensureDeviceKeys(deviceId);
+          await ensureDeviceKeys(myUserId, deviceId);
         } catch (e) {
           console.log("ensureDeviceKeys error", e);
         }

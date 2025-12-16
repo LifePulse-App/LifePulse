@@ -120,7 +120,7 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     }
 
 // At least 8 chars, 1 lowercase, 1 uppercase, 1 digit, no special required
-const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$/;
+const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
 if (!passwordRegex.test(password)) {
   return next(
