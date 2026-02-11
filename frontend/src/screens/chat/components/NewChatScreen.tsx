@@ -83,7 +83,7 @@ export default function NewChatScreen({ navigation }: any) {
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.row}
-                  onPress={() => navigation.navigate("chat", { peerUserId: item._id, peerName: item.name })}
+                  onPress={() => navigation.navigate("chat", { peerUserId: item._id, peerName: item.name }) }
                 >
                   <Text style={styles.name}>{item.name}</Text>
                   {item.username ? <Text style={styles.sub}>{item.username}</Text> : null}

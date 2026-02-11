@@ -14,7 +14,7 @@ import MaterialIcon from "react-native-vector-icons/MaterialIcons";
 import AppScreen from "../../../../components/Layout/AppScreen/AppScreen";
 import AppText from "../../../../components/Layout/AppText/AppText";
 import AppActivityIndicator from "../../../../components/Layout/AppActivityIndicator/AppActivityIndicator";
-import styles from "../../../student/components/adjustment-details/AdjustmentDetailScreenStyles";
+import styles from "../../../mood-map/components/adjustment-details/AdjustmentDetailScreenStyles";
 import colors from "../../../../shared/styling/lightModeColors";
 import api_User from "../../services/api_User";
 import Toast from "react-native-toast-message";

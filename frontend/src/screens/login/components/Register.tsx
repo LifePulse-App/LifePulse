@@ -1,4 +1,5 @@
 import React, { useContext, useRef, useState } from 'react';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import {
   View,
   KeyboardAvoidingView,
@@ -160,11 +161,17 @@ const Register = ({ navigation }: any) => {
 
   return (
     <>
-      <View style={styles.root}>
-      {/* Dashboard-like background */}
-      <View style={styles.baseBackground} />
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
+<View style={styles.root}>
+  <View style={styles.baseBackground} />
+  <View style={styles.glowTop} />
+  <View style={styles.glowBottom} />
+
+  <KeyboardAwareScrollView
+    contentContainerStyle={{ flexGrow: 1 }}
+    keyboardShouldPersistTaps="handled"
+    enableOnAndroid={true}
+    extraScrollHeight={20}
+  >
 
       <KeyboardAvoidingView
         style={styles.kbWrapper}
@@ -287,6 +294,7 @@ const Register = ({ navigation }: any) => {
             </View>
           </View>
         </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
       </View>
 
       <GlassyErrorModal

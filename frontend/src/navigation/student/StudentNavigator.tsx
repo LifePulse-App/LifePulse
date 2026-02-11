@@ -1,11 +1,11 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import StudentList from '../../screens/student/components/studentlist/StudentList';
-import Adjustment from '../../screens/student/components/adjustment/Adjustment';
+import StudentList from '../../screens/mood-map/components/studentlist/StudentList';
+import Adjustment from '../../screens/mood-map/components/adjustment/Adjustment';
 import StudentTabNavigator from './StudentTabNavigator';
-import AnnualItemDetails from '../../screens/student/components/overdues/AnnualItemDetails';
-import AdjustmentDetailScreen from '../../screens/student/components/adjustment-details/AdjustmentDetailScreen';
+import AnnualItemDetails from '../../screens/mood-map/components/overdues/AnnualItemDetails';
+import AdjustmentDetailScreen from '../../screens/mood-map/components/adjustment-details/AdjustmentDetailScreen';
 
 // Define stack type if needed (optional for now)
 const Stack = createNativeStackNavigator();

@@ -23,6 +23,7 @@ import socialApi from "../../../friends/services/api_friends";
 import DeviceInfo from "react-native-device-info";
 import { ensureDeviceKeys } from "../../../chat/services/bootstrap"; // adjust path
 import AuthContext from "../../../../auth/user/UserContext";
+import { getStableDeviceId } from "../../../../shared/services/stableDeviceId";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
@@ -141,7 +142,7 @@ const Dashboard = ({ navigation }: any) => {
     useEffect(() => {
       const bootstrapKeys = async () => {
         try {
-          const deviceId = DeviceInfo.getUniqueIdSync();
+          const deviceId = await getStableDeviceId(myUserId);
           await ensureDeviceKeys(myUserId, deviceId);
         } catch (e) {
           console.log("ensureDeviceKeys error", e);

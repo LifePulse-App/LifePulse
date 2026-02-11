@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "460940026449",
+    "project_id": "crucial-mender-474816-u9",
+    "storage_bucket": "crucial-mender-474816-u9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:460940026449:android:d8a13ba5a10d0381214e70",
+        "android_client_info": {
+          "package_name": "com.streaksphere"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBxfmKkyfJuoo2jPn_NJF4wEqLRmscCw2o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

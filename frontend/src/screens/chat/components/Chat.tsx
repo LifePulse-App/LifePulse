@@ -1,29 +1,102 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useContext } from "react";
 import { View, FlatList, TouchableOpacity, StyleSheet, TextInput } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import NetInfo from "@react-native-community/netinfo";
-import { fetchConversations } from "../services/api_e2ee";
+
+import { fetchConversations, fetchFriends } from "../services/api_e2ee";
+import { listConversationPreviews } from "../services/LocalConversationStore";
+
 import MainLayout from "../../../shared/components/MainLayout";
+import { getStableDeviceId } from "../../../shared/services/stableDeviceId";
+import AuthContext from "../../../auth/user/UserContext";
+import { getUnread, subscribeUnreadChanges } from '../services/ChatNotifications';
+import { subscribeConversationChanges } from '../services/ChatNotifications';
+
+
+const formatLastTime = (iso?: string) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const now = new Date();
+
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+
+  if (sameDay) {
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+  return d.toLocaleDateString([], { month: "short", day: "numeric" }); // e.g. Jan 8
+};
 
 export default function ChatListScreen({ navigation }: any) {
   const [search, setSearch] = useState("");
-  const [convos, setConvos] = useState<any[]>([]);
+  const [rows, setRows] = useState<any[]>([]);
   const [offline, setOffline] = useState(false);
+  const [unreadVersion, setUnreadVersion] = useState(0); // ✅ triggers reload
+
+  const user = useContext(AuthContext);
+  const myUserId = user?.User?.user?.id;
 
   const load = useCallback(async () => {
     try {
-      const { data } = await fetchConversations();
-      setConvos(data.conversations || []);
+      if (!myUserId) return;
+      const deviceId = await getStableDeviceId(myUserId);
+
+      const { data } = await fetchConversations(deviceId);
+      const serverConvos = data.conversations || [];
+
+      const friendsRes = await fetchFriends();
+      const friends = friendsRes?.data?.friends || [];
+      const nameMap = new Map<string, string>();
+      for (const f of friends) nameMap.set(String(f._id), String(f.name || f.username || "Friend"));
+
+      const previews = await listConversationPreviews(String(myUserId), String(deviceId));
+      const previewMap = new Map(previews.map((p) => [String(p.peerUserId), p]));
+
+      const merged = serverConvos.map((c: any) => {
+        const peerId = String(c._id);
+        const p = previewMap.get(peerId);
+
+        return {
+          peerUserId: peerId,
+          peerName: nameMap.get(peerId) || "Friend",
+          lastText: p?.lastText ?? "",
+          lastAt: p?.lastAt ?? c?.lastMessage?.createdAt ?? "",
+          unread: getUnread(peerId), // ✅ always up-to-date
+        };
+      });
+
+      merged.sort((a, b) => new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime());
+      setRows(merged);
     } catch (e) {
       console.log("load convos error", e);
     }
-  }, []);
+  }, [myUserId, unreadVersion]); // ✅ re-run when unread changes
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useEffect(() => {
     const unsub = navigation.addListener("focus", load);
     return unsub;
   }, [navigation, load]);
+
+  useEffect(() => {
+    const unsub = subscribeConversationChanges(() => {
+      console.log("[chat] conversation change received in ChatListScreen");
+      setUnreadVersion((v) => v + 1);
+    });
+    return () => unsub();
+  }, []);
+  useEffect(() => {
+    const unsubUnread = subscribeUnreadChanges(() => {
+      setUnreadVersion((v) => v + 1);
+    });
+    return () => unsubUnread();
+  }, []);
 
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
@@ -33,10 +106,8 @@ export default function ChatListScreen({ navigation }: any) {
     return () => unsub();
   }, []);
 
-  const filtered = convos.filter((c) =>
-    ((c._id?.peerName || c._id?.peer || "") as string)
-      .toLowerCase()
-      .includes(search.toLowerCase())
+  const filtered = rows.filter((r) =>
+    String(r.peerName || "").toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -70,27 +141,44 @@ export default function ChatListScreen({ navigation }: any) {
             />
           </View>
 
-<FlatList
-  data={filtered}
-  keyExtractor={(item) => item._id?.peer ?? item._id?.peerName ?? Math.random().toString()}
-  renderItem={({ item }) => (
-    <TouchableOpacity
-      style={styles.row}
-      onPress={() =>
-        navigation.navigate("Chat", {
-          peerUserId: item._id?.peer,
-          peerName: item._id?.peerName || "Friend",
-        })
-      }
-    >
-      <Text style={styles.peer}>{item._id?.peerName || "Friend"}</Text>
-      <Text style={styles.snippet}>
-        {item.lastMessage?.ciphertext ? "Encrypted message" : ""}
-      </Text>
-    </TouchableOpacity>
-  )}
-  ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-/>
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => item.peerUserId}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() =>
+                  navigation.navigate("chat", {
+                    peerUserId: item.peerUserId,
+                    peerName: item.peerName,
+                  })
+                }
+              >
+                <View style={styles.rowTop}>
+                  <Text style={styles.peer} numberOfLines={1}>{item.peerName}</Text>
+                  <Text style={styles.time}>{formatLastTime(item.lastAt)}</Text>
+                </View>
+
+                <View style={styles.rowTop}>
+                <Text style={styles.snippet} numberOfLines={1}>
+  {!item.lastAt
+    ? "No messages yet"
+    : item.unread > 0
+      ? "Sent a message"
+      : "Opened message"}
+</Text>
+                  {item.unread > 0 && (
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText} numberOfLines={1}>
+                        {item.unread > 99 ? '99+' : item.unread}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            )}
+            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          />
         </View>
       </View>
     </MainLayout>
@@ -100,8 +188,26 @@ export default function ChatListScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0f172a", padding: 12 },
   baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: "#020617" },
-  glowTop: { position: "absolute", top: -120, left: -40, width: 220, height: 220, borderRadius: 220, backgroundColor: "rgba(59, 130, 246, 0.28)" },
-  glowBottom: { position: "absolute", bottom: -140, right: -40, width: 220, height: 220, borderRadius: 220, backgroundColor: "rgba(168, 85, 247, 0.28)" },
+  glowTop: {
+    position: "absolute",
+    top: -120,
+    left: -40,
+    width: 220,
+    height: 220,
+    borderRadius: 220,
+    backgroundColor: "rgba(59, 130, 246, 0.28)",
+  },
+  glowBottom: {
+    position: "absolute",
+    bottom: -140,
+    right: -40,
+    width: 220,
+    height: 220,
+    borderRadius: 220,
+    backgroundColor: "rgba(168, 85, 247, 0.28)",
+  },
+  rowTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 2 },
+  time: { color: "#94a3b8", fontSize: 12, marginLeft: 10 },
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   title: { color: "#fff", fontSize: 20, fontWeight: "800" },
   netStatus: { fontSize: 12, marginTop: 2 },
@@ -113,4 +219,21 @@ const styles = StyleSheet.create({
   row: { backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12 },
   peer: { color: "#fff", fontSize: 16, fontWeight: "700" },
   snippet: { color: "#94a3b8", marginTop: 4 },
+  badge: {
+    marginLeft: 8,
+    backgroundColor: "#f43f5e",
+    borderRadius: 12,
+    minWidth: 22,
+    paddingHorizontal: 5,
+    justifyContent: "center",
+    alignItems: "center",
+    alignSelf: "center",
+  },
+  badgeText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 12,
+    textAlign: "center",
+    includeFontPadding: false,
+  },
 });

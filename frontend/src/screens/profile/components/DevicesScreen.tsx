@@ -67,6 +67,8 @@ const DevicesScreen = () => {
       }
 
       const data: any = res.data;
+      console.log(data);
+      
       setDevices(data.devices || []);
     } catch (e: any) {
       showError('Unable to fetch devices. Please try again.');

@@ -11,6 +11,7 @@ import { authenticator } from "otplib";
 import QRCode from "qrcode";
 import { decryptTOTPSecret, encryptTOTPSecret } from "../utils/crypto2fa.js";
 import { lookupIpLocation } from "../utils/geoip.js";
+import { log } from "console";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 

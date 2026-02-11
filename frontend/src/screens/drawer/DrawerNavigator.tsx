@@ -18,6 +18,9 @@ import EmployeeNavigator from '../../navigation/employee/EmployeeNavigator';
 import UserNavigator from '../../navigation/user/UserNavigator';
 import ChatScreen from '../chat/components/Chat';
 import ProfileScreen from '../profile/components/Profile';
+import NewChatScreen from '../chat/components/NewChatScreen';
+import MoodScreen from '../moodscreen/comp/component/MoodScreen';
+import Friends from '../friends/components/Friends';
 
 
 
@@ -34,6 +37,9 @@ const DrawerNavigator = () => (
     <Drawer.Screen name="User" component={UserNavigator} options={{headerShown: false}} />
     <Drawer.Screen name="Chat" component={ChatScreen} options={{headerShown: false}} />
     <Drawer.Screen name="Profile" component={ProfileScreen} options={{headerShown: false}} />
+    <Drawer.Screen name="NewChat" component={NewChatScreen} options={{headerShown: false}}/>
+    <Drawer.Screen name="MoodScreen" component={MoodScreen}  options={{headerShown: false}}/>
+    <Drawer.Screen name="Friends" component={Friends} options={{headerShown: false}}/>
   </Drawer.Navigator>
 );
 

@@ -255,9 +255,8 @@ const AuthNavigator = () => {
       <Stack.Screen name="SetPass" component={SetPassVerifiedOTP} />
       <Stack.Screen name="Register" component={Register} />
       <Stack.Screen name="Drawer" component={DrawerNavigator} />
-      <Stack.Screen name="MoodScreen" component={MoodScreen} />
+
       <Stack.Screen name="ProofCamera" component={ProofVisionCameraScreen} />
-      <Stack.Screen name="Friends" component={Friends} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="Enable2FA" component={Enable2FAScreen} />
       <Stack.Screen name="Devices" component={DevicesScreen} />
@@ -266,7 +265,6 @@ const AuthNavigator = () => {
 <Stack.Screen name="LegalPolicy" component={LegalPolicyScreen} />
 <Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
 <Stack.Screen name="AvatarCreator" component={AvatarCreatorScreen} />
-<Stack.Screen name="NewChat" component={NewChatScreen} />
 <Stack.Screen name="chat" component={ChatScreen} />
     </Stack.Navigator>
   );

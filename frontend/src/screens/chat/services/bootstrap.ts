@@ -1,71 +1,78 @@
+// services/bootstrap.ts
 import { KeyHelper } from "@privacyresearch/libsignal-protocol-typescript";
 import { SignalStore, toB64, b64ToArrayBuffer } from "./signalStore";
 import { registerDeviceBundle } from "../services/api_e2ee";
 
-export async function ensureDeviceKeys(userId: string, deviceId: string) {
-  const store = new SignalStore(userId);
+  export async function ensureDeviceKeys(userId: string, deviceId: string) {
+    const store = new SignalStore(userId, deviceId);
 
-  let identity = await store.getIdentityKeyPair();
-  let regId = await store.getLocalRegistrationId();
-  let identityRaw;
+  // ---------- Identity (create once) ----------
+  let identityB64 = await store.getIdentityKeyPairB64();
+  let identityRaw: { pubKey: ArrayBuffer; privKey: ArrayBuffer };
 
-  // ---------- Identity ----------
-  if (!identity) {
+  if (!identityB64) {
     const g = await KeyHelper.generateIdentityKeyPair();
-    identity = {
-      pubKey: toB64(g.pubKey),
-      privKey: toB64(g.privKey),
-    };
+    identityB64 = { pubKey: toB64(g.pubKey), privKey: toB64(g.privKey) };
+    await store.storeIdentityKeyPair(identityB64);
     identityRaw = g;
-    await store.storeIdentityKeyPair(identity);
   } else {
     identityRaw = {
-      pubKey: b64ToArrayBuffer(identity.pubKey),
-      privKey: b64ToArrayBuffer(identity.privKey),
+      pubKey: b64ToArrayBuffer(identityB64.pubKey),
+      privKey: b64ToArrayBuffer(identityB64.privKey),
     };
   }
 
-  // ---------- Registration ID ----------
+  // ---------- RegistrationId (create once) ----------
+  let regId = await store.getLocalRegistrationId();
   if (!regId) {
     regId = KeyHelper.generateRegistrationId();
     await store.storeLocalRegistrationId(regId);
   }
 
-  // ---------- Signed PreKey ----------
+  // ---------- Signed prekey (create once) ----------
   const signedPrekeyId = 1;
-  const spk = await KeyHelper.generateSignedPreKey(identityRaw, signedPrekeyId);
 
-  await store.storeSignedPreKey(signedPrekeyId, {
-    keyId: spk.keyId,
-    publicKey: toB64(spk.keyPair.pubKey),
-    privateKey: toB64(spk.keyPair.privKey),
-    signature: toB64(spk.signature),
-  });
+  let spkPair = await store.loadSignedPreKey(signedPrekeyId);
+  let spkSigB64 = await store.getSignedPreKeySignatureB64(signedPrekeyId);
 
-  // ---------- One-time PreKeys ----------
-  const oneTimePrekeys = [];
+  if (!spkPair || !spkSigB64) {
+    const generated = await KeyHelper.generateSignedPreKey(identityRaw, signedPrekeyId);
+    await store.storeSignedPreKey(signedPrekeyId, generated.keyPair);
+    await store.storeSignedPreKeySignatureB64(signedPrekeyId, toB64(generated.signature));
+
+    spkPair = generated.keyPair;
+    spkSigB64 = toB64(generated.signature);
+  }
+
+  if (!spkPair || !spkSigB64) throw new Error("Signed prekey missing after generation");
+
+  // ---------- One-time prekeys (create missing only) ----------
+  const oneTimePrekeys: Array<{ keyId: number; publicKey: string }> = [];
   for (let i = 2; i < 17; i++) {
-    const pk = await KeyHelper.generatePreKey(i);
-    oneTimePrekeys.push({
-      keyId: i,
-      publicKey: toB64(pk.keyPair.pubKey),
-    });
-    await store.storePreKey(i, {
-      keyId: i,
-      publicKey: toB64(pk.keyPair.pubKey),
-      privateKey: toB64(pk.keyPair.privKey),
-    });
+    const existing = await store.loadPreKey(i);
+    if (!existing) {
+      const pk = await KeyHelper.generatePreKey(i);
+      await store.storePreKey(i, pk.keyPair);
+    }
+    const pkNow = await store.loadPreKey(i);
+    if (pkNow) oneTimePrekeys.push({ keyId: i, publicKey: toB64(pkNow.pubKey) });
+  }
+
+  let signalDeviceId = await store.getSignalDeviceId();
+  if (!signalDeviceId) {
+    signalDeviceId = Math.floor(Math.random() * 16000) + 1; // 1..16000
+    await store.storeSignalDeviceId(signalDeviceId);
   }
 
   // ---------- Upload bundle ----------
   await registerDeviceBundle({
-    userId,
     deviceId,
+    signalDeviceId, // ✅
     registrationId: regId,
-    identityPub: identity.pubKey,
+    identityPub: identityB64.pubKey,
     signedPrekeyId,
-    signedPrekeyPub: toB64(spk.keyPair.pubKey),
-    signedPrekeySig: toB64(spk.signature),
+    signedPrekeyPub: toB64(spkPair.pubKey),
+    signedPrekeySig: spkSigB64,
     oneTimePrekeys,
   });
 }

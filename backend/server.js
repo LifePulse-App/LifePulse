@@ -28,11 +28,16 @@ const connectDatabase = () => {
 connectDatabase()
 
 export const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false, // STARTTLS
   auth: {
-    user: process.env.EMAIL_USER, 
+    user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  connectionTimeout: 20000,
+  greetingTimeout: 20000,
+  socketTimeout: 20000,
 });
 
 //import routes
@@ -46,6 +51,7 @@ import ProfileRoutes from "./routes/ProfileRoutes.js"
 import LeaderboardRoutes from "./routes/LeaderboardRoutes.js"
 import E2EERoutes from "./routes/e2eeRoutes.js"
 import FriendRoutes from "./routes/FriendsRoutes.js"
+import PushRoutes from "./routes/NotificationRoutes.js"
 
 // Middlewares
 app.use(cookieParser());
@@ -62,6 +68,7 @@ app.use("/api/profile", ProfileRoutes);
 app.use("/api/leaderboard", LeaderboardRoutes);
 app.use("/api/e2ee", E2EERoutes);
 app.use("/api/friends", FriendRoutes);
+app.use("/api/push", PushRoutes);
 app.use(errorMiddleware)
 
 

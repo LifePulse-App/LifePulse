@@ -1,7 +1,7 @@
 import React from 'react';
 import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
-import Overdues from '../../screens/student/components/overdues/Overdues';
-import Fee from '../../screens/student/components/fee/Fee';
+import Overdues from '../../screens/mood-map/components/overdues/Overdues';
+import Fee from '../../screens/mood-map/components/fee/Fee';
 import { TouchableOpacity } from 'react-native';
 import AppText from '../../components/Layout/AppText/AppText';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';

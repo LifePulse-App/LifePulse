@@ -8,6 +8,8 @@ import {
   storeMessage,
   pullMessages,
   getConversations,
+  getThread,
+  markMessagesAsRead,
 } from "../controllers/e2eeController.js";
 
 const router = express.Router();
@@ -24,5 +26,10 @@ router.get("/messages", isAuthenticatedUser, pullMessages);
 
 // Conversations
 router.get("/conversations", isAuthenticatedUser, getConversations);
+
+// GET /e2ee/messages/thread/:peerUserId
+router.get("/messages/thread/:peerUserId",isAuthenticatedUser, getThread);
+
+router.patch('/messages/markRead', isAuthenticatedUser, markMessagesAsRead);
 
 export default router;
