@@ -2,6 +2,7 @@ import Location from "../models/LocationSchema.js";
 import User from "../models/UserSchema.js";
 import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import ErrorHandler from "../utils/errorHandler.js";
+import Mood from "../models/MoodSchema.js";
 
 // POST /api/location/update
 export const updateMyLocation = catchAsyncErrors(async (req, res, next) => {
@@ -63,5 +64,23 @@ export const getFriendsLocations = catchAsyncErrors(async (req, res, next) => {
     ],
   }).populate("user", "name username avatarUrl");
 
-  res.status(200).json({ success: true, locations: friendsLocations });
+  const moods = await Mood.find({ user: { $in: friendIds } })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  const moodMap = new Map();
+  for (const m of moods) {
+    const id = String(m.user);
+    if (!moodMap.has(id)) moodMap.set(id, m.mood);
+  }
+
+  const withMood = friendsLocations.map((loc) => {
+    const id = String(loc.user?._id || loc.user);
+    return {
+      ...loc.toObject(),
+      mood: moodMap.get(id) || null,
+    };
+  });
+
+  res.status(200).json({ success: true, locations: withMood });
 });

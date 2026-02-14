@@ -4,6 +4,7 @@ import { sendMsgNotification } from './NotificationController.js';
 import mongoose from "mongoose";
 import PushToken from '../models/PushToken.js';
 import admin from '../firebaseAdmin.js';
+import Mood from "../models/MoodSchema.js";
 
 // controllers/e2eeController.js
 export const getThread = async (req, res) => {
@@ -255,11 +256,10 @@ export const pullMessages = async (req, res) => {
 };
 
 // controllers/e2eeController.js
+
 export const getConversations = async (req, res) => {
   try {
     const me = req.user._id;
-
-    // accept both ?deviceId=... and ?params[deviceId]=...
     const deviceId = req.query.deviceId || req.query["params[deviceId]"];
     if (!deviceId) return res.status(400).json({ message: "deviceId required" });
 
@@ -267,17 +267,12 @@ export const getConversations = async (req, res) => {
       {
         $match: {
           $or: [
-            // incoming decryptable on this device
             { toUserId: me, toDeviceId: deviceId },
-
-            // outgoing self-copies decryptable on this device
             { fromUserId: me, toDeviceId: deviceId },
           ],
         },
       },
       { $sort: { createdAt: -1 } },
-
-      // compute peerId per message
       {
         $addFields: {
           peerUserId: {
@@ -285,8 +280,6 @@ export const getConversations = async (req, res) => {
           },
         },
       },
-
-      // take latest message per peer
       {
         $group: {
           _id: "$peerUserId",
@@ -294,6 +287,27 @@ export const getConversations = async (req, res) => {
         },
       },
       { $sort: { "lastMessage.createdAt": -1 } },
+
+      // ✅ lookup latest mood for each peer
+      {
+        $lookup: {
+          from: "moods",
+          let: { peerId: "$_id" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$user", "$$peerId"] } } },
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 },
+            { $project: { mood: 1, _id: 0 } },
+          ],
+          as: "moodInfo",
+        },
+      },
+      {
+        $addFields: {
+          mood: { $ifNull: [{ $arrayElemAt: ["$moodInfo.mood", 0] }, null] },
+        },
+      },
+      { $project: { moodInfo: 0 } },
     ];
 
     const results = await E2EEMessage.aggregate(pipeline);

@@ -59,12 +59,16 @@ export default function ChatListScreen({ navigation }: any) {
         const peerId = String(c._id);
         const p = previewMap.get(peerId);
 
+        console.log(c);
+        
+      
         return {
           peerUserId: peerId,
           peerName: nameMap.get(peerId) || "Friend",
+          mood: c.mood || "",
           lastText: p?.lastText ?? "",
           lastAt: p?.lastAt ?? c?.lastMessage?.createdAt ?? "",
-          unread: getUnread(peerId), // ✅ always up-to-date
+          unread: getUnread(peerId),
         };
       });
 
@@ -151,11 +155,14 @@ export default function ChatListScreen({ navigation }: any) {
                   navigation.navigate("chat", {
                     peerUserId: item.peerUserId,
                     peerName: item.peerName,
+                    peerMood: item.mood, // ✅ add this
                   })
                 }
               >
                 <View style={styles.rowTop}>
-                  <Text style={styles.peer} numberOfLines={1}>{item.peerName}</Text>
+                <Text style={styles.peer} numberOfLines={1}>
+                {item.peerName}  {item.mood ? `[ is ${item.mood} ] ` : ""}
+</Text>
                   <Text style={styles.time}>{formatLastTime(item.lastAt)}</Text>
                 </View>
 

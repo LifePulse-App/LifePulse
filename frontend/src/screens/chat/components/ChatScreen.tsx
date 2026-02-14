@@ -58,7 +58,7 @@ const formatTime = (iso: string) =>
 
 export default function ChatScreen({ route, navigation }: any) {
   const user = useContext(AuthContext);
-  const { peerUserId, peerName } = route.params;
+  const { peerUserId, peerName, peerMood } = route.params;
   const insets = useSafeAreaInsets();
 
   const myUserId = user?.User?.user?.id;
@@ -403,7 +403,9 @@ export default function ChatScreen({ route, navigation }: any) {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
                   <Icon name="arrow-left" size={22} color="#fff" />
                 </TouchableOpacity>
-                <Text style={styles.title}>{peerName || "Friend"}</Text>
+                <Text style={styles.title}>
+                {peerName || "Friend"} {peerMood ? `[ is ${peerMood} ] ` : ""}
+</Text>
                 <View style={{ width: 42 }} />
               </View>
 
