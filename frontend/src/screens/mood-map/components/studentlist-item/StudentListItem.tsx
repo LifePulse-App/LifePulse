@@ -17,7 +17,7 @@ import Icon2 from 'react-native-vector-icons/Ionicons';
 import Icon3 from 'react-native-vector-icons/MaterialIcons';
 import Icon4 from 'react-native-vector-icons/Foundation';
 import {useNavigation} from '@react-navigation/native';
-import api_Student from '../../services/api_Student';
+import api_Student from '../../services/api_location';
 import Toast from 'react-native-toast-message';
 import { IMAGE_BASE_URL  } from '@env';
 

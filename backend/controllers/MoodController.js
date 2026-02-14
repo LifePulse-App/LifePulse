@@ -1,8 +1,11 @@
 import Mood from "../models/MoodSchema.js";
 import User from "../models/UserSchema.js";
+import Location from "../models/LocationSchema.js";
 
 // POST /api/moods
 // body: { mood: string }
+const MOOD_TTL_MS = 24 * 60 * 60 * 1000; // 2 hours
+
 export const createMood = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -14,7 +17,6 @@ export const createMood = async (req, res) => {
         .json({ success: false, message: "Mood is required" });
     }
 
-    // ensure user exists
     const user = await User.findById(userId).select("_id");
     if (!user) {
       return res
@@ -25,6 +27,7 @@ export const createMood = async (req, res) => {
     const moodDoc = await Mood.create({
       user: userId,
       mood,
+      expiresAt: new Date(Date.now() + MOOD_TTL_MS),
     });
 
     return res.status(201).json({
@@ -34,6 +37,7 @@ export const createMood = async (req, res) => {
         id: moodDoc._id,
         mood: moodDoc.mood,
         createdAt: moodDoc.createdAt,
+        expiresAt: moodDoc.expiresAt,
       },
     });
   } catch (err) {
@@ -41,5 +45,46 @@ export const createMood = async (req, res) => {
     return res
       .status(500)
       .json({ success: false, message: "Failed to log mood" });
+  }
+};
+
+export const getWorldMoods = async (req, res) => {
+  try {
+    const activeMoods = await Mood.find({
+      expiresAt: { $gt: new Date() },
+    }).select("user mood createdAt expiresAt");
+
+    const userIds = activeMoods.map((m) => m.user);
+
+    const locations = await Location.find({ user: { $in: userIds } })
+      .select("user coords updatedAt")
+      .sort({ updatedAt: -1 });
+
+    const locMap = new Map();
+    for (const loc of locations) {
+      if (!locMap.has(String(loc.user))) {
+        locMap.set(String(loc.user), loc);
+      }
+    }
+
+    const data = activeMoods
+      .map((m) => {
+        const loc = locMap.get(String(m.user));
+        if (!loc?.coords) return null;
+        return {
+          mood: m.mood,
+          coords: loc.coords, // { lng, lat }
+          createdAt: m.createdAt,
+          expiresAt: m.expiresAt,
+        };
+      })
+      .filter(Boolean);
+
+    return res.json({ success: true, data });
+  } catch (err) {
+    console.error("Error fetching world moods:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load moods" });
   }
 };

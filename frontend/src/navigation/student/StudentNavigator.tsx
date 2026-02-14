@@ -1,7 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-import StudentList from '../../screens/mood-map/components/studentlist/StudentList';
+import StudentList from '../../screens/mood-map/components/mood-map/MoodMap';
 import Adjustment from '../../screens/mood-map/components/adjustment/Adjustment';
 import StudentTabNavigator from './StudentTabNavigator';
 import AnnualItemDetails from '../../screens/mood-map/components/overdues/AnnualItemDetails';

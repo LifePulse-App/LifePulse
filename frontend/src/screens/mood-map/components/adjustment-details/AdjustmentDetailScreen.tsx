@@ -21,7 +21,7 @@ import AppText from '../../../../components/Layout/AppText/AppText';
 import AppActivityIndicator from '../../../../components/Layout/AppActivityIndicator/AppActivityIndicator';
 import styles from './AdjustmentDetailScreenStyles';
 import colors from '../../../../shared/styling/lightModeColors';
-import api_Student from '../../services/api_Student';
+import api_Student from '../../services/api_location';
 import Toast from 'react-native-toast-message';
 
 const AdjustmentDetailScreen = ({ route, navigation }: any) => {

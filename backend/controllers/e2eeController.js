@@ -306,16 +306,16 @@ export const getConversations = async (req, res) => {
 
 // helper function
 async function sendSeenNotification(toUserId, peerUserId) {
-  const tokens = await PushToken.find({ userId: toUserId, platform: 'android' }).lean();
+  const tokens = await PushToken.find({ userId: toUserId, platform: "android" }).lean();
+
   for (const t of tokens) {
     await admin.messaging().send({
       token: t.token,
-      data: payload,
-      notification: {
-        title: 'New Message',
-        body: 'You received a new message',
+      data: {
+        type: "seen",
+        peerUserId: String(peerUserId),
       },
-      android: { priority: 'high' },
+      android: { priority: "high" },
     });
   }
 }

@@ -11,6 +11,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import BitmojiFace from "../../../shared/components/BitmojiFace";
 import { Image } from 'react-native';
 import UserStorage from "../../../auth/user/UserStorage";
+import SavedAccountsStorage from "../../../auth/user/SavedAccountsStorage";
+
 
 // --- Glassy Confirm Modal Component ---
 const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }: any) => {
@@ -483,16 +485,22 @@ const ProfileScreen = ({ navigation }: any) => {
 
   // --- API Action Handlers ---
   const confirmLogout = async () => {
+    const userData = authContext?.User;
+    if (userData?.user?.id && userData?.UserName && userData?.Password) {
+      await SavedAccountsStorage.save({
+        id: userData.user.id,
+        username: userData.UserName,
+        password: userData.Password,
+        user: userData,
+      });
+    }
+  
     await logout(userId);
     authContext?.setUser(null);
-    setLogoutModalVisible(false);
-    setResultCard({ visible: true, type: "success", message: "Logged out!" });
     UserStorage.clearTokens();
     UserStorage.deleteUser();
-    setTimeout(() => {
-      setResultCard({ ...resultCard, visible: false });
-      navigation.replace("Login");
-    }, 1100);
+  
+    navigation.replace("SavedAccounts"); // go to saved accounts screen
   };
   const handleDeleteAccount = async () => {
     try {

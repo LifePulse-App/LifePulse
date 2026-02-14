@@ -8,7 +8,7 @@ import AppScreen from '../../../../components/Layout/AppScreen/AppScreen';
 import AppText from '../../../../components/Layout/AppText/AppText';
 import AppActivityIndicator from '../../../../components/Layout/AppActivityIndicator/AppActivityIndicator';
 import {StudentOverduesAdjustmentListResponse} from '../../models/StudentOverduesAdjustmentListResponse';
-import api_Student from '../../services/api_Student';
+import api_Student from '../../services/api_location';
 import styles from './Adjustmentstyles';
 import colors from '../../../../shared/styling/lightModeColors';
 import Toast from 'react-native-toast-message';

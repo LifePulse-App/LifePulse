@@ -29,6 +29,7 @@ import AvatarCustomizeScreen from '../../screens/profile/components/AvatarCustom
 import AvatarCreatorScreen from '../../screens/profile/components/AvatarCreatorScreen';
 import NewChatScreen from '../../screens/chat/components/NewChatScreen';
 import ChatScreen from '../../screens/chat/components/ChatScreen';
+import SavedAccountsScreen from '../../screens/login/components/SavedAccountsScreen';
 
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');
@@ -196,46 +197,52 @@ const SplashScreen = () => {
   );
 };
 
-const AuthNavigator = () => {
-  const [initialRoute, setInitialRoute] = useState<'Login' | 'Drawer' | null>(null);
-  const authContext = useContext(AuthContext);
+import SavedAccountsStorage from "../../auth/user/SavedAccountsStorage";
 
-  useEffect(() => {
-    const bootstrap = async () => {
-      try {
-        // Ensure static api-key is always set
-        setSecretKey();
+  const AuthNavigator = () => {
+    const [initialRoute, setInitialRoute] = useState<'Login' | 'Drawer' | 'SavedAccounts' | null>(null);
+    const authContext = useContext(AuthContext);
 
-        const creds = await UserStorage.getUser();
-        if (!creds || !creds.username) {
-          setInitialRoute('Login');
-          return;
-        }
-
-        const storedUser: UserLoginResponse = JSON.parse(creds.username);
-        const accessToken =
-          (await UserStorage.getAccessToken()) || storedUser.accessToken;
-
-        if (!accessToken) {
+    useEffect(() => {
+      const bootstrap = async () => {
+        try {
+          setSecretKey();
+    
+          // 1) Try restore session first
+          const creds = await UserStorage.getUser();
+          if (creds?.username) {
+            const storedUser: UserLoginResponse = JSON.parse(creds.username);
+            const accessToken =
+              (await UserStorage.getAccessToken()) || storedUser.accessToken;
+    
+            if (accessToken) {
+              await setAuthHeaders(accessToken);
+              authContext?.setUser?.(storedUser);
+              setInitialRoute("Drawer");
+              return;
+            }
+          }
+    
+          // 2) If no session, show SavedAccounts if any
+          const saved = await SavedAccountsStorage.getAll();
+          if (saved.length > 0) {
+            setInitialRoute("SavedAccounts");
+            return;
+          }
+    
+          // 3) Otherwise Login
           await UserStorage.deleteUser();
           await UserStorage.clearTokens?.();
-          setInitialRoute('Login');
-          return;
+          setInitialRoute("Login");
+        } catch (e) {
+          await UserStorage.deleteUser();
+          await UserStorage.clearTokens?.();
+          setInitialRoute("Login");
         }
-
-        // Restore session
-        await setAuthHeaders(accessToken);
-        authContext?.setUser?.(storedUser);
-        setInitialRoute('Drawer');
-      } catch (e) {
-        await UserStorage.deleteUser();
-        await UserStorage.clearTokens?.();
-        setInitialRoute('Login');
-      }
-    };
-
-    bootstrap();
-  }, [authContext]);
+      };
+    
+      bootstrap();
+    }, [authContext]);
 
   // Show splash while deciding where to go
   if (!initialRoute) {
@@ -248,6 +255,7 @@ const AuthNavigator = () => {
       initialRouteName={initialRoute}
     >
       <Stack.Screen name="Login" component={Login} />
+      <Stack.Screen name="SavedAccounts" component={SavedAccountsScreen} />
       <Stack.Screen name="TwoFA" component={TwoFAScreen} />
       <Stack.Screen name="VerifyOtp" component={VerifyOtp} />
       <Stack.Screen name="ForgotPass" component={ForgotPass} />

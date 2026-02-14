@@ -436,15 +436,18 @@ export default function ChatScreen({ route, navigation }: any) {
                       <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
                           <Text style={styles.text}>{m.plaintext}</Text>
-                          {isMe ? (
+                        </View>
+                        {isMe ? (
   showBlueTick ? (
-    <Icon name="check-all" size={16} color="#2dd4bf" style={{marginLeft: 4}}/>
+    <Icon name="check-all" size={13} color="#2dd4bf" style={{marginLeft: 4}}>
+                              <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
+                              </Icon>
   ) : (
-    <Icon name="check" size={16} color="#a3a3a3" style={{marginLeft: 4}}/>
+    <Icon name="check" size={13} color="#a3a3a3" style={{marginLeft: 4}}>
+          <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
+         </Icon>
   )
 ) : null}
-                        </View>
-                        <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
                       </View>
                     </View>
                   );
@@ -536,7 +539,7 @@ const styles = StyleSheet.create({
   bubbleOther: { backgroundColor: "rgba(255,255,255,0.06)" },
 
   text: { color: "#fff", flexShrink: 1, flexWrap: "wrap" },
-  timeText: { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 4, alignSelf: "flex-end" },
+  timeText: { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 4, alignSelf: "flex-end", marginRight: 4 },
 
   // absolute input bar
   inputBar: {

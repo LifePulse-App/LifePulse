@@ -2,7 +2,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Dashboard from '../../screens/dashboard/components/dashboard/Dashboard';
-import StudentList from '../../screens/mood-map/components/studentlist/StudentList';
+import StudentList from '../../screens/mood-map/components/mood-map/MoodMap';
 import EmployeeList from '../../screens/leaderboard/components/leaderboard/leaderboard';
 import UserList from '../../screens/user/components/UserList/UserList';
 import CustomBottomNav from '../../shared/components/LowNavBar';

@@ -11,7 +11,7 @@ import AuthContext from '../../../../auth/user/UserContext';
 import AppActivityIndicator from '../../../../components/Layout/AppActivityIndicator/AppActivityIndicator';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {StudentFeeListResponse} from '../../models/StudentFeeListResponse';
-import api_Student from '../../services/api_Student';
+import api_Student from '../../services/api_location';
 import Toast from 'react-native-toast-message';
 
 const Fee = ({navigation, route}: any) => {

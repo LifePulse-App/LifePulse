@@ -1,14 +1,17 @@
 import { createNavigationContainerRef } from '@react-navigation/native';
 import UserStorage from '../../auth/user/UserStorage';
 import sharedApi from '../../shared/services/shared-api';
+import SavedAccountsStorage from "../../auth/user/SavedAccountsStorage";
 
 export const navigationRef = createNavigationContainerRef<any>();
 
-export const resetToLogin = () => {
+
+export const resetToLogin = async () => {
   if (navigationRef.isReady()) {
+    const saved = await SavedAccountsStorage.getAll();
     navigationRef.reset({
       index: 0,
-      routes: [{ name: 'Login' as never }],
+      routes: [{ name: saved.length > 0 ? "SavedAccounts" : "Login" as never }],
     });
   }
 };

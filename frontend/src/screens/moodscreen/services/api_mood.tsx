@@ -13,6 +13,10 @@ const logMood = async (mood: string) => {
   }
 };
 
+const getWorldMoods = () =>
+  client.get("/moods/world");
+
 export default {
     logMood,
+    getWorldMoods
   };
