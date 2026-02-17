@@ -131,7 +131,7 @@ const HABIT_DEFS = [
 
 (async () => {
   try {
-    await mongoose.connect("mongodb://localhost:27017/habitsapp");
+    await mongoose.connect("mongodb://localhost:27017/streaksphere-dev");
     for (const h of HABIT_DEFS) {
       await Habit.updateOne({ key: h.key }, { $set: h }, { upsert: true });
     }
