@@ -27,4 +27,4 @@ jobs:
 
       - name: Deploy backend using PM2
         run: |
-          ./backend/deploy.sh production
+          ./backend/scripts/deploy.sh production
