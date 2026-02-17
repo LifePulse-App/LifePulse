@@ -46,9 +46,9 @@ fi
 # -------------------------------------
 # 4️⃣ Start AI Model (Production only)
 # -------------------------------------
-if [ "$ENV" == "production" ] && [ -f "$AI_PATH/ai_model.py" ]; then
-    echo "🤖 Starting AI Model..."
-    pm2 start "$AI_PATH/ai_model.py" \
+
+echo "🤖 Starting AI Model..."
+pm2 start "$AI_PATH/main.py" \
         --name "$APP_NAME-ai" \
         --interpreter python3
 fi
