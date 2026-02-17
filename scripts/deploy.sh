@@ -7,7 +7,7 @@
 # =====================================
 
 ENV=${1:-production}
-BASE_PATH="/home/server-pc/StreakSphere"
+BASE_PATH="/home/server-pc/actions-runner/_work/StreakSphere/StreakSphere"
 NODE_BACKEND_PATH="$BASE_PATH/backend"
 AI_PATH="$BASE_PATH/ai"
 APP_NAME="StreakSphere"
