@@ -17,9 +17,9 @@ echo "🚀 Deploying $APP_NAME in $ENV mode..."
 # -------------------------------------
 # 1️⃣ Reset PM2 completely
 # -------------------------------------
-echo "⏹ Resetting PM2..."
-pm2 delete all >/dev/null 2>&1 || true
-sleep 2
+# echo "⏹ Resetting PM2..."
+# pm2 delete all >/dev/null 2>&1 || true
+# sleep 2
 
 # -------------------------------------
 # 2️⃣ Install backend dependencies
