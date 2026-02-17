@@ -51,7 +51,6 @@ echo "🤖 Starting AI Model..."
 pm2 start "$AI_PATH/main.py" \
         --name "$APP_NAME-ai" \
         --interpreter python3
-fi
 
 # -------------------------------------
 # 5️⃣ Save PM2 state
