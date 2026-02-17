@@ -6,31 +6,21 @@ on:
 
 jobs:
   build-and-deploy-dev:
-    runs-on: [self-hosted, windows]
+    runs-on: [self-hosted, linux]
 
     steps:
-      # 0. Kill any lingering Node/PM2 processes that may lock file
-      - name: pm2 stopping dev
-        shell: powershell
-        run: pm2 stop StreakSphere-dev
-
-      # 1. Checkout repo
       - uses: actions/checkout@v3
 
-      # 2. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 24
 
-      # 3. Install dependencies for backend
       - name: Install backend dependencies
-        shell: powershell
         run: |
-            cd backend 
-            npm install
+          cd backend
+          npm install --legacy-peer-deps
 
-      # 4. Deploy backend using PM2
-      - name: Deploy backend
-        shell: powershell
-        run: .\scripts\deploy.ps1 -env 'development' -appName 'StreakSphere-dev'
+      - name: Deploy backend using PM2
+        run: |
+          ./backend/deploy.sh development

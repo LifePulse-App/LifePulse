@@ -1,46 +1,30 @@
-param(
-    [string]$env = "production",
-    [string]$appName = "StreakSphere"
-)
+#!/bin/bash
+ENV=${1:-production}
+APP_NAME="StreakSphere"
+BACKEND_PATH="/home/server-pc/StreakSphere/backend"
 
-Write-Host "Deploying $appName in $env using PM2..."
+echo "Deploying $APP_NAME in $ENV using PM2..."
 
-# Path to backend folder
-$backendPath = "C:\Users\Administrator\actions-runner\_work\StreakSphere\StreakSphere\backend"
+cd $BACKEND_PATH || { echo "Backend folder not found!"; exit 1; }
 
-try {
-    # Change to backend folder
-    Set-Location $backendPath
+# Install dependencies
+npm install --legacy-peer-deps
 
-    # Install dependencies
-    Write-Host "Installing dependencies..."
-    npm install --legacy-peer-deps
+# Select script
+if [ "$ENV" == "development" ]; then
+    SCRIPT_FILE="server-dev.js"
+    APP_NAME="$APP_NAME-dev"
+else
+    SCRIPT_FILE="server-prod.js"
+    APP_NAME="$APP_NAME-prod"
+fi
 
-    # Determine script file and PM2 process name
-    if ($env -eq "development") {
-        $scriptFile = "server-dev.js"
-        $appName = "StreakSphere-dev"
-    } else {
-        $scriptFile = "server-prod.js"
-        $appName = "StreakSphere-prod"
-    }
+# Stop existing PM2 process
+pm2 stop "$APP_NAME" --silent
+sleep 2
 
-    # Stop only the PM2 process we are about to deploy
-    Write-Host "Stopping old PM2 process for $appName if it exists..."
-    pm2 stop $appName -s
-    Start-Sleep -Seconds 2
+# Start with PM2
+pm2 start "$SCRIPT_FILE" --name "$APP_NAME"
+pm2 save
 
-    # Start PM2 directly on JS file
-    Write-Host "Starting $appName with PM2 using $scriptFile..."
-    pm2 start $scriptFile --name $appName
-
-    # Save PM2 process list
-    pm2 save
-
-    Write-Host "✅ $appName deployed successfully in $env"
-}
-catch {
-    $errMsg = $_.Exception.Message
-    Write-Error "Error deploying: $errMsg"
-    exit 1
-}
+echo "✅ $APP_NAME deployed successfully in $ENV"

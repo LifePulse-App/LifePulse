@@ -6,30 +6,21 @@ on:
 
 jobs:
   build-and-deploy-prod:
-    runs-on: [self-hosted, windows]
+    runs-on: [self-hosted, linux]
+
     steps:
-     # 0. Stopping prod
-      - name: pm2 stopping prod
-        shell: powershell
-        run: pm2 stop StreakSphere-prod
-        
-      # 1. Checkout repo
       - uses: actions/checkout@v3
 
-      # 2. Setup Node
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: 24
 
-      # 3. Install dependencies
-      - name: Install dependencies
-        shell: powershell
+      - name: Install backend dependencies
         run: |
-            cd backend
-            npm install
+          cd backend
+          npm install --legacy-peer-deps
 
-      # 5. Deploy (custom PowerShell script)
-      - name: Deploy to production
-        shell: powershell
-        run: .\scripts\deploy.ps1 -env 'production' -appName 'StreakSphere-prod'
+      - name: Deploy backend using PM2
+        run: |
+          ./backend/deploy.sh production
