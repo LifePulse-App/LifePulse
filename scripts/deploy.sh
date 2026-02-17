@@ -1,65 +1,67 @@
 #!/bin/bash
 
-# -----------------------------
+# =====================================
 # StreakSphere Deployment Script
-# -----------------------------
 # Usage: ./deploy.sh [development|production]
-# Defaults to production
-# -----------------------------
+# Default: production
+# =====================================
 
 ENV=${1:-production}
-NODE_BACKEND_PATH="/home/server-pc/StreakSphere/backend"
-AI_PATH="/home/server-pc/StreakSphere/ai"
+BASE_PATH="/home/server-pc/actions-runner/_work/StreakSphere/StreakSphere"
+NODE_BACKEND_PATH="$BASE_PATH/backend"
+AI_PATH="$BASE_PATH/ai"
 APP_NAME="StreakSphere"
 
-echo "🚀 Starting deployment of $APP_NAME in $ENV environment..."
+echo "🚀 Deploying $APP_NAME in $ENV mode..."
 
-# -----------------------------
-# 1️⃣ Stop & delete all existing PM2 processes
-# -----------------------------
-echo "⏹ Stopping and deleting all PM2 processes..."
-pm2 delete all || echo "No PM2 processes found."
+# -------------------------------------
+# 1️⃣ Reset PM2 completely
+# -------------------------------------
+echo "⏹ Resetting PM2..."
+pm2 delete all >/dev/null 2>&1 || true
 sleep 2
 
-# -----------------------------
+# -------------------------------------
 # 2️⃣ Install backend dependencies
-# -----------------------------
-echo "📦 Installing Node.js backend dependencies..."
-cd "$NODE_BACKEND_PATH" || { echo "Backend folder not found!"; exit 1; }
+# -------------------------------------
+cd "$NODE_BACKEND_PATH" || { echo "❌ Backend folder not found!"; exit 1; }
+echo "📦 Installing backend dependencies..."
 npm install --legacy-peer-deps
 
-# -----------------------------
-# 3️⃣ Deploy Node backend
-# -----------------------------
+# -------------------------------------
+# 3️⃣ Start Backend
+# -------------------------------------
 if [ "$ENV" == "development" ]; then
-    echo "🟢 Deploying Development backend..."
-    pm2 start server-dev.js --name "$APP_NAME-dev" --watch
+    echo "🟢 Starting Development Backend (single instance)..."
+    pm2 start server-dev.js \
+        --name "$APP_NAME-dev" \
+        --instances 1 \
+        --exec_mode fork \
+        --watch
 else
-    echo "🔵 Deploying Production backend..."
-    # Start multiple clustered instances
-    pm2 start server-prod.js --name "$APP_NAME-prod" --instances max --exec_mode cluster
+    echo "🔵 Starting Production Backend (cluster mode)..."
+    pm2 start server-prod.js \
+        --name "$APP_NAME-prod" \
+        --instances max \
+        --exec_mode cluster
 fi
 
-# -----------------------------
-# 4️⃣ Deploy Python AI model (prod only)
-# -----------------------------
-if [ -d "$AI_PATH" ] && [ "$ENV" == "production" ]; then
-    echo "🤖 Starting Python AI model..."
-    pm2 start "$AI_PATH/ai_model.py" --name "$APP_NAME-ai" --interpreter python3
+# -------------------------------------
+# 4️⃣ Start AI Model (Production only)
+# -------------------------------------
+if [ "$ENV" == "production" ] && [ -f "$AI_PATH/ai_model.py" ]; then
+    echo "🤖 Starting AI Model (cluster mode)..."
+
+    pm2 start "$AI_PATH/main.py" \
+        --name "$APP_NAME-ai" \
+        --interpreter python3 \
+        --instances max \
+        --exec_mode fork
 fi
 
-# -----------------------------
-# 5️⃣ Save PM2 process list and setup auto-start on boot
-# -----------------------------
-echo "💾 Saving PM2 process list..."
-pm2 save
+# -------------------------------------
+# 5️⃣ Save PM2 state
+# -------------------------------------
+pm2 save >/dev/null 2>&1
 
-echo "🔧 Setting up PM2 to auto-start on boot..."
-pm2 startup systemd -u server-pc --hp /home/server-pc
-# The above command will print another sudo command, run it once manually if needed
-
-# -----------------------------
-# 6️⃣ Finished
-# -----------------------------
-echo "✅ Deployment complete for $APP_NAME in $ENV"
-pm2 list
+echo "✅ Deployment finished successfully."
