@@ -21,6 +21,10 @@ jobs:
           cd backend
           npm install --legacy-peer-deps
 
+      - name: Make deploy script executable
+        run: chmod +x ./scripts/deploy.sh
+
+
       - name: Deploy backend using PM2
         run: |
           ./backend/deploy.sh development
