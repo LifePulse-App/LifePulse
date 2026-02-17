@@ -44,13 +44,20 @@ else
 fi
 
 # -------------------------------------
-# 4️⃣ Start AI Model (Production only)
+# 4️⃣ Start AI Model
 # -------------------------------------
-
-echo "🤖 Starting AI Model..."
-pm2 start "$AI_PATH/main.py" \
+if [ "$ENV" == "development" ]; then
+    echo "🤖 Starting AI Model (development)..."
+    pm2 start "$AI_PATH/main.py" \
         --name "$APP_NAME-ai" \
         --interpreter python3
+else
+    echo "🤖 Starting AI Model (production cluster)..."
+    pm2 start "$AI_PATH/main.py" \
+        --name "$APP_NAME-ai" \
+        --interpreter python3 \
+        -i max
+fi
 
 # -------------------------------------
 # 5️⃣ Save PM2 state

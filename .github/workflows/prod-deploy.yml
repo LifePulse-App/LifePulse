@@ -24,7 +24,6 @@ jobs:
       - name: Make deploy script executable
         run: chmod +x ./scripts/deploy.sh
 
-
-      - name: Deploy backend using PM2
+      - name: Deploy backend + AI using PM2
         run: |
           ./scripts/deploy.sh production
