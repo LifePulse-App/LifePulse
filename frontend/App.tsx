@@ -102,7 +102,7 @@ const App = () => {
 
     const run = async () => {
       await notifee.requestPermission();
-      const messagingInstance = getMessaging(getApp());
+      const messagingInstance = getMessaging(getApp());      
 
       // Foreground message handler
       return onMessage(messagingInstance, async remoteMessage => {

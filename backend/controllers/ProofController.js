@@ -37,7 +37,7 @@ export const submitProof = async (req, res) => {
     formData.append("habitName", habit.key);
     formData.append("image", fs.createReadStream(req.file.path));
 
-    const aiRes = await axios.post("http://localhost:8000/verify", formData, {
+    const aiRes = await axios.post("https://api-ai.streaksphere.app/verify", formData, {
       headers: formData.getHeaders(),
     });
 

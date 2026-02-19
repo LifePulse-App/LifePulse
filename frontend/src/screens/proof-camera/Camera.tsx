@@ -187,6 +187,9 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
       formData.append('habitId', habitId);
       formData.append('userId', userId);
 
+      console.log(formData);
+      
+
       const res = await ProofApi.SubmitProof(formData);
       console.log(res);
       
@@ -289,7 +292,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {habitsLoading ? (
             <View style={styles.modalLoading}>
-              <AppActivityIndicator visible />
+             
             </View>
           ) : (
             <SectionList
