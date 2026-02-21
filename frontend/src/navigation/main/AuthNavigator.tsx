@@ -198,6 +198,8 @@ const SplashScreen = () => {
 };
 
 import SavedAccountsStorage from "../../auth/user/SavedAccountsStorage";
+import FriendsListScreen from '../../screens/friends/components/FriendsList';
+import ProfilePreviewScreen from '../../screens/profile/components/ProfilePreview';
 
   const AuthNavigator = () => {
     const [initialRoute, setInitialRoute] = useState<'Login' | 'Drawer' | 'SavedAccounts' | null>(null);
@@ -263,7 +265,7 @@ import SavedAccountsStorage from "../../auth/user/SavedAccountsStorage";
       <Stack.Screen name="SetPass" component={SetPassVerifiedOTP} />
       <Stack.Screen name="Register" component={Register} />
       <Stack.Screen name="Drawer" component={DrawerNavigator} />
-
+      <Stack.Screen name="Friends" component={Friends} options={{headerShown: false}}/>
       <Stack.Screen name="ProofCamera" component={ProofVisionCameraScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="Enable2FA" component={Enable2FAScreen} />
@@ -274,6 +276,8 @@ import SavedAccountsStorage from "../../auth/user/SavedAccountsStorage";
 <Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
 <Stack.Screen name="AvatarCreator" component={AvatarCreatorScreen} />
 <Stack.Screen name="chat" component={ChatScreen} />
+<Stack.Screen name="FriendsManage" component={FriendsListScreen} />
+<Stack.Screen name="ProfilePreview" component={ProfilePreviewScreen} />
     </Stack.Navigator>
   );
 };

@@ -42,16 +42,30 @@ export const getProfile = catchAsyncErrors(async (req, res, next) => {
 
 // Edit profile (NO email update!)
 export const editProfile = catchAsyncErrors(async (req, res, next) => {
-  const { name, username, avatar, currentTitle } = req.body;
+  const { name, username, avatar, currentTitle, isPublic } = req.body;
+
   const update = {};
+
   if (name) update.name = name;
+
   if (username) {
     const exists = await User.findOne({ username, _id: { $ne: req.user._id } });
     if (exists) return next(new ErrorHandler("Username already exists", 400));
     update.username = username;
   }
+
   if (avatar) update.avatar = avatar;
   if (currentTitle) update.currentTitle = currentTitle;
+
+  // ✅ NEW: allow toggling location visibility / public profile flag
+  // isPublic === true  -> show location publicly
+  // isPublic === false -> friends only
+  if (typeof isPublic === "boolean") {
+    update.isPublic = isPublic;
+  } else if (isPublic === "true" || isPublic === "false") {
+    // if coming from form-data / string
+    update.isPublic = isPublic === "true";
+  }
 
   const user = await User.findByIdAndUpdate(req.user._id, update, { new: true }).select("-password");
   res.status(200).json({ success: true, user });

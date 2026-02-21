@@ -70,7 +70,6 @@ export default function ChatScreen({ route, navigation }: any) {
   const [items, setItems] = useState<Item[]>([]);
   const [input, setInput] = useState("");
 
-  const [kbHeight, setKbHeight] = useState(0);
 
   const flatRef = useRef<FlatList>(null);
   const scrollToBottom = () =>
@@ -98,13 +97,9 @@ export default function ChatScreen({ route, navigation }: any) {
     };
     const onBlur = () => setActiveChatPeer(null);
   
-    const unsubFocus = navigation.addListener('focus', onFocus);
-    const unsubBlur = navigation.addListener('blur', onBlur);
     onFocus();
   
     return () => {
-      unsubFocus();
-      unsubBlur();
       onBlur();
     };
   }, [navigation, peerUserId]);
@@ -114,24 +109,6 @@ export default function ChatScreen({ route, navigation }: any) {
   }, [messages, buildItemsWithDateSeparators]);
 
   // keyboard height (needed for Android when using absolute input bar)
-  useEffect(() => {
-    const showEvt = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvt = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-
-    const show = Keyboard.addListener(showEvt, (e: any) => {
-      LayoutAnimation.easeInEaseOut();
-      setKbHeight(e?.endCoordinates?.height ?? 0);
-    });
-    const hide = Keyboard.addListener(hideEvt, () => {
-      LayoutAnimation.easeInEaseOut();
-      setKbHeight(0);
-    });
-
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
 
   useEffect(() => {
     (async () => {
@@ -388,10 +365,11 @@ export default function ChatScreen({ route, navigation }: any) {
     <SafeAreaView style={styles.safe} edges={["left", "right"]}>
       {/* ✅ KeyboardAvoidingView is now enabled for BOTH platforms */}
       <KeyboardAvoidingView
-        style={styles.root}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={0}
-      >
+  style={styles.root}
+  behavior={Platform.OS === "ios" ? "padding" : undefined}
+  keyboardVerticalOffset={0}
+  enabled={Platform.OS === "ios"}
+>
         <View style={styles.baseBackground} />
         <View style={styles.glowTop} />
         <View style={styles.glowBottom} />
@@ -404,7 +382,7 @@ export default function ChatScreen({ route, navigation }: any) {
                   <Icon name="arrow-left" size={22} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.title}>
-                {peerName || "Friend"} {peerMood ? `[ is ${peerMood} ] ` : ""}
+                {peerName || "Friend"} {peerMood ? `[ is feeling ${peerMood} ] ` : ""}
 </Text>
                 <View style={{ width: 42 }} />
               </View>
@@ -413,7 +391,7 @@ export default function ChatScreen({ route, navigation }: any) {
                 ref={flatRef}
                 data={items}
                 keyExtractor={(it) => it.id}
-                contentContainerStyle={[styles.listContent, { paddingBottom: inputBarHeight + 10 }]}
+                contentContainerStyle={[styles.listContent, { paddingBottom: 110 + insets.bottom } ]}
                 renderItem={({ item }) => {
                   if (item.type === "date") {
                     return (
@@ -439,17 +417,19 @@ export default function ChatScreen({ route, navigation }: any) {
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
                           <Text style={styles.text}>{m.plaintext}</Text>
                         </View>
-                        {isMe ? (
-  showBlueTick ? (
-    <Icon name="check-all" size={13} color="#2dd4bf" style={{marginLeft: 4}}>
-                              <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
-                              </Icon>
-  ) : (
-    <Icon name="check" size={13} color="#a3a3a3" style={{marginLeft: 4}}>
-          <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
-         </Icon>
-  )
-) : null}
+                        
+                        <View style={styles.metaRow}>
+  {isMe ? (
+    <Icon
+      name={showBlueTick ? "check-all" : "check"}
+      size={13}
+      color={showBlueTick ? "#2dd4bf" : "#a3a3a3"}
+      style={styles.tickIcon}
+    />
+  ) : null}
+
+  <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
+</View>
                       </View>
                     </View>
                   );
@@ -459,21 +439,21 @@ export default function ChatScreen({ route, navigation }: any) {
             </View>
 
             {/* ✅ Move input above keyboard by bottom = kbHeight */}
-     <View style={{marginBottom: 15}}>
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Type a message"
-                  placeholderTextColor="#94a3b8"
-                  value={input}
-                  onChangeText={setInput}
-                  multiline
-                />
-                <TouchableOpacity style={styles.sendBtn} onPress={send}>
-                  <Icon name="send" size={20} color="#fff" />
-                </TouchableOpacity>
-                </View>
-            </View>
+            <View style={[styles.inputBar, { bottom: insets.bottom + 8 }]}>
+  <View style={styles.inputRow}>
+    <TextInput
+      style={styles.input}
+      placeholder="Type a message"
+      placeholderTextColor="#94a3b8"
+      value={input}
+      onChangeText={setInput}
+      multiline
+    />
+    <TouchableOpacity style={styles.sendBtn} onPress={send}>
+      <Icon name="send" size={20} color="#fff" />
+    </TouchableOpacity>
+  </View>
+</View>
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
@@ -575,5 +555,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#6366f1",
     alignItems: "center",
     justifyContent: "center",
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-end", // keeps it bottom-right in the bubble for both sides
+    marginTop: 4,
+  },
+  tickIcon: {
+    marginRight: 4,
   },
 });

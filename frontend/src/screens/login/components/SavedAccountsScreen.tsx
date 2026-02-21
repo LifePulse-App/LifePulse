@@ -165,8 +165,9 @@ const savedStyles = () =>
       shadowOffset: { width: 0, height: 10 },
     },
     accountRow: {
-      backgroundColor: "rgba(255,255,255,0.88)",
-      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: "rgba(255,255,255,0.35)",
+      borderRadius: 10,
       padding: 14,
       marginBottom: 12,
     },
@@ -174,12 +175,12 @@ const savedStyles = () =>
       marginBottom: 10,
     },
     username: {
-      color: "#0f172a",
+      color: "white",
       fontWeight: "800",
       fontSize: 16,
     },
     smallText: {
-      color: "#475569",
+      color: "white",
       fontSize: 12,
       marginTop: 2,
     },

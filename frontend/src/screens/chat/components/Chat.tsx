@@ -39,49 +39,94 @@ export default function ChatListScreen({ navigation }: any) {
   const user = useContext(AuthContext);
   const myUserId = user?.User?.user?.id;
 
+  const loadFromCache = useCallback(async () => {
+    if (!myUserId) return;
+  
+    const deviceId = await getStableDeviceId(myUserId);
+    const previews = await listConversationPreviews(String(myUserId), String(deviceId));    
+  
+    const cachedRows = previews.map((p: any) => ({
+      peerUserId: String(p.peerUserId),
+      peerName: p.peerName || "Friend", // if you store it; otherwise fallback
+      mood: p.mood || "",
+      lastText: p.lastText ?? "",
+      lastAt: p.lastAt ?? "",
+      unread: getUnread(String(p.peerUserId)),
+    }));
+  
+    cachedRows.sort(
+      (a: any, b: any) => new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime()
+    );
+  
+    setRows(cachedRows);
+  }, [myUserId, unreadVersion]);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener((state) => {
+      const isOffline =
+        !state.isConnected || state.isInternetReachable === false;
+      setOffline(isOffline);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   const load = useCallback(async () => {
     try {
       if (!myUserId) return;
+  
+      // 1) show cached immediately
+      await loadFromCache();
+  
+      // 2) if offline, don't hit server
+      if (offline) return;
+  
       const deviceId = await getStableDeviceId(myUserId);
-
+  
       const { data } = await fetchConversations(deviceId);
       const serverConvos = data.conversations || [];
-
+  
       const friendsRes = await fetchFriends();
       const friends = friendsRes?.data?.friends || [];
       const nameMap = new Map<string, string>();
-      for (const f of friends) nameMap.set(String(f._id), String(f.name || f.username || "Friend"));
-
+      for (const f of friends) {
+        nameMap.set(String(f._id), String(f.name || f.username || "Friend"));
+      }
+  
       const previews = await listConversationPreviews(String(myUserId), String(deviceId));
       const previewMap = new Map(previews.map((p) => [String(p.peerUserId), p]));
-
+  
       const merged = serverConvos.map((c: any) => {
         const peerId = String(c._id);
         const p = previewMap.get(peerId);
-
-        console.log(c);
-        
-      
+  
         return {
           peerUserId: peerId,
-          peerName: nameMap.get(peerId) || "Friend",
-          mood: c.mood || "",
+          peerName: nameMap.get(peerId) || p?.peerName || "Friend",
+          mood: c.mood || p?.mood || "",
           lastText: p?.lastText ?? "",
           lastAt: p?.lastAt ?? c?.lastMessage?.createdAt ?? "",
           unread: getUnread(peerId),
         };
       });
-
-      merged.sort((a, b) => new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime());
+  
+      merged.sort(
+        (a, b) => new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime()
+      );
+  
       setRows(merged);
     } catch (e) {
       console.log("load convos error", e);
+      // fallback: keep whatever cache already loaded
     }
-  }, [myUserId, unreadVersion]); // ✅ re-run when unread changes
+  }, [myUserId, unreadVersion, offline, loadFromCache]);
+
 
   useEffect(() => {
     load();
-  }, [load]);
+  }, [offline, load]);
 
   useEffect(() => {
     const unsub = navigation.addListener("focus", load);
@@ -100,14 +145,6 @@ export default function ChatListScreen({ navigation }: any) {
       setUnreadVersion((v) => v + 1);
     });
     return () => unsubUnread();
-  }, []);
-
-  useEffect(() => {
-    const unsub = NetInfo.addEventListener((state) => {
-      const isOffline = !state.isConnected || state.isInternetReachable === false;
-      setOffline(isOffline);
-    });
-    return () => unsub();
   }, []);
 
   const filtered = rows.filter((r) =>
@@ -161,7 +198,7 @@ export default function ChatListScreen({ navigation }: any) {
               >
                 <View style={styles.rowTop}>
                 <Text style={styles.peer} numberOfLines={1}>
-                {item.peerName}  {item.mood ? `[ is ${item.mood} ] ` : ""}
+                {item.peerName}  {item.mood ? `[ is feeling ${item.mood} ] ` : ""}
 </Text>
                   <Text style={styles.time}>{formatLastTime(item.lastAt)}</Text>
                 </View>
@@ -171,7 +208,7 @@ export default function ChatListScreen({ navigation }: any) {
   {!item.lastAt
     ? "No messages yet"
     : item.unread > 0
-      ? "Sent a message"
+      ? "Sent you a message"
       : "Opened message"}
 </Text>
                   {item.unread > 0 && (

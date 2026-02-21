@@ -1,5 +1,6 @@
 import User from "../models/UserSchema.js";
 import catchAsyncErrors from "../utils/catchAsyncErrors.js";
+import Mood from "../models/MoodSchema.js";
 
 /**
  * Helpers
@@ -242,4 +243,79 @@ export const suggestedFriends = catchAsyncErrors(async (req, res) => {
 
   const shuffled = users.sort(() => 0.5 - Math.random());
   res.status(200).json({ suggestions: shuffled });
+});
+
+export const previewProfile = catchAsyncErrors(async (req, res) => {
+  const currentUserId = req.user.id;
+  const { userId } = req.params;
+
+  const target = await User.findById(userId)
+    .select("name username avatar avatarThumbnailUrl level currentTitle country city isPublic")
+    .lean();
+
+  if (!target) return res.status(404).json({ message: "User not found" });
+
+  const me = await User.findById(currentUserId)
+    .select("friends friendRequests")
+    .lean();
+
+  const isFriendFlag = me ? isFriend(me, userId) : false;
+
+  // I sent request to them (they have my id in their friendRequests)
+  const requestSent = await User.exists({
+    _id: userId,
+    "friendRequests.user": currentUserId,
+  });
+
+  // they sent request to me (I have their id in my friendRequests)
+  const requestIncoming = me?.friendRequests?.some(
+    (r) => String(r.user) === String(userId)
+  );
+
+  // Location visibility policy:
+  // - public accounts share location to everyone
+  // - friends share location to each other
+  const canSeeLocation = target.isPublic === true || isFriendFlag;
+
+  // Latest active (non-expired) mood
+  const now = new Date();
+  const moodDoc = await Mood.findOne({
+    user: userId,
+    expiresAt: { $gt: now },
+  })
+    .sort({ createdAt: -1 })
+    .select("mood createdAt expiresAt")
+    .lean();
+
+  res.json({
+    user: {
+      _id: target._id,
+      name: target.name,
+      username: target.username,
+      avatar: target.avatar,
+      avatarThumbnailUrl: target.avatarThumbnailUrl,
+
+      level: target.level,
+      title: target.currentTitle || "",
+
+      // only show if allowed
+      country: canSeeLocation ? target.country || "" : "",
+      city: canSeeLocation ? target.city || "" : "",
+
+      // mood can be treated as public or follow same rule; you decide.
+      // Here: mood is shown to everyone if it exists.
+      mood: moodDoc?.mood || "",
+      moodCreatedAt: moodDoc?.createdAt || null,
+      moodExpiresAt: moodDoc?.expiresAt || null,
+
+      // share setting
+      isPublic: !!target.isPublic,
+      canSeeLocation,
+    },
+    friendship: {
+      isFriend: isFriendFlag,
+      requestSent: !!requestSent,
+      requestIncoming: !!requestIncoming,
+    },
+  });
 });

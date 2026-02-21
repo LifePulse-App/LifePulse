@@ -157,7 +157,7 @@ export const loginStyles = () => {
       height: 52,
       borderTopStartRadius: 12,
       borderTopEndRadius: 12,
-      backgroundColor: 'rgba(255,255,255,0.9)',
+      backgroundColor: 'rgba(255,255,255,1)',
       paddingHorizontal: 12,
       marginBottom: 10,
     },

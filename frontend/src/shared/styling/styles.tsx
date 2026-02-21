@@ -306,7 +306,7 @@ export default {
       bottomBar: {
         backgroundColor: 'transparent',  // must be backgroundColor, not background
         elevation: 0,                    // remove Android shadow
-        borderTopWidth: 0.5,
+        borderTopWidth: 0.2,
         borderTopColor: "white",                  // no top border
         height: 70,                      // fixed normal tab height, NOT "70%"
         justifyContent: 'center',

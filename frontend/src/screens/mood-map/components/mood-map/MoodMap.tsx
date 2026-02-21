@@ -21,6 +21,7 @@ import AuthContext from "../../../../auth/user/UserContext";
 import socialApi from "../../../friends/services/api_friends";
 import MoodService from "../../../moodscreen/services/api_mood";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { withDelay } from "react-native-reanimated";
 
 const SOCKET_URL = "http://YOUR_SERVER_IP:5000";
 
@@ -34,7 +35,7 @@ const MoodMap = () => {
   const [loading, setLoading] = useState(false);
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
   const [moods, setMoods] = useState<any[]>([]);
-  const cameraRef = useRef<MapLibreGL.Camera>(null);
+  const cameraRef = useRef<typeof MapLibreGL.Camera>(null);
   const hasCenteredOnce = useRef(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -75,12 +76,14 @@ const applyOffset = (coords: [number, number]): [number, number] => {
 };
 const isTrackingRef = useRef(true);
 
+
+const handleMoveCamera = (coords: [number, number]) => {
+  cameraRef.current?.moveTo(coords, 10);
+  cameraRef.current?.zoomTo(15, 10);
+};
+
 const moveCamera = (coords: [number, number]) => {
-  cameraRef.current?.setCamera({
-    centerCoordinate: coords,
-    zoomLevel: 15,
-    animationDuration: 700,
-  });
+  cameraRef.current?.moveTo(coords, 1000);
 };
 
 const isUserInteracting = useRef(false);
@@ -306,13 +309,16 @@ if (isTrackingRef.current) {
   scrollEnabled
   onRegionIsChanging={(region) => {
     if(isTrackingRef.current) {
-    moveCamera(myLocation) // user touched -> stop auto center
+    handleMoveCamera(myLocation) // user touched -> stop auto center
     } else {
       moveCamera(region?.geometry?.coordinates)
     }
   }}
->
+>  
+
+
   <MapLibreGL.Camera ref={cameraRef} />
+
 
 {myLocation && (
   <MapLibreGL.PointAnnotation id="me" coordinate={applyOffset(myLocation)}>

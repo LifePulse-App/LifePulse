@@ -97,6 +97,15 @@ const getSuggestedUsers = async (limit = 6) => {
   }
 };
 
+const previewProfile = async (userId: string) => {
+  try {
+    return await client.get(`/friends/preview/${userId}`);
+  } catch (error: any) {
+    if (!error.response) throw new Error("Server is offline, try again later.");
+    throw error;
+  }
+};
+
 export default {
   sendFriendRequest,
   acceptFriendRequest,
@@ -107,4 +116,5 @@ export default {
   getPendingFriendRequests,
   searchUsers,
   getSuggestedUsers,
+  previewProfile
 };

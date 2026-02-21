@@ -58,7 +58,7 @@ export default function NewChatScreen({ navigation }: any) {
                 {offline ? "Connecting..." : "Online"}
               </Text>
             </View>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate("Chat")}>
               <Icon name="close" size={20} color="#fff" />
             </TouchableOpacity>
           </View>

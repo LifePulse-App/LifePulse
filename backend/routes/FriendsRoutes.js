@@ -10,6 +10,7 @@ import {
   pendingFriendRequests,
   searchUsers,
   suggestedFriends,
+  previewProfile,
 } from "../controllers/FriendController.js";
 
 const router = express.Router();
@@ -40,5 +41,7 @@ router.get("/search", isAuthenticatedUser, searchUsers);
 
 // Suggested friends
 router.get("/suggested", isAuthenticatedUser, suggestedFriends);
+
+router.get("/preview/:userId", isAuthenticatedUser, previewProfile);
 
 export default router;

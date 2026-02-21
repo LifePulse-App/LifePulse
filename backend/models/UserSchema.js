@@ -170,7 +170,7 @@ resetPasswordVerified: {
 
     isPublic: {
       type: Boolean,
-      default: false
+      default: true
   },
   followers: [
       {

@@ -12,6 +12,8 @@ import { Text } from "@rneui/themed";
 import { useFocusEffect } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { Country, City } from "country-state-city";
+import NetInfo from "@react-native-community/netinfo";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import {
   getMonthlyLeaderboard,
@@ -33,7 +35,7 @@ const tabs = [
   { key: "permanent", label: "All-time" },
 ];
 
-const LeaderboardScreen = () => {
+const LeaderboardScreen = ({ navigation }: any) => {
   const [tab, setTab] = useState<"monthly" | "permanent">("monthly");
   const [scope, setScope] = useState<"world" | "country" | "city" | "friends">("world");
   const [data, setData] = useState<any>(null);
@@ -71,8 +73,55 @@ const LeaderboardScreen = () => {
     ? `You can change your location again in ${lockStatus.daysLeft} day(s).`
     : null;
 
+    const [dataSource, setDataSource] = useState<"live" | "cache" | null>(null);
+
   // Keep latest currentUser without re-rendering load callback
   const currentUserRef = useRef<any>(null);
+  const LB_CACHE_PREFIX = "leaderboard:v2";
+  const LOCK_CACHE_KEY = "leaderboard:lockStatus:v1";
+  
+  const cacheKeyForLeaderboard = (
+    tab: "monthly" | "permanent",
+    scope: "world" | "country" | "city" | "friends",
+    country?: string,
+    city?: string
+  ) => {
+    const c = (country || "").trim().toLowerCase();
+    const ci = (city || "").trim().toLowerCase();
+    return `${LB_CACHE_PREFIX}:${tab}:${scope}:${c}:${ci}`;
+  };
+  
+  const saveCache = async (key: string, value: any) => {
+    try {
+      await AsyncStorage.setItem(key, JSON.stringify({ ts: Date.now(), value }));
+    } catch (e) {
+      console.log("saveCache error", e);
+    }
+  };
+  
+  const loadCache = async <T,>(key: string): Promise<{ ts: number; value: T } | null> => {
+    try {
+      const raw = await AsyncStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed?.value) return null;
+      return { ts: parsed.ts ?? 0, value: parsed.value as T };
+    } catch (e) {
+      console.log("loadCache error", e);
+      return null;
+    }
+  };
+
+  const [offline, setOffline] = useState(false);
+
+useEffect(() => {
+  const unsub = NetInfo.addEventListener((state) => {
+    const connected = state.isConnected === true;
+    const reachable = state.isInternetReachable === true;
+    setOffline(!connected || !reachable);
+  });
+  return () => unsub();
+}, []);
 
   // Load country list once
   useEffect(() => {
@@ -116,18 +165,40 @@ const LeaderboardScreen = () => {
   }, [prefillFromCurrentUser]);
 
   const loadLockStatus = useCallback(async () => {
+    // 1) show cached immediately (no flash)
+    const cached = await loadCache<{
+      locked: boolean;
+      daysLeft: number;
+      locationLockUntil: string | null;
+    }>(LOCK_CACHE_KEY);
+  
+    if (cached?.value) {
+      setLockStatus(cached.value);
+    }
+  
+    // 2) if offline, stop
+    if (offline) return;
+  
+    // 3) fetch live + cache
     try {
       const res = await getLocationLockStatus();
       const payload = res.data;
-      setLockStatus({
+  
+      const next = {
         locked: !!payload.locked,
         daysLeft: payload.daysLeft ?? 0,
         locationLockUntil: payload.locationLockUntil || null,
-      });
+      };
+  
+      setLockStatus(next);
+      await saveCache(LOCK_CACHE_KEY, next);
     } catch {
-      setLockStatus({ locked: false, daysLeft: 0, locationLockUntil: null });
+      // keep cached if exists; otherwise fallback
+      if (!cached?.value) {
+        setLockStatus({ locked: false, daysLeft: 0, locationLockUntil: null });
+      }
     }
-  }, []);
+  }, [offline]);
 
   const resolveCountryCityParams = () => {
     if (scope === "country" || scope === "city") {
@@ -146,36 +217,71 @@ const LeaderboardScreen = () => {
   const load = useCallback(async () => {
     setLoading(true);
     setErrorMsg(null);
+  
+    const { country, city } = resolveCountryCityParams();
+  
+    // validate (same as your current rules)
+    if ((scope === "country" || scope === "city") && !country) {
+      setLoading(false);
+      setErrorMsg("Please set your country first to view this leaderboard.");
+      return;
+    }
+    if (scope === "city" && !city) {
+      setLoading(false);
+      setErrorMsg("Please set your city to view the city leaderboard.");
+      return;
+    }
+  
+    const key = cacheKeyForLeaderboard(tab, scope, country, city);
+  
+    // 1) Load cache immediately (prevents blank screen)
+    const cached = await loadCache<any>(key);
+    if (cached?.value) {
+      currentUserRef.current = cached.value?.currentUser || null;
+      setData(cached.value);
+      setDataSource("cache");
+    }
+  
+    // 2) If offline, stop here
+    if (offline) {
+      if (!cached?.value) {
+        setData(null);
+        setErrorMsg("You are offline and no cached leaderboard is available yet.");
+      }
+      setLoading(false);
+      return;
+    }
+  
+    // 3) Fetch live + cache
     try {
       const api = tab === "monthly" ? getMonthlyLeaderboard : getPermanentLeaderboard;
-      const { country, city } = resolveCountryCityParams();
-
-      if ((scope === "country" || scope === "city") && !country) {
-        setErrorMsg("Please set your country first to view this leaderboard.");
-        setLoading(false);
-        return;
-      }
-      if (scope === "city" && !city) {
-        setErrorMsg("Please set your city to view the city leaderboard.");
-        setLoading(false);
-        return;
-      }
-
       const res = await api(scope, country, city);
-      currentUserRef.current = res.data?.currentUser || null;
-      setData(res.data);
+      const payload = res.data;
+  
+      currentUserRef.current = payload?.currentUser || null;
+      setData(payload);
+      setDataSource("live");
+  
+      await saveCache(key, payload);
     } catch (e: any) {
-      setData(null);
-      setErrorMsg(e?.response?.data?.message || e?.message || "Failed to load leaderboard");
+      // If live fails and cache existed, keep cache; otherwise show error
+      if (!cached?.value) {
+        setData(null);
+        setErrorMsg(e?.response?.data?.message || e?.message || "Failed to load leaderboard");
+      } else {
+        setErrorMsg("Showing cached leaderboard (network error).");
+      }
     } finally {
       setLoading(false);
     }
-  }, [tab, scope, selectedCountryCode, selectedCity, countryOptions]);
+  }, [tab, scope, offline, selectedCountryCode, selectedCity, countryOptions]);
+
+  useEffect(() => {
+    load();
+  }, [offline, load]);
 
   useFocusEffect(
     useCallback(() => {
-      setData(null);
-      setErrorMsg(null);
       (async () => {
         await loadLockStatus();
         await load();
@@ -255,7 +361,20 @@ const LeaderboardScreen = () => {
   };
 
   const renderRow = ({ item }: any) => (
-    <View style={styles.row}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => {
+        const id = String(item.userId || item._id || "");
+        if (!id) return;
+  
+        navigation.navigate("ProfilePreview", {
+          userId: id,
+          name: item.name || item.username,
+          username: item.username,
+        });
+      }}
+      style={styles.row}
+    >
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         <Text style={styles.rank}>{item.rank}</Text>
         <View>
@@ -265,11 +384,16 @@ const LeaderboardScreen = () => {
           </Text>
         </View>
       </View>
+  
       <View style={{ alignItems: "flex-end" }}>
-        <Text style={styles.xpLabel}>{tab === "monthly" ? "Monthly XP" : "Total XP"}</Text>
-        <Text style={styles.xpValue}>{tab === "monthly" ? item.monthlyXp : item.xp}</Text>
+        <Text style={styles.xpLabel}>
+          {tab === "monthly" ? "Monthly XP" : "Total XP"}
+        </Text>
+        <Text style={styles.xpValue}>
+          {tab === "monthly" ? item.monthlyXp : item.xp}
+        </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   const renderSeparator = () => <View style={styles.separator} />;

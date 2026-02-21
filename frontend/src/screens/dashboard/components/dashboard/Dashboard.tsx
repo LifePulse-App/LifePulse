@@ -14,6 +14,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { Text } from "@rneui/themed";
 import { AnimatedCircularProgress } from "react-native-circular-progress";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import Icon1 from "react-native-vector-icons/MaterialIcons";
 import NetInfo from "@react-native-community/netinfo";
 
 import MainLayout from "../../../../shared/components/MainLayout";
@@ -24,6 +25,10 @@ import DeviceInfo from "react-native-device-info";
 import { ensureDeviceKeys } from "../../../chat/services/bootstrap"; // adjust path
 import AuthContext from "../../../../auth/user/UserContext";
 import { getStableDeviceId } from "../../../../shared/services/stableDeviceId";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const DASHBOARD_CACHE_KEY = "dashboard:summary:v1";
+const TODAY_HABITS_CACHE_KEY = "dashboard:todayHabits:v1";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
@@ -99,6 +104,40 @@ const Dashboard = ({ navigation }: any) => {
     createdAt: string;
   } | null>(null);
 
+  const saveCache = async (key: string, value: any) => {
+    try {
+      await AsyncStorage.setItem(key, JSON.stringify({ ts: Date.now(), value }));
+    } catch (e) {
+      console.log("saveCache error", e);
+    }
+  };
+  
+  const loadCache = async (key: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.value ?? null;
+    } catch (e) {
+      console.log("loadCache error", e);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      const cached = await loadCache(DASHBOARD_CACHE_KEY);
+      if (cached) {
+        setProfile(cached.profile);
+        setSecondaryCards(cached.secondaryCards || null);
+        setCurrentMood(cached.currentMood || null);
+      }
+  
+      const cachedHabits = await loadCache(TODAY_HABITS_CACHE_KEY);
+      if (cachedHabits) setHabits(cachedHabits);
+    })();
+  }, []);
+
   // NetInfo: connectivity listener
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
@@ -152,52 +191,60 @@ const Dashboard = ({ navigation }: any) => {
     }, []);
     useFocusEffect(useCallback(() => { refreshPendingCount(); }, [refreshPendingCount]));
 
-  const fetchTodayHabits = useCallback(async () => {
-    try {
-      const res = await DashboardService.GetTodayHabits(); // adjust base url
-      
-      if (res.data?.success) {
-        setHabits(res?.data.habits);
+    const fetchTodayHabits = useCallback(async () => {
+      try {
+        if (offline) {
+          const cachedHabits = await loadCache(TODAY_HABITS_CACHE_KEY);
+          if (cachedHabits) setHabits(cachedHabits);
+          return;
+        }
+    
+        const res = await DashboardService.GetTodayHabits();
+        if (res.data?.success) {
+          setHabits(res?.data.habits);
+          await saveCache(TODAY_HABITS_CACHE_KEY, res?.data.habits);
+        }
+      } catch (err: any) {
+        console.log("Error loading today habits", err);
+        const cachedHabits = await loadCache(TODAY_HABITS_CACHE_KEY);
+        if (cachedHabits) setHabits(cachedHabits);
       }
-    } catch (err: any) {
-      console.log("Error loading today habits", err);
-      const msg =
-      err?.response?.data?.message ||
-      err?.message ||
-      "Failed to load dashboard";
-    setError(msg);
-    }
-  }, []);
+    }, [offline]);
 
   const fetchDashboard = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Optional: early return if offline
+  
       if (offline) {
-        setLoading(false);
+        const cached = await loadCache(DASHBOARD_CACHE_KEY);
+        if (cached) {
+          const { profile, secondaryCards, currentMood } = cached;
+          setProfile(profile);
+          setSecondaryCards(secondaryCards || null);
+          setCurrentMood(currentMood || null);
+        } else {
+          setError("You are offline and no cached dashboard is available yet.");
+        }
         return;
       }
-
+  
       const res = await DashboardService.GetDashboardSummary();
-      
-      
       const responseData = (res as any).data ?? res;
+  
       if (!responseData.success) {
         throw new Error(responseData.message || "Failed to load dashboard");
       }
-
-     console.log(responseData.data);
-     
-
+  
       const { profile, secondaryCards, currentMood } = responseData.data;
+  
       setProfile(profile);
       setSecondaryCards(secondaryCards || null);
       setCurrentMood(currentMood || null);
-
+  
+      // cache last good payload
+      await saveCache(DASHBOARD_CACHE_KEY, responseData.data);
     } catch (err: any) {
-      console.error("Dashboard fetch error:", err?.message || err);
       const msg =
         err?.response?.data?.message ||
         err?.message ||
@@ -272,6 +319,9 @@ const Dashboard = ({ navigation }: any) => {
       <Text style={styles.badgeText}>{friendReqCount}</Text>
     </View>
   )}
+</TouchableOpacity>
+<TouchableOpacity activeOpacity={0.8} style={styles.iconGlass} onPress={() => navigation.navigate("FriendsManage")}>
+  <Icon1 name="people-outline" size={22} color="#E5E7EB" />
 </TouchableOpacity>
             </View>
           </View>
