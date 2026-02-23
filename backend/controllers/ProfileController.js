@@ -454,3 +454,29 @@ export const getUserProfile = catchAsyncErrors(async (req, res, next) => {
   if (!user) return next(new ErrorHandler("User not found", 404));
   res.json({ success: true, user });
 });
+
+// DELETE avatar for current user
+export const deleteAvatar = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select("avatarUrl");
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  // // Remove file from disk if there is an avatar
+  // if (user.avatarUrl) {
+  //   // Remove leading slash if present
+  //   const filePath = user.avatarUrl.startsWith("/")
+  //     ? user.avatarUrl.slice(1)
+  //     : user.avatarUrl;
+
+  //   // Full path (relative to your project root)
+  //   const absoluteFilePath = path.join(process.cwd(), filePath);
+  //   fs.unlink(absoluteFilePath, (err) => {
+  //     // ignore error (file might not exist)
+  //   });
+  // }
+
+  // Remove avatarUrl reference in db
+  user.avatarUrl = undefined;
+  await user.save();
+
+  res.json({ success: true, message: "Avatar removed." });
+});

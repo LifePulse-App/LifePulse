@@ -23,7 +23,8 @@ import {
   upload,
   uploadAvatar,
   getMyAvatar,
-  getUserProfile
+  getUserProfile,
+  deleteAvatar
 } from "../controllers/ProfileController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 
@@ -64,6 +65,7 @@ router.get('/me/location/lock', isAuthenticatedUser, getLocationLockStatus);
 
 router.post("/me/avatar-url", isAuthenticatedUser, upload.single("avatar"), uploadAvatar);
 router.get("/me/avatar-url", isAuthenticatedUser, getMyAvatar);
+router.delete("/me/delete-avatar", isAuthenticatedUser, deleteAvatar);
 // routes/avatarRoutes.js
 router.get("/avatar/:userId", getUserProfile);
 
