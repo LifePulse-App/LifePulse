@@ -6,15 +6,17 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Modal, // Add Modal from react-native
 } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import NetInfo from "@react-native-community/netinfo";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
-
 import MainLayout from "../../../shared/components/MainLayout";
 import socialApi from "../../friends/services/api_friends";
+import apiClient from "../../../auth/api-client/api_client";
+import { Image } from "react-native";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
@@ -33,8 +35,7 @@ type PreviewUser = {
   mood?: string;
   country?: string;
   city?: string;
-
-  // privacy/location sharing flags from backend
+  avatarUrl: string;
   isPublic?: boolean;
   canSeeLocation?: boolean;
 };
@@ -69,9 +70,31 @@ const loadCache = async (key: string): Promise<PreviewResponse | null> => {
   }
 };
 
+// Preview avatar modal styles
+const previewStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  centered: { alignItems: "center" },
+  previewImg: {
+    width: 330,
+    height: 330,
+    borderRadius: 250,
+    marginVertical: 20,
+  },
+  closeHint: {
+    color: "#94a3b8",
+    fontSize: 15,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+});
+
 export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const userId = route.params?.userId;
-
   const [offline, setOffline] = useState(false);
   const [loading, setLoading] = useState(false);
   const [busyAction, setBusyAction] = useState(false);
@@ -79,6 +102,11 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const [user, setUser] = useState<PreviewUser | null>(null);
   const [friendship, setFriendship] = useState<Friendship | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const [avatarPreviewVisible, setAvatarPreviewVisible] = useState(false); // <--- HERE!
+
+  const baseUrl = apiClient.getBaseURL(); // Example: "http://localhost:40000/api"
+  const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
   // connectivity
   useEffect(() => {
@@ -101,6 +129,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       mood: prev?.mood,
       country: prev?.country,
       city: prev?.city,
+      avatarUrl: prev?.avatarUrl,
       isPublic: prev?.isPublic,
       canSeeLocation: prev?.canSeeLocation,
     }));
@@ -125,11 +154,9 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     // 3) live
     setLoading(true);
     try {
-      // ✅ requires backend endpoint: GET /friends/preview/:userId
+      // requires backend endpoint: GET /friends/preview/:userId
       const res = await (socialApi as any).previewProfile(userId);
       const payload: PreviewResponse = res?.data;
-      console.log(payload);
-      
 
       // Merge route name/username if backend doesn't provide for some reason
       const mergedUser: PreviewUser = {
@@ -193,12 +220,10 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setBusyAction(true);
 
       if (friendship.isFriend) {
-        // optional: confirm
         await (socialApi as any).unfriend(userId);
       } else if (friendship.requestIncoming) {
         await (socialApi as any).acceptFriendRequest(userId);
       } else if (friendship.requestSent) {
-        // disabled by UI, but keep safe here too
         return;
       } else {
         await (socialApi as any).sendFriendRequest(userId);
@@ -221,7 +246,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
 
     try {
       setBusyAction(true);
-      // This uses your existing removeFriendRequest route (depends on how you interpret requesterId).
       await (socialApi as any).removeFriendRequest(userId);
       await load();
     } catch (e: any) {
@@ -278,7 +302,24 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
         <View style={styles.card}>
           <View style={styles.headerRow}>
             <View style={styles.avatarCircle}>
-              <Text style={styles.avatarLetter}>{initials}</Text>
+              {user?.avatarUrl ? (
+                <TouchableOpacity
+                  onPress={() => setAvatarPreviewVisible(true)}
+                  activeOpacity={0.92}
+                >
+                  <Image
+                    source={{
+                      uri: user.avatarUrl.startsWith("http")
+                        ? user.avatarUrl
+                        : newUrl + user.avatarUrl,
+                    }}
+                    style={{ width: 48, height: 48, borderRadius: 24 }}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.avatarLetter}>{initials}</Text>
+              )}
             </View>
 
             <View style={{ flex: 1 }}>
@@ -321,7 +362,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                 Mood: {user?.mood ? user.mood : "—"}
               </Text>
             </View>
-
           </View>
 
           {/* Friend actions */}
@@ -364,10 +404,36 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
 
           {offline ? (
             <Text style={styles.hint}>
-              You���re offline. Showing cached data; friend actions are disabled.
+              You’re offline. Showing cached data; friend actions are disabled.
             </Text>
           ) : null}
         </View>
+
+        {/* Avatar preview modal */}
+        <Modal
+          visible={avatarPreviewVisible && !!user?.avatarUrl}
+          transparent
+          onRequestClose={() => setAvatarPreviewVisible(false)}
+        >
+          <View style={previewStyles.overlay}>
+            <TouchableOpacity
+              style={previewStyles.overlay}
+              activeOpacity={1}
+              onPress={() => setAvatarPreviewVisible(false)}
+            >
+              <View style={previewStyles.centered}>
+                <Image
+                  source={{
+                    uri: user?.avatarUrl?.startsWith("http")
+                      ? user?.avatarUrl
+                      : newUrl + user?.avatarUrl,
+                  }}
+                  style={previewStyles.previewImg}
+                />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </Modal>
       </View>
     </MainLayout>
   );
@@ -412,9 +478,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   title: { color: "#fff", fontSize: 20, fontWeight: "800" },
-  netStatus: { fontSize: 12, marginTop: 2 },
-  netOnline: { color: "#22c55e" },
-  netOffline: { color: "#f59e0b" },
 
   card: {
     backgroundColor: "rgba(255,255,255,0.05)",

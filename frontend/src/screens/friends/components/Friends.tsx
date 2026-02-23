@@ -16,6 +16,7 @@ import AppScreen from "../../../components/Layout/AppScreen/AppScreen";
 import socialApi from "../services/api_friends";
 import AuthContext from "../../../auth/user/UserContext";
 import { UserProfile, FollowRequest } from "../models/FriendModel";
+import apiClient from "../../../auth/api-client/api_client";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
@@ -81,6 +82,9 @@ const Friends = ({ navigation }: any) => {
   const [showRemoveModal, setShowRemoveModal] = useState<{ user: UserProfile | null } | null>(null);
 
   const isSearching = search.trim().length > 0;
+
+  const baseUrl = apiClient.getBaseURL(); // Example: "http://localhost:40000/api"
+  const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
   const openProfilePreview = (u: any) => {
     if (!u?._id) return;
@@ -250,14 +254,15 @@ const Friends = ({ navigation }: any) => {
             style={styles.userClickable}
             onPress={() => openProfilePreview(user)}
           >
-            <View
-              style={[
-                styles.avatar,
-                { backgroundColor: user.avatarColor || "rgba(55, 65, 81, 0.9)" },
-              ]}
-            >
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
+{user.avatarUrl ? (
+      <Image
+        source={{ uri: newUrl + user.avatarUrl }}
+        style={{ width: 40, height: 40, borderRadius: 999 }}
+        resizeMode="cover"
+      />
+    ) : (
+      <Text style={styles.avatarText}>{initials}</Text>
+    )}
       
             <View style={styles.userInfo}>
               <Text style={styles.userName} numberOfLines={1}>

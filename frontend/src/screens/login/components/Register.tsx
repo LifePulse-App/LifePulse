@@ -199,7 +199,8 @@ const Register = ({ navigation }: any) => {
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
                 textColor="#111827"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="grey"
+                cursorColor='black'
               />
 
               <TextInput
@@ -212,7 +213,8 @@ const Register = ({ navigation }: any) => {
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
                 textColor="#111827"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="grey"
+                cursorColor='black'
               />
 
               <TextInput
@@ -225,7 +227,8 @@ const Register = ({ navigation }: any) => {
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
                 textColor="#111827"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="grey"
+                cursorColor='black'
               />
 
               <TextInput
@@ -239,7 +242,8 @@ const Register = ({ navigation }: any) => {
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
                 textColor="#111827"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="grey"
+                cursorColor='black'
               />
 
               <TextInput
@@ -253,7 +257,8 @@ const Register = ({ navigation }: any) => {
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
                 textColor="#111827"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="grey"
+                cursorColor='black'
               />
 
               {loading ? (

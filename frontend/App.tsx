@@ -8,7 +8,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReactNativeBiometrics from 'react-native-biometrics';
 
-import notifee, { AndroidImportance } from '@notifee/react-native';
+import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 
 import {
   getMessaging,
@@ -142,6 +142,43 @@ const App = () => {
   useEffect(() => {
     loadChatNotificationState();
     requestNotificationPermission();
+  }, []);
+
+  // ---------- Notifee notification press handler ----------
+  useEffect(() => {
+    // Foreground/background (app is running)
+    const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
+      if (
+        type === EventType.PRESS &&
+        detail?.notification?.data?.type === 'chat' &&
+        detail?.notification?.data?.peerUserId
+      ) {
+        navigationRef.current?.navigate('chat', {
+          peerUserId: detail.notification.data.peerUserId,
+          peerName: detail.notification.data.peerName,
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    // Cold start launch by notification
+    async function checkInitialNotification() {
+      const initial = await notifee.getInitialNotification();
+      if (
+        initial?.notification?.data?.type === 'chat' &&
+        initial?.notification?.data?.peerUserId
+      ) {
+        setTimeout(() => {
+          navigationRef.current?.navigate('chat', {
+            peerUserId: initial.notification.data.peerUserId,
+            peerName: initial.notification.data.peerName,     
+          });
+        }, 600);
+      }
+    }
+    checkInitialNotification();
   }, []);
 
   // ---------- Setup secret key once ----------

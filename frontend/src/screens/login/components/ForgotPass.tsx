@@ -195,7 +195,8 @@ const ForgotPass = ({ navigation, route }: any) => {
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
                 textColor="#111827"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="grey"
+                cursorColor='black'
               />
 
               {loading ? (

@@ -19,7 +19,11 @@ import {
   getAvatarUrl,
   updateAvatarUrl,
   updateLocation,
-  getLocationLockStatus
+  getLocationLockStatus,
+  upload,
+  uploadAvatar,
+  getMyAvatar,
+  getUserProfile
 } from "../controllers/ProfileController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 
@@ -52,10 +56,16 @@ router.delete("/delete", isAuthenticatedUser, deleteAccount);
 router.get("/login-activity", isAuthenticatedUser, getLoginActivity);
 router.get('/me/avatar', isAuthenticatedUser, getAvatarConfig);
 router.post('/me/avatar', isAuthenticatedUser, updateAvatarConfig);
-router.get('/me/avatar-url', isAuthenticatedUser, getAvatarUrl);
-router.post('/me/avatar-url', isAuthenticatedUser, updateAvatarUrl);
+// router.get('/me/avatar-url', isAuthenticatedUser, getAvatarUrl);
+// router.post('/me/avatar-url', isAuthenticatedUser, updateAvatarUrl);
+
 router.post('/me/location', isAuthenticatedUser, updateLocation);
 router.get('/me/location/lock', isAuthenticatedUser, getLocationLockStatus);
+
+router.post("/me/avatar-url", isAuthenticatedUser, upload.single("avatar"), uploadAvatar);
+router.get("/me/avatar-url", isAuthenticatedUser, getMyAvatar);
+// routes/avatarRoutes.js
+router.get("/avatar/:userId", getUserProfile);
 
 
 export default router;

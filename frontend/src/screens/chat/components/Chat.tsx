@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useContext } from "react";
-import { View, FlatList, TouchableOpacity, StyleSheet, TextInput } from "react-native";
+import { View, FlatList, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import NetInfo from "@react-native-community/netinfo";
@@ -12,7 +12,6 @@ import { getStableDeviceId } from "../../../shared/services/stableDeviceId";
 import AuthContext from "../../../auth/user/UserContext";
 import { getUnread, subscribeUnreadChanges } from '../services/ChatNotifications';
 import { subscribeConversationChanges } from '../services/ChatNotifications';
-
 
 const formatLastTime = (iso?: string) => {
   if (!iso) return "";
@@ -27,40 +26,57 @@ const formatLastTime = (iso?: string) => {
   if (sameDay) {
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
-  return d.toLocaleDateString([], { month: "short", day: "numeric" }); // e.g. Jan 8
+  return d.toLocaleDateString([], { month: "short", day: "numeric" });
 };
 
 export default function ChatListScreen({ navigation }: any) {
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<any[]>([]);
   const [offline, setOffline] = useState(false);
-  const [unreadVersion, setUnreadVersion] = useState(0); // ✅ triggers reload
+  const [unreadVersion, setUnreadVersion] = useState(0); // triggers reload
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false); // Have we shown user any chat list?
 
   const user = useContext(AuthContext);
   const myUserId = user?.User?.user?.id;
 
   const loadFromCache = useCallback(async () => {
     if (!myUserId) return;
-  
+
     const deviceId = await getStableDeviceId(myUserId);
-    const previews = await listConversationPreviews(String(myUserId), String(deviceId));    
-  
+    const previews = await listConversationPreviews(String(myUserId), String(deviceId));
+
     const cachedRows = previews.map((p: any) => ({
       peerUserId: String(p.peerUserId),
-      peerName: p.peerName || "Friend", // if you store it; otherwise fallback
+      peerName: p.peerName || "Friend",
       mood: p.mood || "",
       lastText: p.lastText ?? "",
       lastAt: p.lastAt ?? "",
       unread: getUnread(String(p.peerUserId)),
     }));
-  
+
     cachedRows.sort(
       (a: any, b: any) => new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime()
     );
-  
+
     setRows(cachedRows);
+
+    if (cachedRows.length > 0) {
+      setHasLoadedOnce(true);
+      setInitialLoading(false);
+    }
   }, [myUserId, unreadVersion]);
 
+  // Initial mount: try cache, show immediately, then background update from server
+  useEffect(() => {
+    (async () => {
+      await loadFromCache();
+      await loadInBackground();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // For network status
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
       const isOffline =
@@ -68,40 +84,36 @@ export default function ChatListScreen({ navigation }: any) {
       setOffline(isOffline);
     });
 
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
-  const load = useCallback(async () => {
+  // Load from server, never clears UI; only updates in background
+  const loadInBackground = useCallback(async () => {
     try {
       if (!myUserId) return;
-  
-      // 1) show cached immediately
-      await loadFromCache();
-  
-      // 2) if offline, don't hit server
+
+      // If offline, just show cache
       if (offline) return;
-  
+
       const deviceId = await getStableDeviceId(myUserId);
-  
+
       const { data } = await fetchConversations(deviceId);
       const serverConvos = data.conversations || [];
-  
+
       const friendsRes = await fetchFriends();
       const friends = friendsRes?.data?.friends || [];
       const nameMap = new Map<string, string>();
       for (const f of friends) {
         nameMap.set(String(f._id), String(f.name || f.username || "Friend"));
       }
-  
+
       const previews = await listConversationPreviews(String(myUserId), String(deviceId));
       const previewMap = new Map(previews.map((p) => [String(p.peerUserId), p]));
-  
+
       const merged = serverConvos.map((c: any) => {
         const peerId = String(c._id);
         const p = previewMap.get(peerId);
-  
+
         return {
           peerUserId: peerId,
           peerName: nameMap.get(peerId) || p?.peerName || "Friend",
@@ -111,35 +123,51 @@ export default function ChatListScreen({ navigation }: any) {
           unread: getUnread(peerId),
         };
       });
-  
+
       merged.sort(
         (a, b) => new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime()
       );
-  
+
       setRows(merged);
+      if (merged.length > 0) {
+        setHasLoadedOnce(true);
+        setInitialLoading(false);
+      }
     } catch (e) {
       console.log("load convos error", e);
-      // fallback: keep whatever cache already loaded
     }
-  }, [myUserId, unreadVersion, offline, loadFromCache]);
+  }, [myUserId, unreadVersion, offline]);
 
+  // Reload from server/cache in background if needed, whenever relevant state triggers
+  useEffect(() => {
+    // loadFromCache runs immediately, and background updates in-place
+    if (!hasLoadedOnce) {
+      // Only show loader if not loaded anything
+      setInitialLoading(true);
+      loadFromCache().then(loadInBackground);
+    } else {
+      // Already have data, just update in background
+      loadInBackground();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offline, loadFromCache, loadInBackground]);
 
   useEffect(() => {
-    load();
-  }, [offline, load]);
-
-  useEffect(() => {
-    const unsub = navigation.addListener("focus", load);
+    const unsub = navigation.addListener("focus", () => {
+      // On focus, never reset; just update in background
+      loadInBackground();
+    });
     return unsub;
-  }, [navigation, load]);
+  }, [navigation, loadInBackground]);
 
   useEffect(() => {
+    // Subscribe to conversation/new message changes
     const unsub = subscribeConversationChanges(() => {
-      console.log("[chat] conversation change received in ChatListScreen");
       setUnreadVersion((v) => v + 1);
     });
     return () => unsub();
   }, []);
+
   useEffect(() => {
     const unsubUnread = subscribeUnreadChanges(() => {
       setUnreadVersion((v) => v + 1);
@@ -150,6 +178,18 @@ export default function ChatListScreen({ navigation }: any) {
   const filtered = rows.filter((r) =>
     String(r.peerName || "").toLowerCase().includes(search.toLowerCase())
   );
+
+  // Show loader only on cold start if NOTHING to show yet
+  // if (initialLoading && !hasLoadedOnce) {
+  //   return (
+  //     <MainLayout>
+  //       <View style={[styles.root, { alignItems: "center", justifyContent: "center" }]}>
+  //         <ActivityIndicator size="large" color="#8B5CF6" style={{ marginVertical: 32 }} />
+  //         <Text style={{ color: "#fff", fontSize: 16, marginTop: 24 }}>Loading chats...</Text>
+  //       </View>
+  //     </MainLayout>
+  //   );
+  // }
 
   return (
     <MainLayout>
@@ -192,25 +232,25 @@ export default function ChatListScreen({ navigation }: any) {
                   navigation.navigate("chat", {
                     peerUserId: item.peerUserId,
                     peerName: item.peerName,
-                    peerMood: item.mood, // ✅ add this
+                    peerMood: item.mood,
                   })
                 }
               >
                 <View style={styles.rowTop}>
-                <Text style={styles.peer} numberOfLines={1}>
-                {item.peerName}  {item.mood ? `[ is feeling ${item.mood} ] ` : ""}
-</Text>
+                  <Text style={styles.peer} numberOfLines={1}>
+                    {item.peerName}  {item.mood ? `[ is feeling ${item.mood} ] ` : ""}
+                  </Text>
                   <Text style={styles.time}>{formatLastTime(item.lastAt)}</Text>
                 </View>
 
                 <View style={styles.rowTop}>
-                <Text style={styles.snippet} numberOfLines={1}>
-  {!item.lastAt
-    ? "No messages yet"
-    : item.unread > 0
-      ? "Sent you a message"
-      : "Opened message"}
-</Text>
+                  <Text style={styles.snippet} numberOfLines={1}>
+                    {!item.lastAt
+                      ? "No messages yet"
+                      : item.unread > 0
+                      ? "Sent you a message"
+                      : "Opened message"}
+                  </Text>
                   {item.unread > 0 && (
                     <View style={styles.badge}>
                       <Text style={styles.badgeText} numberOfLines={1}>
@@ -222,6 +262,14 @@ export default function ChatListScreen({ navigation }: any) {
               </TouchableOpacity>
             )}
             ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+            ListEmptyComponent={
+              <View style={{ alignItems: "center", marginTop: 40 }}>
+                <Icon name="chat-outline" size={54} color="#334155" />
+                <Text style={{ color: "#334155", fontWeight: "bold", fontSize: 18, marginTop: 18 }}>
+                  No chats yet
+                </Text>
+              </View>
+            }
           />
         </View>
       </View>

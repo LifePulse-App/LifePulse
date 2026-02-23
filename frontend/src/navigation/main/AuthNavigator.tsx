@@ -265,7 +265,6 @@ import ProfilePreviewScreen from '../../screens/profile/components/ProfilePrevie
       <Stack.Screen name="SetPass" component={SetPassVerifiedOTP} />
       <Stack.Screen name="Register" component={Register} />
       <Stack.Screen name="Drawer" component={DrawerNavigator} />
-      <Stack.Screen name="Friends" component={Friends} options={{headerShown: false}}/>
       <Stack.Screen name="ProofCamera" component={ProofVisionCameraScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="Enable2FA" component={Enable2FAScreen} />
@@ -276,8 +275,6 @@ import ProfilePreviewScreen from '../../screens/profile/components/ProfilePrevie
 <Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
 <Stack.Screen name="AvatarCreator" component={AvatarCreatorScreen} />
 <Stack.Screen name="chat" component={ChatScreen} />
-<Stack.Screen name="FriendsManage" component={FriendsListScreen} />
-<Stack.Screen name="ProfilePreview" component={ProfilePreviewScreen} />
     </Stack.Navigator>
   );
 };

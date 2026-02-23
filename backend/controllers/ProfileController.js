@@ -4,6 +4,9 @@ import validator from "validator";
 import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import ErrorHandler from "../utils/errorHandler.js";
 import { sendVerificationEmail } from "./OtpController.js";
+import fs from "fs";
+import path from "path";
+import multer from "multer";
 
 // Helper: extract avatarId from a models.readyplayer.me GLB URL
 const extractAvatarId = (url) => {
@@ -408,4 +411,46 @@ export const getLocationLockStatus = catchAsyncErrors(async (req, res, next) => 
     country: user.country,
     city: user.city,
   });
+});
+
+// 1. Prepare the directory for file uploads
+const AVATAR_DIR = path.join(process.cwd(), "uploads", "avatars");
+fs.mkdirSync(AVATAR_DIR, { recursive: true });
+
+// 2. Setup Multer storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, AVATAR_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || ".jpg";
+    cb(null, req.user._id + "_" + Date.now() + ext);
+  }
+});
+export const upload = multer({ storage });
+
+// 3. Controller: Upload avatar and save path to user
+export const uploadAvatar = catchAsyncErrors(async (req, res, next) => {
+  if (!req.file) return next(new ErrorHandler("No file uploaded", 400));
+  const avatarUrl = `/avatars/${req.file.filename}`;
+  // Optionally delete previous avatar here (recommended for cleanup!)
+  await User.findByIdAndUpdate(
+    req.user._id,
+    { avatarUrl },
+    { new: true }
+  );
+  res.json({ success: true, url: avatarUrl });
+});
+
+// 4. Controller: Get current avatar of a user (by auth)
+export const getMyAvatar = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select("avatarUrl");
+  if (!user) return next(new ErrorHandler("User not found", 404));
+  res.json({ success: true, avatarUrl: user.avatarUrl });
+});
+
+// controllers/avatarController.js
+export const getUserProfile = catchAsyncErrors(async (req, res, next) => {
+  const { userId } = req.params;
+  const user = await User.findById(userId).select("name username avatarUrl");
+  if (!user) return next(new ErrorHandler("User not found", 404));
+  res.json({ success: true, user });
 });

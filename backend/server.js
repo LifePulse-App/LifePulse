@@ -10,6 +10,7 @@ import https from 'https';
 import fs from 'fs';
 import cron from 'node-cron';
 
+
 const app = express();
 // Load environment based on NODE_ENV
 const envFile = `.env.${process.env.NODE_ENV || ''}`;
@@ -39,6 +40,11 @@ export const transporter = nodemailer.createTransport({
   greetingTimeout: 20000,
   socketTimeout: 20000,
 });
+
+import path from 'path';
+// This should be at the TOP, before app.listen and after creating app.
+const AVATAR_PATH = path.join(process.cwd(), 'uploads', 'avatars');
+app.use('/avatars', express.static(AVATAR_PATH));
 
 //import routes
 import AuthRoutes from "./routes/AuthRoutes.js"

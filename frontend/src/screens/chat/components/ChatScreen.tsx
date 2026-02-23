@@ -23,11 +23,9 @@ import { getStableDeviceId } from "../../../shared/services/stableDeviceId";
 import { SignalStore } from "../services/signalStore";
 import { LocalMessageStore } from "../services/LocalMessageStore";
 import { clearUnread, setActiveChatPeer } from '../services/ChatNotifications';
-import { markMessagesAsRead } from '../services/api_e2ee'; // We'll define this below
-import { markMessagesSeenLocally } from '../services/ChatNotifications'; // Make sure this is exported
+import { markMessagesAsRead } from '../services/api_e2ee';
 import { getLocalSeenAt } from '../services/ChatNotifications';
 import { notifyConversationChanged } from '../services/ChatNotifications';
-
 
 const asNum = (v: any) => (typeof v === "string" ? parseInt(v, 10) : v);
 
@@ -65,11 +63,10 @@ export default function ChatScreen({ route, navigation }: any) {
 
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [sessionManager, setSessionManager] = useState<SessionManager | null>(null);
-
   const [messages, setMessages] = useState<any[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [input, setInput] = useState("");
-
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   const flatRef = useRef<FlatList>(null);
   const scrollToBottom = () =>
@@ -89,11 +86,37 @@ export default function ChatScreen({ route, navigation }: any) {
     return out;
   }, []);
 
+  // Handle keyboard events properly
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setKeyboardHeight(e.endCoordinates.height);
+        // Auto scroll to bottom when keyboard opens
+        setTimeout(scrollToBottom, 100);
+      }
+    );
+
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
+
   useEffect(() => {
     const onFocus = async () => {
       setActiveChatPeer(String(peerUserId));
       clearUnread(String(peerUserId));
-      await markMessagesAsRead(peerUserId); // Make API call!
+      await markMessagesAsRead(peerUserId);
     };
     const onBlur = () => setActiveChatPeer(null);
   
@@ -107,8 +130,6 @@ export default function ChatScreen({ route, navigation }: any) {
   useEffect(() => {
     setItems(buildItemsWithDateSeparators(messages));
   }, [messages, buildItemsWithDateSeparators]);
-
-  // keyboard height (needed for Android when using absolute input bar)
 
   useEffect(() => {
     (async () => {
@@ -314,7 +335,6 @@ export default function ChatScreen({ route, navigation }: any) {
         };
       };
   
-      // ✅ Only one peer device upload gets notifyUser: true!
       for (const [idx, d] of peerDevices.entries()) {
         const built = buildBundle(d);
         if (!built) continue;
@@ -330,11 +350,10 @@ export default function ChatScreen({ route, navigation }: any) {
           sessionId: `sess-${peerUserId}-${built.routingDeviceId}`,
           header: { t: cipherPayload.type, preKeyId: built.otpKeyId },
           ciphertext: cipherPayload.body,
-          notifyUser: idx === 0, // <-- THIS IS CRITICAL
+          notifyUser: idx === 0,
         });
       }
   
-      // For your own devices, no notifyUser flag
       for (const d of myDevices) {
         const built = buildBundle(d);
         if (!built) continue;
@@ -350,7 +369,6 @@ export default function ChatScreen({ route, navigation }: any) {
           sessionId: `sess-${peerUserId}-${built.routingDeviceId}`,
           header: { t: cipherPayload.type, preKeyId: built.otpKeyId },
           ciphertext: cipherPayload.body,
-          // no notifyUser
         });
       }
     } catch (e) {
@@ -358,32 +376,23 @@ export default function ChatScreen({ route, navigation }: any) {
     }
   }, [input, sessionManager, myUserId, deviceId, peerUserId]);
 
-  const inputBarBase = 74;
-  const inputBarHeight = inputBarBase + insets.bottom;
-
   return (
     <SafeAreaView style={styles.safe} edges={["left", "right"]}>
-      {/* ✅ KeyboardAvoidingView is now enabled for BOTH platforms */}
-      <KeyboardAvoidingView
-  style={styles.root}
-  behavior={Platform.OS === "ios" ? "padding" : undefined}
-  keyboardVerticalOffset={0}
-  enabled={Platform.OS === "ios"}
->
+      <View style={styles.root}>
         <View style={styles.baseBackground} />
         <View style={styles.glowTop} />
         <View style={styles.glowBottom} />
 
         <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <View style={{ flex: 1 }}>
+          <View style={styles.innerContainer}>
             <View style={styles.container}>
               <View style={styles.topBar}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
                   <Icon name="arrow-left" size={22} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.title}>
-                {peerName || "Friend"} {peerMood ? `[ is feeling ${peerMood} ] ` : ""}
-</Text>
+                  {peerName || "Friend"} {peerMood ? `[ is feeling ${peerMood} ] ` : ""}
+                </Text>
                 <View style={{ width: 42 }} />
               </View>
 
@@ -391,7 +400,10 @@ export default function ChatScreen({ route, navigation }: any) {
                 ref={flatRef}
                 data={items}
                 keyExtractor={(it) => it.id}
-                contentContainerStyle={[styles.listContent, { paddingBottom: 110 + insets.bottom } ]}
+                contentContainerStyle={[
+                  styles.listContent, 
+                  { paddingBottom: 20 }
+                ]}
                 renderItem={({ item }) => {
                   if (item.type === "date") {
                     return (
@@ -404,7 +416,6 @@ export default function ChatScreen({ route, navigation }: any) {
                   const m = item.msg;
                   const isMe = String(m.fromUserId) === String(myUserId);
                   const localSeenAt = getLocalSeenAt(m.toUserId);
-                  // Show blue tick if message has backend .seenAt, or if it’s <= locally updated "seen"
                   let showBlueTick = false;
                   if (isMe) {
                     showBlueTick = !!m.seenAt ||
@@ -419,17 +430,16 @@ export default function ChatScreen({ route, navigation }: any) {
                         </View>
                         
                         <View style={styles.metaRow}>
-  {isMe ? (
-    <Icon
-      name={showBlueTick ? "check-all" : "check"}
-      size={13}
-      color={showBlueTick ? "#2dd4bf" : "#a3a3a3"}
-      style={styles.tickIcon}
-    />
-  ) : null}
-
-  <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
-</View>
+                          {isMe ? (
+                            <Icon
+                              name={showBlueTick ? "check-all" : "check"}
+                              size={13}
+                              color={showBlueTick ? "#2dd4bf" : "#a3a3a3"}
+                              style={styles.tickIcon}
+                            />
+                          ) : null}
+                          <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
+                        </View>
                       </View>
                     </View>
                   );
@@ -438,25 +448,30 @@ export default function ChatScreen({ route, navigation }: any) {
               />
             </View>
 
-            {/* ✅ Move input above keyboard by bottom = kbHeight */}
-            <View style={[styles.inputBar, { bottom: insets.bottom + 8 }]}>
-  <View style={styles.inputRow}>
-    <TextInput
-      style={styles.input}
-      placeholder="Type a message"
-      placeholderTextColor="#94a3b8"
-      value={input}
-      onChangeText={setInput}
-      multiline
-    />
-    <TouchableOpacity style={styles.sendBtn} onPress={send}>
-      <Icon name="send" size={20} color="#fff" />
-    </TouchableOpacity>
-  </View>
-</View>
+            <View style={[
+              styles.inputBar, 
+              { 
+                paddingBottom: insets.bottom,
+                marginBottom: keyboardHeight + 5
+              }
+            ]}>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Type a message"
+                  placeholderTextColor="#94a3b8"
+                  value={input}
+                  onChangeText={setInput}
+                  multiline
+                />
+                <TouchableOpacity style={styles.sendBtn} onPress={send}>
+                  <Icon name="send" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
         </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -464,6 +479,7 @@ export default function ChatScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "rgba(15, 23, 42, 1)" },
   root: { flex: 1, backgroundColor: "#0f172a" },
+  innerContainer: { flex: 1 },
   baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: "#020617" },
   glowTop: {
     position: "absolute",
@@ -523,20 +539,15 @@ const styles = StyleSheet.create({
   text: { color: "#fff", flexShrink: 1, flexWrap: "wrap" },
   timeText: { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 4, alignSelf: "flex-end", marginRight: 4 },
 
-  // absolute input bar
   inputBar: {
-    position: "absolute",
-    left: 12,
-    right: 12,
+    paddingTop: 8,
+    backgroundColor: "transparent",
   },
   inputRow: {
     flexDirection: "row",
     padding: 10,
-    borderRadius: 16,
-    backgroundColor: "rgba(15, 23, 42, 0.9)",
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.35)",
     alignItems: "center",
+    backgroundColor: "transparent",
   },
   input: {
     flex: 1,
@@ -547,10 +558,12 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginRight: 8,
     maxHeight: 140,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.5)",
   },
   sendBtn: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 12,
     backgroundColor: "#6366f1",
     alignItems: "center",
@@ -559,7 +572,7 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    alignSelf: "flex-end", // keeps it bottom-right in the bubble for both sides
+    alignSelf: "flex-end",
     marginTop: 4,
   },
   tickIcon: {

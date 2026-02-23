@@ -213,6 +213,8 @@ const TwoFAScreen = () => {
                     keyboardType="numeric"
                     maxLength={6}
                     textColor="black"
+                    placeholderTextColor="grey"
+                    cursorColor='black'
                   />
                 </>
               ) : (
@@ -229,6 +231,8 @@ const TwoFAScreen = () => {
                     textColor="black"
                     placeholder="XXXX-XXXX-XX"
                     autoCapitalize="characters"
+                    placeholderTextColor="grey"
+                    cursorColor='black'
                   />
                 </>
               )}

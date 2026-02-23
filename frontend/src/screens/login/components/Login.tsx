@@ -281,7 +281,8 @@ const Login = ({ navigation }: any) => {
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
                 textColor="black"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="grey"
+                cursorColor='black'
               />
 
               <TextInput
@@ -299,7 +300,8 @@ const Login = ({ navigation }: any) => {
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
                 textColor="black"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="grey"
+                cursorColor='black'
                 right={
                   <TextInput.Icon
                     icon={showPassword ? 'eye-off' : 'eye'}

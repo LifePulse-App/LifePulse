@@ -134,21 +134,21 @@ const Enable2FAScreen = () => {
     }
   };
 
-  if (initialLoading) {
-    return (
-      <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
-        <LoaderKitView
-          style={{ width: 40, height: 40 }}
-          name={'BallSpinFadeLoader'}
-          animationSpeedMultiplier={1.0}
-          color={'#FFFFFF'}
-        />
-        <AppText style={{ marginTop: 12, color: '#FFFFFF' }}>
-          Preparing 2FA setup...
-        </AppText>
-      </View>
-    );
-  }
+  // if (initialLoading) {
+  //   return (
+  //     <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
+  //       <LoaderKitView
+  //         style={{ width: 40, height: 40 }}
+  //         name={'BallSpinFadeLoader'}
+  //         animationSpeedMultiplier={1.0}
+  //         color={'#FFFFFF'}
+  //       />
+  //       <AppText style={{ marginTop: 12, color: '#FFFFFF' }}>
+  //         Preparing 2FA setup...
+  //       </AppText>
+  //     </View>
+  //   );
+  // }
 
   // Common header like ProfileScreen
   const renderHeader = () => (
@@ -220,6 +220,7 @@ const Enable2FAScreen = () => {
             activeUnderlineColor="transparent"
             secureTextEntry
             textColor="black"
+            cursorColor='black'
           />
 
           <TextInput
@@ -233,6 +234,7 @@ const Enable2FAScreen = () => {
             keyboardType="numeric"
             maxLength={6}
             textColor="black"
+            cursorColor='black'
           />
 
           <TextInput
@@ -246,6 +248,7 @@ const Enable2FAScreen = () => {
             textColor="black"
             placeholder="XXXX-XXXX-XX"
             autoCapitalize="characters"
+            cursorColor='black'
           />
 
           <TouchableOpacity

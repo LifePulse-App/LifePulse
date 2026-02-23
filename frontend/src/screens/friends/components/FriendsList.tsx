@@ -15,6 +15,8 @@ import { useFocusEffect } from "@react-navigation/native";
 
 import MainLayout from "../../../shared/components/MainLayout";
 import socialApi from "../services/api_friends";
+import apiClient from "../../../auth/api-client/api_client";
+import { Image } from "react-native";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
@@ -58,6 +60,9 @@ export default function FriendsListScreen({ navigation }: any) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const baseUrl = apiClient.getBaseURL(); // Example: "http://localhost:40000/api"
+  const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
   const didSeedFromCacheRef = useRef(false);
 
@@ -138,7 +143,14 @@ export default function FriendsListScreen({ navigation }: any) {
     });
   }, [friends, search]);
 
-  const renderFriend = ({ item }: { item: Friend }) => (
+  const renderFriend = ({ item }: { item: Friend }) => {
+    console.log(item);
+    
+    const initials =
+    item?.name?.split(" ").map((p) => p[0]).join("").toUpperCase().slice(0, 2) ||
+    item?.username?.slice(0, 2)?.toUpperCase() ||
+    "?";
+    return (
     <TouchableOpacity
       activeOpacity={0.85}
       style={styles.card}
@@ -152,9 +164,15 @@ export default function FriendsListScreen({ navigation }: any) {
     >
       <View style={styles.left}>
         <View style={styles.avatarCircle}>
-          <Text style={styles.avatarLetter}>
-            {(item.name || "F").slice(0, 1).toUpperCase()}
-          </Text>
+        {item.avatar ? (
+      <Image
+        source={{ uri: newUrl + item.avatar }}
+        style={{ width: 40, height: 40, borderRadius: 999 }}
+        resizeMode="cover"
+      />
+    ) : (
+      <Text style={styles.avatarText}>{initials}</Text>
+    )}
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.name} numberOfLines={1}>
@@ -168,7 +186,7 @@ export default function FriendsListScreen({ navigation }: any) {
 
       <Icon name="chevron-right" size={22} color="#9CA3AF" />
     </TouchableOpacity>
-  );
+  )}
 
   return (
     <MainLayout>
@@ -347,4 +365,5 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   errorRetryText: { color: "#FEF2F2", fontSize: 11, fontWeight: "600" },
+  avatarText: { color: "#0F172A", fontSize: 14, fontWeight: "700" },
 });

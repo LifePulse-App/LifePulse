@@ -229,7 +229,8 @@ const VerifyOtp = ({ navigation, route }: any) => {
                 keyboardType="number-pad"
                 maxLength={6}
                 textColor="#111827"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor="grey"
+                cursorColor='black'
               />
 
               {loading ? (

@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
   dropdownRow: { marginBottom: 8 },
   dropdownLabel: { color: "#cbd5e1", marginBottom: 4, fontWeight: "600", fontSize: 12 },
   dropdownBox: {
-    maxHeight: 180,
+    maxHeight: 145,
     backgroundColor: "rgba(17, 24, 39, 0.9)",
     borderRadius: 10,
     borderWidth: 1,
