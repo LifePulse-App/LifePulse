@@ -189,6 +189,11 @@ const updateAvatarImage = async (formData: FormData) => {
   }
 };
 
+const deleteAvatar = async () => {
+  return client.delete('/profile/me/delete-avatar');
+};
+
+
 export default {
   getProfile,
   editProfile,
@@ -208,5 +213,6 @@ export default {
   updateAvatar,
   getAvatarUrl,
   updateAvatarUrl,
-  updateAvatarImage
+  updateAvatarImage,
+  deleteAvatar
 };

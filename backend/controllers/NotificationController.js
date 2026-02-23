@@ -101,7 +101,7 @@ async function sendNotificationFCM(tokens, payload) {
 // Usage in /chat notification:
 export async function sendMsgNotification(toUserId, fromUserId, fromUsername) {
   const tokens = await PushToken.find({ userId: toUserId, platform: 'android' }).lean();
-   //console.log('Push tokens for user', toUserId, tokens);
+  //  console.log('Push tokens for user', toUserId, tokens);
   await sendNotificationFCM(tokens, {
     type: 'chat',
     peerUserId: String(fromUserId),

@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
   TouchableOpacity,
   Image,
-  Platform,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -13,11 +12,31 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { launchImageLibrary } from 'react-native-image-picker';
 import profileApi from '../services/api_profile'; // Your API
 import { useNavigation } from '@react-navigation/native';
+import apiClient from '../../../auth/api-client/api_client';
+
+// Set your backend base (for local avatars, adjust as needed)
+const baseUrl = apiClient.getBaseURL(); // Example: "http://localhost:40000/api"
+const BASE_SERVER_URL = baseUrl.replace(/\/api\/?$/, "");
 
 export default function ProfilePicUploaderScreen() {
   const navigation = useNavigation();
   const [photoUri, setPhotoUri] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
+
+  // Load current avatar from backend on mount
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await profileApi.getAvatarUrl();
+        // Prefer .data.avatarUrl if you use their getMyAvatar API
+        setAvatarUrl(res?.data?.avatarUrl ?? null);
+      } catch (e) {
+        setAvatarUrl(null);
+      }
+    };
+    load();
+  }, []);
 
   const pickPhoto = async () => {
     const res = await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
@@ -39,8 +58,10 @@ export default function ProfilePicUploaderScreen() {
         type: 'image/jpeg',
         name: 'avatar.jpg',
       });
-      // API Call (Backend described below)
-      await profileApi.updateAvatarImage(formData);
+      const uploadRes = await profileApi.updateAvatarImage(formData);
+      // If your API returns the new url, update local state:
+      setAvatarUrl(uploadRes?.data?.url ?? null);
+      setPhotoUri(null);
       Alert.alert('Success', 'Profile photo updated!');
       navigation.goBack();
     } catch (e) {
@@ -49,18 +70,36 @@ export default function ProfilePicUploaderScreen() {
     setUploading(false);
   };
 
+  const deleteAvatar = async () => {
+    try {
+      await profileApi.deleteAvatar();
+      setPhotoUri(null);
+      setAvatarUrl(null); // clear displayed avatar
+      Alert.alert('Success', 'Profile picture removed!');
+    } catch (e) {
+      Alert.alert('Error', e?.message || 'Failed to remove profile photo.');
+    }
+  };
+
+  // Compose image url for local uploads (if needed)
+  const avatarDisplayUrl =
+    photoUri ||
+    (avatarUrl
+      ? BASE_SERVER_URL + avatarUrl
+      : null);
+
   return (
     <View style={styles.root}>
       <Text style={styles.header}>Upload Your Profile Picture</Text>
       <TouchableOpacity style={styles.avatarWrap} onPress={pickPhoto} activeOpacity={0.95}>
-        {!photoUri ? (
-          <Icon name="account-circle-outline" size={120} color="#6366f1" />
-        ) : (
+        {avatarDisplayUrl ? (
           <Image
             style={styles.avatar}
-            source={{ uri: photoUri }}
+            source={{ uri: avatarDisplayUrl }}
             resizeMode="cover"
           />
+        ) : (
+          <Icon name="account-circle-outline" size={120} color="#6366f1" />
         )}
       </TouchableOpacity>
       <TouchableOpacity
@@ -72,6 +111,9 @@ export default function ProfilePicUploaderScreen() {
       </TouchableOpacity>
       <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
         <Text style={styles.cancelBtnTxt}>Cancel</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.deleteBtn} onPress={deleteAvatar}>
+        <Text style={styles.deleteBtnTxt}>Remove Profile Picture</Text>
       </TouchableOpacity>
       <Text style={styles.hint}>Tap the avatar above to choose a new photo.</Text>
     </View>
@@ -105,5 +147,18 @@ const styles = StyleSheet.create({
   saveBtnTxt: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
   cancelBtn: { paddingHorizontal: 32, paddingVertical: 11, marginTop: 6 },
   cancelBtnTxt: { color: '#6b7280', fontWeight: 'bold', fontSize: 15 },
+  deleteBtn: {
+    marginTop: 10,
+    paddingHorizontal: 32,
+    paddingVertical: 11,
+    backgroundColor: '#EF4444',
+    borderRadius: 18,
+  },
+  deleteBtnTxt: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 15,
+    textAlign: 'center',
+  },
   hint: { color: '#a1a1aa', marginTop: 12, fontSize: 13 },
 });
