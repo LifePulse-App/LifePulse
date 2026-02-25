@@ -5,6 +5,7 @@ import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import ErrorHandler from "../utils/errorHandler.js";
 import { sendVerificationEmail } from "./OtpController.js";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import multer from "multer";
 
@@ -414,23 +415,30 @@ export const getLocationLockStatus = catchAsyncErrors(async (req, res, next) => 
 });
 
 // 1. Prepare the directory for file uploads
-const AVATAR_DIR = path.join(process.cwd(), "uploads", "avatars");
+const AVATAR_DIR = path.join(os.homedir(), "uploads", "avatars");
+
+// auto-create folder if missing
 fs.mkdirSync(AVATAR_DIR, { recursive: true });
 
-// 2. Setup Multer storage
+// multer storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, AVATAR_DIR),
+
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || ".jpg";
     cb(null, req.user._id + "_" + Date.now() + ext);
-  }
+  },
 });
+
 export const upload = multer({ storage });
 
 // 3. Controller: Upload avatar and save path to user
 export const uploadAvatar = catchAsyncErrors(async (req, res, next) => {
   if (!req.file) return next(new ErrorHandler("No file uploaded", 400));
+  
+  console.log(req.file);
   const avatarUrl = `/avatars/${req.file.filename}`;
+  console.log(avatarUrl);
   // Optionally delete previous avatar here (recommended for cleanup!)
   await User.findByIdAndUpdate(
     req.user._id,

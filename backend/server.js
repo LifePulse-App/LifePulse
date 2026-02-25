@@ -41,9 +41,15 @@ export const transporter = nodemailer.createTransport({
   socketTimeout: 20000,
 });
 
-import path from 'path';
-// This should be at the TOP, before app.listen and after creating app.
-const AVATAR_PATH = path.join(process.cwd(), 'uploads', 'avatars');
+import os from "os";
+import path from "path";
+
+// Home directory of server
+const HOME_DIR = os.homedir();
+
+// Global uploads path
+const AVATAR_PATH = path.join(HOME_DIR, "uploads", "avatars");
+
 app.use('/avatars', express.static(AVATAR_PATH));
 
 //import routes
