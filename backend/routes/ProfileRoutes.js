@@ -24,7 +24,8 @@ import {
   uploadAvatar,
   getMyAvatar,
   getUserProfile,
-  deleteAvatar
+  deleteAvatar,
+  requestDeleteAccountOtp
 } from "../controllers/ProfileController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 
@@ -52,7 +53,8 @@ router.post("/notifications", isAuthenticatedUser, updateNotifications);
 router.post("/app-settings", isAuthenticatedUser, updateAppSettings);
 
 // Account Delete
-router.delete("/delete", isAuthenticatedUser, deleteAccount);
+router.post("/delete", isAuthenticatedUser, deleteAccount);
+router.post("/request-delete", isAuthenticatedUser, requestDeleteAccountOtp);
 
 router.get("/login-activity", isAuthenticatedUser, getLoginActivity);
 router.get('/me/avatar', isAuthenticatedUser, getAvatarConfig);

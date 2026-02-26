@@ -246,8 +246,33 @@ export const updateAppSettings = catchAsyncErrors(async (req, res, next) => {
 });
 
 // Delete account
+// Delete account with OTP
 export const deleteAccount = catchAsyncErrors(async (req, res, next) => {
+  const { otp } = req.body;
+  if (!otp) return next(new ErrorHandler("OTP required", 400));
+
+  const user = await User.findById(req.user._id);
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  if (
+    !user.deleteAccountOtp ||
+    !user.deleteAccountOtpExpire ||
+    user.deleteAccountOtpExpire < Date.now()
+  ) {
+    user.deleteAccountOtp = undefined;
+    user.deleteAccountOtpExpire = undefined;
+    await user.save();
+    return next(new ErrorHandler("OTP invalid or expired. Request again.", 400));
+  }
+
+  const hashed = crypto.createHash("sha256").update(otp).digest("hex");
+  if (hashed !== user.deleteAccountOtp) {
+    return next(new ErrorHandler("Incorrect OTP", 400));
+  }
+
+  // OTP matched: Delete user
   await User.findByIdAndDelete(req.user._id);
+
   res.status(200).json({ success: true, message: "Account deleted" });
 });
 
@@ -487,4 +512,25 @@ export const deleteAvatar = catchAsyncErrors(async (req, res, next) => {
   await user.save();
 
   res.json({ success: true, message: "Avatar removed." });
+});
+
+// Request OTP for account deletion
+export const requestDeleteAccountOtp = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  // Generate OTP (6 digits)
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const hashed = crypto.createHash("sha256").update(otp).digest("hex");
+
+  user.deleteAccountOtp = hashed;
+  user.deleteAccountOtpExpire = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+  await sendVerificationEmail(user.email, otp);
+  await user.save();
+
+  res.status(200).json({
+    success: true,
+    message: "OTP sent to your registered email address for account deletion."
+  });
 });

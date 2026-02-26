@@ -452,7 +452,8 @@ export default function ChatScreen({ route, navigation }: any) {
               styles.inputBar, 
               { 
                 paddingBottom: insets.bottom,
-                marginBottom: keyboardHeight + 5
+                marginBottom: 5,
+                backgroundColor: "transparent"
               }
             ]}>
               <View style={styles.inputRow}>
@@ -477,7 +478,7 @@ export default function ChatScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "rgba(15, 23, 42, 1)" },
+  safe: { flex: 1 },
   root: { flex: 1, backgroundColor: "#0f172a" },
   innerContainer: { flex: 1 },
   baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: "#020617" },

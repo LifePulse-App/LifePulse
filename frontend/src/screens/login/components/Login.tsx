@@ -313,7 +313,7 @@ const Login = ({ navigation }: any) => {
               {loading ? (
                 <View style={styles.loadingOverlay}>
                   <LoaderKitView
-                    style={{ width: 24, height: 24 }}
+                    style={{ width: 20, height: 20 }}
                     name={'BallSpinFadeLoader'}
                     animationSpeedMultiplier={1.0}
                     color={'#FFFFFF'}
@@ -330,7 +330,7 @@ const Login = ({ navigation }: any) => {
               )}
 
               <View style={{ marginTop: 4, alignItems: 'center' }}>
-                <Text style={{ color: 'black' }}>
+                <Text style={{ color: 'black', fontSize: 13 }}>
                   Want to reset password?{' '}
                   <Text
                     style={{
@@ -346,7 +346,7 @@ const Login = ({ navigation }: any) => {
               </View>
 
               <View style={{ marginTop: 5, alignItems: 'center' }}>
-                <Text style={{ color: 'black' }}>
+                <Text style={{ color: 'black', fontSize: 13 }}>
                   Don’t have an account?{' '}
                   <Text
                     style={{

@@ -632,7 +632,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     marginBottom: 18,
   },
-  searchInput: { flex: 1, color: "#E5E7EB", fontSize: 14 },
+  searchInput: { flex: 1, color: "#E5E7EB", fontSize: 12 },
   sectionHeader: { marginBottom: 10 },
   sectionTitle: { fontSize: 16, fontWeight: "700", color: "#F9FAFB" },
   sectionHint: { fontSize: 12, color: "#9CA3AF", marginTop: 2 },

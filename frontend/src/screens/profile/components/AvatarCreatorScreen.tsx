@@ -90,7 +90,14 @@ export default function ProfilePicUploaderScreen() {
 
   return (
     <View style={styles.root}>
-      <Text style={styles.header}>Upload Your Profile Picture</Text>
+          <View style={styles.topBar}>
+              <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass}
+          onPress={() => navigation.goBack()}>
+          <Icon name="arrow-left" size={24} color="#E5E7EB" />
+        </TouchableOpacity>
+        <Text style={styles.pageTitle}>Upload Profile Pic</Text>
+        <View style={styles.rightSpacer} />
+      </View>
       <TouchableOpacity style={styles.avatarWrap} onPress={pickPhoto} activeOpacity={0.95}>
         {avatarDisplayUrl ? (
           <Image
@@ -160,5 +167,16 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
   },
+    pageTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "700", color: "#F9FAFB" },
+  rightSpacer: { width: 40, height: 40 },
   hint: { color: '#a1a1aa', marginTop: 12, fontSize: 13 },
+  topBar: { flexDirection: "row", alignItems: "center", marginTop: 3, marginBottom: 30 },
+  iconGlass: {
+    width: 40, height: 40, borderRadius: 16,
+    backgroundColor: "rgba(15, 23, 42, 0.0)",
+    borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.4)",
+    justifyContent: "center", alignItems: "center", marginRight: 0,
+    shadowColor: "#000", shadowOpacity: 0.15, shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 10, elevation: 4, marginLeft: 12, marginTop: 5
+  },
 });

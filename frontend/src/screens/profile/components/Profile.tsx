@@ -14,7 +14,6 @@ import UserStorage from "../../../auth/user/UserStorage";
 import SavedAccountsStorage from "../../../auth/user/SavedAccountsStorage";
 import apiClient from "../../../auth/api-client/api_client";
 
-
 // --- Glassy Confirm Modal Component ---
 const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }: any) => {
   if (!visible) return null;
@@ -477,18 +476,21 @@ const ProfileScreen = ({ navigation }: any) => {
   const [profile, setProfile] = useState();
   const avatarUrl = (profile as any)?.avatarUrl;
   const [activeModal, setActiveModal] = useState(null);  
-
-  // --- Modal and Glassy Card States ---
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+
+  // --- New for delete account w/ OTP ---
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [deleteOtpStep, setDeleteOtpStep] = useState(0); // 0 = ask confirm, 1 = OTP input
+  const [deleteOtp, setDeleteOtp] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // --- Flash card state ---
   const [resultCard, setResultCard] = useState({ visible: false, type: "success", message: "" });
   const avatarThumbnailUrl = (profile as any)?.avatarThumbnailUrl;
+  const baseUrl = apiClient.getBaseURL();
+  const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
-  const baseUrl = apiClient.getBaseURL(); // Example: "http://localhost:40000/api"
-const newUrl = baseUrl.replace(/\/api\/?$/, "");
-  
-
-  // --- API Action Handlers ---
+  // --- API handlers ---
   const confirmLogout = async () => {
     const userData = authContext?.User;
     if (userData?.user?.id && userData?.UserName && userData?.Password) {
@@ -499,44 +501,61 @@ const newUrl = baseUrl.replace(/\/api\/?$/, "");
         user: userData,
       });
     }
-  
     await logout(userId);
     authContext?.setUser(null);
     UserStorage.clearTokens();
     UserStorage.deleteUser();
-  
-    navigation.replace("SavedAccounts"); // go to saved accounts screen
+    navigation.replace("SavedAccounts");
   };
-  const handleDeleteAccount = async () => {
+
+  // --- Delete account with OTP (NEW) ---
+  const handleRequestDeleteOtp = async () => {
+    setDeleteLoading(true);
     try {
-      await profileApi.deleteAccount();
+      await profileApi.requestDeleteAccountOtp();
+      setDeleteOtpStep(1);
+      setDeleteLoading(false);
+      setResultCard({ visible: true, type: "success", message: "OTP sent to your email." });
+    } catch (error) {
+      setDeleteLoading(false);
+      setResultCard({ visible: true, type: "error", message: error?.response?.data?.message || error?.message || "Error sending OTP." });
+    }
+  };
+
+  const handleDeleteAccountWithOtp = async () => {
+    setDeleteLoading(true);
+    try {
+      await profileApi.deleteAccountWithOtp(deleteOtp);
       setDeleteConfirmVisible(false);
+      setDeleteOtp("");
+      setDeleteOtpStep(0);
       setResultCard({ visible: true, type: "success", message: "Account deleted!" });
       setTimeout(() => {
-        setResultCard({ ...resultCard, visible: false });
+        setResultCard({ visible: false, type: "success", message: "" });
         authContext?.setUser(null);
         UserStorage.clearTokens();
         navigation.replace("Login");
       }, 1400);
     } catch (error) {
-      setDeleteConfirmVisible(false);
+      setDeleteLoading(false);
       setResultCard({ visible: true, type: "error", message: error?.response?.data?.message || error?.message || "Error deleting account." });
     }
   };
+
+  // --- Fetch profile ---
   const fetchProfile = async () => {
     try {
       const [profileRes, avatarRes] = await Promise.all([
         profileApi.getProfile(),
         profileApi.getAvatarUrl(),
       ]);
-  
       const user = profileRes?.data?.user;
       const { avatarThumbnailUrl } = avatarRes.data || {};
-  
       setProfile({ ...user, avatarThumbnailUrl });
     } catch (e) {}
   };
 
+  // --- Modal renderer for edit screens ---
   const renderActionModal = () => {
     if (!activeModal) return null;
     const ModalComponent = actionComponents[activeModal];
@@ -549,17 +568,16 @@ const newUrl = baseUrl.replace(/\/api\/?$/, "");
         useNativeDriver
       >
         <View style={sheetStyles.sheetContent}>
-        <ModalComponent
-  user={profile}
-  onClose={() => setActiveModal(null)}
-  setResultCard={setResultCard}
-  onChange={fetchProfile}  // Pass callback for refresh
-/>
+          <ModalComponent
+            user={profile}
+            onClose={() => setActiveModal(null)}
+            setResultCard={setResultCard}
+            onChange={fetchProfile}
+          />
         </View>
       </Modal>
     );
   };
-
 
   useFocusEffect(
     React.useCallback(() => {
@@ -577,65 +595,65 @@ const newUrl = baseUrl.replace(/\/api\/?$/, "");
         <Text style={styles.pageTitle}>Profile</Text>
         <View style={styles.rightSpacer} />
       </View>
+
       <ScrollView style={styles.overlay}>
         <View style={styles.mainCard}>
           <View style={styles.avatarWrap}>
-
-          <View style={styles.avatarCircle}>
-  {avatarUrl ? (
-    <View style={styles.avatarMask}>
-      <Image
-        source={{ uri: newUrl + avatarUrl }}
-        style={styles.avatarImageZoomed}
-        resizeMode="cover"
-      />
-    </View>
-  ) : (
-    <Icon name="account-circle-outline" size={70} color="#6366f1" />
-  )}
-  <TouchableOpacity
-    style={styles.editBtn}
-    onPress={() => navigation.navigate('AvatarCreator')}
-  >
-    <Icon name="pencil" size={17} color="#fff" />
-  </TouchableOpacity>
-</View>
+            <View style={styles.avatarCircle}>
+              {avatarUrl ? (
+                <View style={styles.avatarMask}>
+                  <Image
+                    source={{ uri: newUrl + avatarUrl }}
+                    style={styles.avatarImageZoomed}
+                    resizeMode="cover"
+                  />
+                </View>
+              ) : (
+                <Icon name="account-circle-outline" size={70} color="#6366f1" />
+              )}
+              <TouchableOpacity
+                style={styles.editBtn}
+                onPress={() => navigation.navigate('AvatarCreator')}
+              >
+                <Icon name="pencil" size={17} color="#fff" />
+              </TouchableOpacity>
+            </View>
             <Text style={styles.userName}>{profile?.name}</Text>
             <Text style={styles.userUsername}>@{profile?.username}</Text>
           </View>
         </View>
         {settingSections.map(section => (
-  <View key={section.title}>
-    <Text style={styles.sectionTitle}>{section.title}</Text>
-    {section.items.map(item => (
-      <TouchableOpacity
-        key={item.route}
-        style={styles.settingCard}
-        onPress={() => {
-          if (item.route === 'Enable2FA') {
-            navigation.navigate('Enable2FA');
-          } else if (item.route === 'Devices') {
-            navigation.navigate('Devices');
-          } else if (item.route === 'HelpSupport') {
-            navigation.navigate('HelpSupport');
-          } else if (item.route === 'ReportProblem') {
-            navigation.navigate('ReportProblem');
-          } else if (item.route === 'LegalPolicy') {
-            navigation.navigate('LegalPolicy');
-          } else {
-            setActiveModal(item.route as any);
-          }
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Icon name={item.icon} size={24} color="#A855F7" />
-          <Text style={styles.settingLabel}>{item.label}</Text>
-        </View>
-        <Icon name="chevron-right" size={22} color="#9CA3AF" />
-      </TouchableOpacity>
-    ))}
-  </View>
-))}
+          <View key={section.title}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            {section.items.map(item => (
+              <TouchableOpacity
+                key={item.route}
+                style={styles.settingCard}
+                onPress={() => {
+                  if (item.route === 'Enable2FA') {
+                    navigation.navigate('Enable2FA');
+                  } else if (item.route === 'Devices') {
+                    navigation.navigate('Devices');
+                  } else if (item.route === 'HelpSupport') {
+                    navigation.navigate('HelpSupport');
+                  } else if (item.route === 'ReportProblem') {
+                    navigation.navigate('ReportProblem');
+                  } else if (item.route === 'LegalPolicy') {
+                    navigation.navigate('LegalPolicy');
+                  } else {
+                    setActiveModal(item.route as any);
+                  }
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Icon name={item.icon} size={24} color="#A855F7" />
+                  <Text style={styles.settingLabel}>{item.label}</Text>
+                </View>
+                <Icon name="chevron-right" size={22} color="#9CA3AF" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        ))}
         <TouchableOpacity style={styles.logoutBtn} onPress={() => setLogoutModalVisible(true)} activeOpacity={0.86}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
@@ -645,15 +663,90 @@ const newUrl = baseUrl.replace(/\/api\/?$/, "");
           onConfirm={confirmLogout}
           onCancel={() => setLogoutModalVisible(false)}
         />
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => setDeleteConfirmVisible(true)}>
+
+        {/* DELETE ACCOUNT SECTION */}
+        <TouchableOpacity style={styles.deleteBtn} onPress={() => {
+          setDeleteConfirmVisible(true);
+          setDeleteOtpStep(0);
+          setDeleteOtp("");
+        }}>
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
-        <GlassyConfirmModal
-          visible={deleteConfirmVisible}
-          message="Are you sure you want to delete your account? This cannot be undone."
-          onConfirm={handleDeleteAccount}
-          onCancel={() => setDeleteConfirmVisible(false)}
-        />
+        {deleteConfirmVisible && (
+          <Modal
+            isVisible={deleteConfirmVisible}
+            backdropOpacity={0.54}
+            useNativeDriver
+            onBackdropPress={() => {
+              setDeleteConfirmVisible(false);
+              setDeleteOtp("");
+              setDeleteOtpStep(0);
+            }}
+            style={{ justifyContent: "center", alignItems: "center" }}
+          >
+            <View style={modalStyles.glassyModal}>
+              <Text style={modalStyles.confirmText}>
+                {deleteOtpStep === 0
+                  ? "Are you sure you want to delete your account? This cannot be undone."
+                  : "Enter the OTP sent to your registered email to confirm account deletion."}
+              </Text>
+              {deleteOtpStep === 0 ? (
+                <View style={modalStyles.modalBtns}>
+                  <TouchableOpacity
+                    style={modalStyles.cancelBtn}
+                    onPress={() => {
+                      setDeleteConfirmVisible(false);
+                      setDeleteOtpStep(0);
+                      setDeleteOtp("");
+                    }}
+                  >
+                    <Text style={{ color: "#374151", fontWeight: "bold" }}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={modalStyles.confirmBtn}
+                    onPress={handleRequestDeleteOtp}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                      {deleteLoading ? "Sending OTP..." : "Send OTP"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <>
+                  <TextInput
+                    style={[sheetStyles.input, { width: 200 }]}
+                    placeholder="Enter OTP"
+                    placeholderTextColor="#6366f1"
+                    value={deleteOtp}
+                    onChangeText={setDeleteOtp}
+                    keyboardType="number-pad"
+                  />
+                  <View style={modalStyles.modalBtns}>
+                    <TouchableOpacity
+                      style={modalStyles.cancelBtn}
+                      onPress={() => {
+                        setDeleteConfirmVisible(false);
+                        setDeleteOtpStep(0);
+                        setDeleteOtp("");
+                      }}
+                    >
+                      <Text style={{ color: "#374151", fontWeight: "bold" }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={modalStyles.confirmBtn}
+                      onPress={handleDeleteAccountWithOtp}
+                      disabled={deleteLoading || !deleteOtp}
+                    >
+                      <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                        {deleteLoading ? "Deleting..." : "Confirm Deletion"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+            </View>
+          </Modal>
+        )}
       </ScrollView>
       <GlassyResultCard
         visible={resultCard.visible}
@@ -665,6 +758,7 @@ const newUrl = baseUrl.replace(/\/api\/?$/, "");
     </MainLayout>
   );
 };
+
 
 const sheetStyles = StyleSheet.create({
   modalSheet: { justifyContent: "flex-end", margin: 0 },
@@ -701,7 +795,7 @@ const sheetStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, paddingTop: 30, paddingHorizontal: 18 },
-  mainCard: { backgroundColor: "rgba(15,23,42,0.65)", borderRadius: 22, padding: 20, marginBottom: 20, alignItems: "center" },
+  mainCard: { backgroundColor: "transparent", borderRadius: 22, padding: 5, marginBottom: 3, alignItems: "center" },
   avatarWrap: { marginBottom: 14, alignItems: "center" },
   avatarCircles: { width: 95, height: 95, borderRadius: 48, backgroundColor: "#F3F4F6", justifyContent: "center", alignItems: "center" },
   editBtn: { position: "absolute", right: 3, bottom: 3, backgroundColor: "#6366f1", borderRadius: 14, padding: 7, zIndex: 999 },

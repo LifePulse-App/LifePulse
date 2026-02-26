@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pillow
+ftfy
+regex
+tqdm
+git+https://github.com/openai/CLIP.git

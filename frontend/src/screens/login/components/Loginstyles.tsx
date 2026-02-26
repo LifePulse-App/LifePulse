@@ -106,7 +106,7 @@ export const loginStyles = () => {
       alignItems: 'center',
     },
     appName: {
-      fontSize: 32,
+      fontSize: 30,
       fontWeight: '700',
       color: '#A8FFF8',
     },
@@ -139,14 +139,14 @@ export const loginStyles = () => {
     },
 
     mainTitle: {
-      fontSize: 22,
+      fontSize: 20,
       fontWeight: '700',
       color: '#000',
       textAlign: 'center',
       marginBottom: 8,
     },
     mainSubtitle: {
-      fontSize: 15,
+      fontSize: 13,
       color: '#000',
       textAlign: 'center',
       marginBottom: 10,
@@ -165,7 +165,7 @@ export const loginStyles = () => {
       width: '100%',
       height: 48,
       borderRadius: 12,
-      backgroundColor: 'rgba(255,255,255,0.85)',
+      backgroundColor: 'rgba(255,255,255,1)',
       paddingHorizontal: 12,
       marginBottom: 14,
     },
@@ -182,7 +182,7 @@ export const loginStyles = () => {
     },
     primaryButtonText: {
       color: '#FFFFFF',
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: '600',
     },
 
@@ -197,7 +197,7 @@ export const loginStyles = () => {
     },
     secondaryButtonText: {
       color: '#E5E7EB',
-      fontSize: 14,
+      fontSize: 12,
       fontWeight: '500',
     },
 
@@ -254,7 +254,7 @@ export const loginStyles = () => {
     },
 
     termsText: {
-      fontSize: 12,
+      fontSize: 10,
       color: '#000',
       textAlign: 'center',
       lineHeight: 17,

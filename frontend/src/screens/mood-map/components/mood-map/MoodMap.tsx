@@ -115,7 +115,7 @@ const worldMoodGeojson = useMemo(() => {
       properties: { mood: m.mood },
       geometry: {
         type: "Point",
-        coordinates: applyOffset([m.coords.lng, m.coords.lat]),
+        coordinates: [m.coords.lng, m.coords.lat],
       },
     })),
   };
@@ -252,7 +252,7 @@ if (isTrackingRef.current) {
       id: f.user?._id || f._id,
       name: f.user?.name,
       mood: f.mood || "",
-      coordinate: applyOffset([f.coords.lng, f.coords.lat]),
+      coordinate: [f.coords.lng, f.coords.lat],
     }));
   }, [friendLocations]);
 
@@ -321,7 +321,7 @@ if (isTrackingRef.current) {
 
 
 {myLocation && (
-  <MapLibreGL.PointAnnotation id="me" coordinate={applyOffset(myLocation)}>
+  <MapLibreGL.PointAnnotation id="me" coordinate={myLocation}>
     <View style={styles.userDot} />
   </MapLibreGL.PointAnnotation>
 )}
