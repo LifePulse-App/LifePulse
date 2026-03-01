@@ -7,7 +7,6 @@ import {
   TextInput,
   Keyboard,
   LayoutAnimation,
-  TouchableWithoutFeedback,
 } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,6 +26,7 @@ import {
   clearUnread,
   setActiveChatPeer,
   notifyConversationChanged,
+  isMessageDeliveredLocally,
 } from "../services/ChatNotifications";
 import {
   loadThreadMessages as loadThreadCacheV2,
@@ -76,6 +76,8 @@ export default function ChatScreen({ route, navigation }: any) {
   const [offline, setOffline] = useState(false);
 
   const flatRef = useRef<FlatList>(null);
+  const didInitialAutoScrollRef = useRef(false);
+
   const scrollToBottom = () =>
     requestAnimationFrame(() => flatRef.current?.scrollToEnd({ animated: true }));
 
@@ -173,7 +175,6 @@ export default function ChatScreen({ route, navigation }: any) {
   const loadThread = useCallback(async () => {
     if (!conversationId || !myUserId) return;
 
-    // 1) Cache first
     const cached = await loadThreadCacheV2(String(myUserId), String(conversationId));
     if (cached.length) {
       const normalizedCached = normalizeServer(
@@ -189,17 +190,14 @@ export default function ChatScreen({ route, navigation }: any) {
         }))
       );
       setMessages(normalizedCached);
-      setTimeout(scrollToBottom, 10);
     }
 
     if (offline) return;
 
     try {
-      // 2) Server fetch
       const { data } = await fetchThread(String(conversationId), { limit: 200 });
       const serverMsgs = data?.messages || [];
 
-      // 3) Save thread cache
       await saveThreadCacheV2(
         String(myUserId),
         String(conversationId),
@@ -216,7 +214,6 @@ export default function ChatScreen({ route, navigation }: any) {
         }))
       );
 
-      // 4) Update preview cache
       if (serverMsgs.length) {
         const last = serverMsgs[serverMsgs.length - 1];
         await upsertPreviewV2(String(myUserId), {
@@ -230,7 +227,6 @@ export default function ChatScreen({ route, navigation }: any) {
         });
       }
 
-      // 5) Merge server + still-pending local messages (prevents flicker/disappear)
       const normalizedServer = normalizeServer(serverMsgs);
 
       setMessages((prev) => {
@@ -277,7 +273,6 @@ export default function ChatScreen({ route, navigation }: any) {
       }
 
       notifyConversationChanged();
-      setTimeout(scrollToBottom, 50);
     } catch (e) {
       console.log("loadThread error — using cache", e);
     }
@@ -285,11 +280,14 @@ export default function ChatScreen({ route, navigation }: any) {
 
   useEffect(() => {
     const unsub = navigation.addListener("focus", async () => {
+      didInitialAutoScrollRef.current = false;
       await loadThread();
+      setTimeout(scrollToBottom, 60);
     });
 
     (async () => {
       await loadThread();
+      setTimeout(scrollToBottom, 60);
     })();
 
     return unsub;
@@ -310,7 +308,6 @@ export default function ChatScreen({ route, navigation }: any) {
     const localId = `loc:${clientMessageId}`;
     setInput("");
 
-    // optimistic UI
     setMessages((prev) => {
       const next = [
         ...prev,
@@ -334,7 +331,6 @@ export default function ChatScreen({ route, navigation }: any) {
 
     scrollToBottom();
 
-    // optimistic cache
     await upsertThreadMessageV2(String(myUserId), String(conversationId), {
       _id: localId,
       conversationId: String(conversationId),
@@ -373,7 +369,6 @@ export default function ChatScreen({ route, navigation }: any) {
       const srv = data?.message;
 
       if (srv?._id) {
-        // reconcile UI
         setMessages((prev) =>
           prev.map((m) =>
             m.clientMessageId === clientMessageId
@@ -389,7 +384,6 @@ export default function ChatScreen({ route, navigation }: any) {
           )
         );
 
-        // reconcile cache
         await upsertThreadMessageV2(String(myUserId), String(conversationId), {
           _id: String(srv._id),
           conversationId: String(conversationId),
@@ -414,8 +408,6 @@ export default function ChatScreen({ route, navigation }: any) {
       }
 
       notifyConversationChanged();
-
-      // delayed refresh to reduce flicker with eventual consistency
       setTimeout(() => {
         loadThread();
       }, 600);
@@ -439,68 +431,88 @@ export default function ChatScreen({ route, navigation }: any) {
         <View style={styles.glowTop} />
         <View style={styles.glowBottom} />
 
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-          <View style={styles.innerContainer}>
-            <View style={styles.container}>
-              <View style={styles.topBar}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-                  <Icon name="arrow-left" size={22} color="#fff" />
-                </TouchableOpacity>
-                <Text style={styles.title}>
-                  {peerName || "Friend"} {peerMood ? `[ is feeling ${peerMood} ] ` : ""}
-                </Text>
-              </View>
+        <View style={styles.innerContainer}>
+          <View style={styles.container}>
+            <View style={styles.topBar}>
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                <Icon name="arrow-left" size={22} color="#fff" />
+              </TouchableOpacity>
+              <Text style={styles.title}>
+                {peerName || "Friend"} {peerMood ? `[ is feeling ${peerMood} ] ` : ""}
+              </Text>
+            </View>
 
-              <FlatList
-                ref={flatRef}
-                data={items}
-                keyExtractor={(it) => it.id}
-                contentContainerStyle={[styles.listContent, { paddingBottom: 20 }]}
-                renderItem={({ item }) => {
-                  if (item.type === "date") {
-                    return (
-                      <View style={styles.dateRow}>
-                        <Text style={styles.dateText}>{formatDateHeader(item.dateKey)}</Text>
-                      </View>
-                    );
-                  }
-
-                  const m = item.msg;
-                  const isMe = String(m.fromUserId) === String(myUserId);
-
+            <FlatList
+              ref={flatRef}
+              data={items}
+              keyExtractor={(it) => it.id}
+              contentContainerStyle={[styles.listContent, { paddingBottom: 20 }]}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+              removeClippedSubviews={false}
+              initialNumToRender={20}
+              windowSize={10}
+              renderItem={({ item }) => {
+                if (item.type === "date") {
                   return (
-                    <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
-                      <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
-                        <Text style={styles.text}>{m.plaintext}</Text>
-                        <View style={styles.metaRow}>
-                          {isMe ? renderTick(m) : null}
-                          <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
-                        </View>
-                      </View>
+                    <View style={styles.dateRow}>
+                      <Text style={styles.dateText}>{formatDateHeader(item.dateKey)}</Text>
                     </View>
                   );
-                }}
-                onContentSizeChange={scrollToBottom}
-              />
-            </View>
+                }
 
-            <View style={[styles.inputBar, { paddingBottom: insets.bottom, marginBottom: 5 }]}>
-              <View style={styles.inputRow}>
-                <TextInput
-                  style={styles.input}
-                  placeholder={offline ? "Offline: message will stay local" : "Type a message"}
-                  placeholderTextColor="#94a3b8"
-                  value={input}
-                  onChangeText={setInput}
-                  multiline
-                />
-                <TouchableOpacity style={styles.sendBtn} onPress={send}>
-                  <Icon name="send" size={20} color="#fff" />
-                </TouchableOpacity>
-              </View>
+                const m = item.msg;
+                const isMe = String(m.fromUserId) === String(myUserId);
+
+                const effectiveTickState =
+                  isMe &&
+                  !m.seenAt &&
+                  !m.deliveredAt &&
+                  (
+                    isMessageDeliveredLocally(String(m._id)) ||
+                    (m.clientMessageId && isMessageDeliveredLocally(String(m.clientMessageId)))
+                  )
+                    ? "delivered"
+                    : m.tickState;
+
+                return (
+                  <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
+                    <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
+                      <Text style={styles.text}>{m.plaintext}</Text>
+                      <View style={styles.metaRow}>
+                        {isMe ? renderTick({ ...m, tickState: effectiveTickState }) : null}
+                        <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              }}
+              onContentSizeChange={() => {
+                if (!didInitialAutoScrollRef.current) {
+                  didInitialAutoScrollRef.current = true;
+                  scrollToBottom();
+                }
+              }}
+            />
+          </View>
+
+          <View style={[styles.inputBar, { paddingBottom: insets.bottom, marginBottom: 5 }]}>
+            <View style={styles.inputRow}>
+              <TextInput
+                style={styles.input}
+                placeholder={offline ? "Offline: message will stay local" : "Type a message"}
+                placeholderTextColor="#94a3b8"
+                value={input}
+                onChangeText={setInput}
+                multiline
+              />
+              <TouchableOpacity style={styles.sendBtn} onPress={send}>
+                <Icon name="send" size={20} color="#fff" />
+              </TouchableOpacity>
             </View>
           </View>
-        </TouchableWithoutFeedback>
+        </View>
       </View>
     </SafeAreaView>
   );

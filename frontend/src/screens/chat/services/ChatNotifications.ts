@@ -5,19 +5,17 @@ const UNREAD_KEY = 'chat_unread_counts';
 let unreadCounts: Record<string, number> = {};
 let activePeerUserId: string | null = null;
 let lastSeenAt: Record<string, string> = {};
+let lastDeliveredAt: Record<string, string> = {};
 
 // conversation listeners
 let conversationListeners: Array<() => void> = [];
-// ChatNotifications.ts
 export function subscribeConversationChanges(cb: () => void) {
-  console.log("[chat] subscribeConversationChanges attached");
   conversationListeners.push(cb);
   return () => {
     conversationListeners = conversationListeners.filter((x) => x !== cb);
   };
 }
 export function notifyConversationChanged() {
-  console.log("[chat] notifyConversationChanged fired");
   conversationListeners.forEach((cb) => cb());
 }
 
@@ -59,14 +57,14 @@ export function notifyIncoming(peerUserId: string) {
   unreadCounts[peerUserId] = (unreadCounts[peerUserId] || 0) + 1;
   saveUnreadCounts();
   emitUnreadChange();
-  notifyConversationChanged(); // ✅ refresh chat list
+  notifyConversationChanged();
 }
 
 export function clearUnread(peerUserId: string) {
   unreadCounts[peerUserId] = 0;
   saveUnreadCounts();
   emitUnreadChange();
-  notifyConversationChanged(); // ✅ refresh chat list
+  notifyConversationChanged();
 }
 
 export function getUnread(peerUserId: string) {
@@ -77,18 +75,38 @@ export async function clearAllUnread() {
   unreadCounts = {};
   await AsyncStorage.removeItem(UNREAD_KEY);
   emitUnreadChange();
-  notifyConversationChanged(); // ✅ refresh chat list
+  notifyConversationChanged();
+}
+
+export function getUnreadChatCount(): number {
+  return Object.values(unreadCounts).filter((c) => c > 0).length;
 }
 
 // ---- "Seen" logic ----
 export function markMessagesSeenLocally(peerUserId: string) {
   lastSeenAt[peerUserId] = new Date().toISOString();
+  notifyConversationChanged();
 }
 export function getLocalSeenAt(peerUserId: string): string | undefined {
   return lastSeenAt[peerUserId];
 }
 
-// Add this function near getUnread
-export function getUnreadChatCount(): number {
-  return Object.values(unreadCounts).filter((c) => c > 0).length;
+// ---- "Delivered" logic ----
+// Called from App.tsx when push type='delivered' arrives
+export function getLocalDeliveredAt(peerUserId: string): string | undefined {
+  return lastDeliveredAt[peerUserId];
+}
+
+let deliveredMessageIds = new Set<string>();
+
+export function markMessagesDeliveredLocally(_peerUserId: string, messageIds: string[] = []) {
+  for (const id of messageIds) {
+    if (id) deliveredMessageIds.add(String(id));
+  }
+  notifyConversationChanged();
+}
+
+export function isMessageDeliveredLocally(messageId?: string) {
+  if (!messageId) return false;
+  return deliveredMessageIds.has(String(messageId));
 }

@@ -28,3 +28,7 @@ export const markSeen = (payload: {
   peerUserId: string;
   lastSeenMessageId: string;
 }) => api.patch("/chat/messages/seen", payload);
+
+export const markAllPendingDelivered = async () => {
+  return api.post("/chat/messages/mark-delivered-all");
+};

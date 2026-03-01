@@ -7,6 +7,7 @@ import {
   markDelivered,
   markSeen,
   listConversationPreviews,
+  markDeliveredAll,
 } from "../controllers/ChatController.js";
 
 const router = express.Router();
@@ -18,5 +19,6 @@ router.post("/messages", isAuthenticatedUser, sendMessage);
 router.get("/messages/thread/:conversationId", isAuthenticatedUser, getThread);
 router.patch("/messages/delivered", isAuthenticatedUser, markDelivered);
 router.patch("/messages/seen", isAuthenticatedUser, markSeen);
+router.post("/messages/mark-delivered-all", isAuthenticatedUser, markDeliveredAll);
 
 export default router;

@@ -267,3 +267,39 @@ export const listConversationPreviews = async (req, res) => {
     res.status(500).json({ message: "Internal error" });
   }
 };
+
+export const markDeliveredAll = async (req, res) => {
+  try {
+    const me = req.user._id;
+
+    const pending = await ChatMessage.find({
+      receiverId: me,
+      deliveredAt: null,
+    }).select("_id senderId").lean();
+
+    if (!pending.length) return res.json({ success: true, count: 0 });
+
+    const ids = pending.map((m) => m._id);
+
+    await ChatMessage.updateMany(
+      { _id: { $in: ids }, receiverId: me, deliveredAt: null },
+      { $set: { deliveredAt: new Date() } }
+    );
+
+    const bySender = new Map();
+    for (const m of pending) {
+      const s = String(m.senderId);
+      if (!bySender.has(s)) bySender.set(s, []);
+      bySender.get(s).push(String(m._id));
+    }
+
+    for (const [senderId, messageIds] of bySender.entries()) {
+      await sendDeliveredNotification(senderId, me, messageIds);
+    }
+
+    return res.json({ success: true, count: ids.length });
+  } catch (e) {
+    console.error("[chat] markDeliveredAll error", e);
+    return res.status(500).json({ message: "Internal error" });
+  }
+};

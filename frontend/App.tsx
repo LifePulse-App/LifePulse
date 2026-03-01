@@ -1,7 +1,14 @@
 import 'react-native-gesture-handler';
 import React, { useState, useRef, useEffect } from 'react';
 import { NavigationContainer, CommonActions } from '@react-navigation/native';
-import { useColorScheme, View, ActivityIndicator, Platform, PermissionsAndroid } from 'react-native';
+import {
+  useColorScheme,
+  View,
+  ActivityIndicator,
+  Platform,
+  PermissionsAndroid,
+  AppState,
+} from 'react-native';
 import { DefaultTheme, MD3DarkTheme, PaperProvider } from 'react-native-paper';
 import Toast, { BaseToast, BaseToastProps } from 'react-native-toast-message';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -9,16 +16,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReactNativeBiometrics from 'react-native-biometrics';
 
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
-
-import {
-  getMessaging,
-  getToken,
-  onMessage,
-  onTokenRefresh,
-} from '@react-native-firebase/messaging';
+import { getMessaging, getToken, onMessage, onTokenRefresh } from '@react-native-firebase/messaging';
 import { getApp } from '@react-native-firebase/app';
-
-// ---- BACKGROUND HANDLER (must be at module/root level!) ----
 import messaging from '@react-native-firebase/messaging';
 
 import AuthContext from './src/auth/user/UserContext';
@@ -34,9 +33,10 @@ import {
   notifyIncoming,
   getActiveChatPeer,
   markMessagesSeenLocally,
+  markMessagesDeliveredLocally,
 } from './src/screens/chat/services/ChatNotifications';
 
-import { markDelivered } from './src/screens/chat/services/api_chat';
+import { markDelivered, markAllPendingDelivered } from './src/screens/chat/services/api_chat';
 
 import 'react-native-get-random-values';
 import { TextEncoder, TextDecoder } from 'text-encoding';
@@ -58,9 +58,16 @@ notifee.createChannel({
   vibration: true,
 });
 
-/**
- * ✅ Group notifications by SENDER (peerUserId)
- */
+function parseMessageIds(raw: any): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return Array.isArray(parsed) ? parsed.map((x) => String(x)) : [];
+  } catch {
+    return [];
+  }
+}
+
 async function displayChatNotificationGroupedBySender(data: any) {
   const peerId = String(data.peerUserId || 'unknown');
   const peerName = data.username || data.peerName || 'Someone';
@@ -105,10 +112,11 @@ async function displayChatNotificationGroupedBySender(data: any) {
   });
 }
 
-// ✅ Background handler: mark delivered + show notification
+// Background handler
 messaging().setBackgroundMessageHandler(async remoteMessage => {
   const data = remoteMessage?.data || {};
-          console.log(data);
+  console.log('[push] background', data);
+
   if (data.type === 'chat') {
     const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
     if (incomingMessageId) {
@@ -124,6 +132,18 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
 
   if (data.type === 'seen') {
     markMessagesSeenLocally(data.peerUserId);
+  }
+
+  if (data.type === 'delivered') {
+    const ids = parseMessageIds(data.messageIds);
+    markMessagesDeliveredLocally(data.peerUserId, ids);
+  }
+
+  // ✅ when app gets background push and user is online again, sweep pending
+  try {
+    await markAllPendingDelivered();
+  } catch (e) {
+    console.log('markAllPendingDelivered (background) failed', e);
   }
 });
 
@@ -150,6 +170,20 @@ const App = () => {
   useEffect(() => {
     loadChatNotificationState();
     requestNotificationPermission();
+  }, []);
+
+  // ✅ app foreground sweep: mark all pending incoming messages as delivered
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (state) => {
+      if (state === 'active') {
+        try {
+          await markAllPendingDelivered();
+        } catch (e) {
+          console.log('markAllPendingDelivered (active) failed', e);
+        }
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   // ---------- Notifee notification press handler ----------
@@ -208,9 +242,6 @@ const App = () => {
         console.log('[push] foreground', data);
 
         if (data.type === 'chat' && data.peerUserId) {
-          console.log(data);
-          
-          // ✅ receiver marks delivered immediately
           const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
           if (incomingMessageId) {
             try {
@@ -229,6 +260,18 @@ const App = () => {
 
         if (data.type === 'seen' && data.peerUserId) {
           markMessagesSeenLocally(data.peerUserId);
+        }
+
+        if (data.type === 'delivered' && data.peerUserId) {
+          const ids = parseMessageIds(data.messageIds);
+          markMessagesDeliveredLocally(data.peerUserId, ids);
+        }
+
+        // ✅ also sweep pending when any foreground push arrives
+        try {
+          await markAllPendingDelivered();
+        } catch (e) {
+          console.log('markAllPendingDelivered (foreground push) failed', e);
         }
       });
     };
@@ -270,6 +313,18 @@ const App = () => {
     return () => {
       if (unsubscribeTokenRefresh) unsubscribeTokenRefresh();
     };
+  }, [User]);
+
+  // ✅ once user session is ready, sweep old pending delivered
+  useEffect(() => {
+    if (!User) return;
+    (async () => {
+      try {
+        await markAllPendingDelivered();
+      } catch (e) {
+        console.log('markAllPendingDelivered (user ready) failed', e);
+      }
+    })();
   }, [User]);
 
   // ---------- Biometric gate ----------
@@ -335,7 +390,6 @@ const App = () => {
         text1Style={{ fontSize: 13, fontWeight: '600', color: 'green' }}
       />
     ),
-
     error: (props: React.JSX.IntrinsicAttributes & BaseToastProps) => (
       <BaseToast
         {...props}
