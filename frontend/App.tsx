@@ -107,6 +107,8 @@ async function displayChatNotificationGroupedBySender(data: any) {
 
 messaging().setBackgroundMessageHandler(async remoteMessage => {
   const data = remoteMessage?.data || {};
+  console.log("[push] foreground", remoteMessage?.data);
+console.log("[push] background", remoteMessage?.data);
 
   if (data.type === 'chat') {
     await displayChatNotificationGroupedBySender(data);
@@ -200,6 +202,8 @@ const App = () => {
       // Foreground message handler
       return onMessage(messagingInstance, async remoteMessage => {
         const data = remoteMessage?.data || {};
+        console.log("[push] foreground", remoteMessage?.data);
+console.log("[push] background", remoteMessage?.data);
         if (data.type === 'chat' && data.peerUserId) {
           const activePeer = getActiveChatPeer();
           if (!activePeer || activePeer !== data.peerUserId) {

@@ -75,7 +75,7 @@ def enableProguardInReleaseBuilds = false
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
 project.ext.react = [
-    enableHermes: false,  // <--- DISABLE Hermes; force JSC
+    enableHermes: true,  // <--- DISABLE Hermes; force JSC
 ]
 
 android {

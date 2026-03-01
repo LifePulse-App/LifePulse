@@ -65,6 +65,7 @@ import E2EERoutes from "./routes/e2eeRoutes.js"
 import FriendRoutes from "./routes/FriendsRoutes.js"
 import PushRoutes from "./routes/NotificationRoutes.js"
 import LocationRoutes from "./routes/LocationRoutes.js"
+import ChatRoutes from "./routes/ChatRoutes.js"
 
 // Middlewares
 app.use(cookieParser());
@@ -83,6 +84,7 @@ app.use("/api/e2ee", E2EERoutes);
 app.use("/api/friends", FriendRoutes);
 app.use("/api/push", PushRoutes);
 app.use("/api/location", LocationRoutes);
+app.use("/api/chat", ChatRoutes);
 app.use(errorMiddleware)
 
 

@@ -5,33 +5,51 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
   Keyboard,
   LayoutAnimation,
   TouchableWithoutFeedback,
 } from "react-native";
+import NetInfo from "@react-native-community/netinfo";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import { v4 as uuidv4 } from "uuid";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import AuthContext from "../../../auth/user/UserContext";
-import { sendCipher, pullMessages, fetchDevices } from "../services/api_e2ee";
-import { SessionManager } from "../services/SessionManager";
-import { ensureDeviceKeys } from "../services/bootstrap";
-import { getStableDeviceId } from "../../../shared/services/stableDeviceId";
-import { SignalStore } from "../services/signalStore";
-import { LocalMessageStore } from "../services/LocalMessageStore";
-import { clearUnread, setActiveChatPeer } from '../services/ChatNotifications';
-import { markMessagesAsRead } from '../services/api_e2ee';
-import { getLocalSeenAt } from '../services/ChatNotifications';
-import { notifyConversationChanged } from '../services/ChatNotifications';
-
-const asNum = (v: any) => (typeof v === "string" ? parseInt(v, 10) : v);
+import {
+  openDirectConversation,
+  sendMessage,
+  fetchThread,
+  markDelivered,
+  markSeen,
+} from "../services/api_chat";
+import {
+  clearUnread,
+  setActiveChatPeer,
+  notifyConversationChanged,
+} from "../services/ChatNotifications";
 
 type Item =
   | { type: "date"; id: string; dateKey: string }
   | { type: "msg"; id: string; msg: any };
+
+const CHAT_CACHE_PREFIX = "chat_messages_cache";
+
+const saveChatCache = async (conversationId: string, msgs: any[]) => {
+  try {
+    await AsyncStorage.setItem(`${CHAT_CACHE_PREFIX}:${conversationId}`, JSON.stringify(msgs));
+  } catch {}
+};
+
+const loadChatCache = async (conversationId: string): Promise<any[]> => {
+  try {
+    const raw = await AsyncStorage.getItem(`${CHAT_CACHE_PREFIX}:${conversationId}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
 
 const dateKey = (iso: string) => new Date(iso).toISOString().slice(0, 10);
 
@@ -61,20 +79,57 @@ export default function ChatScreen({ route, navigation }: any) {
 
   const myUserId = user?.User?.user?.id;
 
-  const [deviceId, setDeviceId] = useState<string | null>(null);
-  const [sessionManager, setSessionManager] = useState<SessionManager | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(
+    route?.params?.conversationId || null
+  );
   const [messages, setMessages] = useState<any[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [input, setInput] = useState("");
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [offline, setOffline] = useState(false);
 
   const flatRef = useRef<FlatList>(null);
   const scrollToBottom = () =>
     requestAnimationFrame(() => flatRef.current?.scrollToEnd({ animated: true }));
 
+  const normalizeServer = useCallback(
+    (serverMsgs: any[]) => {
+      return serverMsgs
+        .map((m: any) => {
+          const isMe = String(m.senderId) === String(myUserId);
+          let tickState = "pending";
+
+          if (isMe) {
+            if (m.seenAt) tickState = "seen";
+            else if (m.deliveredAt) tickState = "delivered";
+            else tickState = "sent";
+          } else {
+            tickState = "delivered";
+          }
+
+          return {
+            _id: String(m._id),
+            fromUserId: String(m.senderId),
+            toUserId: String(m.receiverId),
+            plaintext: String(m.text || ""),
+            createdAt: m.createdAt,
+            clientMessageId: m.clientMessageId,
+            seenAt: m.seenAt || null,
+            deliveredAt: m.deliveredAt || null,
+            tickState,
+          };
+        })
+        .sort(
+          (a: any, b: any) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+    },
+    [myUserId]
+  );
+
   const buildItemsWithDateSeparators = useCallback((msgs: any[]): Item[] => {
     const out: Item[] = [];
     let lastDate = "";
+
     for (const m of msgs) {
       const dk = dateKey(m.createdAt);
       if (dk !== lastDate) {
@@ -83,49 +138,41 @@ export default function ChatScreen({ route, navigation }: any) {
       }
       out.push({ type: "msg", id: `msg-${m._id}`, msg: m });
     }
+
     return out;
   }, []);
 
-  // Handle keyboard events properly
+  // Load cache immediately when conversationId is known
   useEffect(() => {
-    const keyboardWillShow = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setKeyboardHeight(e.endCoordinates.height);
-        // Auto scroll to bottom when keyboard opens
-        setTimeout(scrollToBottom, 100);
+    if (!conversationId) return;
+    loadChatCache(conversationId).then((cached) => {
+      if (cached.length > 0) {
+        setMessages(cached);
+        setTimeout(scrollToBottom, 50);
       }
-    );
+    });
+  }, [conversationId]);
 
-    const keyboardWillHide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        setKeyboardHeight(0);
-      }
-    );
-
-    return () => {
-      keyboardWillShow.remove();
-      keyboardWillHide.remove();
-    };
+  useEffect(() => {
+    const unsub = NetInfo.addEventListener((state) => {
+      setOffline(!state.isConnected || state.isInternetReachable === false);
+    });
+    return () => unsub();
   }, []);
 
   useEffect(() => {
-    const onFocus = async () => {
-      setActiveChatPeer(String(peerUserId));
-      clearUnread(String(peerUserId));
-      await markMessagesAsRead(peerUserId);
-    };
-    const onBlur = () => setActiveChatPeer(null);
-  
-    onFocus();
-  
-    return () => {
-      onBlur();
-    };
-  }, [navigation, peerUserId]);
+    const show = Keyboard.addListener("keyboardDidShow", () => {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setTimeout(scrollToBottom, 80);
+    });
+    return () => show.remove();
+  }, []);
+
+  useEffect(() => {
+    setActiveChatPeer(String(peerUserId));
+    clearUnread(String(peerUserId));
+    return () => setActiveChatPeer(null);
+  }, [peerUserId]);
 
   useEffect(() => {
     setItems(buildItemsWithDateSeparators(messages));
@@ -133,312 +180,180 @@ export default function ChatScreen({ route, navigation }: any) {
 
   useEffect(() => {
     (async () => {
-      if (!myUserId) return;
-      const id = await getStableDeviceId(myUserId);
-      setDeviceId(id);
-      setSessionManager(new SessionManager(myUserId, id));
+      if (conversationId) return;
+      const { data } = await openDirectConversation(String(peerUserId));
+      const cid = data?.conversation?._id;
+      if (cid) setConversationId(String(cid));
     })();
-  }, [myUserId]);
+  }, [peerUserId, conversationId]);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!myUserId || !deviceId) return;
-        await ensureDeviceKeys(myUserId, deviceId);
-      } catch (e) {
-        console.log("ensureDeviceKeys error", e);
+  const loadThread = useCallback(async () => {
+    if (!conversationId || !myUserId || offline) return;
+
+    try {
+      const { data } = await fetchThread(String(conversationId), { limit: 200 });
+      const serverMsgs = data?.messages || [];
+
+      const normalized = normalizeServer(serverMsgs);
+      setMessages(normalized);
+      saveChatCache(conversationId, normalized); // persist for offline/fast reload
+
+      const incomingUndelivered = serverMsgs
+        .filter(
+          (m: any) =>
+            String(m.receiverId) === String(myUserId) && !m.deliveredAt
+        )
+        .map((m: any) => String(m._id));
+
+      if (incomingUndelivered.length) {
+        await markDelivered(incomingUndelivered);
       }
-    })();
-  }, [myUserId, deviceId]);
 
-  const loadFromStorage = useCallback(async () => {
-    if (!myUserId || !deviceId || !peerUserId) return;
-    const store = new LocalMessageStore(String(myUserId), String(deviceId), String(peerUserId));
-    const local = await store.listPlaintext();
+      const incoming = serverMsgs.filter(
+        (m: any) => String(m.receiverId) === String(myUserId)
+      );
 
-    setMessages(
-      local.map((m) => ({
-        _id: m.id,
-        fromUserId: String(m.fromUserId),
-        fromDeviceId: String(m.fromDeviceId),
-        toUserId: String(peerUserId),
-        toDeviceId: String(m.toDeviceId),
-        plaintext: m.plaintext,
-        createdAt: m.createdAt,
-      }))
-    );
-  }, [myUserId, deviceId, peerUserId]);
-
-  const pullDecryptStore = useCallback(async () => {
-    if (!deviceId || !myUserId || !peerUserId || !sessionManager) return;
-
-    const store = new LocalMessageStore(String(myUserId), String(deviceId), String(peerUserId));
-    const { data } = await pullMessages(deviceId);
-    const pulled = data?.messages || [];
-    if (!pulled.length) return;
-
-    for (const m of pulled) {
-      const peer =
-        String(m.fromUserId) === String(myUserId) ? String(m.toUserId) : String(m.fromUserId);
-      if (peer !== String(peerUserId)) continue;
-
-      try {
-        const pt = await sessionManager.decrypt(m.fromUserId, m.fromSignalDeviceId, {
-          type: m.header?.t,
-          body: m.ciphertext,
+      if (incoming.length) {
+        const lastIncoming = incoming[incoming.length - 1];
+        await markSeen({
+          conversationId: String(conversationId),
+          peerUserId: String(peerUserId),
+          lastSeenMessageId: String(lastIncoming._id),
         });
-
-        await store.upsertPlaintext({
-          id: `srv:${m._id}`,
-          createdAt: m.createdAt,
-          fromUserId: String(m.fromUserId),
-          fromDeviceId: String(m.fromDeviceId),
-          toDeviceId: String(m.toDeviceId),
-          plaintext: pt,
-          status: "received",
-        });
-
-        notifyConversationChanged();
-
-        setMessages((prev) => {
-          const exists = prev.some((x) => String(x._id) === `srv:${m._id}`);
-          if (exists) return prev;
-
-          const next = [
-            ...prev,
-            {
-              _id: `srv:${m._id}`,
-              fromUserId: String(m.fromUserId),
-              fromDeviceId: String(m.fromDeviceId),
-              toUserId: String(peerUserId),
-              toDeviceId: String(m.toDeviceId),
-              plaintext: pt,
-              createdAt: m.createdAt,
-            },
-          ];
-          next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-          return next;
-        });
-      } catch (e) {
-        console.log("decrypt failed (pull)", m._id, e);
       }
+
+      notifyConversationChanged();
+      setTimeout(scrollToBottom, 50);
+    } catch (e) {
+      console.log("loadThread error — using cache", e);
+      // cache already rendered, nothing else to do
     }
-
-    scrollToBottom();
-  }, [deviceId, myUserId, peerUserId, sessionManager]);
+  }, [conversationId, myUserId, peerUserId, offline, normalizeServer]);
 
   useEffect(() => {
-    const unsub = navigation.addListener("focus", async () => {
-      await loadFromStorage();
-      await pullDecryptStore();
-      setTimeout(scrollToBottom, 50);
-    });
-
-    (async () => {
-      await loadFromStorage();
-      await pullDecryptStore();
-      setTimeout(scrollToBottom, 50);
-    })();
-
+    const unsub = navigation.addListener("focus", loadThread);
+    loadThread();
     return unsub;
-  }, [navigation, loadFromStorage, pullDecryptStore]);
+  }, [navigation, loadThread]);
 
   useEffect(() => {
-    const t = setInterval(pullDecryptStore, 2000);
+    if (offline) return;
+    const t = setInterval(loadThread, 2500);
     return () => clearInterval(t);
-  }, [pullDecryptStore]);
+  }, [loadThread, offline]);
 
   const send = useCallback(async () => {
-    console.log("SEND function called", { text: input });
     const text = input.trim();
-    if (!text || !sessionManager || !myUserId || !deviceId) return;
-  
-    const now = new Date().toISOString();
-    setInput("");
-  
-    const localStore = new LocalMessageStore(String(myUserId), String(deviceId), String(peerUserId));
-    const localId = `loc:${now}:${Math.random().toString(16).slice(2)}`;
-  
-    await localStore.upsertPlaintext({
-      id: localId,
-      createdAt: now,
-      fromUserId: String(myUserId),
-      fromDeviceId: String(deviceId),
-      toDeviceId: String(deviceId),
-      plaintext: text,
-      status: "sent",
-    });
+    if (!text || !conversationId || !myUserId || offline) return;
 
-    notifyConversationChanged();
-  
+    const now = new Date().toISOString();
+    const clientMessageId = uuidv4();
+
+    // Optimistic message so send feels instant
+    const optimistic = {
+      _id: clientMessageId,
+      fromUserId: String(myUserId),
+      toUserId: String(peerUserId),
+      plaintext: text,
+      createdAt: now,
+      clientMessageId,
+      seenAt: null,
+      deliveredAt: null,
+      tickState: "pending",
+    };
+
     setMessages((prev) => {
-      const next = [
-        ...prev,
-        {
-          _id: localId,
-          fromUserId: String(myUserId),
-          fromDeviceId: String(deviceId),
-          toUserId: String(peerUserId),
-          toDeviceId: String(deviceId),
-          plaintext: text,
-          createdAt: now,
-        },
-      ];
-      next.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      return next;
+      const updated = [...prev, optimistic];
+      saveChatCache(conversationId, updated);
+      return updated;
     });
-    scrollToBottom();
-  
+    setInput("");
+    setTimeout(scrollToBottom, 50);
+
     try {
-      const store = new SignalStore(myUserId, deviceId);
-      const mySignalDeviceId = await store.getSignalDeviceId();
-      if (!mySignalDeviceId) throw new Error("Missing my signalDeviceId");
-  
-      const { data: peerData } = await fetchDevices(peerUserId);
-      const peerDevices = peerData?.devices || [];
-  
-      const { data: myData } = await fetchDevices(myUserId);
-      const myDevices = myData?.devices || [];
-  
-      const buildBundle = (d: any) => {
-        const otp = d.oneTimePrekeys?.[0];
-        const preKeyPub = otp?.publicKey;
-  
-        if (
-          typeof d.signalDeviceId !== "number" ||
-          typeof d.registrationId !== "number" ||
-          !d.identityPub ||
-          !d.signedPrekeyPub ||
-          !d.signedPrekeySig ||
-          !otp?.keyId ||
-          !preKeyPub
-        ) {
-          return null;
-        }
-        return {
-          bundle: {
-            deviceId: d.signalDeviceId,
-            registrationId: d.registrationId,
-            identityKey: d.identityPub,
-            signedPreKey: {
-              keyId: asNum(d.signedPrekeyId ?? 1),
-              publicKey: d.signedPrekeyPub,
-              signature: d.signedPrekeySig,
-            },
-            preKey: {
-              keyId: asNum(otp.keyId),
-              publicKey: preKeyPub,
-            },
-          },
-          otpKeyId: otp.keyId as number,
-          routingDeviceId: d.deviceId as string,
-        };
-      };
-  
-      for (const [idx, d] of peerDevices.entries()) {
-        const built = buildBundle(d);
-        if (!built) continue;
-  
-        await sessionManager.ensureSession(peerUserId, built.bundle);
-        const cipherPayload = await sessionManager.encrypt(peerUserId, built.bundle, text);
-  
-        await sendCipher({
-          toUserId: peerUserId,
-          toDeviceId: built.routingDeviceId,
-          fromDeviceId: deviceId,
-          fromSignalDeviceId: mySignalDeviceId,
-          sessionId: `sess-${peerUserId}-${built.routingDeviceId}`,
-          header: { t: cipherPayload.type, preKeyId: built.otpKeyId },
-          ciphertext: cipherPayload.body,
-          notifyUser: idx === 0,
-        });
-      }
-  
-      for (const d of myDevices) {
-        const built = buildBundle(d);
-        if (!built) continue;
-  
-        await sessionManager.ensureSession(myUserId, built.bundle);
-        const cipherPayload = await sessionManager.encrypt(myUserId, built.bundle, text);
-  
-        await sendCipher({
-          toUserId: peerUserId,
-          toDeviceId: built.routingDeviceId,
-          fromDeviceId: deviceId,
-          fromSignalDeviceId: mySignalDeviceId,
-          sessionId: `sess-${peerUserId}-${built.routingDeviceId}`,
-          header: { t: cipherPayload.type, preKeyId: built.otpKeyId },
-          ciphertext: cipherPayload.body,
-        });
-      }
+      await sendMessage({
+        conversationId: String(conversationId),
+        receiverId: String(peerUserId),
+        text: String(text),
+        clientMessageId: String(clientMessageId),
+        notifyUser: true,
+      });
+
+      await loadThread(); // replace optimistic with real message from server
     } catch (e) {
       console.log("send error", e);
     }
-  }, [input, sessionManager, myUserId, deviceId, peerUserId]);
+  }, [input, conversationId, myUserId, peerUserId, offline, loadThread]);
+
+  const renderTick = (m: any) => {
+    const s = m.tickState || "pending";
+    if (s === "seen")
+      return <Icon name="check-all" size={13} color="#2dd4bf" style={styles.tickIcon} />;
+    if (s === "delivered")
+      return <Icon name="check-all" size={13} color="#a3a3a3" style={styles.tickIcon} />;
+    if (s === "sent")
+      return <Icon name="check" size={13} color="#a3a3a3" style={styles.tickIcon} />;
+    return <Icon name="clock-outline" size={13} color="#a3a3a3" style={styles.tickIcon} />;
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={["left", "right"]}>
       <View style={styles.root}>
-        <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
-
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={styles.innerContainer}>
             <View style={styles.container}>
               <View style={styles.topBar}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
                   <Icon name="arrow-left" size={22} color="#fff" />
                 </TouchableOpacity>
+
                 <Text style={styles.title}>
-                  {peerName || "Friend"} {peerMood ? `[ is feeling ${peerMood} ] ` : ""}
+                  {peerName || "Friend"} {peerMood ? `[ is feeling ${peerMood} ]` : ""}
                 </Text>
-                <View style={{ width: 42 }} />
+
+                <Text style={{ color: offline ? "#f97316" : "#22c55e", fontSize: 11 }}>
+                  {offline ? "Offline" : "Online"}
+                </Text>
               </View>
 
               <FlatList
                 ref={flatRef}
                 data={items}
                 keyExtractor={(it) => it.id}
-                contentContainerStyle={[
-                  styles.listContent, 
-                  { paddingBottom: 20 }
-                ]}
+                contentContainerStyle={{ paddingVertical: 8, paddingBottom: 20 }}
                 renderItem={({ item }) => {
                   if (item.type === "date") {
                     return (
                       <View style={styles.dateRow}>
-                        <Text style={styles.dateText}>{formatDateHeader(item.dateKey)}</Text>
+                        <Text style={styles.dateText}>
+                          {formatDateHeader(item.dateKey)}
+                        </Text>
                       </View>
                     );
                   }
-                
+
                   const m = item.msg;
                   const isMe = String(m.fromUserId) === String(myUserId);
-                  const localSeenAt = getLocalSeenAt(m.toUserId);
-                  let showBlueTick = false;
-                  if (isMe) {
-                    showBlueTick = !!m.seenAt ||
-                      (!!localSeenAt && new Date(m.createdAt) <= new Date(localSeenAt));
-                  }
-                
+
                   return (
-                    <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
-                      <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
-                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                          <Text style={styles.text}>{m.plaintext}</Text>
-                        </View>
-                        
+                    <View
+                      style={[
+                        styles.msgRow,
+                        isMe ? styles.msgRowMe : styles.msgRowOther,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.bubble,
+                          isMe ? styles.bubbleMe : styles.bubbleOther,
+                        ]}
+                      >
+                        <Text style={styles.text}>{m.plaintext}</Text>
                         <View style={styles.metaRow}>
-                          {isMe ? (
-                            <Icon
-                              name={showBlueTick ? "check-all" : "check"}
-                              size={13}
-                              color={showBlueTick ? "#2dd4bf" : "#a3a3a3"}
-                              style={styles.tickIcon}
-                            />
-                          ) : null}
-                          <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
+                          {isMe ? renderTick(m) : null}
+                          <Text style={styles.timeText}>
+                            {formatTime(m.createdAt)}
+                          </Text>
                         </View>
                       </View>
                     </View>
@@ -448,14 +363,7 @@ export default function ChatScreen({ route, navigation }: any) {
               />
             </View>
 
-            <View style={[
-              styles.inputBar, 
-              { 
-                paddingBottom: insets.bottom,
-                marginBottom: 5,
-                backgroundColor: "transparent"
-              }
-            ]}>
+            <View style={[styles.inputBar, { paddingBottom: insets.bottom }]}>
               <View style={styles.inputRow}>
                 <TextInput
                   style={styles.input}
@@ -477,106 +385,34 @@ export default function ChatScreen({ route, navigation }: any) {
   );
 }
 
+// styles unchanged ...
+
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   root: { flex: 1, backgroundColor: "#0f172a" },
   innerContainer: { flex: 1 },
   baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: "#020617" },
-  glowTop: {
-    position: "absolute",
-    top: -120,
-    left: -40,
-    width: 220,
-    height: 220,
-    borderRadius: 220,
-    backgroundColor: "rgba(59, 130, 246, 0.22)",
-  },
-  glowBottom: {
-    position: "absolute",
-    bottom: -140,
-    right: -40,
-    width: 240,
-    height: 240,
-    borderRadius: 240,
-    backgroundColor: "rgba(168, 85, 247, 0.22)",
-  },
-
+  glowTop: { position: "absolute", top: -120, left: -40, width: 220, height: 220, borderRadius: 220, backgroundColor: "rgba(59, 130, 246, 0.22)" },
+  glowBottom: { position: "absolute", bottom: -140, right: -40, width: 240, height: 240, borderRadius: 240, backgroundColor: "rgba(168, 85, 247, 0.22)" },
   container: { flex: 1, paddingTop: 16, paddingHorizontal: 12 },
-  topBar: { flexDirection: "row", alignItems: "center", marginBottom: 1, paddingVertical: 6, marginTop: 15 },
-  iconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.35)",
-  },
-  title: { color: "#fff", fontSize: 18, fontWeight: "700", marginLeft: 12 },
-
+  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 1, paddingVertical: 6, marginTop: 15 },
+  iconBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(148,163,184,0.35)" },
+  title: { color: "#fff", fontSize: 18, fontWeight: "700", marginLeft: 12, flex: 1, marginRight: 10 },
   listContent: { paddingVertical: 8 },
   dateRow: { alignItems: "center", marginVertical: 10 },
-  dateText: {
-    color: "#cbd5e1",
-    fontSize: 12,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.25)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-
+  dateText: { color: "#cbd5e1", fontSize: 12, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(148,163,184,0.25)", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: "hidden" },
   msgRow: { width: "100%", flexDirection: "row", marginBottom: 8 },
   msgRowMe: { justifyContent: "flex-end" },
   msgRowOther: { justifyContent: "flex-start" },
-
   bubble: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, maxWidth: "82%", minWidth: 52 },
   bubbleMe: { backgroundColor: "#4f46e5" },
   bubbleOther: { backgroundColor: "rgba(255,255,255,0.06)" },
-
   text: { color: "#fff", flexShrink: 1, flexWrap: "wrap" },
   timeText: { color: "rgba(255,255,255,0.75)", fontSize: 11, marginTop: 4, alignSelf: "flex-end", marginRight: 4 },
-
-  inputBar: {
-    paddingTop: 8,
-    backgroundColor: "transparent",
-  },
-  inputRow: {
-    flexDirection: "row",
-    padding: 10,
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  input: {
-    flex: 1,
-    color: "#fff",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 12,
-    marginRight: 8,
-    maxHeight: 140,
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.5)",
-  },
-  sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "#6366f1",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-end",
-    marginTop: 4,
-  },
-  tickIcon: {
-    marginRight: 4,
-  },
+  inputBar: { paddingTop: 8, backgroundColor: "transparent" },
+  inputRow: { flexDirection: "row", padding: 10, alignItems: "center", backgroundColor: "transparent" },
+  input: { flex: 1, color: "#fff", paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, marginRight: 8, maxHeight: 140, borderWidth: 1, borderColor: "rgba(148,163,184,0.5)" },
+  sendBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "#6366f1", alignItems: "center", justifyContent: "center" },
+  metaRow: { flexDirection: "row", alignItems: "center", alignSelf: "flex-end", marginTop: 4 },
+  tickIcon: { marginRight: 4 },
 });

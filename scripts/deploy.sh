@@ -83,10 +83,10 @@ pm2 delete "$APP_NAME-ai" >/dev/null 2>&1 || true
 # Kill anything using port 8000
 sudo fuser -k 8000/tcp >/dev/null 2>&1 || true
 
-pm2 start venv/bin/uvicorn \
+pm2 start ./venv/bin/python \
     --name "$APP_NAME-ai" \
     --cwd "$AI_PATH" \
-    -- main:app --host 0.0.0.0 --port 8000 --workers 2
+    -- -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
 
 # -------------------------------------
 # 5️⃣ Save PM2 State

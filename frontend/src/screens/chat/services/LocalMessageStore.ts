@@ -10,30 +10,28 @@ export type LocalMsgStatus = "sent" | "received";
 
 export type LocalStoredMsgV1 = {
   v: 1;
-  id: string; // "srv:<mongoId>" or "loc:<...>"
+  id: string;
   peerUserId: string;
   createdAt: string;
-
   fromUserId: string;
   fromDeviceId: string;
   toDeviceId: string;
-
   pt: {
     alg: "AES-256-GCM";
     ivHex: string;
     tagHex: string;
     ctHex: string;
   };
-
   status: LocalMsgStatus;
 };
 
-const aesService = (userId: string, deviceId: string) => `E2EE_LOCAL_AES256_${userId}_${deviceId}`;
-const threadKey = (userId: string, deviceId: string, peerUserId: string) =>
-  `E2EE_THREAD_V1:${userId}:${deviceId}:${peerUserId}`;
+const aesService = (userId: string) => `E2EE_LOCAL_AES256_${userId}`;
+// ✅ removed deviceId from thread key
+const threadKey = (userId: string, peerUserId: string) =>
+  `E2EE_THREAD_V1:${userId}:${peerUserId}`;
 
-async function getOrCreateAesKeyHex(myUserId: string, deviceId: string): Promise<string> {
-  const service = aesService(myUserId, deviceId);
+async function getOrCreateAesKeyHex(myUserId: string): Promise<string> {
+  const service = aesService(myUserId);
   const creds = await Keychain.getGenericPassword({ service });
   if (creds?.password) return JSON.parse(creds.password) as string;
 
@@ -49,16 +47,10 @@ async function getOrCreateAesKeyHex(myUserId: string, deviceId: string): Promise
 function encryptAesGcm(keyHex: string, plaintext: string) {
   const key = Buffer.from(keyHex, "hex");
   const iv = crypto.randomBytes(12);
-
   const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
-
   const pt = enc.encode(plaintext);
-  const ct1 = cipher.update(pt);
-  const ct2 = cipher.final();
-
-  const ct = Buffer.concat([Buffer.from(ct1), Buffer.from(ct2)]);
+  const ct = Buffer.concat([Buffer.from(cipher.update(pt)), Buffer.from(cipher.final())]);
   const tag = cipher.getAuthTag();
-
   return {
     alg: "AES-256-GCM" as const,
     ivHex: Buffer.from(iv).toString("hex"),
@@ -72,22 +64,17 @@ function decryptAesGcm(keyHex: string, payload: { ivHex: string; tagHex: string;
   const iv = Buffer.from(payload.ivHex, "hex");
   const tag = Buffer.from(payload.tagHex, "hex");
   const ct = Buffer.from(payload.ctHex, "hex");
-
   const decipher = crypto.createDecipheriv("aes-256-gcm", key, iv);
   decipher.setAuthTag(tag);
-
-  const pt1 = decipher.update(ct);
-  const pt2 = decipher.final();
-  const pt = Buffer.concat([Buffer.from(pt1), Buffer.from(pt2)]);
-
+  const pt = Buffer.concat([Buffer.from(decipher.update(ct)), Buffer.from(decipher.final())]);
   return dec.decode(pt);
 }
 
 export class LocalMessageStore {
-  constructor(private myUserId: string, private deviceId: string, private peerUserId: string) {}
+  constructor(private myUserId: string, private peerUserId: string) {}
 
   private async loadRaw(): Promise<LocalStoredMsgV1[]> {
-    const raw = await AsyncStorage.getItem(threadKey(this.myUserId, this.deviceId, this.peerUserId));
+    const raw = await AsyncStorage.getItem(threadKey(this.myUserId, this.peerUserId));
     if (!raw) return [];
     try {
       const parsed = JSON.parse(raw) as LocalStoredMsgV1[];
@@ -98,16 +85,12 @@ export class LocalMessageStore {
   }
 
   private async saveRaw(msgs: LocalStoredMsgV1[]) {
-    await AsyncStorage.setItem(
-      threadKey(this.myUserId, this.deviceId, this.peerUserId),
-      JSON.stringify(msgs)
-    );
+    await AsyncStorage.setItem(threadKey(this.myUserId, this.peerUserId), JSON.stringify(msgs));
   }
 
   async listPlaintext(): Promise<(LocalStoredMsgV1 & { plaintext: string })[]> {
-    const keyHex = await getOrCreateAesKeyHex(this.myUserId, this.deviceId);
+    const keyHex = await getOrCreateAesKeyHex(this.myUserId);
     const msgs = await this.loadRaw();
-
     const out = msgs.map((m) => ({ ...m, plaintext: decryptAesGcm(keyHex, m.pt) }));
     out.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     return out;
@@ -122,10 +105,8 @@ export class LocalMessageStore {
     plaintext: string;
     status: LocalMsgStatus;
   }) {
-    const keyHex = await getOrCreateAesKeyHex(this.myUserId, this.deviceId);
+    const keyHex = await getOrCreateAesKeyHex(this.myUserId);
     const msgs = await this.loadRaw();
-
-    const ptEnc = encryptAesGcm(keyHex, input.plaintext);
 
     const next: LocalStoredMsgV1 = {
       v: 1,
@@ -135,7 +116,7 @@ export class LocalMessageStore {
       fromUserId: input.fromUserId,
       fromDeviceId: input.fromDeviceId,
       toDeviceId: input.toDeviceId,
-      pt: ptEnc,
+      pt: encryptAesGcm(keyHex, input.plaintext),
       status: input.status,
     };
 

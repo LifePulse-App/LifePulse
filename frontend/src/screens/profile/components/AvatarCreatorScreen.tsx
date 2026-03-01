@@ -5,7 +5,7 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Alert,
+  TextInput,
 } from 'react-native';
 import { Text } from '@rneui/themed';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -13,6 +13,31 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import profileApi from '../services/api_profile'; // Your API
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../../auth/api-client/api_client';
+
+// Glassy Result Card Component
+const GlassyResultCard = ({ visible, type = "success", message, onClose }: any) => {
+  if (!visible) return null;
+  return (
+    <View style={resultStyles.overlay}>
+      <View style={resultStyles.card}>
+        <Text style={[
+          resultStyles.message,
+          { color: type === "error" ? "#ef4444" : "#22c55e" }
+        ]}>{message}</Text>
+        <TouchableOpacity style={resultStyles.okBtn} onPress={onClose}>
+          <Text style={{ color: "#fff", fontWeight: "bold" }}>OK</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+const resultStyles = StyleSheet.create({
+  overlay: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: "rgba(30,41,59,0.45)", justifyContent: "center", alignItems: "center", zIndex: 2000 },
+  card: { backgroundColor: "rgba(15,23,42,0.94)", borderColor: "#fff", borderWidth: 1, borderRadius: 24, padding: 26, width: 270, alignItems: "center" },
+  message: { fontSize: 17, fontWeight: "bold", textAlign: "center", marginBottom: 18, marginTop: 2 },
+  okBtn: { backgroundColor: "#6366f1", borderRadius: 14, paddingVertical: 9, paddingHorizontal: 34, marginTop: 2 },
+});
 
 // Set your backend base (for local avatars, adjust as needed)
 const baseUrl = apiClient.getBaseURL(); // Example: "http://localhost:40000/api"
@@ -24,12 +49,14 @@ export default function ProfilePicUploaderScreen() {
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
 
+  // Glassy message state!
+  const [resultCard, setResultCard] = useState({ visible: false, type: "success", message: "" });
+
   // Load current avatar from backend on mount
   useEffect(() => {
     const load = async () => {
       try {
         const res = await profileApi.getAvatarUrl();
-        // Prefer .data.avatarUrl if you use their getMyAvatar API
         setAvatarUrl(res?.data?.avatarUrl ?? null);
       } catch (e) {
         setAvatarUrl(null);
@@ -42,7 +69,7 @@ export default function ProfilePicUploaderScreen() {
     const res = await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
     if (res.didCancel) return;
     if (res.errorCode) {
-      Alert.alert('Error', res.errorMessage || 'Failed to pick image');
+      setResultCard({ visible: true, type: "error", message: res.errorMessage || 'Failed to pick image' });
       return;
     }
     if (res.assets?.[0]?.uri) setPhotoUri(res.assets[0].uri);
@@ -59,13 +86,15 @@ export default function ProfilePicUploaderScreen() {
         name: 'avatar.jpg',
       });
       const uploadRes = await profileApi.updateAvatarImage(formData);
-      // If your API returns the new url, update local state:
       setAvatarUrl(uploadRes?.data?.url ?? null);
       setPhotoUri(null);
-      Alert.alert('Success', 'Profile photo updated!');
-      navigation.goBack();
+      setResultCard({ visible: true, type: "success", message: "Profile photo updated!" });
+      setTimeout(() => {
+        setResultCard({ visible: false, type: "success", message: "" });
+        navigation.goBack();
+      }, 1400);
     } catch (e) {
-      Alert.alert('Error uploading photo', e?.message || 'Try again later');
+      setResultCard({ visible: true, type: "error", message: e?.message || 'Error uploading photo. Try again later.' });
     }
     setUploading(false);
   };
@@ -74,10 +103,10 @@ export default function ProfilePicUploaderScreen() {
     try {
       await profileApi.deleteAvatar();
       setPhotoUri(null);
-      setAvatarUrl(null); // clear displayed avatar
-      Alert.alert('Success', 'Profile picture removed!');
+      setAvatarUrl(null);
+      setResultCard({ visible: true, type: "success", message: "Profile picture removed!" });
     } catch (e) {
-      Alert.alert('Error', e?.message || 'Failed to remove profile photo.');
+      setResultCard({ visible: true, type: "error", message: e?.message || 'Failed to remove profile photo.' });
     }
   };
 
@@ -90,8 +119,8 @@ export default function ProfilePicUploaderScreen() {
 
   return (
     <View style={styles.root}>
-          <View style={styles.topBar}>
-              <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass}
+      <View style={styles.topBar}>
+        <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass}
           onPress={() => navigation.goBack()}>
           <Icon name="arrow-left" size={24} color="#E5E7EB" />
         </TouchableOpacity>
@@ -123,6 +152,12 @@ export default function ProfilePicUploaderScreen() {
         <Text style={styles.deleteBtnTxt}>Remove Profile Picture</Text>
       </TouchableOpacity>
       <Text style={styles.hint}>Tap the avatar above to choose a new photo.</Text>
+      <GlassyResultCard
+        visible={resultCard.visible}
+        type={resultCard.type}
+        message={resultCard.message}
+        onClose={() => setResultCard({ visible: false, type: resultCard.type, message: "" })}
+      />
     </View>
   );
 }
@@ -167,7 +202,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     textAlign: 'center',
   },
-    pageTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "700", color: "#F9FAFB" },
+  pageTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "700", color: "#F9FAFB" },
   rightSpacer: { width: 40, height: 40 },
   hint: { color: '#a1a1aa', marginTop: 12, fontSize: 13 },
   topBar: { flexDirection: "row", alignItems: "center", marginTop: 3, marginBottom: 30 },

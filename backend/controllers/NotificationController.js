@@ -75,7 +75,6 @@ export const unregisterPushToken = async (req, res) => {
 // data.peerUserId = sender id; username = sender's display name
 // Helper for any notification type
 async function sendNotificationFCM(tokens, payload) {
-  console.log("ok");
   for (const t of tokens) {
     try {
       await admin.messaging().send({
@@ -101,12 +100,14 @@ async function sendNotificationFCM(tokens, payload) {
 // Usage in /chat notification:
 export async function sendMsgNotification(toUserId, fromUserId, fromUsername) {
   const tokens = await PushToken.find({ userId: toUserId, platform: 'android' }).lean();
-  //  console.log('Push tokens for user', toUserId, tokens);
-  await sendNotificationFCM(tokens, {
-    type: 'chat',
-    peerUserId: String(fromUserId),
-    username: fromUsername,
-  });
+await sendNotificationFCM(tokens, {
+  type: "chat",
+  peerUserId: String(fromUserId),
+  peerName: fromUsername,
+  username: fromUsername,
+  body: "Sent you a message",
+  messageId: String(Date.now()),
+});
 }
 
 // Usage in /seen notification:
