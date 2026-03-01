@@ -29,8 +29,8 @@ const formatLastTime = (iso?: string) => {
 };
 
 const saveCache = async (userId: string, data: any[]) => {
-  try {
-    await AsyncStorage.setItem(`${CACHE_KEY}:${userId}`, JSON.stringify(data));
+  try {    
+  await AsyncStorage.setItem(`${CACHE_KEY}:${userId}`, JSON.stringify(data));    
   } catch {}
 };
 
@@ -50,7 +50,7 @@ export default function ChatListScreen({ navigation }: any) {
   const [version, setVersion] = useState(0);
 
   const user = useContext(AuthContext);
-  const myUserId = String(user?.User?.user?.id || user?.User?.user?._id || "");
+  const myUserId = String(user?.User?.user?.id || "");
 
   // Load cache immediately on mount for instant display
   useEffect(() => {
@@ -60,50 +60,49 @@ export default function ChatListScreen({ navigation }: any) {
     });
   }, [myUserId]);
 
-  const loadOnline = useCallback(async () => {
-    if (!myUserId) return;
+const loadOnline = useCallback(async () => {
+  if (!myUserId || offline) return;
+   
+  try {
+    const [{ data: convRes }, friendsRes] = await Promise.all([
+      listConversationPreviewsApi(),
+      fetchFriends(),
+    ]);
 
-    try {
-      const [{ data: convRes }, friendsRes] = await Promise.all([
-        listConversationPreviewsApi(),
-        fetchFriends(),
-      ]);
+    const friends = friendsRes?.data?.friends || [];
+    const nameMap = new Map<string, string>();
 
-      const friends = friendsRes?.data?.friends || [];
-      const nameMap = new Map<string, string>();
-
-      for (const f of friends) {
-        const id = String(f._id);
-        const name = String(f.name || f.username || "Friend");
-        nameMap.set(id, name);
-      }
-
-      const convos = convRes?.conversations || [];
-      const mapped = convos.map((c: any) => {
-        const peerId = String(c.peerUserId);
-        return {
-          conversationId: String(c.conversationId),
-          peerUserId: peerId,
-          peerName: c.peerName || nameMap.get(peerId) || "Friend",
-          mood: c.mood || "",
-          lastText: c.lastText || "",
-          lastAt: c.lastAt || "",
-          unread: Number(c.unread ?? getUnread(peerId) ?? 0),
-        };
-      });
-
-      mapped.sort(
-        (a: any, b: any) =>
-          new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime()
-      );
-
-      setRows(mapped);
-      saveCache(myUserId, mapped); // persist for next time / offline
-    } catch (e) {
-      console.log("load list error — using cache", e);
-      // cache already shown from the mount effect, nothing to do
+    for (const f of friends) {
+      const id = String(f._id);
+      const name = String(f.name || f.username || "Friend");
+      nameMap.set(id, name);
     }
-  }, [myUserId]);
+
+    const convos = convRes?.conversations || [];
+    const mapped = convos.map((c: any) => {
+      const peerId = String(c.peerUserId);
+      return {
+        conversationId: String(c.conversationId),
+        peerUserId: peerId,
+        peerName: c.peerName || nameMap.get(peerId) || "Friend",
+        mood: c.mood || "",
+        lastText: c.lastText || "",
+        lastAt: c.lastAt || "",
+        unread: Number(c.unread ?? getUnread(peerId) ?? 0),
+      };
+    });
+
+    mapped.sort(
+      (a: any, b: any) =>
+        new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime()
+    );
+
+    setRows(mapped);
+    await saveCache(myUserId, mapped);
+  } catch (e) {
+    console.log("load list error — using cache", e);
+  }
+}, [myUserId, offline]);
 
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
@@ -120,6 +119,16 @@ export default function ChatListScreen({ navigation }: any) {
     const unsub = navigation.addListener("focus", loadOnline);
     return unsub;
   }, [navigation, loadOnline]);
+
+  useEffect(() => {
+  const unsub = navigation.addListener("focus", () => {
+    loadCache(myUserId).then((cached) => {
+      if (cached.length) setRows(cached);
+    });
+    loadOnline();
+  });
+  return unsub;
+}, [navigation, loadOnline, myUserId]);
 
   useEffect(() => {
     const a = subscribeConversationChanges(() => setVersion((v) => v + 1));

@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import React, { useState, useRef, useEffect } from 'react';
 import { NavigationContainer, CommonActions } from '@react-navigation/native';
-import { useColorScheme, View, ActivityIndicator, Platform } from 'react-native';
+import { useColorScheme, View, ActivityIndicator, Platform, PermissionsAndroid } from 'react-native';
 import { DefaultTheme, MD3DarkTheme, PaperProvider } from 'react-native-paper';
 import Toast, { BaseToast, BaseToastProps } from 'react-native-toast-message';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -18,6 +18,9 @@ import {
 } from '@react-native-firebase/messaging';
 import { getApp } from '@react-native-firebase/app';
 
+// ---- BACKGROUND HANDLER (must be at module/root level!) ----
+import messaging from '@react-native-firebase/messaging';
+
 import AuthContext from './src/auth/user/UserContext';
 import NavigationTheme from './src/navigation/main/NavigationTheme';
 import AuthNavigator from './src/navigation/main/AuthNavigator';
@@ -26,24 +29,24 @@ import UserStorage from './src/auth/user/UserStorage';
 import apiClient, { setSecretKey } from './src/auth/api-client/api_client';
 import { navigationRef } from './src/navigation/main/RootNavigation';
 
-import { loadChatNotificationState, notifyIncoming, getActiveChatPeer, markMessagesSeenLocally } from './src/screens/chat/services/ChatNotifications';
+import {
+  loadChatNotificationState,
+  notifyIncoming,
+  getActiveChatPeer,
+  markMessagesSeenLocally,
+} from './src/screens/chat/services/ChatNotifications';
 
-import { PermissionsAndroid } from 'react-native';
+import { markDelivered } from './src/screens/chat/services/api_chat';
 
 import 'react-native-get-random-values';
 import { TextEncoder, TextDecoder } from 'text-encoding';
 (global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
 
-// ---- BACKGROUND HANDLER (must be at module/root level!) ----
-import messaging from '@react-native-firebase/messaging';
-
 /**
  * ---------------------------
  * Channel (sound + vibration)
  * ---------------------------
- * NOTE: channels are sticky on Android. If "default" was silent before,
- * you may need uninstall/reinstall OR change channel id.
  */
 const CHAT_CHANNEL_ID = 'default';
 
@@ -57,21 +60,17 @@ notifee.createChannel({
 
 /**
  * ✅ Group notifications by SENDER (peerUserId)
- * - All messages from same sender stack together.
- * - Different senders create separate groups (still under your app).
  */
 async function displayChatNotificationGroupedBySender(data: any) {
   const peerId = String(data.peerUserId || 'unknown');
-  const peerName = data.username || 'Someone';
+  const peerName = data.username || data.peerName || 'Someone';
 
   const messageId = data.messageId || data.msgId || data._id || Date.now();
   const body = data.body || data.text || 'Sent you a message';
 
-  // Group per sender
   const groupId = `chat:${peerId}`;
   const summaryId = `chat-summary:${peerId}`;
 
-  // 1) Actual message notification
   await notifee.displayNotification({
     id: `chat:${peerId}:msg:${messageId}`,
     title: peerName,
@@ -84,10 +83,10 @@ async function displayChatNotificationGroupedBySender(data: any) {
     data: {
       type: 'chat',
       peerUserId: peerId,
+      peerName,
     },
   });
 
-  // 2) Summary notification (required for reliable grouping)
   await notifee.displayNotification({
     id: summaryId,
     title: peerName,
@@ -101,16 +100,25 @@ async function displayChatNotificationGroupedBySender(data: any) {
     data: {
       type: 'chat_summary',
       peerUserId: peerId,
+      peerName,
     },
   });
 }
 
+// ✅ Background handler: mark delivered + show notification
 messaging().setBackgroundMessageHandler(async remoteMessage => {
   const data = remoteMessage?.data || {};
-  console.log("[push] foreground", remoteMessage?.data);
-console.log("[push] background", remoteMessage?.data);
-
+          console.log(data);
   if (data.type === 'chat') {
+    const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
+    if (incomingMessageId) {
+      try {
+        await markDelivered([incomingMessageId]);
+      } catch (e) {
+        console.log('markDelivered (background) failed', e);
+      }
+    }
+
     await displayChatNotificationGroupedBySender(data);
   }
 
@@ -137,8 +145,6 @@ const App = () => {
   const [isCheckingBiometric, setIsCheckingBiometric] = useState(true);
 
   const secretKeySetRef = useRef(false);
-
-  // Prevent duplicate /push/register calls for the same token
   const lastRegisteredTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -148,7 +154,6 @@ const App = () => {
 
   // ---------- Notifee notification press handler ----------
   useEffect(() => {
-    // Foreground/background (app is running)
     const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
       if (
         type === EventType.PRESS &&
@@ -165,7 +170,6 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    // Cold start launch by notification
     async function checkInitialNotification() {
       const initial = await notifee.getInitialNotification();
       if (
@@ -175,7 +179,7 @@ const App = () => {
         setTimeout(() => {
           navigationRef.current?.navigate('chat', {
             peerUserId: initial.notification.data.peerUserId,
-            peerName: initial.notification.data.peerName,     
+            peerName: initial.notification.data.peerName,
           });
         }, 600);
       }
@@ -199,18 +203,30 @@ const App = () => {
       await notifee.requestPermission();
       const messagingInstance = getMessaging(getApp());
 
-      // Foreground message handler
       return onMessage(messagingInstance, async remoteMessage => {
         const data = remoteMessage?.data || {};
-        console.log("[push] foreground", remoteMessage?.data);
-console.log("[push] background", remoteMessage?.data);
+        console.log('[push] foreground', data);
+
         if (data.type === 'chat' && data.peerUserId) {
+          console.log(data);
+          
+          // ✅ receiver marks delivered immediately
+          const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
+          if (incomingMessageId) {
+            try {
+              await markDelivered([incomingMessageId]);
+            } catch (e) {
+              console.log('markDelivered (foreground) failed', e);
+            }
+          }
+
           const activePeer = getActiveChatPeer();
           if (!activePeer || activePeer !== data.peerUserId) {
             notifyIncoming(data.peerUserId);
             await displayChatNotificationGroupedBySender(data);
           }
         }
+
         if (data.type === 'seen' && data.peerUserId) {
           markMessagesSeenLocally(data.peerUserId);
         }

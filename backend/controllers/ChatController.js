@@ -3,6 +3,7 @@ import ChatMessage from "../models/ChatMessage.js";
 import Conversation from "../models/Conversation.js";
 import Mood from "../models/MoodSchema.js";
 import { sendMsgNotification, sendSeenNotification } from "./NotificationController.js";
+import { sendDeliveredNotification } from './NotificationController.js';
 
 const toObjectId = (v) => {
   try {
@@ -82,9 +83,15 @@ export const sendMessage = async (req, res) => {
 
     // send push only on fresh create, not on retry/idempotent hit
 if (createdNow && notifyUser && String(senderId) !== String(recvObj)) {
-      const fromUsername = req.user?.name || req.user?.username || "Someone";
-      await sendMsgNotification(recvObj, senderId, fromUsername);
-    }
+  const fromUsername = req.user?.name || req.user?.username || 'Someone';
+  await sendMsgNotification(
+    recvObj,
+    senderId,
+    fromUsername,
+    msg._id,              // ✅ real message id
+    String(msg.text || '') // optional body
+  );
+}
 
     res.json({
       success: true,
@@ -128,28 +135,51 @@ export const markDelivered = async (req, res) => {
   try {
     const me = req.user._id;
     const { messageIds } = req.body;
+
     if (!Array.isArray(messageIds) || !messageIds.length) {
-      return res.status(400).json({ message: "messageIds required" });
+      return res.status(400).json({ message: 'messageIds required' });
     }
 
     const ids = messageIds.map((id) => toObjectId(id)).filter(Boolean);
 
+    // find target msgs before update (to know senderIds)
+    const msgs = await ChatMessage.find({
+      _id: { $in: ids },
+      receiverId: me,
+      deliveredAt: null,
+    })
+      .select('_id senderId receiverId')
+      .lean();
+
+    if (!msgs.length) {
+      return res.json({ success: true, count: 0 });
+    }
+
+    const msgIdsToUpdate = msgs.map((m) => m._id);
+
     await ChatMessage.updateMany(
-      {
-        _id: { $in: ids },
-        receiverId: me,
-        deliveredAt: null,
-      },
+      { _id: { $in: msgIdsToUpdate }, receiverId: me, deliveredAt: null },
       { $set: { deliveredAt: new Date() } }
     );
 
-    res.json({ success: true });
+    // notify each sender (group by senderId)
+    const bySender = new Map();
+    for (const m of msgs) {
+      const s = String(m.senderId);
+      if (!bySender.has(s)) bySender.set(s, []);
+      bySender.get(s).push(String(m._id));
+    }
+
+    for (const [senderId, deliveredMsgIds] of bySender.entries()) {
+      await sendDeliveredNotification(senderId, me, deliveredMsgIds);
+    }
+
+    res.json({ success: true, count: msgIdsToUpdate.length });
   } catch (err) {
-    console.error("[chat] markDelivered error", err);
-    res.status(500).json({ message: "Internal error" });
+    console.error('[chat] markDelivered error', err);
+    res.status(500).json({ message: 'Internal error' });
   }
 };
-
 export const markSeen = async (req, res) => {
   try {
     const me = req.user._id;

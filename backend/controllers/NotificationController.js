@@ -2,8 +2,6 @@ import PushToken from '../models/PushToken.js';
 import admin from '../firebaseAdmin.js';
 
 // POST /api/push/register
-// body: { token: string, platform?: 'android' | 'ios' }
-// auth: Bearer token -> sets req.user
 export const registerPushToken = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -12,12 +10,11 @@ export const registerPushToken = async (req, res) => {
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
-
     if (!token) {
       return res.status(400).json({ success: false, message: 'token is required' });
     }
 
-    // Detach token from other users
+    // detach from other users
     await PushToken.deleteMany({ token, userId: { $ne: userId } });
 
     const pushTokenDoc = await PushToken.findOneAndUpdate(
@@ -44,8 +41,6 @@ export const registerPushToken = async (req, res) => {
 };
 
 // POST /api/push/unregister
-// body: { token: string, platform?: 'android' | 'ios' }
-// auth: Bearer token -> sets req.user
 export const unregisterPushToken = async (req, res) => {
   try {
     const userId = req.user?._id;
@@ -54,7 +49,6 @@ export const unregisterPushToken = async (req, res) => {
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
     }
-
     if (!token) {
       return res.status(400).json({ success: false, message: 'token is required' });
     }
@@ -72,8 +66,6 @@ export const unregisterPushToken = async (req, res) => {
   }
 };
 
-// data.peerUserId = sender id; username = sender's display name
-// Helper for any notification type
 async function sendNotificationFCM(tokens, payload) {
   for (const t of tokens) {
     try {
@@ -83,13 +75,12 @@ async function sendNotificationFCM(tokens, payload) {
         android: { priority: 'high' },
       });
     } catch (err) {
-      // Remove invalid/expired tokens
       if (
         err.code === 'messaging/registration-token-not-registered' ||
         err.errorInfo?.code === 'messaging/registration-token-not-registered'
       ) {
         await PushToken.deleteOne({ token: t.token });
-        console.log("deleted token");
+        console.log('[push] deleted invalid token');
       } else {
         console.error('[push] Failed to send to token', t.token, err.code, err.message);
       }
@@ -97,24 +88,49 @@ async function sendNotificationFCM(tokens, payload) {
   }
 }
 
-// Usage in /chat notification:
-export async function sendMsgNotification(toUserId, fromUserId, fromUsername) {
+/**
+ * CHAT push
+ * IMPORTANT: pass REAL message _id so receiver can call markDelivered([messageId])
+ */
+export async function sendMsgNotification(toUserId, fromUserId, fromUsername, messageId, bodyText = 'Sent you a message') {
   const tokens = await PushToken.find({ userId: toUserId, platform: 'android' }).lean();
-await sendNotificationFCM(tokens, {
-  type: "chat",
-  peerUserId: String(fromUserId),
-  peerName: fromUsername,
-  username: fromUsername,
-  body: "Sent you a message",
-  messageId: String(Date.now()),
-});
+  if (!tokens.length) return;
+
+  await sendNotificationFCM(tokens, {
+    type: 'chat',
+    peerUserId: String(fromUserId),
+    peerName: String(fromUsername || 'Someone'),
+    username: String(fromUsername || 'Someone'),
+    body: String(bodyText || 'Sent you a message'),
+    messageId: String(messageId), // ✅ REAL Mongo message _id
+  });
 }
 
-// Usage in /seen notification:
+/**
+ * SEEN push
+ */
 export async function sendSeenNotification(toUserId, peerUserId) {
   const tokens = await PushToken.find({ userId: toUserId, platform: 'android' }).lean();
+  if (!tokens.length) return;
+
   await sendNotificationFCM(tokens, {
     type: 'seen',
     peerUserId: String(peerUserId),
+  });
+}
+
+/**
+ * DELIVERED push (like seen)
+ * toUserId = sender (who should see double-tick update)
+ * peerUserId = receiver (who delivered the message)
+ */
+export async function sendDeliveredNotification(toUserId, peerUserId, messageIds = []) {
+  const tokens = await PushToken.find({ userId: toUserId, platform: 'android' }).lean();
+  if (!tokens.length) return;
+
+  await sendNotificationFCM(tokens, {
+    type: 'delivered',
+    peerUserId: String(peerUserId),
+    messageIds: JSON.stringify((messageIds || []).map(String)),
   });
 }
