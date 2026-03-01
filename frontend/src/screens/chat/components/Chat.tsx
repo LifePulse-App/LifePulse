@@ -29,8 +29,8 @@ const formatLastTime = (iso?: string) => {
 };
 
 const saveCache = async (userId: string, data: any[]) => {
-  try {    
-  await AsyncStorage.setItem(`${CACHE_KEY}:${userId}`, JSON.stringify(data));    
+  try {
+    await AsyncStorage.setItem(`${CACHE_KEY}:${userId}`, JSON.stringify(data));
   } catch {}
 };
 
@@ -50,9 +50,9 @@ export default function ChatListScreen({ navigation }: any) {
   const [version, setVersion] = useState(0);
 
   const user = useContext(AuthContext);
-  const myUserId = String(user?.User?.user?.id || "");
+  const myUserId = String(user?.User?.user?.id || user?.User?.user?._id || "");
 
-  // Load cache immediately on mount for instant display
+  // Load cache immediately on mount/user change
   useEffect(() => {
     if (!myUserId) return;
     loadCache(myUserId).then((cached) => {
@@ -60,49 +60,49 @@ export default function ChatListScreen({ navigation }: any) {
     });
   }, [myUserId]);
 
-const loadOnline = useCallback(async () => {
-  if (!myUserId || offline) return;
-   
-  try {
-    const [{ data: convRes }, friendsRes] = await Promise.all([
-      listConversationPreviewsApi(),
-      fetchFriends(),
-    ]);
+  const loadOnline = useCallback(async () => {
+    if (!myUserId || offline) return;
 
-    const friends = friendsRes?.data?.friends || [];
-    const nameMap = new Map<string, string>();
+    try {
+      const [{ data: convRes }, friendsRes] = await Promise.all([
+        listConversationPreviewsApi(),
+        fetchFriends(),
+      ]);
 
-    for (const f of friends) {
-      const id = String(f._id);
-      const name = String(f.name || f.username || "Friend");
-      nameMap.set(id, name);
+      const friends = friendsRes?.data?.friends || [];
+      const nameMap = new Map<string, string>();
+      for (const f of friends) {
+        const id = String(f._id);
+        const name = String(f.name || f.username || "Friend");
+        nameMap.set(id, name);
+      }
+
+      const convos = convRes?.conversations || [];
+      const mapped = convos.map((c: any) => {
+        const peerId = String(c.peerUserId);
+        return {
+          conversationId: String(c.conversationId),
+          peerUserId: peerId,
+          peerName: c.peerName || nameMap.get(peerId) || "Friend",
+          mood: c.mood || "",
+          lastText: c.lastText || "",
+          lastAt: c.lastAt || "",
+          // ✅ local unread should win for instant consistency
+          unread: Number(getUnread(peerId) || c.unread || 0),
+        };
+      });
+
+      mapped.sort(
+        (a: any, b: any) =>
+          new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime()
+      );
+
+      setRows(mapped);
+      await saveCache(myUserId, mapped);
+    } catch (e) {
+      console.log("load list error — using cache", e);
     }
-
-    const convos = convRes?.conversations || [];
-    const mapped = convos.map((c: any) => {
-      const peerId = String(c.peerUserId);
-      return {
-        conversationId: String(c.conversationId),
-        peerUserId: peerId,
-        peerName: c.peerName || nameMap.get(peerId) || "Friend",
-        mood: c.mood || "",
-        lastText: c.lastText || "",
-        lastAt: c.lastAt || "",
-        unread: Number(c.unread ?? getUnread(peerId) ?? 0),
-      };
-    });
-
-    mapped.sort(
-      (a: any, b: any) =>
-        new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime()
-    );
-
-    setRows(mapped);
-    await saveCache(myUserId, mapped);
-  } catch (e) {
-    console.log("load list error — using cache", e);
-  }
-}, [myUserId, offline]);
+  }, [myUserId, offline]);
 
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
@@ -115,20 +115,17 @@ const loadOnline = useCallback(async () => {
     loadOnline();
   }, [loadOnline, version]);
 
+  // ✅ Keep only ONE focus listener
   useEffect(() => {
-    const unsub = navigation.addListener("focus", loadOnline);
-    return unsub;
-  }, [navigation, loadOnline]);
-
-  useEffect(() => {
-  const unsub = navigation.addListener("focus", () => {
-    loadCache(myUserId).then((cached) => {
-      if (cached.length) setRows(cached);
+    const unsub = navigation.addListener("focus", () => {
+      if (!myUserId) return;
+      loadCache(myUserId).then((cached) => {
+        if (cached.length) setRows(cached);
+      });
+      loadOnline();
     });
-    loadOnline();
-  });
-  return unsub;
-}, [navigation, loadOnline, myUserId]);
+    return unsub;
+  }, [navigation, loadOnline, myUserId]);
 
   useEffect(() => {
     const a = subscribeConversationChanges(() => setVersion((v) => v + 1));
@@ -180,6 +177,7 @@ const loadOnline = useCallback(async () => {
           <FlatList
             data={filtered}
             keyExtractor={(item) => `${item.conversationId}:${item.peerUserId}`}
+            keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.row}
@@ -220,8 +218,6 @@ const loadOnline = useCallback(async () => {
     </MainLayout>
   );
 }
-
-// styles unchanged ...
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0f172a", padding: 12 },

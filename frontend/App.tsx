@@ -43,11 +43,6 @@ import { TextEncoder, TextDecoder } from 'text-encoding';
 (global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
 
-/**
- * ---------------------------
- * Channel (sound + vibration)
- * ---------------------------
- */
 const CHAT_CHANNEL_ID = 'default';
 
 notifee.createChannel({
@@ -71,9 +66,8 @@ function parseMessageIds(raw: any): string[] {
 async function displayChatNotificationGroupedBySender(data: any) {
   const peerId = String(data.peerUserId || 'unknown');
   const peerName = data.username || data.peerName || 'Someone';
-
   const messageId = data.messageId || data.msgId || data._id || Date.now();
-  const body = data.body || data.text || 'Sent you a message';
+  const body = data.body || 'Sent you a message';
 
   const groupId = `chat:${peerId}`;
   const summaryId = `chat-summary:${peerId}`;
@@ -112,10 +106,9 @@ async function displayChatNotificationGroupedBySender(data: any) {
   });
 }
 
-// Background handler
+// ✅ keep background handler light (no markAllPendingDelivered loop here)
 messaging().setBackgroundMessageHandler(async remoteMessage => {
   const data = remoteMessage?.data || {};
-  console.log('[push] background', data);
 
   if (data.type === 'chat') {
     const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
@@ -126,7 +119,6 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         console.log('markDelivered (background) failed', e);
       }
     }
-
     await displayChatNotificationGroupedBySender(data);
   }
 
@@ -138,16 +130,8 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
     const ids = parseMessageIds(data.messageIds);
     markMessagesDeliveredLocally(data.peerUserId, ids);
   }
-
-  // ✅ when app gets background push and user is online again, sweep pending
-  try {
-    await markAllPendingDelivered();
-  } catch (e) {
-    console.log('markAllPendingDelivered (background) failed', e);
-  }
 });
 
-// Android 13+ notification runtime permission
 async function requestNotificationPermission() {
   if (Platform.OS === 'android' && Platform.Version >= 33) {
     await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
@@ -167,26 +151,42 @@ const App = () => {
   const secretKeySetRef = useRef(false);
   const lastRegisteredTokenRef = useRef<string | null>(null);
 
+  // ✅ anti-spam guard for markAllPendingDelivered
+  const deliveringAllRef = useRef(false);
+  const lastDeliverAllAtRef = useRef(0);
+
+  const runMarkAllPendingDelivered = async (reason: string) => {
+    const now = Date.now();
+    if (now - lastDeliverAllAtRef.current < 10000) return; // 10s throttle
+    if (deliveringAllRef.current) return;
+
+    deliveringAllRef.current = true;
+    lastDeliverAllAtRef.current = now;
+
+    try {
+      await markAllPendingDelivered();
+    } catch (e) {
+      console.log(`markAllPendingDelivered (${reason}) failed`, e);
+    } finally {
+      deliveringAllRef.current = false;
+    }
+  };
+
   useEffect(() => {
     loadChatNotificationState();
     requestNotificationPermission();
   }, []);
 
-  // ✅ app foreground sweep: mark all pending incoming messages as delivered
+  // ✅ only run on app active
   useEffect(() => {
-    const sub = AppState.addEventListener('change', async (state) => {
+    const sub = AppState.addEventListener('change', async state => {
       if (state === 'active') {
-        try {
-          await markAllPendingDelivered();
-        } catch (e) {
-          console.log('markAllPendingDelivered (active) failed', e);
-        }
+        await runMarkAllPendingDelivered('active');
       }
     });
     return () => sub.remove();
   }, []);
 
-  // ---------- Notifee notification press handler ----------
   useEffect(() => {
     const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
       if (
@@ -221,7 +221,6 @@ const App = () => {
     checkInitialNotification();
   }, []);
 
-  // ---------- Setup secret key once ----------
   useEffect(() => {
     if (!secretKeySetRef.current) {
       setSecretKey();
@@ -229,7 +228,6 @@ const App = () => {
     }
   }, []);
 
-  // ---------- Foreground notifications handler ----------
   useEffect(() => {
     if (Platform.OS !== 'android') return;
 
@@ -239,7 +237,6 @@ const App = () => {
 
       return onMessage(messagingInstance, async remoteMessage => {
         const data = remoteMessage?.data || {};
-        console.log('[push] foreground', data);
 
         if (data.type === 'chat' && data.peerUserId) {
           const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
@@ -267,12 +264,7 @@ const App = () => {
           markMessagesDeliveredLocally(data.peerUserId, ids);
         }
 
-        // ✅ also sweep pending when any foreground push arrives
-        try {
-          await markAllPendingDelivered();
-        } catch (e) {
-          console.log('markAllPendingDelivered (foreground push) failed', e);
-        }
+        // ❌ removed continuous markAllPendingDelivered from every push
       });
     };
 
@@ -284,7 +276,6 @@ const App = () => {
     };
   }, []);
 
-  // ---------- Register token AFTER user is available + token refresh ----------
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     if (!User) return;
@@ -315,19 +306,12 @@ const App = () => {
     };
   }, [User]);
 
-  // ✅ once user session is ready, sweep old pending delivered
+  // ✅ once after user ready
   useEffect(() => {
     if (!User) return;
-    (async () => {
-      try {
-        await markAllPendingDelivered();
-      } catch (e) {
-        console.log('markAllPendingDelivered (user ready) failed', e);
-      }
-    })();
+    runMarkAllPendingDelivered('user-ready');
   }, [User]);
 
-  // ---------- Biometric gate ----------
   useEffect(() => {
     const checkBiometric = async () => {
       try {
