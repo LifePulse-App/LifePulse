@@ -24,13 +24,31 @@
   <link rel="stylesheet" href="styles.css" />
 
   <style>
-    /* Prevent white flash when scrolling */
     html, body {
       background: #0b0f1a;
       margin: 0;
       padding: 0;
       min-height: 100%;
       overscroll-behavior: none;
+    }
+
+    .top-nav {
+      position: sticky;
+      top: 0;
+      z-index: 9999;
+      backdrop-filter: blur(8px);
+    }
+
+    a, button, .btn, .nav-link {
+      -webkit-tap-highlight-color: transparent;
+      tap-highlight-color: transparent;
+      outline: none;
+    }
+    a:focus, a:active, a:visited,
+    button:focus, button:active, .btn:focus, .btn:active, .nav-link:focus, .nav-link:active {
+      outline: none !important;
+      box-shadow: none !important;
+      color: inherit;
     }
 
     .feature-grid, .method-grid {
@@ -77,6 +95,33 @@
     .section-space {
       margin-top: 70px;
     }
+
+    /* ✅ Pre-release glass capsule */
+    .download-card { position: relative; }
+    .pre-release-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 10px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      color: #dbeafe;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(147, 197, 253, 0.45);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 20px rgba(59, 130, 246, 0.18);
+    }
+    .pre-release-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #60a5fa;
+      box-shadow: 0 0 10px rgba(96, 165, 250, 0.9);
+    }
   </style>
 </head>
 
@@ -96,7 +141,6 @@
 
   <main>
 
-    <!-- HERO -->
     <section class="hero container reveal">
       <p class="tag">🔥 Discipline • Habit Tracking • Private Accountability</p>
       <h2>Build Powerful Habits. Track Mood. Stay Accountable.</h2>
@@ -109,6 +153,12 @@
       <div class="download-cards">
 
         <article class="download-card tilt">
+          <!-- ✅ Added glass capsule -->
+          <span class="pre-release-pill">
+            <span class="pre-release-dot"></span>
+            Pre-Released
+          </span>
+
           <h3>Download Android APK</h3>
           <p>Direct installation for Android devices.</p>
           <a class="btn btn-primary" href="https://github.com/StreakSphere-App/StreakSphere/releases/download/v2.0/StreakSphere.apk" download>
@@ -116,18 +166,17 @@
           </a>
         </article>
 
-<article class="download-card tilt">
-  <h3>Download iOS IPA</h3>
-  <p>Manual sideload required (AltStore or Sideloadly).</p>
-  <button class="btn btn-primary ipa-disabled" disabled>
-    IPA Will Be Available Soon
-  </button>
-</article>
+        <article class="download-card tilt">
+          <h3>Download iOS IPA</h3>
+          <p>Manual sideload required (AltStore or Sideloadly).</p>
+          <button class="btn btn-primary ipa-disabled" disabled>
+            IPA Will Be Available Soon
+          </button>
+        </article>
 
       </div>
     </section>
 
-    <!-- FEATURES -->
     <section class="container section-space">
       <div class="section-head reveal">
         <h2>Core Features</h2>
@@ -168,7 +217,6 @@
       </div>
     </section>
 
-    <!-- INSTALLATION -->
     <section class="container section-space">
       <div class="section-head reveal">
         <h2>Installation Guide</h2>
@@ -224,7 +272,6 @@
       </article>
     </section>
 
-    <!-- RELEASE LOGS -->
     <section id="release-logs" class="release-section container section-space">
       <div class="section-head reveal">
         <h2>Version Updates</h2>
