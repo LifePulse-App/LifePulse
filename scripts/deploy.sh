@@ -21,18 +21,23 @@ echo "📦 Installing backend dependencies..."
 npm install --legacy-peer-deps
 
 # -------------------------------------
-# 2️⃣ Restart backend
+# 2️⃣ Restart backend (only target env)
 # -------------------------------------
 echo "🔄 Restarting Backend..."
 
-pm2 delete "$APP_NAME-dev" >/dev/null 2>&1 || true
-pm2 delete "$APP_NAME-prod" >/dev/null 2>&1 || true
-
 if [ "$ENV" == "development" ]; then
-    pm2 start server-dev.js --name "$APP_NAME-dev" -i max
+    TARGET_NAME="$APP_NAME-dev"
+    TARGET_SCRIPT="server-dev.js"
 else
-    pm2 start server-prod.js --name "$APP_NAME-prod" -i max
+    TARGET_NAME="$APP_NAME-prod"
+    TARGET_SCRIPT="server-prod.js"
 fi
+
+# Delete only the process being deployed
+pm2 delete "$TARGET_NAME" >/dev/null 2>&1 || true
+
+# Start selected environment
+pm2 start "$TARGET_SCRIPT" --name "$TARGET_NAME" -i max
 
 # -------------------------------------
 # 3️⃣ Prepare AI Environment
