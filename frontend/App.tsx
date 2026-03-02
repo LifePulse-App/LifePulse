@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Platform,
   PermissionsAndroid,
-  AppState,
 } from 'react-native';
 import { DefaultTheme, MD3DarkTheme, PaperProvider } from 'react-native-paper';
 import Toast, { BaseToast, BaseToastProps } from 'react-native-toast-message';
@@ -106,7 +105,7 @@ async function displayChatNotificationGroupedBySender(data: any) {
   });
 }
 
-// ✅ keep background handler light (no markAllPendingDelivered loop here)
+// ✅ keep background handler light
 messaging().setBackgroundMessageHandler(async remoteMessage => {
   const data = remoteMessage?.data || {};
 
@@ -151,40 +150,28 @@ const App = () => {
   const secretKeySetRef = useRef(false);
   const lastRegisteredTokenRef = useRef<string | null>(null);
 
-  // ✅ anti-spam guard for markAllPendingDelivered
-  const deliveringAllRef = useRef(false);
-  const lastDeliverAllAtRef = useRef(0);
+  // ✅ run markAllPendingDelivered only once per app process
+  const hasMarkedAllOnAppLoadRef = useRef(false);
+  const isMarkingAllNowRef = useRef(false);
 
-  const runMarkAllPendingDelivered = async (reason: string) => {
-    const now = Date.now();
-    if (now - lastDeliverAllAtRef.current < 10000) return; // 10s throttle
-    if (deliveringAllRef.current) return;
+  const runMarkAllPendingDeliveredOnceOnAppLoad = async () => {
+    if (hasMarkedAllOnAppLoadRef.current) return;
+    if (isMarkingAllNowRef.current) return;
 
-    deliveringAllRef.current = true;
-    lastDeliverAllAtRef.current = now;
-
+    isMarkingAllNowRef.current = true;
     try {
       await markAllPendingDelivered();
+      hasMarkedAllOnAppLoadRef.current = true;
     } catch (e) {
-      console.log(`markAllPendingDelivered (${reason}) failed`, e);
+      console.log('markAllPendingDelivered (initial-load) failed', e);
     } finally {
-      deliveringAllRef.current = false;
+      isMarkingAllNowRef.current = false;
     }
   };
 
   useEffect(() => {
     loadChatNotificationState();
     requestNotificationPermission();
-  }, []);
-
-  // ✅ only run on app active
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', async state => {
-      if (state === 'active') {
-        await runMarkAllPendingDelivered('active');
-      }
-    });
-    return () => sub.remove();
   }, []);
 
   useEffect(() => {
@@ -263,8 +250,6 @@ const App = () => {
           const ids = parseMessageIds(data.messageIds);
           markMessagesDeliveredLocally(data.peerUserId, ids);
         }
-
-        // ❌ removed continuous markAllPendingDelivered from every push
       });
     };
 
@@ -286,7 +271,6 @@ const App = () => {
       if (lastRegisteredTokenRef.current === token) return;
       await apiClient.post('/push/register', { token, platform: 'android' });
       lastRegisteredTokenRef.current = token;
-      console.log('[FCM] Registered token:', token);
     };
 
     const run = async () => {
@@ -306,10 +290,10 @@ const App = () => {
     };
   }, [User]);
 
-  // ✅ once after user ready
+  // ✅ ONLY FIRST LOAD WHEN APP OPENS (after user becomes available)
   useEffect(() => {
     if (!User) return;
-    runMarkAllPendingDelivered('user-ready');
+    runMarkAllPendingDeliveredOnceOnAppLoad();
   }, [User]);
 
   useEffect(() => {

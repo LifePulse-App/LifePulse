@@ -19,9 +19,28 @@ const SavedAccountsScreen = ({ navigation }: any) => {
   const [accounts, setAccounts] = useState<SavedAccount[]>([]);
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
+  // ✅ keep only unique usernames (case-insensitive)
+  const getUniqueByUsername = (list: SavedAccount[]) => {
+    const seen = new Set<string>();
+    const unique: SavedAccount[] = [];
+
+    for (const acc of list) {
+      const username = String(acc?.username || "").trim().toLowerCase();
+      if (!username) continue;
+
+      if (!seen.has(username)) {
+        seen.add(username);
+        unique.push(acc);
+      }
+    }
+
+    return unique;
+  };
+
   const load = async () => {
     const list = await SavedAccountsStorage.getAll();
-    setAccounts(list);
+    const unique = getUniqueByUsername(list);
+    setAccounts(unique);
   };
 
   useEffect(() => {
@@ -96,7 +115,7 @@ const SavedAccountsScreen = ({ navigation }: any) => {
             {accounts.map((acc) => (
               <View key={acc.id} style={localStyles.accountRow}>
                 <View style={localStyles.userInfo}>
-                  <Text style={localStyles.username}>{acc.username}</Text>
+                  <Text style={localStyles.username}>{acc?.user?.user?.name}</Text>
                   <Text style={localStyles.smallText}>Tap login to continue</Text>
                 </View>
 
@@ -156,11 +175,11 @@ const savedStyles = () =>
       width: "100%",
       borderRadius: 24,
       padding: 18,
-      backgroundColor: "rgba(255,255,255,0.25)",
-      borderWidth: 1.5,
-      borderColor: "rgba(255,255,255,0.35)",
+      backgroundColor: "rgba(255,255,255,0.1)",
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,1)",
       shadowColor: "#000",
-      shadowOpacity: 0.25,
+      shadowOpacity: 0.5,
       shadowRadius: 20,
       shadowOffset: { width: 0, height: 10 },
     },

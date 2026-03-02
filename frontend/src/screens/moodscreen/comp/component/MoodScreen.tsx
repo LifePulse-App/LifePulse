@@ -173,8 +173,7 @@ const MoodScreen = ({ navigation, route }: any) => {
             >
               <Text style={styles.mainTitle}>How are you feeling today?</Text>
               <Text style={styles.subtitle}>
-                Tap one mood that best matches your current state. This helps us
-                track your mood journey over time.
+                Tap one mood that best matches your current state.
               </Text>
 
               {MOOD_GROUPS.map((group) => (

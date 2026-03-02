@@ -6,6 +6,7 @@ import {
   FlatList,
   TextInput,
   Platform,
+  Image,
 } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
@@ -16,7 +17,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import MainLayout from "../../../shared/components/MainLayout";
 import socialApi from "../services/api_friends";
 import apiClient from "../../../auth/api-client/api_client";
-import { Image } from "react-native";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
@@ -28,6 +28,8 @@ type Friend = {
   name: string;
   username?: string;
   avatar?: any;
+  avatarUrl?: string;
+  avatarThumbnailUrl?: string;
   since?: string;
 };
 
@@ -37,9 +39,7 @@ const saveCache = async (friends: Friend[]) => {
       FRIENDS_CACHE_KEY,
       JSON.stringify({ ts: Date.now(), friends })
     );
-  } catch (e) {
-    // ignore
-  }
+  } catch (e) {}
 };
 
 const loadCache = async (): Promise<Friend[] | null> => {
@@ -61,16 +61,14 @@ export default function FriendsListScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const baseUrl = apiClient.getBaseURL(); // Example: "http://localhost:40000/api"
+  const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
-
   const didSeedFromCacheRef = useRef(false);
 
-  // NetInfo
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
       const connected = state.isConnected === true;
-      const reachable = state.isInternetReachable === true; // null => false
+      const reachable = state.isInternetReachable === true;
       setOffline(!connected || !reachable);
     });
     return () => unsub();
@@ -87,7 +85,6 @@ export default function FriendsListScreen({ navigation }: any) {
   const loadFriends = useCallback(async () => {
     setErrorMsg(null);
 
-    // Always try cache first (instant fill)
     await seedFromCache();
 
     if (offline) {
@@ -109,7 +106,6 @@ export default function FriendsListScreen({ navigation }: any) {
       const msg =
         e?.response?.data?.message || e?.message || "Failed to load friends list.";
 
-      // If we have nothing cached, show error. Otherwise keep cached list.
       const cached = await loadCache();
       if (!cached || cached.length === 0) {
         setErrorMsg(msg);
@@ -127,7 +123,6 @@ export default function FriendsListScreen({ navigation }: any) {
     }, [loadFriends])
   );
 
-  // Reload when connectivity changes
   useEffect(() => {
     loadFriends();
   }, [offline, loadFriends]);
@@ -143,50 +138,60 @@ export default function FriendsListScreen({ navigation }: any) {
     });
   }, [friends, search]);
 
-  const renderFriend = ({ item }: { item: Friend }) => {
-    console.log(item);
-    
-    const initials =
-    item?.name?.split(" ").map((p) => p[0]).join("").toUpperCase().slice(0, 2) ||
-    item?.username?.slice(0, 2)?.toUpperCase() ||
-    "?";
-    return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      style={styles.card}
-      onPress={() =>
-        navigation.navigate("ProfilePreview", {
-          userId: item._id,
-          name: item.name,
-          username: item.username,
-        })
-      }
-    >
-      <View style={styles.left}>
-        <View style={styles.avatarCircle}>
-        {item.avatar ? (
-      <Image
-        source={{ uri: newUrl + item.avatar }}
-        style={{ width: 40, height: 40, borderRadius: 999 }}
-        resizeMode="cover"
-      />
-    ) : (
-      <Text style={styles.avatarText}>{initials}</Text>
-    )}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.name} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <Text style={styles.username} numberOfLines={1}>
-            {item.username ? `@${item.username}` : "@"}
-          </Text>
-        </View>
-      </View>
+  const resolveAvatarUri = (item: Friend) => {
+    const raw =
+      item.avatarThumbnailUrl ||
+      item.avatarUrl ||
+      (typeof item.avatar === "string" ? item.avatar : item.avatar?.url) ||
+      "";
 
-      <Icon name="chevron-right" size={22} color="#9CA3AF" />
-    </TouchableOpacity>
-  )}
+    if (!raw) return "";
+    return raw.startsWith("http") ? raw : newUrl + raw;
+  };
+
+  const renderFriend = ({ item }: { item: Friend }) => {
+    const avatarUri = resolveAvatarUri(item);
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.85}
+        style={styles.card}
+        onPress={() =>
+          navigation.navigate("ProfilePreview", {
+            userId: item._id,
+            name: item.name,
+            username: item.username,
+          })
+        }
+      >
+        <View style={styles.left}>
+          <View style={styles.avatarCircle}>
+            {avatarUri ? (
+              <Image
+                source={{ uri: avatarUri }}
+                style={{ width: 40, height: 40, borderRadius: 999 }}
+                resizeMode="cover"
+              />
+            ) : (
+              // ✅ person icon fallback
+              <Icon name="account" size={20} color="#E5E7EB" />
+            )}
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text style={styles.username} numberOfLines={1}>
+              {item.username ? `@${item.username}` : "@"}
+            </Text>
+          </View>
+        </View>
+
+        <Icon name="chevron-right" size={22} color="#9CA3AF" />
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <MainLayout>
@@ -214,7 +219,7 @@ export default function FriendsListScreen({ navigation }: any) {
           <TouchableOpacity
             activeOpacity={0.8}
             style={styles.iconGlass}
-            onPress={() => navigation.navigate("Friends")} // or your requests screen
+            onPress={() => navigation.navigate("Friends")}
           >
             <Icon name="account-plus-outline" size={22} color="#E5E7EB" />
           </TouchableOpacity>
@@ -330,17 +335,17 @@ const styles = StyleSheet.create({
   },
   left: { flexDirection: "row", alignItems: "center", flex: 1, marginRight: 10 },
   avatarCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "rgba(99, 102, 241, 0.35)",
     borderWidth: 1,
     borderColor: "rgba(191, 219, 254, 0.35)",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
+    overflow: "hidden",
   },
-  avatarLetter: { color: "#E5E7EB", fontWeight: "800" },
   name: { color: "#fff", fontSize: 16, fontWeight: "700" },
   username: { color: "#94a3b8", marginTop: 2 },
 
@@ -365,5 +370,4 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   errorRetryText: { color: "#FEF2F2", fontSize: 11, fontWeight: "600" },
-  avatarText: { color: "#0F172A", fontSize: 14, fontWeight: "700" },
 });

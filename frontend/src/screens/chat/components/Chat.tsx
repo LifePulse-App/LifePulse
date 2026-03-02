@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useContext } from "react";
-import { View, FlatList, TouchableOpacity, StyleSheet, TextInput } from "react-native";
+import { View, FlatList, TouchableOpacity, StyleSheet, TextInput, Image } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import NetInfo from "@react-native-community/netinfo";
@@ -10,6 +10,7 @@ import { listConversationPreviews as listConversationPreviewsApi, fetchFriends }
 import MainLayout from "../../../shared/components/MainLayout";
 import AuthContext from "../../../auth/user/UserContext";
 import { getUnread, subscribeUnreadChanges, subscribeConversationChanges } from "../services/ChatNotifications";
+import apiClient from "../../../auth/api-client/api_client";
 
 const CACHE_KEY = "chat_list_cache";
 
@@ -43,6 +44,25 @@ const loadCache = async (userId: string): Promise<any[]> => {
   }
 };
 
+// ✅ person icon fallback instead of initials
+const Avatar = ({ url }: { url?: string }) => {
+
+  if (url) {
+    return (
+      <Image
+        source={{ uri: url }}
+        style={styles.avatar}
+      />
+    );
+  } else {
+  return (
+    <View style={styles.avatarFallback}>
+      <Icon name="account" size={22} color="#cbd5e1" />
+    </View>
+  );
+}
+};
+
 export default function ChatListScreen({ navigation }: any) {
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<any[]>([]);
@@ -52,7 +72,9 @@ export default function ChatListScreen({ navigation }: any) {
   const user = useContext(AuthContext);
   const myUserId = String(user?.User?.user?.id || user?.User?.user?._id || "");
 
-  // Load cache immediately on mount/user change
+    const baseUrl = apiClient.getBaseURL();
+  const newUrl = baseUrl.replace(/\/api\/?$/, "");
+
   useEffect(() => {
     if (!myUserId) return;
     loadCache(myUserId).then((cached) => {
@@ -70,24 +92,39 @@ export default function ChatListScreen({ navigation }: any) {
       ]);
 
       const friends = friendsRes?.data?.friends || [];
-      const nameMap = new Map<string, string>();
+      
+      const friendMap = new Map<
+        string,
+        { name: string; avatarUrl: string; avatarThumb: string; avatarPublicUrl: string }
+      >();
+
       for (const f of friends) {
         const id = String(f._id);
-        const name = String(f.name || f.username || "Friend");
-        nameMap.set(id, name);
+        friendMap.set(id, {
+          name: String(f.name || f.username || "Friend"),
+          avatarUrl: String(f.avatar || ""),
+          avatarThumb: String(f.avatarThumbnailUrl || ""),
+          avatarPublicUrl: String(f.avatar?.url || ""),
+        });
       }
 
       const convos = convRes?.conversations || [];
       const mapped = convos.map((c: any) => {
         const peerId = String(c.peerUserId);
+        const friend = friendMap.get(peerId);
+
+        const resolvedAvatar =
+          friend?.avatarUrl ||
+          "";
+
         return {
           conversationId: String(c.conversationId),
           peerUserId: peerId,
-          peerName: c.peerName || nameMap.get(peerId) || "Friend",
+          peerName: c.peerName || friend?.name || "Friend",
+          peerAvatarUrl: String(resolvedAvatar || ""),
           mood: c.mood || "",
           lastText: c.lastText || "",
           lastAt: c.lastAt || "",
-          // ✅ local unread should win for instant consistency
           unread: Number(getUnread(peerId) || c.unread || 0),
         };
       });
@@ -115,7 +152,6 @@ export default function ChatListScreen({ navigation }: any) {
     loadOnline();
   }, [loadOnline, version]);
 
-  // ✅ Keep only ONE focus listener
   useEffect(() => {
     const unsub = navigation.addListener("focus", () => {
       if (!myUserId) return;
@@ -187,27 +223,32 @@ export default function ChatListScreen({ navigation }: any) {
                     peerUserId: item.peerUserId,
                     peerName: item.peerName,
                     peerMood: item.mood,
+                    peerAvatarUrl: item.peerAvatarUrl, // pass avatar to chat header
                   })
                 }
               >
-                <View style={styles.rowTop}>
-                  <Text style={styles.peer} numberOfLines={1}>
-                    {item.peerName} {item.mood ? `[ is feeling ${item.mood} ]` : ""}
-                  </Text>
-                  <Text style={styles.time}>{formatLastTime(item.lastAt)}</Text>
-                </View>
+                <Avatar url={ newUrl + item.peerAvatarUrl} />
 
-                <View style={styles.rowTop}>
-                  <Text style={styles.snippet} numberOfLines={1}>
-                    {item.lastText || "No messages yet"}
-                  </Text>
-                  {item.unread > 0 && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText} numberOfLines={1}>
-                        {item.unread > 99 ? "99+" : item.unread}
-                      </Text>
-                    </View>
-                  )}
+                <View style={styles.rowContent}>
+                  <View style={styles.rowTop}>
+                    <Text style={styles.peer} numberOfLines={1}>
+                      {item.peerName}
+                    </Text>
+                    <Text style={styles.time}>{formatLastTime(item.lastAt)}</Text>
+                  </View>
+
+                  <View style={styles.rowTop}>
+                    <Text style={styles.snippet} numberOfLines={1}>
+                      {item.lastText || "No messages yet"}
+                    </Text>
+                    {item.unread > 0 && (
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText} numberOfLines={1}>
+                          {item.unread > 99 ? "99+" : item.unread}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </TouchableOpacity>
             )}
@@ -240,6 +281,35 @@ const styles = StyleSheet.create({
     borderRadius: 220,
     backgroundColor: "rgba(168, 85, 247, 0.28)",
   },
+
+  row: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderRadius: 12,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  rowContent: { flex: 1, marginLeft: 10 },
+
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.35)",
+  },
+  avatarFallback: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.35)",
+  },
+
   rowTop: {
     flexDirection: "row",
     alignItems: "center",
@@ -247,6 +317,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   time: { color: "#94a3b8", fontSize: 12, marginLeft: 10 },
+
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -276,7 +347,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(148,163,184,0.3)",
   },
   searchInput: { flex: 1, color: "#fff", paddingVertical: 8, marginLeft: 6 },
-  row: { backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 12 },
+
   peer: { color: "#fff", fontSize: 16, fontWeight: "700", flex: 1, marginRight: 8 },
   snippet: { color: "#94a3b8", marginTop: 4, flex: 1, marginRight: 8 },
   badge: {

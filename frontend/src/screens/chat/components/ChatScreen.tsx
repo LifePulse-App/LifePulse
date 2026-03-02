@@ -7,6 +7,7 @@ import {
   TextInput,
   Keyboard,
   LayoutAnimation,
+  Image,
 } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,6 +35,7 @@ import {
   upsertThreadMessage as upsertThreadMessageV2,
   upsertConversationPreview as upsertPreviewV2,
 } from "../services/LocalChatCache";
+import apiClient from "../../../auth/api-client/api_client";
 
 type Item =
   | { type: "date"; id: string; dateKey: string }
@@ -62,7 +64,7 @@ const formatTime = (iso: string) =>
 
 export default function ChatScreen({ route, navigation }: any) {
   const user = useContext(AuthContext);
-  const { peerUserId, peerName, peerMood } = route.params;
+  const { peerUserId, peerName, peerMood, peerAvatarUrl, avatarUrl } = route.params;
   const insets = useSafeAreaInsets();
 
   const myUserId = String(user?.User?.user?.id || user?.User?.user?._id || "");
@@ -77,6 +79,12 @@ export default function ChatScreen({ route, navigation }: any) {
 
   const flatRef = useRef<FlatList>(null);
   const didInitialAutoScrollRef = useRef(false);
+
+  const resolvedPeerAvatar = String(peerAvatarUrl || avatarUrl || "");
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+      const baseUrl = apiClient.getBaseURL();
+  const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
   const scrollToBottom = () =>
     requestAnimationFrame(() => flatRef.current?.scrollToEnd({ animated: true }));
@@ -437,9 +445,33 @@ export default function ChatScreen({ route, navigation }: any) {
               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
                 <Icon name="arrow-left" size={22} color="#fff" />
               </TouchableOpacity>
-              <Text style={styles.title}>
-                {peerName || "Friend"} {peerMood ? `[ is feeling ${peerMood} ] ` : ""}
-              </Text>
+
+              <TouchableOpacity
+                style={styles.titlePressable}
+                activeOpacity={0.7}
+                onPress={() =>
+                  navigation.navigate("ProfilePreview", {
+                    userId: String(peerUserId),
+                  })
+                }
+              >
+                {resolvedPeerAvatar && !avatarFailed ? (
+                  <Image
+                    source={{ uri: newUrl + resolvedPeerAvatar }}
+                    style={styles.headerAvatar}
+                    onError={() => setAvatarFailed(true)}
+                  />
+                ) : (
+                  <View style={styles.headerAvatarFallback}>
+                    {/* ✅ person icon fallback */}
+                    <Icon name="account" size={18} color="#cbd5e1" />
+                  </View>
+                )}
+
+                <Text numberOfLines={1} style={styles.title}>
+                  {peerName || "Friend"} {peerMood ? `[ is ${peerMood} ] ` : ""}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             <FlatList
@@ -559,8 +591,39 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "rgba(148,163,184,0.35)",
+    marginRight: 8,
   },
-  title: { color: "#fff", fontSize: 18, fontWeight: "700", marginLeft: 12, flex: 1, marginRight: 10 },
+
+  titlePressable: {
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 10,
+    paddingVertical: 4,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.35)",
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  headerAvatarFallback: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    marginRight: 10,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.35)",
+  },
+
+  title: { color: "#fff", fontSize: 18, fontWeight: "700", flex: 1 },
   listContent: { paddingVertical: 8 },
   dateRow: { alignItems: "center", marginVertical: 10 },
   dateText: {

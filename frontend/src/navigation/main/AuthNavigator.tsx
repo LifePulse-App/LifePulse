@@ -275,6 +275,7 @@ import ProfilePreviewScreen from '../../screens/profile/components/ProfilePrevie
 <Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
 <Stack.Screen name="AvatarCreator" component={AvatarCreatorScreen} />
 <Stack.Screen name="chat" component={ChatScreen} />
+    <Stack.Screen name="ProfilePreview" component={ProfilePreviewScreen} options={{headerShown: false}}/>
     </Stack.Navigator>
   );
 };
