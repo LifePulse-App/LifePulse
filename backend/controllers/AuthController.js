@@ -4,14 +4,12 @@ import crypto from "crypto";
 import validator from "validator"
 import ErrorHandler from "../utils/errorHandler.js";
 import catchAsyncErrors from "../utils/catchAsyncErrors.js";
-import { sendResetPasswordEmail, sendVerificationEmail, verifyEmail } from "./OtpController.js";
+import { sendResetPasswordEmail, sendVerificationEmail } from "./OtpController.js";
 import { OAuth2Client } from "google-auth-library";
-import appleSignin from "apple-signin-auth";
 import { authenticator } from "otplib";
 import QRCode from "qrcode";
 import { decryptTOTPSecret, encryptTOTPSecret } from "../utils/crypto2fa.js";
 import { lookupIpLocation } from "../utils/geoip.js";
-import { log } from "console";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -151,7 +149,6 @@ if (!passwordRegex.test(password)) {
       message: "User registered. Verification code sent to email.",
     });
   } catch (err) {
-    console.log(err);
     return next(new ErrorHandler(err, 500));
   }
 });
@@ -219,7 +216,6 @@ export const resendVerificationOtp = catchAsyncErrors(async (req, res, next) => 
       resetAt: user.otpResendResetAt,
     });
   } catch (err) {
-    console.log(err);
     return next(new ErrorHandler(err.message || "Internal Server Error", 500));
   }
 });

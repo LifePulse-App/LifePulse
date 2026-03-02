@@ -207,8 +207,6 @@ export const storeMessage = async (req, res) => {
       ciphertext,
     }));
 
-    // console.log("ok");
-
     const inserted = await E2EEMessage.insertMany(messages);
     // Only push if recipient is not the sender (don't notify self-messages/devices)
 
@@ -217,9 +215,7 @@ export const storeMessage = async (req, res) => {
       req.body.notifyUser == false // Only true for the FIRST device upload per message
     ) {
       const senderName = req.user?.name || req.user?.username || "Someone";
-      console.log("ok");
       await sendMsgNotification(toUserId, req.user._id, senderName);
-      console.log("PUSH SENT");
     }
     res.json({ success: true, count: inserted.length, ids: inserted.map((m) => m._id) });
   } catch (err) {

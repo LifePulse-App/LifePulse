@@ -84,7 +84,6 @@ export const listHabits = async (req, res) => {
   try {
     const search = req.query.search || req.query["params[search]"] || "";
     const query = { active: true }; // no : any
-    console.log(search);
     if (search) {
       query.$or = [
         { habitName: { $regex: search, $options: "i" } },

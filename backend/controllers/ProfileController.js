@@ -461,9 +461,7 @@ export const upload = multer({ storage });
 export const uploadAvatar = catchAsyncErrors(async (req, res, next) => {
   if (!req.file) return next(new ErrorHandler("No file uploaded", 400));
   
-  console.log(req.file);
   const avatarUrl = `/avatars/${req.file.filename}`;
-  console.log(avatarUrl);
   // Optionally delete previous avatar here (recommended for cleanup!)
   await User.findByIdAndUpdate(
     req.user._id,

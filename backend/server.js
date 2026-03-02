@@ -6,8 +6,6 @@ import dotenv from "dotenv";
 import cookieParser from 'cookie-parser';
 import nodemailer from "nodemailer"
 import errorMiddleware from "./utils/errorMiddleware.js"
-import https from 'https';
-import fs from 'fs';
 import cron from 'node-cron';
 
 
@@ -97,24 +95,11 @@ app.get('/health', (req, res) => {
   res.send(`Backend API is running on ${PORT} in ${ENV} mode🚀`);
 });
 
-// HTTPS options (Cloudflare origin certificate)
-// const sslOptions = {
-//   key: fs.readFileSync('./certs/key.pem'),
-//   cert: fs.readFileSync('./certs/cert.pem'),
-// };
-
-// Start HTTPS server
-// const server = https.createServer(sslOptions, app).listen(PORT, '0.0.0.0', () => {
-//   console.log(`Server running on https://0.0.0.0:${PORT} in ${ENV} mode`);
-// });
-
 import { runMonthlyReset } from './helpers/monthlyReset.js'; // adjust path
 
 cron.schedule('0 0 0 1 * *', async () => {
-  console.log('[cron] Monthly reset started (PKT midnight)');
   try {
     await runMonthlyReset();
-    console.log('[cron] Monthly reset finished');
   } catch (err) {
     console.error('[cron] Monthly reset failed:', err);
   }

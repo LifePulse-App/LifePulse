@@ -80,7 +80,6 @@ async function sendNotificationFCM(tokens, payload) {
         err.errorInfo?.code === 'messaging/registration-token-not-registered'
       ) {
         await PushToken.deleteOne({ token: t.token });
-        console.log('[push] deleted invalid token');
       } else {
         console.error('[push] Failed to send to token', t.token, err.code, err.message);
       }

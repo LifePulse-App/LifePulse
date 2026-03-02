@@ -2,7 +2,7 @@ import User from "../models/UserSchema.js";
 import Mood from "../models/MoodSchema.js";
 import Habit from "../models/HabitSchema.js";
 import Proof from "../models/ProofSchema.js";
-import { LEVELS, calculateXpProgress } from "../helpers/levels.js";
+import { calculateXpProgress } from "../helpers/levels.js";
 import { getStreakTitle } from "../helpers/streak.js";
 const toUtcMidnight = (d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
 
