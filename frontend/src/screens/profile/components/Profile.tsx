@@ -13,6 +13,9 @@ import { Image } from 'react-native';
 import UserStorage from "../../../auth/user/UserStorage";
 import SavedAccountsStorage from "../../../auth/user/SavedAccountsStorage";
 import apiClient from "../../../auth/api-client/api_client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const PROFILE_CACHE_KEY = "profile_cache_v1";
 
 // --- Glassy Confirm Modal Component ---
 const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }: any) => {
@@ -116,11 +119,9 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Step 1: Request OTP after entering passwords
   const requestOtp = async () => {
     setLoading(true);
     try {
-      // You can pass the passwords here, or require OTP on registered email regardless
       await profileApi.requestPasswordChangeOtp();
       setLoading(false);
       setStep(2);
@@ -235,7 +236,7 @@ function ChangeNumberModal({ user, onClose, setResultCard }: any) {
       await profileApi.changeNumber(number);
       setLoading(false);
       setResultCard({ visible: true, type: "success", message: "Number changed!" });
-      
+
       onClose();
     } catch (err) {
       setLoading(false);
@@ -257,7 +258,7 @@ function ChangeNumberModal({ user, onClose, setResultCard }: any) {
 }
 function LinkedAccountModal({ onClose, onChange }: any) {
   const [email, setEmail] = useState("");
-  const [stage, setStage] = useState(1); // 1: request, 2: verify OTP
+  const [stage, setStage] = useState(1);
   const [newEmail, setNewEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -275,14 +276,11 @@ function LinkedAccountModal({ onClose, onChange }: any) {
     })();
   }, []);
 
-  // Request OTP (verify password first!)
   const handleRequestOtp = async () => {
     setLoading(true);
     try {
-      
-      const response = await profileApi.requestEmailChange({ currentPassword, newEmail }); // Update API on frontend to send password!
-      
-      if (!response.ok) {  
+      const response = await profileApi.requestEmailChange({ currentPassword, newEmail });
+      if (!response.ok) {
         setResult({
           visible: true,
           type: "error",
@@ -303,11 +301,10 @@ function LinkedAccountModal({ onClose, onChange }: any) {
     }
   };
 
-  // Verify OTP and actually change email
   const handleVerifyOtp = async () => {
     setLoading(true);
     try {
-      const response = await profileApi.verifyEmailChange({ otp }); // Make sure this matches backend (only OTP needed)
+      const response = await profileApi.verifyEmailChange({ otp });
       if (!response.ok) {
         setResult({
           visible: true,
@@ -475,22 +472,30 @@ const ProfileScreen = ({ navigation }: any) => {
   const userId = user?.id;
   const [profile, setProfile] = useState();
   const avatarUrl = (profile as any)?.avatarUrl;
-  const [activeModal, setActiveModal] = useState(null);  
+  const [activeModal, setActiveModal] = useState(null);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
-  // --- New for delete account w/ OTP ---
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  const [deleteOtpStep, setDeleteOtpStep] = useState(0); // 0 = ask confirm, 1 = OTP input
+  const [deleteOtpStep, setDeleteOtpStep] = useState(0);
   const [deleteOtp, setDeleteOtp] = useState("");
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // --- Flash card state ---
   const [resultCard, setResultCard] = useState({ visible: false, type: "success", message: "" });
   const avatarThumbnailUrl = (profile as any)?.avatarThumbnailUrl;
   const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
-  // --- API handlers ---
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+        if (!raw) return;
+        const cached = JSON.parse(raw);
+        if (cached) setProfile(cached);
+      } catch {}
+    })();
+  }, []);
+
   const confirmLogout = async () => {
     const userData = authContext?.User;
     if (userData?.user?.id && userData?.UserName && userData?.Password) {
@@ -501,6 +506,7 @@ const ProfileScreen = ({ navigation }: any) => {
         user: userData,
       });
     }
+    await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
     await logout(userId);
     authContext?.setUser(null);
     UserStorage.clearTokens();
@@ -508,7 +514,6 @@ const ProfileScreen = ({ navigation }: any) => {
     navigation.replace("SavedAccounts");
   };
 
-  // --- Delete account with OTP (NEW) ---
   const handleRequestDeleteOtp = async () => {
     setDeleteLoading(true);
     try {
@@ -526,6 +531,7 @@ const ProfileScreen = ({ navigation }: any) => {
     setDeleteLoading(true);
     try {
       await profileApi.deleteAccountWithOtp(deleteOtp);
+      await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
       setDeleteConfirmVisible(false);
       setDeleteOtp("");
       setDeleteOtpStep(0);
@@ -542,7 +548,6 @@ const ProfileScreen = ({ navigation }: any) => {
     }
   };
 
-  // --- Fetch profile ---
   const fetchProfile = async () => {
     try {
       const [profileRes, avatarRes] = await Promise.all([
@@ -551,11 +556,12 @@ const ProfileScreen = ({ navigation }: any) => {
       ]);
       const user = profileRes?.data?.user;
       const { avatarThumbnailUrl } = avatarRes.data || {};
-      setProfile({ ...user, avatarThumbnailUrl });
+      const merged = { ...user, avatarThumbnailUrl };
+      setProfile(merged as any);
+      await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
     } catch (e) {}
   };
 
-  // --- Modal renderer for edit screens ---
   const renderActionModal = () => {
     if (!activeModal) return null;
     const ModalComponent = actionComponents[activeModal];
@@ -664,7 +670,6 @@ const ProfileScreen = ({ navigation }: any) => {
           onCancel={() => setLogoutModalVisible(false)}
         />
 
-        {/* DELETE ACCOUNT SECTION */}
         <TouchableOpacity style={styles.deleteBtn} onPress={() => {
           setDeleteConfirmVisible(true);
           setDeleteOtpStep(0);
@@ -759,7 +764,6 @@ const ProfileScreen = ({ navigation }: any) => {
   );
 };
 
-
 const sheetStyles = StyleSheet.create({
   modalSheet: { justifyContent: "flex-end", margin: 0 },
   sheetContent: {
@@ -836,23 +840,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  
-  // circular mask
+
   avatarMask: {
     width: 95,
     height: 95,
     borderRadius: 48,
-    overflow: 'hidden',       // critical: crops the image to the circle
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  
-  // zoomed face image
+
   avatarImageZoomed: {
-    width: 110,               // > 95 so it zooms in
+    width: 110,
     height: 110,
     borderRadius: 65,
-    // Move image up so face is centered; tweak these two lines to taste:         // negative to push face up
   },
 });
 

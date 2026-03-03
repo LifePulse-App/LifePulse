@@ -23,7 +23,25 @@ const ChatMessageSchema = new mongoose.Schema(
       index: true,
     },
 
-    text: { type: String, required: true },
+    // text is optional now (for media-only message)
+    text: { type: String, default: "" },
+
+    // NEW
+    messageType: {
+      type: String,
+      enum: ["text", "image", "video", "document"],
+      default: "text",
+      index: true,
+    },
+
+    media: {
+      url: { type: String, default: "" },
+      mimeType: { type: String, default: "" },
+      size: { type: Number, default: 0 },
+      name: { type: String, default: "" },
+      thumbnailUrl: { type: String, default: "" },
+      duration: { type: Number, default: 0 },
+    },
 
     clientMessageId: { type: String, required: true, index: true },
     deliveredAt: { type: Date, default: null },

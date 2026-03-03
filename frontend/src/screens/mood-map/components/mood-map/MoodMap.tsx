@@ -9,6 +9,7 @@ import {
   Pressable,
   PermissionsAndroid,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppText from "../../../../components/Layout/AppText/AppText";
 import AppScreen from "../../../../components/Layout/AppScreen/AppScreen";
 import MainLayout from "../../../../shared/components/MainLayout";
@@ -24,6 +25,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const SOCKET_URL = "http://YOUR_SERVER_IP:5000";
 const DARK_MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+
+const CACHE_KEYS = {
+  myLocation: "moodmap:myLocation:v1",
+  friendLocations: "moodmap:friendLocations:v1",
+  worldMoods: "moodmap:worldMoods:v1",
+  allFriends: "moodmap:allFriends:v1",
+  share: "moodmap:shareSettings:v1",
+};
 
 const MoodMap = () => {
   const authContext = useContext(AuthContext);
@@ -46,6 +55,21 @@ const MoodMap = () => {
   const isTrackingRef = useRef(true);
   const socket = useMemo(() => io(SOCKET_URL), []);
 
+  const saveCache = async (key: string, value: any) => {
+    try {
+      await AsyncStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+  };
+
+  const loadCache = async <T,>(key: string): Promise<T | null> => {
+    try {
+      const raw = await AsyncStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+      return null;
+    }
+  };
+
   const MOOD_LEGEND = [
     { mood: "ecstatic", color: "#22c55e" }, { mood: "happy", color: "#4ade80" }, { mood: "grateful", color: "#86efac" },
     { mood: "calm", color: "#38bdf8" }, { mood: "relaxed", color: "#60a5fa" }, { mood: "lovely", color: "#f472b6" },
@@ -55,6 +79,30 @@ const MoodMap = () => {
     { mood: "stressed", color: "#ef4444" }, { mood: "overwhelmed", color: "#dc2626" }, { mood: "annoyed", color: "#f43f5e" },
     { mood: "frustrated", color: "#e11d48" }, { mood: "angry", color: "#b91c1c" },
   ];
+
+  useEffect(() => {
+    (async () => {
+      const [cachedMyLoc, cachedFriendsLoc, cachedWorldMoods, cachedFriends, cachedShare] =
+        await Promise.all([
+          loadCache<[number, number]>(CACHE_KEYS.myLocation),
+          loadCache<any[]>(CACHE_KEYS.friendLocations),
+          loadCache<any[]>(CACHE_KEYS.worldMoods),
+          loadCache<any[]>(CACHE_KEYS.allFriends),
+          loadCache<{ shareEnabled: boolean; shareMode: ShareMode; selectedFriends: string[] }>(CACHE_KEYS.share),
+        ]);
+
+      if (cachedMyLoc) setMyLocation(cachedMyLoc);
+      if (cachedFriendsLoc) setFriendLocations(cachedFriendsLoc);
+      if (cachedWorldMoods) setWorldMoods(cachedWorldMoods);
+      if (cachedFriends) setAllFriends(cachedFriends);
+
+      if (cachedShare) {
+        setShareEnabled(!!cachedShare.shareEnabled);
+        setShareMode(cachedShare.shareMode || "all");
+        setSelectedFriends(cachedShare.selectedFriends || []);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     MapLibreGL.setAccessToken("");
@@ -74,7 +122,9 @@ const MoodMap = () => {
   useEffect(() => {
     const loadAllFriends = async () => {
       const res = await socialApi.getFriends();
-      setAllFriends(res?.data?.friends || []);
+      const friends = res?.data?.friends || [];
+      setAllFriends(friends);
+      await saveCache(CACHE_KEYS.allFriends, friends);
     };
     loadAllFriends();
   }, []);
@@ -82,7 +132,9 @@ const MoodMap = () => {
   useEffect(() => {
     const loadWorldMoods = async () => {
       const res = await MoodService.getWorldMoods();
-      setWorldMoods(res?.data?.data || []);
+      const wm = res?.data?.data || [];
+      setWorldMoods(wm);
+      await saveCache(CACHE_KEYS.worldMoods, wm);
     };
     loadWorldMoods();
     const id = setInterval(loadWorldMoods, 5000);
@@ -124,6 +176,7 @@ const MoodMap = () => {
         async (pos) => {
           const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
           setMyLocation(coords);
+          await saveCache(CACHE_KEYS.myLocation, coords);
 
           await locationApi.updateMyLocation(coords[0], coords[1]);
         },
@@ -146,7 +199,9 @@ const MoodMap = () => {
   useEffect(() => {
     const loadFriends = async () => {
       const data = await locationApi.getFriendsLocations();
-      setFriendLocations(data?.data?.locations || []);
+      const locations = data?.data?.locations || [];
+      setFriendLocations(locations);
+      await saveCache(CACHE_KEYS.friendLocations, locations);
     };
     loadFriends();
     const id = setInterval(loadFriends, 5000);
@@ -154,15 +209,23 @@ const MoodMap = () => {
   }, []);
 
   useEffect(() => {
-    if (!shareEnabled) {
-      locationApi.setLocationShare("none", []);
-      return;
-    }
-    if (shareMode === "custom") {
-      locationApi.setLocationShare("custom", selectedFriends);
-    } else {
-      locationApi.setLocationShare(shareMode, []);
-    }
+    const applyShare = async () => {
+      if (!shareEnabled) {
+        await locationApi.setLocationShare("none", []);
+      } else if (shareMode === "custom") {
+        await locationApi.setLocationShare("custom", selectedFriends);
+      } else {
+        await locationApi.setLocationShare(shareMode, []);
+      }
+
+      await saveCache(CACHE_KEYS.share, {
+        shareEnabled,
+        shareMode,
+        selectedFriends,
+      });
+    };
+
+    applyShare();
   }, [shareEnabled, shareMode, selectedFriends]);
 
   const friendMarkers = useMemo(
@@ -210,8 +273,8 @@ const MoodMap = () => {
           zoomEnabled
           pitchEnabled
           scrollEnabled
-          attributionEnabled={false} // ✅ removes "i" attribution button
-          logoEnabled={false} // ✅ removes logo if present
+          attributionEnabled={false}
+          logoEnabled={false}
         >
           <MapLibreGL.Camera ref={cameraRef} />
 
@@ -271,7 +334,7 @@ const MoodMap = () => {
         <TouchableOpacity
           style={[
             styles.locateBtn,
-            { bottom: insets.bottom }, // ✅ dynamic for all phone screens/nav bars
+            { bottom: insets.bottom },
           ]}
           onPress={handleLocate}
         >
@@ -391,9 +454,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     zIndex: 20,
-    transform: [{ rotate: "270deg" }] 
+    transform: [{ rotate: "270deg" }]
   },
-  locateIcon: { color: "#E5E7EB", fontSize: 18, marginBottom: 5},
+  locateIcon: { color: "#E5E7EB", fontSize: 18, marginBottom: 5 },
 
   infoBtn: {
     width: 40,

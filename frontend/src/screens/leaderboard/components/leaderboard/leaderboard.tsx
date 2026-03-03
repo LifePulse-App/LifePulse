@@ -37,12 +37,11 @@ const tabs = [
   { key: "permanent", label: "All-time" },
 ];
 
-    const baseUrl = apiClient.getBaseURL();
-  const newUrl = baseUrl.replace(/\/api\/?$/, "");
+const baseUrl = apiClient.getBaseURL();
+const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
 const RowAvatar = ({ url }: { url?: string }) => {
   const [imgError, setImgError] = useState(false);
-  
 
   if (url && !imgError) {
     return (
@@ -83,9 +82,6 @@ const LeaderboardScreen = ({ navigation }: any) => {
 
   const [showConfirm, setShowConfirm] = useState(false);
   const [showRules, setShowRules] = useState(false);
-
-        const baseUrl = apiClient.getBaseURL();
-  const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
   const [timeLeft, setTimeLeft] = useState<string>("--:--:--");
   const [daysLeftUntilReset, setDaysLeftUntilReset] = useState<number>(0);

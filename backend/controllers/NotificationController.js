@@ -76,16 +76,10 @@ async function sendNotificationFCM(tokens, payload) {
         data: Object.fromEntries(
           Object.entries(payload || {}).map(([k, v]) => [k, String(v ?? '')])
         ),
-        ...(isChat
-          ? {
-              notification: {
-                title: String(payload.username || payload.peerName || 'Someone'),
-                body: String(payload.body || 'Sent you a message'),
-              },
-            }
-          : {}),
+        // ✅ REMOVE notification block to prevent duplicate system notification
         android: {
           priority: 'high',
+          // optional channel config; safe to keep/remove
           notification: isChat
             ? {
                 channelId: 'default',
@@ -106,7 +100,6 @@ async function sendNotificationFCM(tokens, payload) {
     }
   }
 }
-
 /**
  * CHAT push
  * IMPORTANT: pass REAL message _id so receiver can call markDelivered([messageId])

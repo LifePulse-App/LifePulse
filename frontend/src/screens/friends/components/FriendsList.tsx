@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useContext } from "react";
 import {
   View,
   StyleSheet,
@@ -17,11 +17,12 @@ import { useFocusEffect } from "@react-navigation/native";
 import MainLayout from "../../../shared/components/MainLayout";
 import socialApi from "../services/api_friends";
 import apiClient from "../../../auth/api-client/api_client";
+import AuthContext from "../../../auth/user/UserContext";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
 
-const FRIENDS_CACHE_KEY = "friends:list:v1";
+const FRIENDS_CACHE_PREFIX = "friends:list:v2";
 
 type Friend = {
   _id: string;
@@ -33,18 +34,18 @@ type Friend = {
   since?: string;
 };
 
-const saveCache = async (friends: Friend[]) => {
+const saveCache = async (key: string, friends: Friend[]) => {
   try {
     await AsyncStorage.setItem(
-      FRIENDS_CACHE_KEY,
+      key,
       JSON.stringify({ ts: Date.now(), friends })
     );
   } catch (e) {}
 };
 
-const loadCache = async (): Promise<Friend[] | null> => {
+const loadCache = async (key: string): Promise<Friend[] | null> => {
   try {
-    const raw = await AsyncStorage.getItem(FRIENDS_CACHE_KEY);
+    const raw = await AsyncStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     return parsed?.friends ?? null;
@@ -54,6 +55,10 @@ const loadCache = async (): Promise<Friend[] | null> => {
 };
 
 export default function FriendsListScreen({ navigation }: any) {
+  const authContext = useContext(AuthContext);
+  const currentUserId = String(authContext?.User?.user?.id || authContext?.User?.user?._id || "anon");
+  const cacheKey = `${FRIENDS_CACHE_PREFIX}:${currentUserId}`;
+
   const [search, setSearch] = useState("");
   const [offline, setOffline] = useState(false);
 
@@ -75,12 +80,12 @@ export default function FriendsListScreen({ navigation }: any) {
   }, []);
 
   const seedFromCache = useCallback(async () => {
-    const cached = await loadCache();
-    if (cached && cached.length) {
-      setFriends(cached);
+    const cached = await loadCache(cacheKey);
+    if (cached) {
+      setFriends(cached); // ✅ always set cache (even empty)
       didSeedFromCacheRef.current = true;
     }
-  }, []);
+  }, [cacheKey]);
 
   const loadFriends = useCallback(async () => {
     setErrorMsg(null);
@@ -100,14 +105,14 @@ export default function FriendsListScreen({ navigation }: any) {
       const list: Friend[] = res?.data?.friends || [];
 
       setFriends(list);
-      await saveCache(list);
+      await saveCache(cacheKey, list); // ✅ per-user cache
       didSeedFromCacheRef.current = true;
     } catch (e: any) {
       const msg =
         e?.response?.data?.message || e?.message || "Failed to load friends list.";
 
-      const cached = await loadCache();
-      if (!cached || cached.length === 0) {
+      const cached = await loadCache(cacheKey);
+      if (!cached) {
         setErrorMsg(msg);
       } else {
         setErrorMsg("Showing cached friends list (network error).");
@@ -115,7 +120,7 @@ export default function FriendsListScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [offline, seedFromCache]);
+  }, [offline, seedFromCache, cacheKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -173,7 +178,6 @@ export default function FriendsListScreen({ navigation }: any) {
                 resizeMode="cover"
               />
             ) : (
-              // ✅ person icon fallback
               <Icon name="account" size={20} color="#E5E7EB" />
             )}
           </View>

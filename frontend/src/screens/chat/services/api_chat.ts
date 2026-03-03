@@ -32,3 +32,25 @@ export const markSeen = (payload: {
 export const markAllPendingDelivered = async () => {
   return api.post("/chat/messages/mark-delivered-all");
 };
+
+// ✅ NEW: upload multiple chat files (max 10, each <= 50MB backend enforced)
+export const uploadChatMediaMultiple = async (files: Array<{
+  uri: string;
+  name: string;
+  type: string;
+}>) => {
+  const form = new FormData();
+  files.forEach((f) => {
+    form.append("files", {
+      uri: f.uri,
+      name: f.name || "file",
+      type: f.type || "application/octet-stream",
+    } as any);
+  });
+
+  return api.post("/chat/messages/upload-multiple", form, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
+};

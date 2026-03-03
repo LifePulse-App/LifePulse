@@ -11,21 +11,19 @@ import os from "os";
 import path from "path";
 
 const app = express();
-// Load environment based on NODE_ENV
+
 const envFile = `.env.${process.env.NODE_ENV || ''}`;
 dotenv.config({ path: envFile });
 
-//Connection Database
 let DB_URL = process.env.MONGO_URI;
 const connectDatabase = () => { 
-    mongoose.connect(DB_URL)
-    .then((con) => {
-        console.log('connected with database',DB_URL);
+  mongoose.connect(DB_URL)
+    .then(() => {
+      console.log('connected with database', DB_URL);
     })
-    .catch(err => console.error("error:",err));    
+    .catch(err => console.error("error:", err));    
 };
-
-connectDatabase()
+connectDatabase();
 
 export const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
@@ -40,15 +38,16 @@ export const transporter = nodemailer.createTransport({
   socketTimeout: 20000,
 });
 
-// Home directory of server
 const HOME_DIR = os.homedir();
 
-// Global uploads path
+// existing avatars
 const AVATAR_PATH = path.join(HOME_DIR, "uploads", "avatars");
-
 app.use('/avatars', express.static(AVATAR_PATH));
 
-//import routes
+// ✅ NEW: chat media path (ubuntu home directory)
+const CHAT_MEDIA_PATH = path.join(HOME_DIR, "uploads", "chat");
+app.use('/chat-media', express.static(CHAT_MEDIA_PATH));
+
 import AuthRoutes from "./routes/AuthRoutes.js"
 import DashboardRoutes from "./routes/DashboardRoutes.js"
 import HabitRoutes from "./routes/HabitRoutes.js"
@@ -62,12 +61,13 @@ import FriendRoutes from "./routes/FriendsRoutes.js"
 import PushRoutes from "./routes/NotificationRoutes.js"
 import LocationRoutes from "./routes/LocationRoutes.js"
 import ChatRoutes from "./routes/ChatRoutes.js"
+import appVersionRoutes from './routes/AppVersion.js';
 
-// Middlewares
 app.use(cookieParser());
 app.use(express.json());
 app.use(cors());
 app.use("/api", apiKeyMiddleware);
+app.use('/api/app', appVersionRoutes);
 app.use("/api/auth", AuthRoutes);
 app.use("/api/dashboard", DashboardRoutes);
 app.use("/api/habit", HabitRoutes);
@@ -83,17 +83,14 @@ app.use("/api/location", LocationRoutes);
 app.use("/api/chat", ChatRoutes);
 app.use(errorMiddleware)
 
-
-// Pick port based on environment
 const ENV = process.env.NODE_ENV;
 const PORT = ENV === 'development' ? 40000 : 8080;
 
-// Test route
 app.get('/health', (req, res) => {
   res.send(`Backend API is running on ${PORT} in ${ENV} mode🚀`);
 });
 
-import { runMonthlyReset } from './helpers/monthlyReset.js'; // adjust path
+import { runMonthlyReset } from './helpers/monthlyReset.js';
 
 cron.schedule('0 0 0 1 * *', async () => {
   try {
@@ -101,14 +98,11 @@ cron.schedule('0 0 0 1 * *', async () => {
   } catch (err) {
     console.error('[cron] Monthly reset failed:', err);
   }
-}, {
-  timezone: 'UTC',
-});
+}, { timezone: 'UTC' });
 
-// Graceful shutdown handlers
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled Rejection:', err);
-  server.close(() => process.exit(1));
+  process.exit(1);
 });
 
 process.on('uncaughtException', (err) => {
@@ -116,7 +110,6 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-// Remove https and sslOptions
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT} in ${ENV} mode`);
 });

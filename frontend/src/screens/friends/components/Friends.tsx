@@ -10,6 +10,7 @@ import {
   StatusBar,
   Image,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import MainLayout from "../../../shared/components/MainLayout";
@@ -22,6 +23,8 @@ import apiClient from "../../../auth/api-client/api_client";
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
 const ICON_GLASS_BG = "rgba(15, 23, 42, 0)";
+
+const CACHE_PREFIX = "friends_cache_v1";
 
 const GlassNotification = ({ visible, type, message, onDismiss }: any) => {
   if (!visible) return null;
@@ -87,6 +90,30 @@ const Friends = ({ navigation }: any) => {
   const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
+  const cacheKeys = useMemo(() => {
+    const uid = String(currentUserId || "anon");
+    return {
+      suggestions: `${CACHE_PREFIX}:${uid}:suggestions`,
+      friendRequests: `${CACHE_PREFIX}:${uid}:friendRequests`,
+      search: (q: string) => `${CACHE_PREFIX}:${uid}:search:${q.trim().toLowerCase()}`,
+    };
+  }, [currentUserId]);
+
+  const saveCache = async (key: string, value: any) => {
+    try {
+      await AsyncStorage.setItem(key, JSON.stringify(value));
+    } catch {}
+  };
+
+  const loadCache = async <T,>(key: string): Promise<T | null> => {
+    try {
+      const raw = await AsyncStorage.getItem(key);
+      return raw ? (JSON.parse(raw) as T) : null;
+    } catch {
+      return null;
+    }
+  };
+
   const openProfilePreview = (u: any) => {
     if (!u?._id) return;
     navigation.navigate("ProfilePreview", {
@@ -103,29 +130,42 @@ const Friends = ({ navigation }: any) => {
     }
   }, [notification]);
 
+  useEffect(() => {
+    (async () => {
+      const [cachedSuggestions, cachedRequests] = await Promise.all([
+        loadCache<UserProfile[]>(cacheKeys.suggestions),
+        loadCache<FollowRequest[]>(cacheKeys.friendRequests),
+      ]);
+      if (cachedSuggestions) setSuggestions(cachedSuggestions);
+      if (cachedRequests) setFriendRequests(cachedRequests);
+    })();
+  }, [cacheKeys]);
+
   const fetchSuggestions = useCallback(async () => {
     try {
       const res = await socialApi.getSuggestedUsers(10);
       const data = (res?.data?.suggestions ?? []).filter((u: any) => u?._id);
-      console.log("[FRIENDS] fetched suggestions count:", data.length, "| sample:", data[0]);
       setSuggestions(data);
+      await saveCache(cacheKeys.suggestions, data);
     } catch (e) {
       console.log("[FRIENDS] fetchSuggestions error:", e);
-      setSuggestions([]);
     }
-  }, []);
+  }, [cacheKeys]);
 
   const fetchSearch = useCallback(async () => {
     try {
+      const key = cacheKeys.search(search);
+      const cached = await loadCache<UserProfile[]>(key);
+      if (cached) setAllUsers(cached);
+
       const res = await socialApi.searchUsers(`q=${encodeURIComponent(search)}`);
       const data = (res?.data?.user ?? []).filter((u: any) => u?._id);
-      console.log("[FRIENDS] fetched search count:", data.length, "| sample:", data[0]);
       setAllUsers(data);
+      await saveCache(key, data);
     } catch (e) {
       console.log("[FRIENDS] fetchSearch error:", e);
-      setAllUsers([]);
     }
-  }, [search]);
+  }, [search, cacheKeys]);
 
   const fetchRequests = useCallback(async () => {
     try {
@@ -150,11 +190,11 @@ const Friends = ({ navigation }: any) => {
           };
         })
         .filter((r: any) => r?.user?._id);
+
       setFriendRequests(cleaned);
-    } catch (e) {
-      setFriendRequests([]);
-    }
-  }, []);
+      await saveCache(cacheKeys.friendRequests, cleaned);
+    } catch (e) {}
+  }, [cacheKeys]);
 
   useEffect(() => {
     fetchSuggestions();
@@ -177,6 +217,7 @@ const Friends = ({ navigation }: any) => {
       await socialApi.sendFriendRequest(user._id);
       setNotification({ type: "success", message: `Request sent to ${user.name || user.username}` });
       isSearching ? await fetchSearch() : await fetchSuggestions();
+      await fetchRequests();
     } catch (e) {
       console.log("[FRIENDS] handleAddFriend error:", e);
       setNotification({ type: "error", message: "Could not send friend request." });
@@ -190,6 +231,7 @@ const Friends = ({ navigation }: any) => {
       await socialApi.removeFriendRequest(user._id);
       setNotification({ type: "success", message: `Removed request to ${user.name || user.username}` });
       isSearching ? await fetchSearch() : await fetchSuggestions();
+      await fetchRequests();
     } catch (e) {
       console.log("[FRIENDS] handleCancelRequest error:", e);
       setNotification({ type: "error", message: "Couldn't remove friend request." });
@@ -200,18 +242,15 @@ const Friends = ({ navigation }: any) => {
 
   const handleAcceptRequest = async (req: FollowRequest) => {
     const id = req?.user?._id;
-    if (!id) {
-      console.log("[FRIENDS] handleAcceptRequest missing user._id", req);
-      return;
-    }
+    if (!id) return;
     setLoadingActions(id);
     try {
       await socialApi.acceptFriendRequest(id);
       setNotification({ type: "success", message: `Accepted request from ${req.user.name}` });
       setFriendRequests((prev) => prev.filter((r) => r.user._id !== id));
       isSearching ? await fetchSearch() : await fetchSuggestions();
+      await fetchRequests();
     } catch (e) {
-      console.log("[FRIENDS] handleAcceptRequest error:", e);
       setNotification({ type: "error", message: "Couldn't accept request." });
     }
     setLoadingActions(null);
@@ -219,18 +258,15 @@ const Friends = ({ navigation }: any) => {
 
   const handleRejectRequest = async (req: FollowRequest) => {
     const id = req?.user?._id;
-    if (!id) {
-      console.log("[FRIENDS] handleRejectRequest missing user._id", req);
-      return;
-    }
+    if (!id) return;
     setLoadingActions(id);
     try {
       await socialApi.removeFriendRequest(id);
       setNotification({ type: "success", message: `Rejected request from ${req.user.name}` });
       setFriendRequests((prev) => prev.filter((r) => r.user._id !== id));
       isSearching ? await fetchSearch() : await fetchSuggestions();
+      await fetchRequests();
     } catch (e) {
-      console.log("[FRIENDS] handleRejectRequest error:", e);
       setNotification({ type: "error", message: "Couldn't reject request." });
     }
     setLoadingActions(null);
@@ -239,10 +275,7 @@ const Friends = ({ navigation }: any) => {
   const renderUserItem = ({ item }: { item: UserProfile | FollowRequest }) => {
     const isRequest = (item as FollowRequest).requestedAt !== undefined;
     const user = isRequest ? (item as FollowRequest).user : (item as UserProfile);
-    if (!user || !user._id) {
-      console.log("[FRIENDS] renderUserItem skipped bad user:", item);
-      return null;
-    }
+    if (!user || !user._id) return null;
 
     const rawAvatar =
       (user as any).avatarThumbnailUrl ||
@@ -270,7 +303,6 @@ const Friends = ({ navigation }: any) => {
                 resizeMode="cover"
               />
             ) : (
-              // ✅ person icon fallback instead of initials
               <Icon name="account" size={20} color="#E5E7EB" />
             )}
           </View>

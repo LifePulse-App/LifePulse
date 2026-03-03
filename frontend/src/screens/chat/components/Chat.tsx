@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useContext } from "react";
 import { View, FlatList, TouchableOpacity, StyleSheet, TextInput, Image } from "react-native";
 import { Text } from "@rneui/themed";
+import { useFocusEffect } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import NetInfo from "@react-native-community/netinfo";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -44,26 +45,24 @@ const loadCache = async (userId: string): Promise<any[]> => {
   }
 };
 
+const baseUrl = apiClient.getBaseURL();
+const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
-    const baseUrl = apiClient.getBaseURL();
-  const newUrl = baseUrl.replace(/\/api\/?$/, "");
-
-// ✅ person icon fallback instead of initials
 const Avatar = ({ url }: { url?: string }) => {
-
   if (url) {
     return (
       <Image
         source={{ uri: newUrl + url }}
         style={styles.avatar}
       />
-    )} else {
-  return (
-    <View style={styles.avatarFallback}>
-      <Icon name="account" size={22} color="#cbd5e1" />
-    </View>
-  );
-}
+    );
+  } else {
+    return (
+      <View style={styles.avatarFallback}>
+        <Icon name="account" size={22} color="#cbd5e1" />
+      </View>
+    );
+  }
 };
 
 export default function ChatListScreen({ navigation }: any) {
@@ -78,7 +77,7 @@ export default function ChatListScreen({ navigation }: any) {
   useEffect(() => {
     if (!myUserId) return;
     loadCache(myUserId).then((cached) => {
-      if (cached.length > 0) setRows(cached);
+      setRows(cached || []); // ✅ always set cached value (even empty)
     });
   }, [myUserId]);
 
@@ -92,7 +91,7 @@ export default function ChatListScreen({ navigation }: any) {
       ]);
 
       const friends = friendsRes?.data?.friends || [];
-      
+
       const friendMap = new Map<
         string,
         { name: string; avatarUrl: string; avatarThumb: string; avatarPublicUrl: string }
@@ -113,9 +112,7 @@ export default function ChatListScreen({ navigation }: any) {
         const peerId = String(c.peerUserId);
         const friend = friendMap.get(peerId);
 
-        const resolvedAvatar =
-          friend?.avatarUrl ||
-          "";
+        const resolvedAvatar = friend?.avatarUrl || "";
 
         return {
           conversationId: String(c.conversationId),
@@ -156,12 +153,21 @@ export default function ChatListScreen({ navigation }: any) {
     const unsub = navigation.addListener("focus", () => {
       if (!myUserId) return;
       loadCache(myUserId).then((cached) => {
-        if (cached.length) setRows(cached);
+        setRows(cached || []); // ✅ always restore cache on focus
       });
       loadOnline();
     });
     return unsub;
   }, [navigation, loadOnline, myUserId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!myUserId) return;
+      loadCache(myUserId).then((cached) => {
+        setRows(cached || []); // ✅ restore every time screen becomes active
+      });
+    }, [myUserId])
+  );
 
   useEffect(() => {
     const a = subscribeConversationChanges(() => setVersion((v) => v + 1));
@@ -223,11 +229,11 @@ export default function ChatListScreen({ navigation }: any) {
                     peerUserId: item.peerUserId,
                     peerName: item.peerName,
                     peerMood: item.mood,
-                    peerAvatarUrl: item.peerAvatarUrl, // pass avatar to chat header
+                    peerAvatarUrl: item.peerAvatarUrl,
                   })
                 }
               >
-                <Avatar url={ item.peerAvatarUrl} />
+                <Avatar url={item.peerAvatarUrl} />
 
                 <View style={styles.rowContent}>
                   <View style={styles.rowTop}>

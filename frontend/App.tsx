@@ -18,7 +18,6 @@ import ReactNativeBiometrics from 'react-native-biometrics';
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import { getMessaging, getToken, onMessage, onTokenRefresh } from '@react-native-firebase/messaging';
 import { getApp } from '@react-native-firebase/app';
-import messaging from '@react-native-firebase/messaging';
 
 import AuthContext from './src/auth/user/UserContext';
 import NavigationTheme from './src/navigation/main/NavigationTheme';
@@ -26,7 +25,8 @@ import AuthNavigator from './src/navigation/main/AuthNavigator';
 import { user } from './src/screens/user/models/UserLoginResponse';
 import UserStorage from './src/auth/user/UserStorage';
 import apiClient, { setSecretKey } from './src/auth/api-client/api_client';
-import { navigationRef } from './src/navigation/main/RootNavigation';
+import { navigationRef, resetToLogin } from './src/navigation/main/RootNavigation';
+import AppUpdateGate from './AppUpdateGate';
 
 import {
   loadChatNotificationState,
@@ -67,8 +67,6 @@ async function displayChatNotificationGroupedBySender(
   data: any,
   fallback?: { title?: string; body?: string }
 ) {
-  console.log(data);
-
   const peerId = String(data.peerUserId || 'unknown');
   const peerName = data.username || data.peerName || fallback?.title || 'Someone';
   const messageId = data.messageId || data.msgId || data._id || Date.now();
@@ -83,7 +81,7 @@ async function displayChatNotificationGroupedBySender(
     body,
     android: {
       channelId: CHAT_CHANNEL_ID,
-      groupId, // ✅ group by sender
+      groupId,
       pressAction: { id: 'default' },
     },
     data: {
@@ -99,7 +97,7 @@ async function displayChatNotificationGroupedBySender(
     body: 'New messages',
     android: {
       channelId: CHAT_CHANNEL_ID,
-      groupId, // ✅ same sender group
+      groupId,
       groupSummary: true,
       pressAction: { id: 'default' },
     },
@@ -110,42 +108,6 @@ async function displayChatNotificationGroupedBySender(
     },
   });
 }
-
-// ✅ keep background handler light (no markAllPendingDelivered loop here)
-messaging().setBackgroundMessageHandler(async remoteMessage => {
-  const data = remoteMessage?.data || {};
-  const notifTitle = remoteMessage?.notification?.title;
-  const notifBody = remoteMessage?.notification?.body;
-
-  if (data.type === 'chat') {
-    const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
-    if (incomingMessageId) {
-      try {
-        await markDelivered([incomingMessageId]);
-      } catch (e) {
-        console.log('markDelivered (background) failed', e);
-      }
-    }
-
-    // ✅ avoid duplicate when FCM already shows system notification
-    // still grouped by sender when data-only
-    if (!remoteMessage?.notification) {
-      await displayChatNotificationGroupedBySender(data, {
-        title: notifTitle,
-        body: notifBody,
-      });
-    }
-  }
-
-  if (data.type === 'seen') {
-    markMessagesSeenLocally(data.peerUserId);
-  }
-
-  if (data.type === 'delivered') {
-    const ids = parseMessageIds(data.messageIds);
-    markMessagesDeliveredLocally(data.peerUserId, ids);
-  }
-});
 
 async function requestNotificationPermission() {
   if (Platform.OS === 'android' && Platform.Version >= 33) {
@@ -166,13 +128,12 @@ const App = () => {
   const secretKeySetRef = useRef(false);
   const lastRegisteredTokenRef = useRef<string | null>(null);
 
-  // ✅ anti-spam guard for markAllPendingDelivered
   const deliveringAllRef = useRef(false);
   const lastDeliverAllAtRef = useRef(0);
 
   const runMarkAllPendingDelivered = async (reason: string) => {
     const now = Date.now();
-    if (now - lastDeliverAllAtRef.current < 15000) return; // 15s throttle
+    if (now - lastDeliverAllAtRef.current < 15000) return;
     if (deliveringAllRef.current) return;
 
     deliveringAllRef.current = true;
@@ -192,7 +153,6 @@ const App = () => {
     requestNotificationPermission();
   }, []);
 
-  // ✅ only run on app active
   useEffect(() => {
     const sub = AppState.addEventListener('change', async state => {
       if (state === 'active') {
@@ -204,8 +164,6 @@ const App = () => {
 
   useEffect(() => {
     const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
-      console.log({ type, detail });
-
       if (
         type === EventType.PRESS &&
         detail?.notification?.data?.type === 'chat' &&
@@ -223,7 +181,6 @@ const App = () => {
   useEffect(() => {
     async function checkInitialNotification() {
       const initial = await notifee.getInitialNotification();
-      console.log(initial);
 
       if (
         initial?.notification?.data?.type === 'chat' &&
@@ -271,7 +228,6 @@ const App = () => {
           if (!activePeer || activePeer !== data.peerUserId) {
             notifyIncoming(data.peerUserId);
 
-            // ✅ foreground: show grouped local notification
             await displayChatNotificationGroupedBySender(data, {
               title: remoteMessage?.notification?.title,
               body: remoteMessage?.notification?.body,
@@ -287,8 +243,6 @@ const App = () => {
           const ids = parseMessageIds(data.messageIds);
           markMessagesDeliveredLocally(data.peerUserId, ids);
         }
-
-        // ❌ removed continuous markAllPendingDelivered from every push
       });
     };
 
@@ -307,6 +261,7 @@ const App = () => {
     let unsubscribeTokenRefresh: undefined | (() => void);
 
     const register = async (token: string) => {
+      if (!token) return;
       if (lastRegisteredTokenRef.current === token) return;
       await apiClient.post('/push/register', { token, platform: 'android' });
       lastRegisteredTokenRef.current = token;
@@ -323,14 +278,13 @@ const App = () => {
       });
     };
 
-    run();
+    run().catch((e) => console.log('[FCM] token setup failed', e));
 
     return () => {
       if (unsubscribeTokenRefresh) unsubscribeTokenRefresh();
     };
   }, [User]);
 
-  // ✅ once after user ready
   useEffect(() => {
     if (!User) return;
     runMarkAllPendingDelivered('user-ready');
@@ -355,12 +309,7 @@ const App = () => {
             setIsBiometricVerified(false);
             await UserStorage.deleteUser();
             await UserStorage.clearTokens?.();
-            navigationRef.current?.dispatch(
-              CommonActions.reset({
-                index: 0,
-                routes: [{ name: 'Login' }],
-              }),
-            );
+            resetToLogin();
           }
         } else {
           setIsBiometricVerified(true);
@@ -447,12 +396,14 @@ const App = () => {
       }}
     >
       <AuthContext.Provider value={{ User, setUser }}>
-        {isBiometricVerified ? (
-          <NavigationContainer theme={NavigationTheme} ref={navigationRef}>
-            <AuthNavigator />
-          </NavigationContainer>
-        ) : null}
-        <Toast config={toastConfig} position="top" topOffset={5} />
+        <AppUpdateGate>
+          {isBiometricVerified ? (
+            <NavigationContainer theme={NavigationTheme} ref={navigationRef}>
+              <AuthNavigator />
+            </NavigationContainer>
+          ) : null}
+          <Toast config={toastConfig} position="top" topOffset={5} />
+        </AppUpdateGate>
       </AuthContext.Provider>
     </PaperProvider>
   );

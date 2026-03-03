@@ -1,9 +1,16 @@
 import mongoose from "mongoose";
+import fs from "fs";
+import os from "os";
+import path from "path";
+
 import ChatMessage from "../models/ChatMessage.js";
 import Conversation from "../models/Conversation.js";
 import Mood from "../models/MoodSchema.js";
 import { sendMsgNotification, sendSeenNotification } from "./NotificationController.js";
-import { sendDeliveredNotification } from './NotificationController.js';
+import { sendDeliveredNotification } from "./NotificationController.js";
+
+const MAX_FILES = 10;
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB each
 
 const toObjectId = (v) => {
   try {
@@ -13,6 +20,143 @@ const toObjectId = (v) => {
   }
 };
 
+const allowedTypes = ["text", "image", "video", "document"];
+
+const normalizeMessageBody = (body) => {
+  const {
+    text,
+    messageType = "text",
+    media = null,
+    conversationId,
+    receiverId,
+    clientMessageId,
+    notifyUser = true,
+  } = body || {};
+
+  const type = allowedTypes.includes(String(messageType)) ? String(messageType) : "text";
+  const safeText = String(text || "").trim();
+
+  const safeMedia = media
+    ? {
+        url: String(media.url || ""),
+        mimeType: String(media.mimeType || ""),
+        size: Number(media.size || 0),
+        name: String(media.name || ""),
+        thumbnailUrl: String(media.thumbnailUrl || ""),
+        duration: Number(media.duration || 0),
+      }
+    : null;
+
+  return {
+    type,
+    text: safeText,
+    media: safeMedia,
+    conversationId,
+    receiverId,
+    clientMessageId,
+    notifyUser,
+  };
+};
+
+const getPushBody = (msg) => {
+  if (msg.messageType === "image") return "📷 Photo";
+  if (msg.messageType === "video") return "🎥 Video";
+  if (msg.messageType === "document") return "📎 Document";
+  return String(msg.text || "");
+};
+
+const detectMessageTypeFromMime = (mimeType = "") => {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
+  return "document";
+};
+
+const saveOneFile = async (file) => {
+  const HOME_DIR = os.homedir();
+  const CHAT_DIR = path.join(HOME_DIR, "uploads", "chat");
+  await fs.promises.mkdir(CHAT_DIR, { recursive: true });
+
+  const ext = path.extname(file.originalname || "") || "";
+  const safeBase = (file.originalname || "file")
+    .replace(ext, "")
+    .replace(/[^a-zA-Z0-9._-]/g, "_");
+
+  const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}_${safeBase}${ext}`;
+  const filePath = path.join(CHAT_DIR, fileName);
+
+  await fs.promises.writeFile(filePath, file.buffer);
+
+  return {
+    url: `/chat-media/${fileName}`,
+    mimeType: String(file.mimetype || ""),
+    size: Number(file.size || 0),
+    name: String(file.originalname || fileName),
+    thumbnailUrl: "",
+    duration: 0,
+    messageType: detectMessageTypeFromMime(String(file.mimetype || "")),
+  };
+};
+
+export const uploadChatMedia = async (req, res) => {
+  try {
+    const files = Array.isArray(req.files)
+      ? req.files
+      : req.file
+      ? [req.file]
+      : [];
+
+    if (!files.length) {
+      return res.status(400).json({ message: "file(s) is required" });
+    }
+
+    if (files.length > MAX_FILES) {
+      return res.status(400).json({ message: `You can upload maximum ${MAX_FILES} files at once` });
+    }
+
+    for (const f of files) {
+      if (Number(f.size || 0) > MAX_FILE_SIZE) {
+        return res.status(400).json({
+          message: `Each file must be <= ${Math.floor(MAX_FILE_SIZE / (1024 * 1024))}MB`,
+        });
+      }
+    }
+
+    const uploaded = [];
+    for (const f of files) {
+      const one = await saveOneFile(f);
+      uploaded.push(one);
+    }
+
+    // backward compatibility for old single-file frontend
+    if (uploaded.length === 1) {
+      const first = uploaded[0];
+      return res.status(200).json({
+        success: true,
+        messageType: first.messageType,
+        media: {
+          url: first.url,
+          mimeType: first.mimeType,
+          size: first.size,
+          name: first.name,
+          thumbnailUrl: first.thumbnailUrl,
+          duration: first.duration,
+        },
+        files: uploaded,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      files: uploaded,
+      count: uploaded.length,
+    });
+  } catch (err) {
+    console.error("[chat] uploadChatMedia error", err);
+    return res.status(500).json({ message: "Upload failed" });
+  }
+};
+
+// ----- your existing exports below (unchanged) -----
 export const openDirectConversation = async (req, res) => {
   try {
     const me = req.user._id;
@@ -42,10 +186,27 @@ export const openDirectConversation = async (req, res) => {
 export const sendMessage = async (req, res) => {
   try {
     const senderId = req.user._id;
-    const { conversationId, receiverId, text, clientMessageId, notifyUser = true } = req.body;
 
-    if (!conversationId || !receiverId || !text || !clientMessageId) {
+    const {
+      type,
+      text,
+      media,
+      conversationId,
+      receiverId,
+      clientMessageId,
+      notifyUser,
+    } = normalizeMessageBody(req.body);
+
+    if (!conversationId || !receiverId || !clientMessageId) {
       return res.status(400).json({ message: "Missing fields" });
+    }
+
+    if (type === "text" && !text) {
+      return res.status(400).json({ message: "Text is required for text message" });
+    }
+
+    if (type !== "text" && (!media || !media.url)) {
+      return res.status(400).json({ message: "Media url is required for media message" });
     }
 
     const convoObj = toObjectId(conversationId);
@@ -62,7 +223,6 @@ export const sendMessage = async (req, res) => {
       convo.participants.some((p) => String(p) === String(recvObj));
     if (!isMember) return res.status(403).json({ message: "Not a participant" });
 
-    // idempotent write (important for retries)
     let msg = await ChatMessage.findOne({
       conversationId: convoObj,
       senderId,
@@ -75,26 +235,34 @@ export const sendMessage = async (req, res) => {
         conversationId: convoObj,
         senderId,
         receiverId: recvObj,
-        text: String(text),
+        text: type === "text" ? String(text) : String(text || ""),
+        messageType: type,
+        media:
+          type === "text"
+            ? undefined
+            : {
+                url: media.url,
+                mimeType: media.mimeType,
+                size: media.size,
+                name: media.name,
+                thumbnailUrl: media.thumbnailUrl,
+                duration: media.duration,
+              },
         clientMessageId: String(clientMessageId),
       });
       createdNow = true;
-    } 
-    
+    }
 
-    // send push only on fresh create, not on retry/idempotent hit
-if (createdNow && notifyUser && String(senderId) !== String(recvObj)) {
-  
-  const fromUsername = req.user?.name || req.user?.username || 'Someone';
-  
-  await sendMsgNotification(
-    recvObj,
-    senderId,
-    fromUsername,
-    msg._id,              // ✅ real message id
-    String(msg.text || '') // optional body
-  );
-}
+    if (createdNow && notifyUser && String(senderId) !== String(recvObj)) {
+      const fromUsername = req.user?.name || req.user?.username || "Someone";
+      await sendMsgNotification(
+        recvObj,
+        senderId,
+        fromUsername,
+        msg._id,
+        getPushBody(msg)
+      );
+    }
 
     res.json({
       success: true,
@@ -140,18 +308,17 @@ export const markDelivered = async (req, res) => {
     const { messageIds } = req.body;
 
     if (!Array.isArray(messageIds) || !messageIds.length) {
-      return res.status(400).json({ message: 'messageIds required' });
+      return res.status(400).json({ message: "messageIds required" });
     }
 
     const ids = messageIds.map((id) => toObjectId(id)).filter(Boolean);
 
-    // find target msgs before update (to know senderIds)
     const msgs = await ChatMessage.find({
       _id: { $in: ids },
       receiverId: me,
       deliveredAt: null,
     })
-      .select('_id senderId receiverId')
+      .select("_id senderId receiverId")
       .lean();
 
     if (!msgs.length) {
@@ -165,7 +332,6 @@ export const markDelivered = async (req, res) => {
       { $set: { deliveredAt: new Date() } }
     );
 
-    // notify each sender (group by senderId)
     const bySender = new Map();
     for (const m of msgs) {
       const s = String(m.senderId);
@@ -179,10 +345,11 @@ export const markDelivered = async (req, res) => {
 
     res.json({ success: true, count: msgIdsToUpdate.length });
   } catch (err) {
-    console.error('[chat] markDelivered error', err);
-    res.status(500).json({ message: 'Internal error' });
+    console.error("[chat] markDelivered error", err);
+    res.status(500).json({ message: "Internal error" });
   }
 };
+
 export const markSeen = async (req, res) => {
   try {
     const me = req.user._id;
@@ -198,7 +365,6 @@ export const markSeen = async (req, res) => {
     const lastMsg = await ChatMessage.findById(lastObj).lean();
     if (!lastMsg) return res.status(404).json({ message: "Message not found" });
 
-    // security check: lastSeenMessageId must belong to same conversation
     if (String(lastMsg.conversationId) !== String(convoObj)) {
       return res.status(400).json({ message: "Message not in conversation" });
     }
@@ -214,7 +380,6 @@ export const markSeen = async (req, res) => {
       { $set: { seenAt: new Date() } }
     );
 
-    // notify only when something changed
     const changed = upd.modifiedCount ?? upd.nModified ?? 0;
     if (changed > 0) {
       await sendSeenNotification(peerObj, me);
@@ -253,10 +418,18 @@ export const listConversationPreviews = async (req, res) => {
 
       const moodDoc = await Mood.findOne({ user: peer }).sort({ createdAt: -1 }).lean();
 
+      let lastText = "";
+      if (last) {
+        if (last.messageType === "image") lastText = "📷 Photo";
+        else if (last.messageType === "video") lastText = "🎥 Video";
+        else if (last.messageType === "document") lastText = "📎 Document";
+        else lastText = last.text || "";
+      }
+
       out.push({
         conversationId: c._id,
         peerUserId: peer,
-        lastText: last?.text || "",
+        lastText,
         lastAt: last?.createdAt || c.updatedAt,
         unread,
         mood: moodDoc?.mood || "",
