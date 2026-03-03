@@ -25,9 +25,9 @@ const ChatMessageSchema = new mongoose.Schema(
 
     text: { type: String, required: true },
 
-    clientMessageId: { type: String, required: true, index: true }, // for idempotency
-    deliveredAt: { type: Date, default: null }, // double tick
-    seenAt: { type: Date, default: null }, // blue tick
+    clientMessageId: { type: String, required: true, index: true },
+    deliveredAt: { type: Date, default: null },
+    seenAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

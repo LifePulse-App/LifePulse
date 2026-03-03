@@ -69,10 +69,30 @@ export const unregisterPushToken = async (req, res) => {
 async function sendNotificationFCM(tokens, payload) {
   for (const t of tokens) {
     try {
+      const isChat = payload?.type === 'chat';
+
       await admin.messaging().send({
         token: t.token,
-        data: payload,
-        android: { priority: 'high' },
+        data: Object.fromEntries(
+          Object.entries(payload || {}).map(([k, v]) => [k, String(v ?? '')])
+        ),
+        ...(isChat
+          ? {
+              notification: {
+                title: String(payload.username || payload.peerName || 'Someone'),
+                body: String(payload.body || 'Sent you a message'),
+              },
+            }
+          : {}),
+        android: {
+          priority: 'high',
+          notification: isChat
+            ? {
+                channelId: 'default',
+                sound: 'default',
+              }
+            : undefined,
+        },
       });
     } catch (err) {
       if (

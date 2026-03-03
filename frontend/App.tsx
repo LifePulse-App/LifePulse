@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Platform,
   PermissionsAndroid,
+  AppState,
 } from 'react-native';
 import { DefaultTheme, MD3DarkTheme, PaperProvider } from 'react-native-paper';
 import Toast, { BaseToast, BaseToastProps } from 'react-native-toast-message';
@@ -62,11 +63,16 @@ function parseMessageIds(raw: any): string[] {
   }
 }
 
-async function displayChatNotificationGroupedBySender(data: any) {
+async function displayChatNotificationGroupedBySender(
+  data: any,
+  fallback?: { title?: string; body?: string }
+) {
+  console.log(data);
+
   const peerId = String(data.peerUserId || 'unknown');
-  const peerName = data.username || data.peerName || 'Someone';
+  const peerName = data.username || data.peerName || fallback?.title || 'Someone';
   const messageId = data.messageId || data.msgId || data._id || Date.now();
-  const body = data.body || 'Sent you a message';
+  const body = data.body || data.message || fallback?.body || 'Sent you a message';
 
   const groupId = `chat:${peerId}`;
   const summaryId = `chat-summary:${peerId}`;
@@ -77,7 +83,7 @@ async function displayChatNotificationGroupedBySender(data: any) {
     body,
     android: {
       channelId: CHAT_CHANNEL_ID,
-      groupId,
+      groupId, // ✅ group by sender
       pressAction: { id: 'default' },
     },
     data: {
@@ -93,7 +99,7 @@ async function displayChatNotificationGroupedBySender(data: any) {
     body: 'New messages',
     android: {
       channelId: CHAT_CHANNEL_ID,
-      groupId,
+      groupId, // ✅ same sender group
       groupSummary: true,
       pressAction: { id: 'default' },
     },
@@ -105,9 +111,11 @@ async function displayChatNotificationGroupedBySender(data: any) {
   });
 }
 
-// ✅ keep background handler light
+// ✅ keep background handler light (no markAllPendingDelivered loop here)
 messaging().setBackgroundMessageHandler(async remoteMessage => {
   const data = remoteMessage?.data || {};
+  const notifTitle = remoteMessage?.notification?.title;
+  const notifBody = remoteMessage?.notification?.body;
 
   if (data.type === 'chat') {
     const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
@@ -118,7 +126,15 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         console.log('markDelivered (background) failed', e);
       }
     }
-    await displayChatNotificationGroupedBySender(data);
+
+    // ✅ avoid duplicate when FCM already shows system notification
+    // still grouped by sender when data-only
+    if (!remoteMessage?.notification) {
+      await displayChatNotificationGroupedBySender(data, {
+        title: notifTitle,
+        body: notifBody,
+      });
+    }
   }
 
   if (data.type === 'seen') {
@@ -150,22 +166,24 @@ const App = () => {
   const secretKeySetRef = useRef(false);
   const lastRegisteredTokenRef = useRef<string | null>(null);
 
-  // ✅ run markAllPendingDelivered only once per app process
-  const hasMarkedAllOnAppLoadRef = useRef(false);
-  const isMarkingAllNowRef = useRef(false);
+  // ✅ anti-spam guard for markAllPendingDelivered
+  const deliveringAllRef = useRef(false);
+  const lastDeliverAllAtRef = useRef(0);
 
-  const runMarkAllPendingDeliveredOnceOnAppLoad = async () => {
-    if (hasMarkedAllOnAppLoadRef.current) return;
-    if (isMarkingAllNowRef.current) return;
+  const runMarkAllPendingDelivered = async (reason: string) => {
+    const now = Date.now();
+    if (now - lastDeliverAllAtRef.current < 15000) return; // 15s throttle
+    if (deliveringAllRef.current) return;
 
-    isMarkingAllNowRef.current = true;
+    deliveringAllRef.current = true;
+    lastDeliverAllAtRef.current = now;
+
     try {
       await markAllPendingDelivered();
-      hasMarkedAllOnAppLoadRef.current = true;
     } catch (e) {
-      console.log('markAllPendingDelivered (initial-load) failed', e);
+      console.log(`markAllPendingDelivered (${reason}) failed`, e);
     } finally {
-      isMarkingAllNowRef.current = false;
+      deliveringAllRef.current = false;
     }
   };
 
@@ -174,8 +192,20 @@ const App = () => {
     requestNotificationPermission();
   }, []);
 
+  // ✅ only run on app active
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async state => {
+      if (state === 'active') {
+        await runMarkAllPendingDelivered('active');
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   useEffect(() => {
     const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
+      console.log({ type, detail });
+
       if (
         type === EventType.PRESS &&
         detail?.notification?.data?.type === 'chat' &&
@@ -193,6 +223,8 @@ const App = () => {
   useEffect(() => {
     async function checkInitialNotification() {
       const initial = await notifee.getInitialNotification();
+      console.log(initial);
+
       if (
         initial?.notification?.data?.type === 'chat' &&
         initial?.notification?.data?.peerUserId
@@ -238,7 +270,12 @@ const App = () => {
           const activePeer = getActiveChatPeer();
           if (!activePeer || activePeer !== data.peerUserId) {
             notifyIncoming(data.peerUserId);
-            await displayChatNotificationGroupedBySender(data);
+
+            // ✅ foreground: show grouped local notification
+            await displayChatNotificationGroupedBySender(data, {
+              title: remoteMessage?.notification?.title,
+              body: remoteMessage?.notification?.body,
+            });
           }
         }
 
@@ -250,6 +287,8 @@ const App = () => {
           const ids = parseMessageIds(data.messageIds);
           markMessagesDeliveredLocally(data.peerUserId, ids);
         }
+
+        // ❌ removed continuous markAllPendingDelivered from every push
       });
     };
 
@@ -271,6 +310,7 @@ const App = () => {
       if (lastRegisteredTokenRef.current === token) return;
       await apiClient.post('/push/register', { token, platform: 'android' });
       lastRegisteredTokenRef.current = token;
+      console.log('[FCM] Registered token:', token);
     };
 
     const run = async () => {
@@ -290,10 +330,10 @@ const App = () => {
     };
   }, [User]);
 
-  // ✅ ONLY FIRST LOAD WHEN APP OPENS (after user becomes available)
+  // ✅ once after user ready
   useEffect(() => {
     if (!User) return;
-    runMarkAllPendingDeliveredOnceOnAppLoad();
+    runMarkAllPendingDelivered('user-ready');
   }, [User]);
 
   useEffect(() => {

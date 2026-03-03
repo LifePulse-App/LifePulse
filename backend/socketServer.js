@@ -5,7 +5,6 @@ import app from "./server.js";
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
-// attach io to requests
 app.use((req, res, next) => {
   req.io = io;
   next();

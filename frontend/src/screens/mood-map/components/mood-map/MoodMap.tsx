@@ -125,12 +125,6 @@ const MoodMap = () => {
           const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
           setMyLocation(coords);
 
-          if (isTrackingRef.current) {
-            cameraRef.current?.moveTo(coords, 1000);
-            cameraRef.current?.zoomTo(15, 1000);
-            isTrackingRef.current = false;
-          }
-
           await locationApi.updateMyLocation(coords[0], coords[1]);
         },
         (err) => console.log("watchPosition error", err),
@@ -188,8 +182,8 @@ const MoodMap = () => {
 
   const handleLocate = () => {
     if (myLocation) {
-      cameraRef.current?.moveTo(myLocation, 800);
-      cameraRef.current?.zoomTo(15, 800);
+      cameraRef.current?.moveTo(myLocation, 10);
+      cameraRef.current?.zoomTo(15, 10);
     }
   };
 

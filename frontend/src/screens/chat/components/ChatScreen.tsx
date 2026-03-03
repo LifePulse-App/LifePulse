@@ -83,7 +83,7 @@ export default function ChatScreen({ route, navigation }: any) {
   const resolvedPeerAvatar = String(peerAvatarUrl || avatarUrl || "");
   const [avatarFailed, setAvatarFailed] = useState(false);
 
-      const baseUrl = apiClient.getBaseURL();
+  const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
   const scrollToBottom = () =>
@@ -244,9 +244,9 @@ export default function ChatScreen({ route, navigation }: any) {
             .filter(Boolean)
             .map((x: any) => String(x))
         );
-
         const serverIds = new Set(normalizedServer.map((m: any) => String(m._id)));
 
+        // ✅ keep only local pending that are NOT represented on server
         const stillPendingLocal = prev.filter((m: any) => {
           const isLocalId = String(m._id).startsWith("loc:");
           const hasClientId = !!m.clientMessageId;
@@ -256,7 +256,39 @@ export default function ChatScreen({ route, navigation }: any) {
           return isLocalId && !existsOnServerById && !existsOnServerByClientId;
         });
 
-        return [...normalizedServer, ...stillPendingLocal].sort(
+        // ✅ merge + de-dupe by clientMessageId / _id (prevents flicker duplicate bubble)
+        const merged = [...normalizedServer, ...stillPendingLocal];
+        const byKey = new Map<string, any>();
+
+        for (const msg of merged) {
+          const key = msg.clientMessageId
+            ? `c:${String(msg.clientMessageId)}`
+            : `i:${String(msg._id)}`;
+
+          const existing = byKey.get(key);
+
+          if (!existing) {
+            byKey.set(key, msg);
+            continue;
+          }
+
+          // prefer non-local id / richer server message
+          const existingLocal = String(existing._id).startsWith("loc:");
+          const currentLocal = String(msg._id).startsWith("loc:");
+
+          if (existingLocal && !currentLocal) {
+            byKey.set(key, msg);
+          } else if (!existingLocal && currentLocal) {
+            // keep existing
+          } else {
+            // choose latest tick state / timestamp
+            const existingTime = new Date(existing.createdAt || 0).getTime();
+            const currentTime = new Date(msg.createdAt || 0).getTime();
+            byKey.set(key, currentTime >= existingTime ? msg : existing);
+          }
+        }
+
+        return Array.from(byKey.values()).sort(
           (a: any, b: any) =>
             new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
@@ -377,6 +409,7 @@ export default function ChatScreen({ route, navigation }: any) {
       const srv = data?.message;
 
       if (srv?._id) {
+        // ✅ replace local by clientMessageId; no duplicate append
         setMessages((prev) =>
           prev.map((m) =>
             m.clientMessageId === clientMessageId
@@ -463,7 +496,6 @@ export default function ChatScreen({ route, navigation }: any) {
                   />
                 ) : (
                   <View style={styles.headerAvatarFallback}>
-                    {/* ✅ person icon fallback */}
                     <Icon name="account" size={18} color="#cbd5e1" />
                   </View>
                 )}

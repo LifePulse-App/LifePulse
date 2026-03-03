@@ -44,17 +44,20 @@ const loadCache = async (userId: string): Promise<any[]> => {
   }
 };
 
+
+    const baseUrl = apiClient.getBaseURL();
+  const newUrl = baseUrl.replace(/\/api\/?$/, "");
+
 // ✅ person icon fallback instead of initials
 const Avatar = ({ url }: { url?: string }) => {
 
   if (url) {
     return (
       <Image
-        source={{ uri: url }}
+        source={{ uri: newUrl + url }}
         style={styles.avatar}
       />
-    );
-  } else {
+    )} else {
   return (
     <View style={styles.avatarFallback}>
       <Icon name="account" size={22} color="#cbd5e1" />
@@ -71,9 +74,6 @@ export default function ChatListScreen({ navigation }: any) {
 
   const user = useContext(AuthContext);
   const myUserId = String(user?.User?.user?.id || user?.User?.user?._id || "");
-
-    const baseUrl = apiClient.getBaseURL();
-  const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
   useEffect(() => {
     if (!myUserId) return;
@@ -227,7 +227,7 @@ export default function ChatListScreen({ navigation }: any) {
                   })
                 }
               >
-                <Avatar url={ newUrl + item.peerAvatarUrl} />
+                <Avatar url={ item.peerAvatarUrl} />
 
                 <View style={styles.rowContent}>
                   <View style={styles.rowTop}>

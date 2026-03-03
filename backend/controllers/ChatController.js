@@ -79,11 +79,14 @@ export const sendMessage = async (req, res) => {
         clientMessageId: String(clientMessageId),
       });
       createdNow = true;
-    }
+    } 
+    
 
     // send push only on fresh create, not on retry/idempotent hit
 if (createdNow && notifyUser && String(senderId) !== String(recvObj)) {
+  
   const fromUsername = req.user?.name || req.user?.username || 'Someone';
+  
   await sendMsgNotification(
     recvObj,
     senderId,
