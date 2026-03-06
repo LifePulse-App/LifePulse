@@ -40,10 +40,16 @@ export default function AppUpdateGate({ children }: any) {
         const currentVersion = DeviceInfo.getVersion();
         const platform = Platform.OS;
 
+        console.log(currentVersion, platform);
+        
+
         const res = await apiClient.get(
           `/app/version?platform=${platform}&currentVersion=${currentVersion}`
         );
         const d = res?.data || {};
+
+        console.log(d);
+        
 
         // Defaults if not available
         const minSupported = d.minSupported || d.min_version || "0.0.0";
