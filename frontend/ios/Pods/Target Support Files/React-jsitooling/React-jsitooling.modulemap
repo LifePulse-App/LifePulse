@@ -1,4 +1,4 @@
-framework module JSITooling {
+module react_runtime {
   umbrella header "React-jsitooling-umbrella.h"
 
   export *

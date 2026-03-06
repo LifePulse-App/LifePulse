@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "7DC496D775AB2B83F4A5576D4C125CD2"
-               BuildableName = "react_native_biometrics.framework"
+               BuildableName = "libreact-native-biometrics.a"
                BlueprintName = "react-native-biometrics"
                ReferencedContainer = "container:Pods.xcodeproj">
             </BuildableReference>

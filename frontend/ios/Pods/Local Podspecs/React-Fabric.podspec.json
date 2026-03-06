@@ -32,8 +32,6 @@
       "$(PODS_ROOT)/RCT-Folly"
     ]
   },
-  "header_mappings_dir": "./",
-  "module_name": "React_Fabric",
   "dependencies": {
     "React-jsiexecutor": [],
     "RCTRequired": [],
@@ -87,7 +85,7 @@
       "exclude_files": "react/renderer/core/tests",
       "header_dir": "react/renderer/core",
       "pod_target_xcconfig": {
-        "HEADER_SEARCH_PATHS": "\"$(PODS_TARGET_SRCROOT)/ReactCommon\" \"$(PODS_ROOT)/Headers/Private/Yoga\" \"$(PODS_TARGET_SRCROOT)\" \"$(PODS_TARGET_SRCROOT)/react/renderer/textlayoutmanager/platform/ios\" \"$(PODS_TARGET_SRCROOT)/react/renderer/components/text/platform/cxx\" \"$(PODS_TARGET_SRCROOT)/react/renderer/components/textinput/platform/ios\" \"$(PODS_TARGET_SRCROOT)/react/renderer/components/view/platform/cxx\""
+        "HEADER_SEARCH_PATHS": "\"$(PODS_TARGET_SRCROOT)/ReactCommon\" \"$(PODS_ROOT)/Headers/Private/Yoga\" \"$(PODS_TARGET_SRCROOT)\""
       }
     },
     {

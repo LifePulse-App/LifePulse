@@ -17,7 +17,6 @@
   "pod_target_xcconfig": {
     "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
     "HEADER_SEARCH_PATHS": [
-      "\"$(PODS_TARGET_SRCROOT)/../../..\"",
       "$(PODS_ROOT)/glog",
       "$(PODS_ROOT)/boost",
       "$(PODS_ROOT)/DoubleConversion",
@@ -29,8 +28,6 @@
     "OTHER_CFLAGS": "$(inherited)",
     "DEFINES_MODULE": "YES"
   },
-  "module_name": "React_featureflagsnativemodule",
-  "header_mappings_dir": "../..",
   "dependencies": {
     "React-jsi": [],
     "React-jsiexecutor": [],

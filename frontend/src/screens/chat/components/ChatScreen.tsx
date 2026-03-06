@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   TextInput,
   Keyboard,
-  LayoutAnimation,
   Image,
   Modal,
   Pressable,
   ActivityIndicator,
   PermissionsAndroid,
   Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import NetInfo from "@react-native-community/netinfo";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -61,13 +61,17 @@ const formatDateHeader = (yyyyMmDd: string) => {
   const y = new Date();
   y.setDate(today.getDate() - 1);
   const sameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
   if (sameDay(d, today)) return "Today";
   if (sameDay(d, y)) return "Yesterday";
   return d.toLocaleDateString([], { year: "numeric", month: "short", day: "numeric" });
 };
-const formatTime = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-const stableMessageKey = (m: any) => (m?.clientMessageId ? `c:${String(m.clientMessageId)}` : `i:${String(m?._id ?? "")}`);
+const formatTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const stableMessageKey = (m: any) =>
+  m?.clientMessageId ? `c:${String(m.clientMessageId)}` : `i:${String(m?._id ?? "")}`;
 
 const dedupeMessages = (arr: any[]) => {
   const map = new Map<string, any>();
@@ -80,16 +84,10 @@ const dedupeMessages = (arr: any[]) => {
     }
     const exLocal = String(ex._id).startsWith("loc:");
     const curLocal = String(m._id).startsWith("loc:");
-    if (exLocal && !curLocal) {
-      map.set(k, m);
-      continue;
-    }
+    if (exLocal && !curLocal) { map.set(k, m); continue; }
     if (!exLocal && curLocal) continue;
     const rank = (x: any) => (x.seenAt ? 3 : x.deliveredAt ? 2 : x.tickState === "sent" ? 1 : 0);
-    if (rank(m) > rank(ex)) {
-      map.set(k, m);
-      continue;
-    }
+    if (rank(m) > rank(ex)) { map.set(k, m); continue; }
     const exT = new Date(ex.createdAt || 0).getTime();
     const curT = new Date(m.createdAt || 0).getTime();
     if (curT >= exT) map.set(k, m);
@@ -112,7 +110,9 @@ export default function ChatScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
   const myUserId = String(user?.User?.user?.id || user?.User?.user?._id || "");
 
-  const [conversationId, setConversationId] = useState<string | null>(route?.params?.conversationId || null);
+  const [conversationId, setConversationId] = useState<string | null>(
+    route?.params?.conversationId || null
+  );
   const [messages, setMessages] = useState<any[]>([]);
   const [items, setItems] = useState<Item[]>([]);
   const [input, setInput] = useState("");
@@ -126,6 +126,7 @@ export default function ChatScreen({ route, navigation }: any) {
 
   const flatRef = useRef<FlatList>(null);
   const didInitialAutoScrollRef = useRef(false);
+  const isNearBottomRef = useRef(true); // ✅ track if user is near bottom
 
   const resolvedPeerAvatar = String(peerAvatarUrl || avatarUrl || "");
   const [avatarFailed, setAvatarFailed] = useState(false);
@@ -133,12 +134,17 @@ export default function ChatScreen({ route, navigation }: any) {
   const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
-  const scrollToBottom = () =>
-    requestAnimationFrame(() => flatRef.current?.scrollToEnd({ animated: true }));
+  const scrollToBottom = useCallback((animated = true) => {
+    requestAnimationFrame(() =>
+      flatRef.current?.scrollToEnd({ animated })
+    );
+  }, []);
+
   const showGlassyError = (msg: string) => {
     setGlassError(msg);
     setTimeout(() => setGlassError(null), 2600);
   };
+
   const openImageViewer = (url: string) => {
     setActiveImageUrl(url);
     setImageViewerVisible(true);
@@ -187,7 +193,6 @@ export default function ChatScreen({ route, navigation }: any) {
             else if (m.deliveredAt) tickState = "delivered";
             else tickState = "sent";
           } else tickState = "delivered";
-
           return {
             _id: String(m._id),
             fromUserId: String(m.senderId),
@@ -224,19 +229,21 @@ export default function ChatScreen({ route, navigation }: any) {
     return out;
   }, []);
 
+  // ✅ Keyboard listeners — scroll to bottom when keyboard opens
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () => {
+      if (isNearBottomRef.current) {
+        setTimeout(() => scrollToBottom(true), 100);
+      }
+    });
+    return () => showSub.remove();
+  }, [scrollToBottom]);
+
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) =>
       setOffline(!state.isConnected || state.isInternetReachable === false)
     );
     return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    const show = Keyboard.addListener("keyboardDidShow", () => {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setTimeout(scrollToBottom, 80);
-    });
-    return () => show.remove();
   }, []);
 
   useEffect(() => {
@@ -266,6 +273,7 @@ export default function ChatScreen({ route, navigation }: any) {
 
   const loadThread = useCallback(async () => {
     if (!conversationId || !myUserId) return;
+
     const cached = await loadThreadCacheV2(String(myUserId), String(conversationId));
     if (cached.length) {
       const normalizedCached = normalizeServer(
@@ -283,40 +291,57 @@ export default function ChatScreen({ route, navigation }: any) {
         }))
       );
       setMessages(dedupeMessages(normalizedCached));
+    } else {
+      setMessages([]);
     }
+
     if (offline) return;
 
     try {
       const { data } = await fetchThread(String(conversationId), { limit: 200 });
       const serverMsgs = data?.messages || [];
-      await saveThreadCacheV2(
-        String(myUserId),
-        String(conversationId),
-        serverMsgs.map((m: any) => ({
-          _id: String(m._id),
-          conversationId: String(conversationId),
-          senderId: String(m.senderId),
-          receiverId: String(m.receiverId),
-          text: String(m.text || ""),
-          messageType: String(m.messageType || "text"),
-          media: m.media || null,
-          createdAt: m.createdAt,
-          clientMessageId: m.clientMessageId,
-          deliveredAt: m.deliveredAt || null,
-          seenAt: m.seenAt || null,
-        }))
-      );
 
       if (serverMsgs.length) {
+        await saveThreadCacheV2(
+          String(myUserId),
+          String(conversationId),
+          serverMsgs.map((m: any) => ({
+            _id: String(m._id),
+            conversationId: String(conversationId),
+            senderId: String(m.senderId),
+            receiverId: String(m.receiverId),
+            text: String(m.text || ""),
+            messageType: String(m.messageType || "text"),
+            media: m.media || null,
+            createdAt: m.createdAt,
+            clientMessageId: m.clientMessageId,
+            deliveredAt: m.deliveredAt || null,
+            seenAt: m.seenAt || null,
+          }))
+        );
+
+        const normalizedServer = normalizeServer(serverMsgs);
+        setMessages((prev) => {
+          const serverClientIds = new Set(
+            normalizedServer.map((m: any) => m.clientMessageId).filter(Boolean).map((x: any) => String(x))
+          );
+          const serverIds = new Set(normalizedServer.map((m: any) => String(m._id)));
+          const stillPendingLocal = prev.filter((m: any) => {
+            const isLocalId = String(m._id).startsWith("loc:");
+            const hasClientId = !!m.clientMessageId;
+            const existsOnServerById = serverIds.has(String(m._id));
+            const existsOnServerByClientId = hasClientId && serverClientIds.has(String(m.clientMessageId));
+            return isLocalId && !existsOnServerById && !existsOnServerByClientId;
+          });
+          return dedupeMessages([...normalizedServer, ...stillPendingLocal]);
+        });
+
         const last = serverMsgs[serverMsgs.length - 1];
         const previewText =
-          last?.messageType === "image"
-            ? "📷 Photo"
-            : last?.messageType === "video"
-            ? "🎥 Video"
-            : last?.messageType === "document"
-            ? "📎 Document"
-            : String(last.text || "");
+          last?.messageType === "image" ? "📷 Photo"
+          : last?.messageType === "video" ? "🎥 Video"
+          : last?.messageType === "document" ? "📎 Document"
+          : String(last.text || "");
 
         await upsertPreviewV2(String(myUserId), {
           conversationId: String(conversationId),
@@ -327,59 +352,44 @@ export default function ChatScreen({ route, navigation }: any) {
           lastAt: String(last.createdAt || new Date().toISOString()),
           unread: 0,
         });
+
+        const incomingUndelivered = serverMsgs
+          .filter((m: any) => String(m.receiverId) === String(myUserId) && !m.deliveredAt)
+          .map((m: any) => String(m._id));
+        if (incomingUndelivered.length) await markDelivered(incomingUndelivered);
+
+        const incoming = serverMsgs.filter((m: any) => String(m.receiverId) === String(myUserId));
+        if (incoming.length) {
+          const lastIncoming = incoming[incoming.length - 1];
+          await markSeen({
+            conversationId: String(conversationId),
+            peerUserId: String(peerUserId),
+            lastSeenMessageId: String(lastIncoming._id),
+          });
+        }
+
+        notifyConversationChanged();
+      } else {
+        console.log("API returned empty thread, cache not cleared");
       }
-
-      const normalizedServer = normalizeServer(serverMsgs);
-      setMessages((prev) => {
-        const serverClientIds = new Set(
-          normalizedServer
-            .map((m: any) => m.clientMessageId)
-            .filter(Boolean)
-            .map((x: any) => String(x))
-        );
-        const serverIds = new Set(normalizedServer.map((m: any) => String(m._id)));
-        const stillPendingLocal = prev.filter((m: any) => {
-          const isLocalId = String(m._id).startsWith("loc:");
-          const hasClientId = !!m.clientMessageId;
-          const existsOnServerById = serverIds.has(String(m._id));
-          const existsOnServerByClientId =
-            hasClientId && serverClientIds.has(String(m.clientMessageId));
-          return isLocalId && !existsOnServerById && !existsOnServerByClientId;
-        });
-        return dedupeMessages([...normalizedServer, ...stillPendingLocal]);
-      });
-
-      const incomingUndelivered = serverMsgs
-        .filter((m: any) => String(m.receiverId) === String(myUserId) && !m.deliveredAt)
-        .map((m: any) => String(m._id));
-      if (incomingUndelivered.length) await markDelivered(incomingUndelivered);
-
-      const incoming = serverMsgs.filter((m: any) => String(m.receiverId) === String(myUserId));
-      if (incoming.length) {
-        const lastIncoming = incoming[incoming.length - 1];
-        await markSeen({
-          conversationId: String(conversationId),
-          peerUserId: String(peerUserId),
-          lastSeenMessageId: String(lastIncoming._id),
-        });
-      }
-
+    } catch (e) {
+      console.log("fetchThread failed — showing cached messages", e);
       notifyConversationChanged();
-    } catch {}
+    }
   }, [conversationId, myUserId, peerUserId, peerName, peerMood, offline, normalizeServer]);
 
   useEffect(() => {
     const unsub = navigation.addListener("focus", async () => {
       didInitialAutoScrollRef.current = false;
       await loadThread();
-      setTimeout(scrollToBottom, 60);
+      setTimeout(() => scrollToBottom(false), 60);
     });
     (async () => {
       await loadThread();
-      setTimeout(scrollToBottom, 60);
+      setTimeout(() => scrollToBottom(false), 60);
     })();
     return unsub;
-  }, [navigation, loadThread]);
+  }, [navigation, loadThread, scrollToBottom]);
 
   useEffect(() => {
     if (offline) return;
@@ -409,22 +419,19 @@ export default function ChatScreen({ route, navigation }: any) {
     const localId = `loc:${clientMessageId}`;
 
     setMessages((prev) =>
-      dedupeMessages([
-        ...prev,
-        {
-          _id: localId,
-          fromUserId: String(myUserId),
-          toUserId: String(peerUserId),
-          plaintext: "",
-          messageType: uploaded.messageType,
-          media: uploaded.media,
-          createdAt: now,
-          clientMessageId,
-          tickState: "pending",
-          deliveredAt: null,
-          seenAt: null,
-        },
-      ])
+      dedupeMessages([...prev, {
+        _id: localId,
+        fromUserId: String(myUserId),
+        toUserId: String(peerUserId),
+        plaintext: "",
+        messageType: uploaded.messageType,
+        media: uploaded.media,
+        createdAt: now,
+        clientMessageId,
+        tickState: "pending",
+        deliveredAt: null,
+        seenAt: null,
+      }])
     );
 
     await upsertThreadMessageV2(String(myUserId), String(conversationId), {
@@ -447,11 +454,9 @@ export default function ChatScreen({ route, navigation }: any) {
       peerName: String(peerName || "Friend"),
       mood: String(peerMood || ""),
       lastText:
-        uploaded.messageType === "image"
-          ? "📷 Photo"
-          : uploaded.messageType === "video"
-          ? "🎥 Video"
-          : "📎 Document",
+        uploaded.messageType === "image" ? "📷 Photo"
+        : uploaded.messageType === "video" ? "🎥 Video"
+        : "📎 Document",
       lastAt: now,
       unread: 0,
     });
@@ -471,22 +476,20 @@ export default function ChatScreen({ route, navigation }: any) {
     const srv = data?.message;
     if (srv?._id) {
       setMessages((prev) =>
-        dedupeMessages(
-          prev.map((mm) =>
-            mm.clientMessageId === clientMessageId
-              ? {
-                  ...mm,
-                  _id: String(srv._id),
-                  createdAt: srv.createdAt || mm.createdAt,
-                  media: srv.media || mm.media,
-                  messageType: srv.messageType || mm.messageType,
-                  tickState: srv.seenAt ? "seen" : srv.deliveredAt ? "delivered" : "sent",
-                  deliveredAt: srv.deliveredAt || null,
-                  seenAt: srv.seenAt || null,
-                }
-              : mm
-          )
-        )
+        dedupeMessages(prev.map((mm) =>
+          mm.clientMessageId === clientMessageId
+            ? {
+                ...mm,
+                _id: String(srv._id),
+                createdAt: srv.createdAt || mm.createdAt,
+                media: srv.media || mm.media,
+                messageType: srv.messageType || mm.messageType,
+                tickState: srv.seenAt ? "seen" : srv.deliveredAt ? "delivered" : "sent",
+                deliveredAt: srv.deliveredAt || null,
+                seenAt: srv.seenAt || null,
+              }
+            : mm
+        ))
       );
     }
   };
@@ -499,14 +502,13 @@ export default function ChatScreen({ route, navigation }: any) {
     if (files.length > MAX_FILES) return showGlassyError(`Select up to ${MAX_FILES} files only.`);
     const over = files.find((f) => Number(f.fileSize || 0) > MAX_SIZE);
     if (over) return showGlassyError("Each file must be <= 50MB.");
-
     try {
       setSendingMedia(true);
       for (const f of files) {
         const uploaded = await uploadOne(f);
         await sendMediaMessage(uploaded);
       }
-      setTimeout(scrollToBottom, 80);
+      setTimeout(() => scrollToBottom(true), 80);
     } catch (e: any) {
       showGlassyError(e?.message || "Failed to send media");
     } finally {
@@ -517,23 +519,12 @@ export default function ChatScreen({ route, navigation }: any) {
   const pickFromGallery = async () => {
     try {
       setSheetOpen(false);
-      const res = await launchImageLibrary({
-        mediaType: "mixed",
-        selectionLimit: MAX_FILES,
-        includeExtra: true,
-      });
+      const res = await launchImageLibrary({ mediaType: "mixed", selectionLimit: MAX_FILES, includeExtra: true });
       if (res.didCancel || !res.assets?.length) return;
-      await processAndSendFiles(
-        res.assets.map((a) => ({
-          uri: String(a.uri || ""),
-          type: a.type,
-          name: a.fileName || `media_${Date.now()}`,
-          fileSize: a.fileSize,
-        }))
-      );
-    } catch {
-      showGlassyError("Could not open gallery");
-    }
+      await processAndSendFiles(res.assets.map((a) => ({
+        uri: String(a.uri || ""), type: a.type, name: a.fileName || `media_${Date.now()}`, fileSize: a.fileSize,
+      })));
+    } catch { showGlassyError("Could not open gallery"); }
   };
 
   const openCameraPhoto = async () => {
@@ -543,17 +534,10 @@ export default function ChatScreen({ route, navigation }: any) {
       if (!ok) return showGlassyError("Camera permission denied");
       const res = await launchCamera({ mediaType: "photo", saveToPhotos: true });
       if (res.didCancel || !res.assets?.length) return;
-      await processAndSendFiles(
-        res.assets.map((a) => ({
-          uri: String(a.uri || ""),
-          type: a.type,
-          name: a.fileName || `photo_${Date.now()}.jpg`,
-          fileSize: a.fileSize,
-        }))
-      );
-    } catch {
-      showGlassyError("Could not open camera");
-    }
+      await processAndSendFiles(res.assets.map((a) => ({
+        uri: String(a.uri || ""), type: a.type, name: a.fileName || `photo_${Date.now()}.jpg`, fileSize: a.fileSize,
+      })));
+    } catch { showGlassyError("Could not open camera"); }
   };
 
   const openCameraVideo = async () => {
@@ -561,23 +545,12 @@ export default function ChatScreen({ route, navigation }: any) {
       setSheetOpen(false);
       const ok = await ensureCameraPerms();
       if (!ok) return showGlassyError("Camera/Mic permission denied");
-      const res = await launchCamera({
-        mediaType: "video",
-        videoQuality: "high",
-        saveToPhotos: true,
-      });
+      const res = await launchCamera({ mediaType: "video", videoQuality: "high", saveToPhotos: true });
       if (res.didCancel || !res.assets?.length) return;
-      await processAndSendFiles(
-        res.assets.map((a) => ({
-          uri: String(a.uri || ""),
-          type: a.type,
-          name: a.fileName || `video_${Date.now()}.mp4`,
-          fileSize: a.fileSize,
-        }))
-      );
-    } catch {
-      showGlassyError("Could not record video");
-    }
+      await processAndSendFiles(res.assets.map((a) => ({
+        uri: String(a.uri || ""), type: a.type, name: a.fileName || `video_${Date.now()}.mp4`, fileSize: a.fileSize,
+      })));
+    } catch { showGlassyError("Could not record video"); }
   };
 
   const pickDocuments = async () => {
@@ -586,22 +559,12 @@ export default function ChatScreen({ route, navigation }: any) {
       const docs = await pick({ allowMultiSelection: true, type: [types.allFiles] });
       if (!docs?.length) return;
       if (docs.length > MAX_FILES) return showGlassyError(`Select up to ${MAX_FILES} files only.`);
-      await processAndSendFiles(
-        docs.map((d: any) => ({
-          uri: d.uri,
-          type: d.type,
-          name: d.name || `doc_${Date.now()}`,
-          fileSize: d.size,
-        }))
-      );
+      await processAndSendFiles(docs.map((d: any) => ({
+        uri: d.uri, type: d.type, name: d.name || `doc_${Date.now()}`, fileSize: d.size,
+      })));
     } catch (e: any) {
       const code = e?.code || e?.name;
-      if (
-        code === "DOCUMENT_PICKER_CANCELED" ||
-        code === "OPERATION_CANCELED" ||
-        code === "AbortError"
-      )
-        return;
+      if (code === "DOCUMENT_PICKER_CANCELED" || code === "OPERATION_CANCELED" || code === "AbortError") return;
       showGlassyError("Could not pick documents");
     }
   };
@@ -615,22 +578,19 @@ export default function ChatScreen({ route, navigation }: any) {
     setInput("");
 
     setMessages((prev) =>
-      dedupeMessages([
-        ...prev,
-        {
-          _id: localId,
-          fromUserId: String(myUserId),
-          toUserId: String(peerUserId),
-          plaintext: text,
-          messageType: "text",
-          media: null,
-          createdAt: now,
-          clientMessageId,
-          tickState: "pending",
-          deliveredAt: null,
-          seenAt: null,
-        },
-      ])
+      dedupeMessages([...prev, {
+        _id: localId,
+        fromUserId: String(myUserId),
+        toUserId: String(peerUserId),
+        plaintext: text,
+        messageType: "text",
+        media: null,
+        createdAt: now,
+        clientMessageId,
+        tickState: "pending",
+        deliveredAt: null,
+        seenAt: null,
+      }])
     );
 
     await upsertThreadMessageV2(String(myUserId), String(conversationId), {
@@ -658,6 +618,9 @@ export default function ChatScreen({ route, navigation }: any) {
     });
 
     notifyConversationChanged();
+    // ✅ Scroll to bottom immediately after sending
+    setTimeout(() => scrollToBottom(true), 50);
+
     if (offline) return;
 
     try {
@@ -673,27 +636,25 @@ export default function ChatScreen({ route, navigation }: any) {
       const srv = data?.message;
       if (srv?._id) {
         setMessages((prev) =>
-          dedupeMessages(
-            prev.map((m) =>
-              m.clientMessageId === clientMessageId
-                ? {
-                    ...m,
-                    _id: String(srv._id),
-                    createdAt: srv.createdAt || m.createdAt,
-                    tickState: srv.seenAt ? "seen" : srv.deliveredAt ? "delivered" : "sent",
-                    deliveredAt: srv.deliveredAt || null,
-                    seenAt: srv.seenAt || null,
-                  }
-                : m
-            )
-          )
+          dedupeMessages(prev.map((m) =>
+            m.clientMessageId === clientMessageId
+              ? {
+                  ...m,
+                  _id: String(srv._id),
+                  createdAt: srv.createdAt || m.createdAt,
+                  tickState: srv.seenAt ? "seen" : srv.deliveredAt ? "delivered" : "sent",
+                  deliveredAt: srv.deliveredAt || null,
+                  seenAt: srv.seenAt || null,
+                }
+              : m
+          ))
         );
       }
       setTimeout(() => loadThread(), 600);
     } catch {
       showGlassyError("Failed to send message");
     }
-  }, [input, conversationId, myUserId, peerUserId, peerName, peerMood, offline, loadThread]);
+  }, [input, conversationId, myUserId, peerUserId, peerName, peerMood, offline, loadThread, scrollToBottom]);
 
   const renderTick = (m: any) => {
     const s = m.tickState || "pending";
@@ -706,23 +667,17 @@ export default function ChatScreen({ route, navigation }: any) {
   const renderMedia = (m: any) => {
     const t = m.messageType || "text";
     if (t === "text") return <Text style={styles.text}>{m.plaintext}</Text>;
-
     const mediaUrl = getMediaUrl(m);
     if (!mediaUrl) return null;
-
     if (t === "image") {
       return (
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => (mediaUrl ? openImageViewer(mediaUrl) : showGlassyError("Image not ready"))}
-        >
+        <TouchableOpacity activeOpacity={0.9} onPress={() => mediaUrl ? openImageViewer(mediaUrl) : showGlassyError("Image not ready")}>
           <View style={styles.mediaContainer}>
             <Image source={{ uri: mediaUrl }} style={styles.mediaImage} />
           </View>
         </TouchableOpacity>
       );
     }
-
     if (t === "video") {
       return (
         <View style={styles.mediaContainer}>
@@ -732,15 +687,12 @@ export default function ChatScreen({ route, navigation }: any) {
         </View>
       );
     }
-
     return (
       <TouchableOpacity onPress={() => openDocInApp(mediaUrl, m?.media?.name)}>
         <View style={styles.mediaContainer}>
           <View style={styles.docRow}>
             <Icon name="file-document-outline" size={22} color="#fff" />
-            <Text style={styles.docName} numberOfLines={1}>
-              {m?.media?.name || "Document"}
-            </Text>
+            <Text style={styles.docName} numberOfLines={1}>{m?.media?.name || "Document"}</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -749,465 +701,333 @@ export default function ChatScreen({ route, navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safe} edges={["left", "right"]}>
-      <View style={styles.root}>
-        <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
+      <View style={{ flex: 1, backgroundColor: "#020617" }}>
+        <View style={styles.root}>
+          <View style={styles.baseBackground} />
+          <View style={styles.glowTop} />
+          <View style={styles.glowBottom} />
 
-        {!!glassError && (
-          <View style={styles.errorCard}>
-            <Icon name="alert-circle-outline" size={18} color="#FEE2E2" />
-            <Text style={styles.errorText}>{glassError}</Text>
-          </View>
-        )}
-
-        <View style={styles.innerContainer}>
-          <View style={styles.container}>
-            <View style={styles.topBar}>
-              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-                <Icon name="arrow-left" size={22} color="#fff" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.titlePressable}
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate("ProfilePreview", { userId: String(peerUserId) })}
-              >
-                {resolvedPeerAvatar && !avatarFailed ? (
-                  <Image
-                    source={{ uri: newUrl + resolvedPeerAvatar }}
-                    style={styles.headerAvatar}
-                    onError={() => setAvatarFailed(true)}
-                  />
-                ) : (
-                  <View style={styles.headerAvatarFallback}>
-                    <Icon name="account" size={18} color="#cbd5e1" />
-                  </View>
-                )}
-                <Text numberOfLines={1} style={styles.title}>
-                  {peerName || "Friend"} {peerMood ? `[ is ${peerMood} ] ` : ""}
-                </Text>
-              </TouchableOpacity>
+          {!!glassError && (
+            <View style={styles.errorCard}>
+              <Icon name="alert-circle-outline" size={18} color="#FEE2E2" />
+              <Text style={styles.errorText}>{glassError}</Text>
             </View>
+          )}
 
-            <FlatList
-              ref={flatRef}
-              data={items}
-              keyExtractor={(it) => it.id}
-              contentContainerStyle={[styles.listContent, { paddingBottom: 20 }]}
-              keyboardShouldPersistTaps="handled"
-              nestedScrollEnabled
-              maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-              removeClippedSubviews={false}
-              initialNumToRender={20}
-              windowSize={10}
-              renderItem={({ item }) => {
-                if (item.type === "date") {
+          <View style={styles.innerContainer}>
+            <View style={styles.container}>
+              <View style={styles.topBar}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                  <Icon name="arrow-left" size={22} color="#fff" />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.titlePressable}
+                  activeOpacity={0.7}
+                  onPress={() => navigation.navigate("ProfilePreview", { userId: String(peerUserId) })}
+                >
+                  {resolvedPeerAvatar && !avatarFailed ? (
+                    <Image
+                      source={{ uri: newUrl + resolvedPeerAvatar }}
+                      style={styles.headerAvatar}
+                      onError={() => setAvatarFailed(true)}
+                    />
+                  ) : (
+                    <View style={styles.headerAvatarFallback}>
+                      <Icon name="account" size={18} color="#cbd5e1" />
+                    </View>
+                  )}
+                  <Text numberOfLines={1} style={styles.title}>
+                    {peerName || "Friend"} {peerMood ? `[ is ${peerMood} ] ` : ""}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <FlatList
+                ref={flatRef}
+                data={items}
+                keyExtractor={(it) => it.id}
+                contentContainerStyle={[styles.listContent, { paddingBottom: 20 }]}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+                maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+                removeClippedSubviews={false}
+                initialNumToRender={20}
+                windowSize={10}
+                // ✅ Track if user scrolled up — don't auto scroll if they did
+                onScroll={(e) => {
+                  const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+                  const distanceFromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
+                  isNearBottomRef.current = distanceFromBottom < 100;
+                }}
+                scrollEventThrottle={16}
+                // ✅ Auto scroll on initial load and new messages if near bottom
+                onContentSizeChange={() => {
+                  if (!didInitialAutoScrollRef.current) {
+                    didInitialAutoScrollRef.current = true;
+                    scrollToBottom(false);
+                    return;
+                  }
+                  if (isNearBottomRef.current) {
+                    scrollToBottom(true);
+                  }
+                }}
+                renderItem={({ item }) => {
+                  if (item.type === "date") {
+                    return (
+                      <View style={styles.dateRow}>
+                        <Text style={styles.dateText}>{formatDateHeader(item.dateKey)}</Text>
+                      </View>
+                    );
+                  }
+                  const m = item.msg;
+                  const isMe = String(m.fromUserId) === String(myUserId);
+                  const isMedia = m.messageType && m.messageType !== "text";
+                  const effectiveTickState =
+                    isMe && !m.seenAt && !m.deliveredAt &&
+                    (isMessageDeliveredLocally(String(m._id)) ||
+                      (m.clientMessageId && isMessageDeliveredLocally(String(m.clientMessageId))))
+                      ? "delivered"
+                      : m.tickState;
+
                   return (
-                    <View style={styles.dateRow}>
-                      <Text style={styles.dateText}>{formatDateHeader(item.dateKey)}</Text>
+                    <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
+                      <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
+                        {isMedia ? (
+                          <>
+                            {renderMedia(m)}
+                            <View style={styles.metaRowMedia}>
+                              {isMe ? renderTick({ ...m, tickState: effectiveTickState }) : null}
+                              <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
+                            </View>
+                          </>
+                        ) : (
+                          <>
+                            <View style={isMe ? styles.textBubbleMe : styles.textBubbleOther}>
+                              {renderMedia(m)}
+                            </View>
+                            <View style={styles.metaRow}>
+                              {isMe ? renderTick({ ...m, tickState: effectiveTickState }) : null}
+                              <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
+                            </View>
+                          </>
+                        )}
+                      </View>
                     </View>
                   );
-                }
-
-                const m = item.msg;
-                const isMe = String(m.fromUserId) === String(myUserId);
-                const isMedia = m.messageType && m.messageType !== "text";
-
-                const effectiveTickState =
-                  isMe &&
-                  !m.seenAt &&
-                  !m.deliveredAt &&
-                  (isMessageDeliveredLocally(String(m._id)) ||
-                    (m.clientMessageId && isMessageDeliveredLocally(String(m.clientMessageId))))
-                    ? "delivered"
-                    : m.tickState;
-
-                return (
-                  <View style={[styles.msgRow, isMe ? styles.msgRowMe : styles.msgRowOther]}>
-                    <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleOther]}>
-                      {isMedia ? (
-                        <>
-                          {renderMedia(m)}
-                          <View style={styles.metaRowMedia}>
-                            {isMe ? renderTick({ ...m, tickState: effectiveTickState }) : null}
-                            <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
-                          </View>
-                        </>
-                      ) : (
-                        <>
-                          <View style={isMe ? styles.textBubbleMe : styles.textBubbleOther}>
-                            {renderMedia(m)}
-                          </View>
-                          <View style={styles.metaRow}>
-                            {isMe ? renderTick({ ...m, tickState: effectiveTickState }) : null}
-                            <Text style={styles.timeText}>{formatTime(m.createdAt)}</Text>
-                          </View>
-                        </>
-                      )}
-                    </View>
-                  </View>
-                );
-              }}
-              onContentSizeChange={() => {
-                if (!didInitialAutoScrollRef.current) {
-                  didInitialAutoScrollRef.current = true;
-                  scrollToBottom();
-                }
-              }}
-            />
-          </View>
-
-          <View style={[styles.inputBar, { paddingBottom: insets.bottom, marginBottom: 5 }]}>
-            <View style={styles.inputRow}>
-
-              <TextInput
-                style={styles.input}
-                placeholder={offline ? "Offline: message will stay local" : "Type a message"}
-                placeholderTextColor="#94a3b8"
-                value={input}
-                onChangeText={setInput}
-                multiline
+                }}
               />
-
-              {sendingMedia ? (
-                <View style={styles.sendBtn}>
-                  <ActivityIndicator size="small" color="#fff" />
-                </View>
-              ) : (
-                <>
-                <TouchableOpacity style={styles.attachBtn} onPress={() => setSheetOpen(true)}>
-                <Icon name="paperclip" size={20} color="#fff" />
-              </TouchableOpacity>
-                <TouchableOpacity style={styles.sendBtn} onPress={send}>
-                  <Icon name="send" size={20} color="#fff" />
-                </TouchableOpacity>
-                </>
-              )}
             </View>
-          </View>
-        </View>
 
-        <Modal
-          visible={imageViewerVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setImageViewerVisible(false)}
-        >
-          <View style={styles.imageViewerRoot}>
-            <TouchableOpacity
-              style={styles.imageViewerClose}
-              onPress={() => setImageViewerVisible(false)}
+            {/* ✅ KeyboardAvoidingView wraps ONLY the input bar */}
+            <KeyboardAvoidingView
+              behavior={Platform.OS === "ios" ? "padding" : undefined}
+              keyboardVerticalOffset={0}
             >
-              <Icon name="close" size={24} color="#fff" />
-            </TouchableOpacity>
-            <Image source={{ uri: activeImageUrl }} style={styles.imageViewerImage} resizeMode="contain" />
+              <View style={[styles.inputBar, {
+                paddingBottom: Platform.OS === "ios" ? Math.max(insets.bottom, 2) : insets.bottom,
+                marginBottom: 0,
+              }]}>
+                <View style={styles.inputRow}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={offline ? "Offline: message will stay local" : "Type a message"}
+                    placeholderTextColor="#94a3b8"
+                    value={input}
+                    onChangeText={setInput}
+                    multiline
+                  />
+                  {sendingMedia ? (
+                    <View style={styles.sendBtn}>
+                      <ActivityIndicator size="small" color="#fff" />
+                    </View>
+                  ) : (
+                    <>
+                      <TouchableOpacity style={styles.attachBtn} onPress={() => setSheetOpen(true)}>
+                        <Icon name="paperclip" size={20} color="#fff" />
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.sendBtn} onPress={send}>
+                        <Icon name="send" size={20} color="#fff" />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              </View>
+            </KeyboardAvoidingView>
           </View>
-        </Modal>
 
-        <Modal visible={sheetOpen} transparent animationType="fade" onRequestClose={() => setSheetOpen(false)}>
-          <Pressable style={styles.sheetOverlay} onPress={() => setSheetOpen(false)} />
-          <View style={styles.sheetCard}>
-            <Text style={styles.sheetTitle}>Attach</Text>
-            <View style={styles.sheetGrid}>
-              <TouchableOpacity style={styles.sheetTile} onPress={openCameraPhoto}>
-                <Icon name="camera-outline" size={24} color="#fff" />
-                <Text style={styles.sheetTileText}>Camera</Text>
+          {/* Image Viewer Modal */}
+          <Modal visible={imageViewerVisible} transparent animationType="fade" onRequestClose={() => setImageViewerVisible(false)}>
+            <View style={styles.imageViewerRoot}>
+              <TouchableOpacity style={styles.imageViewerClose} onPress={() => setImageViewerVisible(false)}>
+                <Icon name="close" size={24} color="#fff" />
               </TouchableOpacity>
-
-              <TouchableOpacity style={styles.sheetTile} onPress={openCameraVideo}>
-                <Icon name="video-outline" size={24} color="#fff" />
-                <Text style={styles.sheetTileText}>Record</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.sheetTile} onPress={pickFromGallery}>
-                <Icon name="image-multiple-outline" size={24} color="#fff" />
-                <Text style={styles.sheetTileText}>Gallery</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={styles.sheetTile} onPress={pickDocuments}>
-                <Icon name="file-document-outline" size={24} color="#fff" />
-                <Text style={styles.sheetTileText}>Document</Text>
-              </TouchableOpacity>
+              <Image source={{ uri: activeImageUrl }} style={styles.imageViewerImage} resizeMode="contain" />
             </View>
-            <Text style={styles.sheetHint}>Max 10 files • 50MB each</Text>
-          </View>
-        </Modal>
+          </Modal>
+
+          {/* Attach Sheet Modal */}
+          <Modal visible={sheetOpen} transparent animationType="fade" onRequestClose={() => setSheetOpen(false)}>
+            <Pressable style={styles.sheetOverlay} onPress={() => setSheetOpen(false)} />
+            <View style={styles.sheetCard}>
+              <Text style={styles.sheetTitle}>Attach</Text>
+              <View style={styles.sheetGrid}>
+                <TouchableOpacity style={styles.sheetTile} onPress={openCameraPhoto}>
+                  <Icon name="camera-outline" size={24} color="#fff" />
+                  <Text style={styles.sheetTileText}>Camera</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.sheetTile} onPress={openCameraVideo}>
+                  <Icon name="video-outline" size={24} color="#fff" />
+                  <Text style={styles.sheetTileText}>Record</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.sheetTile} onPress={pickFromGallery}>
+                  <Icon name="image-multiple-outline" size={24} color="#fff" />
+                  <Text style={styles.sheetTileText}>Gallery</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.sheetTile} onPress={pickDocuments}>
+                  <Icon name="file-document-outline" size={24} color="#fff" />
+                  <Text style={styles.sheetTileText}>Document</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.sheetHint}>Max 10 files • 50MB each</Text>
+            </View>
+          </Modal>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  root: { flex: 1, backgroundColor: "#0f172a" },
-  innerContainer: { flex: 1 },
+  safe: { flex: 1, backgroundColor: "#020617" },
+  root: { flex: 1, backgroundColor: "#020617" },
+  innerContainer: { flex: 1, backgroundColor: "#020617" },
   baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: "#020617" },
   glowTop: {
-    position: "absolute",
-    top: -120,
-    left: -40,
-    width: 220,
-    height: 220,
-    borderRadius: 220,
-    backgroundColor: "rgba(59, 130, 246, 0.22)",
+    position: "absolute", top: -120, left: -40, width: 220, height: 220,
+    borderRadius: 220, backgroundColor: "rgba(59, 130, 246, 0.22)",
   },
   glowBottom: {
-    position: "absolute",
-    bottom: -140,
-    right: -40,
-    width: 240,
-    height: 240,
-    borderRadius: 240,
-    backgroundColor: "rgba(168, 85, 247, 0.22)",
+    position: "absolute", bottom: -140, right: -40, width: 240, height: 240,
+    borderRadius: 240, backgroundColor: "rgba(168, 85, 247, 0.22)",
   },
-
   errorCard: {
-    position: "absolute",
-    top: 16,
-    left: 12,
-    right: 12,
-    zIndex: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 14,
-    backgroundColor: "rgba(127, 29, 29, 0.45)",
-    borderWidth: 1,
+    position: "absolute", top: 16, left: 12, right: 12, zIndex: 20,
+    flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 14,
+    backgroundColor: "rgba(127, 29, 29, 0.45)", borderWidth: 1,
     borderColor: "rgba(248, 113, 113, 0.5)",
   },
   errorText: { color: "#FEE2E2", marginLeft: 8, fontSize: 12, flex: 1 },
-
   container: { flex: 1, paddingTop: 16, paddingHorizontal: 12 },
   topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 1,
-    paddingVertical: 6,
-    marginTop: 15,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    marginBottom: 1, paddingVertical: 6,
+    marginTop: Platform.OS === "ios" ? 35 : 15,
   },
   iconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.35)",
-    marginRight: 8,
+    width: 42, height: 42, borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: "rgba(148,163,184,0.35)", marginRight: 8,
   },
   titlePressable: {
-    flex: 1,
-    marginLeft: 12,
-    marginRight: 10,
-    paddingVertical: 4,
-    flexDirection: "row",
-    alignItems: "center",
+    flex: 1, marginLeft: 12, marginRight: 10, paddingVertical: 4,
+    flexDirection: "row", alignItems: "center",
   },
   headerAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.35)",
+    width: 34, height: 34, borderRadius: 17, marginRight: 10,
+    borderWidth: 1, borderColor: "rgba(148,163,184,0.35)",
     backgroundColor: "rgba(255,255,255,0.08)",
   },
   headerAvatarFallback: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    marginRight: 10,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.35)",
+    width: 34, height: 34, borderRadius: 17, marginRight: 10,
+    backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: "rgba(148,163,184,0.35)",
   },
   title: { color: "#fff", fontSize: 18, fontWeight: "700", flex: 1 },
-
   listContent: { paddingVertical: 8 },
   dateRow: { alignItems: "center", marginVertical: 10 },
   dateText: {
-    color: "#cbd5e1",
-    fontSize: 12,
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.25)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    overflow: "hidden",
+    color: "#cbd5e1", fontSize: 12, backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1, borderColor: "rgba(148,163,184,0.25)",
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: "hidden",
   },
-
   msgRow: { width: "100%", flexDirection: "row", marginBottom: 8 },
   msgRowMe: { justifyContent: "flex-end" },
   msgRowOther: { justifyContent: "flex-start" },
-
   bubble: {
-    paddingHorizontal: 0,
-    paddingVertical: 0,
-    borderRadius: 16,
-    maxWidth: "82%",
-    minWidth: 52,
-    position: "relative",
-    overflow: "hidden",
+    paddingHorizontal: 0, paddingVertical: 0, maxWidth: "82%",
+    minWidth: 5, position: "relative", overflow: "hidden",
   },
   bubbleMe: { backgroundColor: "transparent" },
   bubbleOther: { backgroundColor: "transparent" },
-
   textBubbleMe: {
-    backgroundColor: "#4f46e5",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
+    backgroundColor: "#4f46e5", paddingHorizontal: 12,
+    paddingVertical: 8, borderRadius: 16,
   },
   textBubbleOther: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.08)", paddingHorizontal: 12,
+    paddingVertical: 8, borderRadius: 16,
   },
-
   text: { color: "#fff", flexShrink: 1, flexWrap: "wrap" },
-
   mediaContainer: { paddingBottom: 0 },
-
-  mediaImage: {
-    width: 190,
-    height: 220,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  videoWrap: {
-    width: 220,
-    height: 200,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "#000",
-  },
+  mediaImage: { width: 190, height: 220, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.08)" },
+  videoWrap: { width: 220, height: 200, borderRadius: 12, overflow: "hidden", backgroundColor: "#000" },
   video: { width: "100%", height: "100%" },
-
   docRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    minWidth: 180,
-    maxWidth: 220,
+    flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, minWidth: 180, maxWidth: 220,
   },
   docName: { color: "#fff", marginLeft: 8, flex: 1, fontSize: 12 },
-
   metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-end",
-    marginTop: 4,
+    flexDirection: "row", alignItems: "center", alignSelf: "flex-end", marginTop: 4, marginLeft: 5,
   },
   metaRowMedia: {
-    position: "absolute",
-    right: 0,
-    bottom: 6,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
+    position: "absolute", right: 0, bottom: 6, flexDirection: "row",
+    alignItems: "center", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10,
   },
   tickIcon: { marginRight: 4 },
-  timeText: {
-    color: "rgba(255,255,255,0.9)",
-    fontSize: 11,
-    marginRight: 4,
-  },
-
+  timeText: { color: "rgba(255,255,255,0.9)", fontSize: 11, marginRight: 4 },
   inputBar: { paddingTop: 8, backgroundColor: "transparent" },
   inputRow: {
-    flexDirection: "row",
-    padding: 10,
-    alignItems: "center",
-    backgroundColor: "transparent",
+    flexDirection: "row", paddingLeft: 10, paddingRight: 10,
+    alignItems: "center", backgroundColor: "transparent",
   },
   attachBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.35)",
+    width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.08)",
+    alignItems: "center", justifyContent: "center", marginRight: 8,
+    borderWidth: 1, borderColor: "rgba(148,163,184,0.35)",
   },
   input: {
-    flex: 1,
-    color: "#fff",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 12,
-    marginRight: 8,
-    maxHeight: 140,
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.5)",
+    flex: 1, color: "#fff", paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, marginRight: 8,
+    maxHeight: 140, borderWidth: 1, borderColor: "rgba(148,163,184,0.5)",
   },
   sendBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: "#6366f1",
-    alignItems: "center",
-    justifyContent: "center",
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: "#6366f1", alignItems: "center", justifyContent: "center",
   },
-
   imageViewerRoot: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.96)",
-    justifyContent: "center",
-    alignItems: "center",
-    height: "100%"
+    flex: 1, backgroundColor: "rgba(0,0,0,0.96)",
+    justifyContent: "center", alignItems: "center", height: "100%",
   },
   imageViewerClose: {
-    position: "absolute",
-    top: 50,
-    right: 18,
-    zIndex: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.18)",
-    alignItems: "center",
-    justifyContent: "center",
+    position: "absolute", top: 50, right: 18, zIndex: 10, width: 40, height: 40,
+    borderRadius: 20, backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center", justifyContent: "center",
   },
   imageViewerImage: { width: "100%", height: "85%" },
-
   sheetOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },
   sheetCard: {
-    position: "absolute",
-    left: 12,
-    right: 12,
-    bottom: 12,
-    backgroundColor: "rgba(15, 23, 42, 0.9)",
-    borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.4)",
-    borderRadius: 18,
-    padding: 14,
+    position: "absolute", left: 12, right: 12, bottom: 12,
+    backgroundColor: "rgba(15, 23, 42, 0.9)", borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.4)", borderRadius: 18, padding: 14,
   },
   sheetTitle: { color: "#fff", fontSize: 16, fontWeight: "700", marginBottom: 10 },
   sheetGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
   sheetTile: {
-    width: "48%",
-    borderRadius: 14,
-    paddingVertical: 14,
-    marginBottom: 10,
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.06)",
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.35)",
+    width: "48%", borderRadius: 14, paddingVertical: 14, marginBottom: 10,
+    alignItems: "center", backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1, borderColor: "rgba(148,163,184,0.35)",
   },
   sheetTileText: { color: "#E5E7EB", marginTop: 6, fontSize: 13, fontWeight: "600" },
   sheetHint: { color: "#94A3B8", fontSize: 12, textAlign: "center", marginTop: 4 },

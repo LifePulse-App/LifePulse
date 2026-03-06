@@ -14,15 +14,18 @@ import NetInfo from "@react-native-community/netinfo";
 import MainLayout from "../../../shared/components/MainLayout";
 import api from "../../friends/services/api_friends";
 import apiClient from "../../../auth/api-client/api_client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Friend = {
   _id: string;
   name: string;
   username?: string;
-  avatar?: { url?: string };
+  avatar?: { url?: string } | string;
   avatarUrl?: string;
   avatarThumbnailUrl?: string;
 };
+
+const FRIENDS_CACHE_KEY = "chat:newChatFriends:v1";
 
 export default function NewChatScreen({ navigation }: any) {
   const [q, setQ] = useState("");
@@ -30,21 +33,33 @@ export default function NewChatScreen({ navigation }: any) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(true);
   const [imageErrorMap, setImageErrorMap] = useState<Record<string, boolean>>({});
-      const baseUrl = apiClient.getBaseURL();
+  const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
-  const loadFriends = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await api.getFriends();
-      setFriends(res?.data?.friends || []);
-    } catch (e) {
-      console.log("friends load error", e);
-      setFriends([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // --- Improved cache loading logic for offline-first experience ---
+  useEffect(() => {
+    (async () => {
+      let cacheHit = false;
+      try {
+        const raw = await AsyncStorage.getItem(FRIENDS_CACHE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.friends) {
+            setFriends(parsed.friends);
+            cacheHit = true;
+            setLoading(false);
+          }
+        }
+      } catch {}
+      // Only call API if online
+      if (!offline) {
+        loadFriends();
+      } else if (!cacheHit) {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offline]);
 
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
@@ -54,9 +69,19 @@ export default function NewChatScreen({ navigation }: any) {
     return () => unsub();
   }, []);
 
-  useEffect(() => {
-    loadFriends();
-  }, [loadFriends]);
+  const loadFriends = useCallback(async () => {
+    setLoading(true); // only needed for online fetch
+    try {
+      const res = await api.getFriends();
+      const list = res?.data?.friends || [];
+      setFriends(list);
+      await AsyncStorage.setItem(FRIENDS_CACHE_KEY, JSON.stringify({ ts: Date.now(), friends: list }));
+    } catch (e) {
+      // never clear cache on error!
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const filtered = friends.filter(
     (u) =>
@@ -64,11 +89,18 @@ export default function NewChatScreen({ navigation }: any) {
       (u.username || "").toLowerCase().includes(q.toLowerCase())
   );
 
-  const getAvatarUrl = (item: Friend) =>
-    item.avatar|| "";
+  const getAvatarUrl = (item: Friend) => {
+    let raw =
+      (typeof item.avatar === "string" ? item.avatar :
+        item.avatar?.url) ||
+      item.avatarUrl ||
+      item.avatarThumbnailUrl ||
+      "";
+    return raw.startsWith("http") ? raw : newUrl + raw;
+  };
 
   const renderAvatar = (item: Friend) => {
-    const uri = newUrl + getAvatarUrl(item);
+    const uri = getAvatarUrl(item);
     const hasError = !!imageErrorMap[item._id];
 
     if (uri && !hasError) {
@@ -85,8 +117,6 @@ export default function NewChatScreen({ navigation }: any) {
         />
       );
     }
-
-    // ✅ person icon fallback (not initials)
     return (
       <View style={styles.avatarFallback}>
         <Icon name="account" size={22} color="#cbd5e1" />
@@ -138,7 +168,7 @@ export default function NewChatScreen({ navigation }: any) {
                     navigation.navigate("chat", {
                       peerUserId: item._id,
                       peerName: item.name,
-                      peerAvatarUrl: getAvatarUrl(item), // pass avatar to ChatScreen header
+                      peerAvatarUrl: getAvatarUrl(item),
                     })
                   }
                 >
@@ -215,7 +245,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(148,163,184,0.3)",
   },
   searchInput: { flex: 1, color: "#fff", paddingVertical: 8, marginLeft: 6 },
-
   row: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 12,
@@ -227,7 +256,6 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 10,
   },
-
   avatar: {
     width: 44,
     height: 44,
@@ -246,7 +274,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   name: { color: "#fff", fontSize: 16, fontWeight: "700" },
   sub: { color: "#94a3b8", fontSize: 12, marginTop: 2 },
 });

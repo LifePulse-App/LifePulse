@@ -18,7 +18,6 @@
   "pod_target_xcconfig": {
     "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
     "HEADER_SEARCH_PATHS": [
-      "\"$(PODS_TARGET_SRCROOT)/../../..\"",
       "\"${PODS_CONFIGURATION_BUILD_DIR}/React-jsinspectortracing/jsinspector_moderntracing.framework/Headers\"",
       "$(PODS_ROOT)/glog",
       "$(PODS_ROOT)/boost",
@@ -29,8 +28,6 @@
       "$(PODS_ROOT)/RCT-Folly"
     ]
   },
-  "module_name": "React_performancetimeline",
-  "header_mappings_dir": "../../..",
   "dependencies": {
     "React-featureflags": [],
     "React-jsinspectortracing": [],

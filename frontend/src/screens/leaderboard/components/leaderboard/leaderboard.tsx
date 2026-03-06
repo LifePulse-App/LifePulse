@@ -94,6 +94,12 @@ const LeaderboardScreen = ({ navigation }: any) => {
   const [dataSource, setDataSource] = useState<"live" | "cache" | null>(null);
 
   const currentUserRef = useRef<any>(null);
+
+  // FIX 1: Use a ref for offline status so load() always reads the latest value
+  // without needing it as a useCallback dependency (avoids stale closure bug).
+  const offlineRef = useRef(false);
+  const [offline, setOffline] = useState(false);
+
   const LB_CACHE_PREFIX = "leaderboard:v2";
   const LOCK_CACHE_KEY = "leaderboard:lockStatus:v1";
 
@@ -121,7 +127,9 @@ const LeaderboardScreen = ({ navigation }: any) => {
       const raw = await AsyncStorage.getItem(key);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      if (!parsed?.value) return null;
+      // FIX 2: Check parsed exists but don't gate on .value being truthy —
+      // a valid payload could theoretically be falsy; check key existence instead.
+      if (parsed === null || parsed === undefined || !("value" in parsed)) return null;
       return { ts: parsed.ts ?? 0, value: parsed.value as T };
     } catch (e) {
       console.log("loadCache error", e);
@@ -129,14 +137,26 @@ const LeaderboardScreen = ({ navigation }: any) => {
     }
   };
 
-  const [offline, setOffline] = useState(false);
-
+  // FIX 3: Keep offlineRef in sync with offline state so load() can read it synchronously.
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
       const connected = state.isConnected === true;
-      const reachable = state.isInternetReachable === true;
-      setOffline(!connected || !reachable);
+      const reachable = state.isInternetReachable !== false; // treat null as reachable to avoid false offline
+      const isOffline = !connected || !reachable;
+      offlineRef.current = isOffline;
+      setOffline(isOffline);
     });
+
+    // FIX 4: Fetch initial network state immediately so offlineRef is populated
+    // before the first load() call, not just on change events.
+    NetInfo.fetch().then((state) => {
+      const connected = state.isConnected === true;
+      const reachable = state.isInternetReachable !== false;
+      const isOffline = !connected || !reachable;
+      offlineRef.current = isOffline;
+      setOffline(isOffline);
+    });
+
     return () => unsub();
   }, []);
 
@@ -190,7 +210,8 @@ const LeaderboardScreen = ({ navigation }: any) => {
       setLockStatus(cached.value);
     }
 
-    if (offline) return;
+    // FIX 5: Use offlineRef.current instead of offline state for synchronous read
+    if (offlineRef.current) return;
 
     try {
       const res = await getLocationLockStatus();
@@ -209,9 +230,9 @@ const LeaderboardScreen = ({ navigation }: any) => {
         setLockStatus({ locked: false, daysLeft: 0, locationLockUntil: null });
       }
     }
-  }, [offline]);
+  }, []); // no offline dependency — uses ref
 
-  const resolveCountryCityParams = () => {
+  const resolveCountryCityParams = useCallback(() => {
     if (scope === "country" || scope === "city") {
       const countryLabel =
         countryOptions.find((c) => c.value === selectedCountryCode)?.label ||
@@ -223,7 +244,7 @@ const LeaderboardScreen = ({ navigation }: any) => {
       return { country: countryLabel, city: cityValue };
     }
     return { country: undefined, city: undefined };
-  };
+  }, [scope, countryOptions, selectedCountryCode, selectedCity]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -231,46 +252,80 @@ const LeaderboardScreen = ({ navigation }: any) => {
 
     const { country, city } = resolveCountryCityParams();
 
-    if ((scope === "country" || scope === "city") && !country) {
-      setLoading(false);
-      setErrorMsg("Please set your country first to view this leaderboard.");
-      return;
-    }
-    if (scope === "city" && !city) {
-      setLoading(false);
-      setErrorMsg("Please set your city to view the city leaderboard.");
-      return;
-    }
+    // FIX 6: For country/city scope, don't hard-block if country missing when offline —
+    // still attempt to load cache first, then show error only if cache is also empty.
+    const needsCountry = scope === "country" || scope === "city";
+    const needsCity = scope === "city";
 
     const key = cacheKeyForLeaderboard(tab, scope, country, city);
-    const cached = await loadCache<any>(key);
 
+    // FIX 7: Always load cache first, unconditionally — before any online/offline checks.
+    const cached = await loadCache<any>(key);
     if (cached?.value) {
       currentUserRef.current = cached.value?.currentUser || null;
       setData(cached.value);
       setDataSource("cache");
+      console.log("Cache restored for key:", key);
     }
 
-    if (offline) {
+    // FIX 8: Read offline status from ref (synchronous, always current).
+    const isOffline = offlineRef.current;
+
+    if (isOffline) {
+      // Offline path: show cache if available, otherwise friendly error.
       if (!cached?.value) {
+        if (needsCountry && !country) {
+          setErrorMsg("You are offline. Please set your country when back online.");
+        } else if (needsCity && !city) {
+          setErrorMsg("You are offline. Please set your city when back online.");
+        } else {
+          setErrorMsg("You are offline and no cached leaderboard is available yet.");
+        }
         setData(null);
-        setErrorMsg("You are offline and no cached leaderboard is available yet.");
+      } else {
+        // Cache loaded — clear any previous error, show offline notice softly.
+        setErrorMsg("You are offline — showing cached data.");
       }
       setLoading(false);
+      return;
+    }
+
+    // Online path: now enforce country/city requirements.
+    if (needsCountry && !country) {
+      setLoading(false);
+      setErrorMsg("Please set your country first to view this leaderboard.");
+      return;
+    }
+    if (needsCity && !city) {
+      setLoading(false);
+      setErrorMsg("Please set your city to view the city leaderboard.");
       return;
     }
 
     try {
       const api = tab === "monthly" ? getMonthlyLeaderboard : getPermanentLeaderboard;
       const res = await api(scope, country, city);
-      const payload = res.data;
+      const payload = res?.data;
+
+      // FIX 9: Guard against undefined/null API response — don't overwrite good cache.
+      if (!payload || !payload.leaderboard) {
+        console.log("API returned empty/undefined payload — keeping cache.");
+        if (!cached?.value) {
+          setErrorMsg("No leaderboard data available right now.");
+          setData(null);
+        }
+        setLoading(false);
+        return;
+      }
 
       currentUserRef.current = payload?.currentUser || null;
       setData(payload);
       setDataSource("live");
-
       await saveCache(key, payload);
+      console.log("Live data loaded and cached for key:", key);
     } catch (e: any) {
+      // FIX 10: On API error, keep the cache that was already set above — don't clear it.
+      console.log("API error — keeping cache if available:", e?.message);
       if (!cached?.value) {
         setData(null);
         setErrorMsg(e?.response?.data?.message || e?.message || "Failed to load leaderboard");
@@ -280,26 +335,27 @@ const LeaderboardScreen = ({ navigation }: any) => {
     } finally {
       setLoading(false);
     }
-  }, [tab, scope, offline, selectedCountryCode, selectedCity, countryOptions]);
+  }, [tab, scope, resolveCountryCityParams]); // FIX 11: removed `offline` — using offlineRef instead
+
+  // FIX 12: Single source of truth for triggering load — only useEffect, not both
+  // useEffect + useFocusEffect, which caused double-fire race conditions.
+  const hasMountedRef = useRef(false);
 
   useEffect(() => {
     load();
-  }, [offline, load]);
+  }, [load]);
 
   useFocusEffect(
     useCallback(() => {
-      (async () => {
-        await loadLockStatus();
-        await load();
-      })();
+      // Skip the very first mount since the useEffect above handles it.
+      if (!hasMountedRef.current) {
+        hasMountedRef.current = true;
+        return;
+      }
+      loadLockStatus();
+      load();
     }, [load, loadLockStatus])
   );
-
-  useEffect(() => {
-    (async () => {
-      await load();
-    })();
-  }, [scope, tab, load]);
 
   useEffect(() => {
     if (tab !== "monthly") return;
@@ -382,11 +438,7 @@ const LeaderboardScreen = ({ navigation }: any) => {
       <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 10 }}>
         <Text style={styles.rank}>{item.rank}</Text>
 
-        <RowAvatar
-          url={
-            item.avatarUrl || ""
-          }
-        />
+        <RowAvatar url={item.avatarUrl || ""} />
 
         <View style={{ marginLeft: 10, flex: 1 }}>
           <Text style={styles.name} numberOfLines={1}>
@@ -614,7 +666,7 @@ const LeaderboardScreen = ({ navigation }: any) => {
             <View style={styles.modalCard}>
               <Text style={styles.modalTitle}>Confirm Location Change</Text>
               <Text style={styles.modalText}>
-                You won’t be able to change this for 30 days. Continue?
+                You won't be able to change this for 30 days. Continue?
               </Text>
               <View style={styles.modalButtons}>
                 <TouchableOpacity

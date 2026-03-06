@@ -335,7 +335,6 @@ const Login = ({ navigation }: any) => {
                   <Text
                     style={{
                       fontWeight: '700',
-                      textDecorationLine: 'underline',
                       color: '#F9FAFB',
                     }}
                     onPress={() => navigation.navigate('ForgotPass')}
@@ -351,7 +350,6 @@ const Login = ({ navigation }: any) => {
                   <Text
                     style={{
                       fontWeight: '700',
-                      textDecorationLine: 'underline',
                       color: '#F9FAFB',
                     }}
                     onPress={() => navigation.navigate('Register')}

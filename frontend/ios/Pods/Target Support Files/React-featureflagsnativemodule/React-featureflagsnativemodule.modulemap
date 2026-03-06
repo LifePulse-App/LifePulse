@@ -1,4 +1,4 @@
-framework module React_featureflagsnativemodule {
+module react_nativemodule_featureflags {
   umbrella header "React-featureflagsnativemodule-umbrella.h"
 
   export *

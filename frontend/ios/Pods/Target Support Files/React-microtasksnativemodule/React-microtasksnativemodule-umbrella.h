@@ -10,8 +10,8 @@
 #endif
 #endif
 
-#import "nativemodule/microtasks/NativeMicrotasks.h"
+#import "react/nativemodule/microtasks/NativeMicrotasks.h"
 
-FOUNDATION_EXPORT double React_microtasksnativemoduleVersionNumber;
-FOUNDATION_EXPORT const unsigned char React_microtasksnativemoduleVersionString[];
+FOUNDATION_EXPORT double react_nativemodule_microtasksVersionNumber;
+FOUNDATION_EXPORT const unsigned char react_nativemodule_microtasksVersionString[];
 

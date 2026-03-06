@@ -1,4 +1,4 @@
-framework module idlecallbacksnativemodule {
+module react_nativemodule_idlecallbacks {
   umbrella header "React-idlecallbacksnativemodule-umbrella.h"
 
   export *

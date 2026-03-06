@@ -1,18 +1,70 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, TextInput, TouchableOpacity, StyleSheet } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import profileApi from "../services/api_profile";
 import GlassyResultCard from "./GlassyConfirmModal"; // <-- Make sure this is GlassyResultCard
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
+
+const PROFILE_CACHE_KEY = "profile_cache_v1";
 
 const EditProfileScreen = ({ navigation }: any) => {
   const [profileData, setProfileData] = useState({ name: "", username: "" });
   const [resultCard, setResultCard] = useState({ visible: false, type: "success", message: "" });
+  const [loading, setLoading] = useState(true);
+  const [offline, setOffline] = useState(false);
+
+  // Load cached profile FIRST, then fetch if online
+  useEffect(() => {
+    (async () => {
+      let cacheHit = false;
+      try {
+        const raw = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed) {
+            setProfileData({ name: parsed.name || "", username: parsed.username || "" });
+            cacheHit = true;
+            setLoading(false);
+          }
+        }
+      } catch {}
+      // Only fetch API if online
+      if (!offline) {
+        await loadProfileOnline();
+      } else if (!cacheHit) {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offline]);
+
+  useEffect(() => {
+    const unsub = NetInfo.addEventListener((state) => {
+      const isOffline = !state.isConnected || state.isInternetReachable === false;
+      setOffline(isOffline);
+    });
+    return () => unsub();
+  }, []);
+
+  // API profile fetch only if online
+  const loadProfileOnline = async () => {
+    setLoading(true);
+    try {
+      const res = await profileApi.getProfile();
+      const user = res?.data?.user || {};
+      setProfileData({ name: user.name || "", username: user.username || "" });
+      await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(user));
+    } catch {}
+    setLoading(false);
+  };
 
   const handleEditProfile = async () => {
     try {
       await profileApi.editProfile(profileData);
       setResultCard({ visible: true, type: "success", message: "Profile updated!" });
+      await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profileData));
       setTimeout(() => {
         setResultCard({ ...resultCard, visible: false });
         navigation.goBack();
@@ -21,6 +73,14 @@ const EditProfileScreen = ({ navigation }: any) => {
       setResultCard({ visible: true, type: "error", message: "Error updating profile." });
     }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.glassyMain}>
+        <Text style={{ color: "#fff", fontSize: 18, marginTop: 40 }}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.glassyMain}>

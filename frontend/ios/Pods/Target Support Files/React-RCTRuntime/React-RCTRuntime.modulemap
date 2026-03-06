@@ -1,4 +1,4 @@
-framework module RCTRuntime {
+module RCTRuntime {
   umbrella header "React-RCTRuntime-umbrella.h"
 
   export *

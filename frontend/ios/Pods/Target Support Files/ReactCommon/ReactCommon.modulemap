@@ -1,4 +1,4 @@
-framework module ReactCommon {
+module ReactCommon {
   umbrella header "ReactCommon-umbrella.h"
 
   export *

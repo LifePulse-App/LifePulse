@@ -1,34 +1,32 @@
-import React, { useContext, useEffect, useState } from "react";
-import { View, TouchableOpacity, StyleSheet, ScrollView, TextInput } from "react-native";
+import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { View, TouchableOpacity, StyleSheet, ScrollView, TextInput, Image } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import Modal from "react-native-modal";
 import MainLayout from "../../../shared/components/MainLayout";
 import AuthContext from '../../../auth/user/UserContext';
 import { logout } from "../../../navigation/main/RootNavigation";
-import profileApi from "../services/api_profile"; // Use your actual path!
+import profileApi from "../services/api_profile";
 import { useFocusEffect } from "@react-navigation/native";
-import BitmojiFace from "../../../shared/components/BitmojiFace";
-import { Image } from 'react-native';
 import UserStorage from "../../../auth/user/UserStorage";
 import SavedAccountsStorage from "../../../auth/user/SavedAccountsStorage";
 import apiClient from "../../../auth/api-client/api_client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
 
 const PROFILE_CACHE_KEY = "profile_cache_v1";
 
-// --- Glassy Confirm Modal Component ---
-const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }: any) => {
+const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }) => {
   if (!visible) return null;
   return (
-    <View style={modalStyles.modalOverlay}>
-      <View style={modalStyles.glassyModal}>
-        <Text style={modalStyles.confirmText}>{message}</Text>
-        <View style={modalStyles.modalBtns}>
-          <TouchableOpacity style={modalStyles.cancelBtn} onPress={onCancel}>
+    <View style={styles.modalOverlay}>
+      <View style={styles.glassyModal}>
+        <Text style={styles.confirmText}>{message}</Text>
+        <View style={styles.modalBtns}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
             <Text style={{ color: "#374151", fontWeight: "bold" }}>Cancel</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={modalStyles.confirmBtn} onPress={onConfirm}>
+          <TouchableOpacity style={styles.confirmBtn} onPress={onConfirm}>
             <Text style={{ color: "#fff", fontWeight: "bold" }}>Confirm</Text>
           </TouchableOpacity>
         </View>
@@ -36,55 +34,41 @@ const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }: any) => {
     </View>
   );
 };
-const modalStyles = StyleSheet.create({
-  modalOverlay: {
-    position: 'absolute', left: 0, top: 0, right: 0, bottom: 0,
-    backgroundColor: "rgba(30,41,59,0.7)", justifyContent: "center",
-    alignItems: "center", zIndex: 1000,
-  },
-  glassyModal: {
-    backgroundColor: "rgba(15,23,42,0.82)", borderColor: "white",
-    borderWidth: 1, borderRadius: 28, padding: 26, alignItems: "center", width: 280,
-    shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 18, elevation: 18,
-  },
-  confirmText: {
-    color: "#F9FAFB", fontSize: 18, fontWeight: "700", marginBottom: 22, textAlign: "center",
-  },
-  modalBtns: { flexDirection: "row", justifyContent: "space-evenly", width: '100%' },
-  cancelBtn: { backgroundColor: "rgba(228,227,236,1)", borderRadius: 12, paddingVertical: 9, paddingHorizontal: 23, marginRight: 10 },
-  confirmBtn: { backgroundColor: "#6366f1", borderRadius: 12, paddingVertical: 9, paddingHorizontal: 23 },
-});
 
-// --- Glassy Result Card Component ---
-const GlassyResultCard = ({ visible, type = "success", message, onClose }: any) => {
+const GlassyResultCard = ({ visible, type = "success", message, onClose }) => {
   if (!visible) return null;
   return (
-    <View style={resultStyles.overlay}>
-      <View style={resultStyles.card}>
+    <View style={styles.resultOverlay}>
+      <View style={styles.resultCard}>
         <Text style={[
-          resultStyles.message,
+          styles.resultMessage,
           { color: type === "error" ? "#ef4444" : "#22c55e" }
-        ]}>
-          {message}
-        </Text>
-        <TouchableOpacity style={resultStyles.okBtn} onPress={onClose}>
+        ]}>{message}</Text>
+        <TouchableOpacity style={styles.resultOkBtn} onPress={onClose}>
           <Text style={{ color: "#fff", fontWeight: "bold" }}>OK</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 };
-const resultStyles = StyleSheet.create({
-  overlay: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: "rgba(30,41,59,0.45)", justifyContent: "center", alignItems: "center", zIndex: 2000 },
-  card: { backgroundColor: "rgba(15,23,42,0.94)", borderColor: "#fff", borderWidth: 1, borderRadius: 24, padding: 26, width: 270, alignItems: "center" },
-  message: { fontSize: 17, fontWeight: "bold", textAlign: "center", marginBottom: 18, marginTop: 2 },
-  okBtn: { backgroundColor: "#6366f1", borderRadius: 14, paddingVertical: 9, paddingHorizontal: 34, marginTop: 2 },
-});
 
-// --- Bottom Sheet Modal Components for Each Action ---
-function EditProfileModal({ user, onClose, setResultCard, onChange }: any) {
-  const [data, setData] = useState({ name: user?.name || "", username: user?.username || "" });
+// --- Edit Profile Modal ---
+function EditProfileModal({ user, onClose, setResultCard, onChange }) {
+  const [data, setData] = useState({
+    name: user?.name || "",
+    username: user?.username || "",
+    isPublic: typeof user?.isPublic === "boolean" ? user.isPublic : true,
+  });
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setData({
+      name: user?.name || "",
+      username: user?.username || "",
+      isPublic: typeof user?.isPublic === "boolean" ? user.isPublic : true,
+    });
+  }, [user]);
+
   const onSave = async () => {
     setLoading(true);
     try {
@@ -95,24 +79,68 @@ function EditProfileModal({ user, onClose, setResultCard, onChange }: any) {
       onClose();
     } catch (err) {
       setLoading(false);
-      setResultCard({ visible: true, type: "error", message: "Error updating profile." });
+      setResultCard({
+        visible: true,
+        type: "error",
+        message: err?.response?.data?.message || err?.message || "Error updating profile."
+      });
     }
   };
+
   return (
-    <View style={sheetStyles.glassyInner}>
-      <Text style={sheetStyles.sheetTitle}>Edit Profile</Text>
-      <TextInput style={sheetStyles.input} placeholder="Name" placeholderTextColor="#6366f1" value={data.name} onChangeText={name => setData(d => ({ ...d, name }))} />
-      <TextInput style={sheetStyles.input} placeholder="Username" placeholderTextColor="#6366f1" value={data.username} onChangeText={username => setData(d => ({ ...d, username }))} />
-      <TouchableOpacity style={sheetStyles.saveBtn} onPress={onSave} disabled={loading}>
+    <View style={styles.glassyInner}>
+      <Text style={styles.sheetTitle}>Edit Profile</Text>
+      <TextInput
+        style={styles.sheetInput}
+        placeholder="Name"
+        placeholderTextColor="#6366f1"
+        value={data.name}
+        onChangeText={name => setData(d => ({ ...d, name }))}
+      />
+      <TextInput
+        style={styles.sheetInput}
+        placeholder="Username"
+        placeholderTextColor="#6366f1"
+        value={data.username}
+        autoCapitalize="none"
+        onChangeText={username => setData(d => ({ ...d, username }))}
+      />
+      <TouchableOpacity
+        activeOpacity={0.88}
+        style={styles.toggleRow}
+        onPress={() => setData(d => ({ ...d, isPublic: !d.isPublic }))}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+          <Icon
+            name={data.isPublic ? "earth" : "account-multiple"}
+            size={20}
+            color={data.isPublic ? "#22c55e" : "#f59e0b"}
+          />
+          <View style={{ marginLeft: 10, flex: 1 }}>
+            <Text style={styles.toggleTitle}>Show my location</Text>
+            <Text style={styles.toggleSub}>
+              {data.isPublic
+                ? "Anyone can see your city & country in profile."
+                : "No one can see your city & country."}
+            </Text>
+          </View>
+        </View>
+        <View style={[styles.togglePill, data.isPublic ? styles.pillOn : styles.pillOff]}>
+          <View style={[styles.toggleDot, data.isPublic ? styles.dotOn : styles.dotOff]} />
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.sheetSaveBtn} onPress={onSave} disabled={loading}>
         <Text style={{ color: "#fff", fontWeight: "bold" }}>{loading ? "Saving..." : "Save"}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={sheetStyles.cancelBtn} onPress={onClose}>
+      <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
         <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Cancel</Text>
       </TouchableOpacity>
     </View>
   );
 }
-function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
+
+// --- Change Password Modal ---
+function ChangePasswordModal({ onClose, setResultCard, onChange }) {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [step, setStep] = useState(1);
@@ -127,11 +155,7 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
       setStep(2);
     } catch (err) {
       setLoading(false);
-      setResultCard({
-        visible: true,
-        type: "error",
-        message: "Error sending OTP"
-      });
+      setResultCard({ visible: true, type: "error", message: "Error sending OTP" });
     }
   };
 
@@ -148,11 +172,7 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
         onClose();
         return;
       }
-      setResultCard({
-        visible: true,
-        type: "success",
-        message: "Password changed!"
-      });
+      setResultCard({ visible: true, type: "success", message: "Password changed!" });
       onChange?.();
       onClose();
     } catch (err) {
@@ -167,12 +187,12 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
   };
 
   return (
-    <View style={sheetStyles.glassyInner}>
-      <Text style={sheetStyles.sheetTitle}>Change Password</Text>
+    <View style={styles.glassyInner}>
+      <Text style={styles.sheetTitle}>Change Password</Text>
       {step === 1 ? (
         <>
           <TextInput
-            style={sheetStyles.input}
+            style={styles.sheetInput}
             placeholder="Current Password"
             placeholderTextColor="#6366f1"
             value={oldPassword}
@@ -180,7 +200,7 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
             onChangeText={setOldPassword}
           />
           <TextInput
-            style={sheetStyles.input}
+            style={styles.sheetInput}
             placeholder="New Password"
             placeholderTextColor="#6366f1"
             value={newPassword}
@@ -188,7 +208,7 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
             onChangeText={setNewPassword}
           />
           <TouchableOpacity
-            style={sheetStyles.saveBtn}
+            style={styles.sheetSaveBtn}
             onPress={requestOtp}
             disabled={loading || !oldPassword || !newPassword}
           >
@@ -203,7 +223,7 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
             Enter OTP sent to your email to confirm password change:
           </Text>
           <TextInput
-            style={sheetStyles.input}
+            style={styles.sheetInput}
             placeholder="OTP"
             placeholderTextColor="#6366f1"
             value={otp}
@@ -211,7 +231,7 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
             onChangeText={setOtp}
           />
           <TouchableOpacity
-            style={sheetStyles.saveBtn}
+            style={styles.sheetSaveBtn}
             onPress={changePasswordWithOtp}
             disabled={loading || !otp}
           >
@@ -221,13 +241,15 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
           </TouchableOpacity>
         </>
       )}
-      <TouchableOpacity style={sheetStyles.cancelBtn} onPress={onClose}>
+      <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
         <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Cancel</Text>
       </TouchableOpacity>
     </View>
   );
 }
-function ChangeNumberModal({ user, onClose, setResultCard }: any) {
+
+// --- Change Number Modal ---
+function ChangeNumberModal({ user, onClose, setResultCard }) {
   const [number, setNumber] = useState(user?.phone || "");
   const [loading, setLoading] = useState(false);
   const onSave = async () => {
@@ -236,7 +258,6 @@ function ChangeNumberModal({ user, onClose, setResultCard }: any) {
       await profileApi.changeNumber(number);
       setLoading(false);
       setResultCard({ visible: true, type: "success", message: "Number changed!" });
-
       onClose();
     } catch (err) {
       setLoading(false);
@@ -244,19 +265,21 @@ function ChangeNumberModal({ user, onClose, setResultCard }: any) {
     }
   };
   return (
-    <View style={sheetStyles.glassyInner}>
-      <Text style={sheetStyles.sheetTitle}>Change Number</Text>
-      <TextInput style={sheetStyles.input} placeholder="Phone Number" placeholderTextColor="#6366f1" value={number} keyboardType="phone-pad" onChangeText={setNumber} />
-      <TouchableOpacity style={sheetStyles.saveBtn} onPress={onSave} disabled={loading}>
+    <View style={styles.glassyInner}>
+      <Text style={styles.sheetTitle}>Change Number</Text>
+      <TextInput style={styles.sheetInput} placeholder="Phone Number" placeholderTextColor="#6366f1" value={number} keyboardType="phone-pad" onChangeText={setNumber} />
+      <TouchableOpacity style={styles.sheetSaveBtn} onPress={onSave} disabled={loading}>
         <Text style={{ color: "#fff", fontWeight: "bold" }}>{loading ? "Saving..." : "Update"}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={sheetStyles.cancelBtn} onPress={onClose}>
+      <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
         <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Cancel</Text>
       </TouchableOpacity>
     </View>
   );
 }
-function LinkedAccountModal({ onClose, onChange }: any) {
+
+// --- Linked Account Modal ---
+function LinkedAccountModal({ onClose, onChange }) {
   const [email, setEmail] = useState("");
   const [stage, setStage] = useState(1);
   const [newEmail, setNewEmail] = useState("");
@@ -281,23 +304,15 @@ function LinkedAccountModal({ onClose, onChange }: any) {
     try {
       const response = await profileApi.requestEmailChange({ currentPassword, newEmail });
       if (!response.ok) {
-        setResult({
-          visible: true,
-          type: "error",
-          message: response?.data?.message || "Error changing password."
-        });
+        setResult({ visible: true, type: "error", message: response?.data?.message || "Error changing password." });
         onClose();
         return;
       }
       setLoading(false);
       setStage(2);
-    } catch (err: any) {
+    } catch (err) {
       setLoading(false);
-      setResult({
-        visible: true,
-        type: "error",
-        message: err?.response?.data?.message || "Failed to send OTP.",
-      });
+      setResult({ visible: true, type: "error", message: err?.response?.data?.message || "Failed to send OTP." });
     }
   };
 
@@ -306,11 +321,7 @@ function LinkedAccountModal({ onClose, onChange }: any) {
     try {
       const response = await profileApi.verifyEmailChange({ otp });
       if (!response.ok) {
-        setResult({
-          visible: true,
-          type: "error",
-          message: response.data?.message || "Error changing password."
-        });
+        setResult({ visible: true, type: "error", message: response.data?.message || "Error changing password." });
         onClose();
         return;
       }
@@ -322,27 +333,22 @@ function LinkedAccountModal({ onClose, onChange }: any) {
       setLoading(false);
       setResult({ visible: true, type: "success", message: "Email successfully updated!" });
       onChange?.();
-    } catch (err: any) {
+    } catch (err) {
       setLoading(false);
-      setResult({
-        visible: true,
-        type: "error",
-        message: err?.response?.data?.message || "Failed to update email.",
-      });
+      setResult({ visible: true, type: "error", message: err?.response?.data?.message || "Failed to update email." });
     }
   };
 
   return (
-    <View style={sheetStyles.glassyInner}>
-      <Text style={sheetStyles.sheetTitle}>Change Email</Text>
+    <View style={styles.glassyInner}>
+      <Text style={styles.sheetTitle}>Change Email</Text>
       <Text style={{ color: "#fff", marginTop: 30, fontSize: 16, marginBottom: 20 }}>
         Registered Email: <Text style={{ fontWeight: "bold", color: "#6366f1" }}>{email}</Text>
       </Text>
-
       {stage === 1 ? (
         <>
           <TextInput
-            style={sheetStyles.input}
+            style={styles.sheetInput}
             placeholder="Current Password"
             placeholderTextColor="#6366f1"
             value={currentPassword}
@@ -350,7 +356,7 @@ function LinkedAccountModal({ onClose, onChange }: any) {
             onChangeText={setCurrentPassword}
           />
           <TextInput
-            style={sheetStyles.input}
+            style={styles.sheetInput}
             placeholder="Enter new email"
             placeholderTextColor="#6366f1"
             value={newEmail}
@@ -359,7 +365,7 @@ function LinkedAccountModal({ onClose, onChange }: any) {
             keyboardType="email-address"
           />
           <TouchableOpacity
-            style={sheetStyles.saveBtn}
+            style={styles.sheetSaveBtn}
             onPress={handleRequestOtp}
             disabled={loading || !newEmail || !currentPassword}
           >
@@ -370,11 +376,9 @@ function LinkedAccountModal({ onClose, onChange }: any) {
         </>
       ) : (
         <>
-          <Text style={{ color: "#fff", marginBottom: 9 }}>
-            Enter OTP sent to your new email:
-          </Text>
+          <Text style={{ color: "#fff", marginBottom: 9 }}>Enter OTP sent to your new email:</Text>
           <TextInput
-            style={sheetStyles.input}
+            style={styles.sheetInput}
             placeholder="OTP"
             placeholderTextColor="#6366f1"
             value={otp}
@@ -382,7 +386,7 @@ function LinkedAccountModal({ onClose, onChange }: any) {
             keyboardType="number-pad"
           />
           <TouchableOpacity
-            style={sheetStyles.saveBtn}
+            style={styles.sheetSaveBtn}
             onPress={handleVerifyOtp}
             disabled={loading || !otp}
           >
@@ -392,37 +396,19 @@ function LinkedAccountModal({ onClose, onChange }: any) {
           </TouchableOpacity>
         </>
       )}
-      <TouchableOpacity style={sheetStyles.cancelBtn} onPress={onClose}>
+      <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
         <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Close</Text>
       </TouchableOpacity>
       {result.visible && (
-        <View style={{
-          backgroundColor: "rgba(30,41,59,0.61)",
-          borderRadius: 16,
-          position: "absolute",
-          left: 20,
-          right: 20,
-          top: '45%',
-          zIndex: 400
-        }}>
+        <View style={styles.resultSoftCard}>
           <Text style={{
             padding: 16,
             color: result.type === "success" ? "#22c55e" : "#ef4444",
             fontWeight: "bold",
             textAlign: "center"
-          }}>
-            {result.message}
-          </Text>
+          }}>{result.message}</Text>
           <TouchableOpacity
-            style={{
-              backgroundColor: "#6366f1",
-              borderRadius: 10,
-              alignSelf: "center",
-              marginBottom: 12,
-              marginTop: 5,
-              paddingHorizontal: 32,
-              paddingVertical: 9,
-            }}
+            style={styles.resultSoftOkBtn}
             onPress={() => setResult({ ...result, visible: false })}
           >
             <Text style={{ color: "#fff", fontWeight: "bold" }}>OK</Text>
@@ -466,12 +452,12 @@ const settingSections = [
   },
 ];
 
-const ProfileScreen = ({ navigation }: any) => {
+export default function ProfileScreen({ navigation }) {
   const authContext = useContext(AuthContext);
   const user = authContext?.User?.user;
   const userId = user?.id;
-  const [profile, setProfile] = useState();
-  const avatarUrl = (profile as any)?.avatarUrl;
+  const [profile, setProfile] = useState(null);
+  const avatarUrl = profile?.avatarUrl || profile?.avatarThumbnailUrl;
   const [activeModal, setActiveModal] = useState(null);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
@@ -481,20 +467,99 @@ const ProfileScreen = ({ navigation }: any) => {
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [resultCard, setResultCard] = useState({ visible: false, type: "success", message: "" });
-  const avatarThumbnailUrl = (profile as any)?.avatarThumbnailUrl;
+
   const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
+  // FIX 1: Use a ref for offline status so callbacks always read the latest
+  // value synchronously — avoids stale closure in useFocusEffect and fetchProfileOnline.
+  const offlineRef = useRef(false);
+  const [offline, setOffline] = useState(false);
+
+  // FIX 2: Track mount to prevent useFocusEffect double-firing with the initial load.
+  const hasMountedRef = useRef(false);
+
+  // FIX 3: Set up NetInfo listener AND fetch initial state immediately on mount,
+  // so offlineRef is populated before the first profile load runs.
+  useEffect(() => {
+    NetInfo.fetch().then((state) => {
+      const isOffline = !state.isConnected || state.isInternetReachable === false;
+      offlineRef.current = isOffline;
+      setOffline(isOffline);
+    });
+
+    const unsub = NetInfo.addEventListener((state) => {
+      const isOffline = !state.isConnected || state.isInternetReachable === false;
+      offlineRef.current = isOffline;
+      setOffline(isOffline);
+    });
+    return () => unsub();
+  }, []);
+
+  const fetchProfileOnline = useCallback(async () => {
+    // FIX 4: Read offlineRef.current synchronously — never rely on offline state here.
+    if (offlineRef.current) return;
+
+    try {
+      const [profileRes, avatarRes] = await Promise.all([
+        profileApi.getProfile(),
+        profileApi.getAvatarUrl(),
+      ]);
+      const fetchedUser = profileRes?.data?.user;
+
+      // FIX 5: Guard against undefined API response — don't overwrite good cache.
+      if (!fetchedUser) {
+        console.log("[Profile] API returned no user data — keeping cache.");
+        return;
+      }
+
+      const { avatarThumbnailUrl } = avatarRes?.data || {};
+      const merged = { ...fetchedUser, avatarThumbnailUrl };
+      setProfile(merged);
+      await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
+    } catch (e) {
+      // On error, keep whatever is already in state (loaded from cache below).
+      console.log("[Profile] fetchProfileOnline error — keeping cache:", e?.message);
+    }
+  }, []); // FIX 6: No `offline` dependency — uses ref instead.
+
+  // FIX 7: On mount, always load cache first unconditionally, then attempt online fetch.
+  // Previously the online fetch ran inside the same effect that read offline state —
+  // but offline state wasn't set yet at that point, so it always hit the API.
   useEffect(() => {
     (async () => {
+      // Step 1: Load cache immediately for instant display.
       try {
         const raw = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
-        if (!raw) return;
-        const cached = JSON.parse(raw);
-        if (cached) setProfile(cached);
+        if (raw) {
+          const cached = JSON.parse(raw);
+          if (cached) setProfile(cached);
+        }
       } catch {}
+
+      // Step 2: Attempt live fetch (fetchProfileOnline checks offlineRef internally).
+      await fetchProfileOnline();
     })();
-  }, []);
+  }, [fetchProfileOnline]);
+
+  // FIX 8: useFocusEffect skips first mount (handled above) and only re-fetches
+  // on subsequent screen focus events — prevents double-fire race condition.
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasMountedRef.current) {
+        hasMountedRef.current = true;
+        return;
+      }
+      fetchProfileOnline();
+    }, [fetchProfileOnline])
+  );
+
+  // FIX 9: Re-fetch when coming back online so live data replaces cached data.
+  useEffect(() => {
+    if (!offline) {
+      fetchProfileOnline();
+    }
+  }, [offline]); // intentionally only triggers on offline toggle
 
   const confirmLogout = async () => {
     const userData = authContext?.User;
@@ -548,20 +613,6 @@ const ProfileScreen = ({ navigation }: any) => {
     }
   };
 
-  const fetchProfile = async () => {
-    try {
-      const [profileRes, avatarRes] = await Promise.all([
-        profileApi.getProfile(),
-        profileApi.getAvatarUrl(),
-      ]);
-      const user = profileRes?.data?.user;
-      const { avatarThumbnailUrl } = avatarRes.data || {};
-      const merged = { ...user, avatarThumbnailUrl };
-      setProfile(merged as any);
-      await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
-    } catch (e) {}
-  };
-
   const renderActionModal = () => {
     if (!activeModal) return null;
     const ModalComponent = actionComponents[activeModal];
@@ -569,33 +620,26 @@ const ProfileScreen = ({ navigation }: any) => {
       <Modal
         isVisible={!!activeModal}
         onBackdropPress={() => setActiveModal(null)}
-        style={sheetStyles.modalSheet}
+        style={styles.modalSheet}
         backdropOpacity={0.41}
         useNativeDriver
       >
-        <View style={sheetStyles.sheetContent}>
+        <View style={styles.sheetContent}>
           <ModalComponent
             user={profile}
             onClose={() => setActiveModal(null)}
             setResultCard={setResultCard}
-            onChange={fetchProfile}
+            onChange={fetchProfileOnline}
           />
         </View>
       </Modal>
     );
   };
 
-  useFocusEffect(
-    React.useCallback(() => {
-      fetchProfile();
-    }, [])
-  );
-
   return (
     <MainLayout>
       <View style={styles.topBar}>
-        <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass}
-          onPress={() => navigation.goBack()}>
+        <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass} onPress={() => navigation.goBack()}>
           <Icon name="arrow-left" size={24} color="#E5E7EB" />
         </TouchableOpacity>
         <Text style={styles.pageTitle}>Profile</Text>
@@ -609,7 +653,7 @@ const ProfileScreen = ({ navigation }: any) => {
               {avatarUrl ? (
                 <View style={styles.avatarMask}>
                   <Image
-                    source={{ uri: newUrl + avatarUrl }}
+                    source={{ uri: avatarUrl.startsWith("http") ? avatarUrl : newUrl + avatarUrl }}
                     style={styles.avatarImageZoomed}
                     resizeMode="cover"
                   />
@@ -628,6 +672,7 @@ const ProfileScreen = ({ navigation }: any) => {
             <Text style={styles.userUsername}>@{profile?.username}</Text>
           </View>
         </View>
+
         {settingSections.map(section => (
           <View key={section.title}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
@@ -636,18 +681,10 @@ const ProfileScreen = ({ navigation }: any) => {
                 key={item.route}
                 style={styles.settingCard}
                 onPress={() => {
-                  if (item.route === 'Enable2FA') {
-                    navigation.navigate('Enable2FA');
-                  } else if (item.route === 'Devices') {
-                    navigation.navigate('Devices');
-                  } else if (item.route === 'HelpSupport') {
-                    navigation.navigate('HelpSupport');
-                  } else if (item.route === 'ReportProblem') {
-                    navigation.navigate('ReportProblem');
-                  } else if (item.route === 'LegalPolicy') {
-                    navigation.navigate('LegalPolicy');
+                  if (["Enable2FA", "Devices", "HelpSupport", "ReportProblem", "LegalPolicy"].includes(item.route)) {
+                    navigation.navigate(item.route);
                   } else {
-                    setActiveModal(item.route as any);
+                    setActiveModal(item.route);
                   }
                 }}
               >
@@ -660,6 +697,7 @@ const ProfileScreen = ({ navigation }: any) => {
             ))}
           </View>
         ))}
+
         <TouchableOpacity style={styles.logoutBtn} onPress={() => setLogoutModalVisible(true)} activeOpacity={0.86}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
@@ -677,6 +715,7 @@ const ProfileScreen = ({ navigation }: any) => {
         }}>
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
+
         {deleteConfirmVisible && (
           <Modal
             isVisible={deleteConfirmVisible}
@@ -689,28 +728,21 @@ const ProfileScreen = ({ navigation }: any) => {
             }}
             style={{ justifyContent: "center", alignItems: "center" }}
           >
-            <View style={modalStyles.glassyModal}>
-              <Text style={modalStyles.confirmText}>
+            <View style={styles.glassyModal}>
+              <Text style={styles.confirmText}>
                 {deleteOtpStep === 0
                   ? "Are you sure you want to delete your account? This cannot be undone."
                   : "Enter the OTP sent to your registered email to confirm account deletion."}
               </Text>
               {deleteOtpStep === 0 ? (
-                <View style={modalStyles.modalBtns}>
+                <View style={styles.modalBtns}>
                   <TouchableOpacity
-                    style={modalStyles.cancelBtn}
-                    onPress={() => {
-                      setDeleteConfirmVisible(false);
-                      setDeleteOtpStep(0);
-                      setDeleteOtp("");
-                    }}
+                    style={styles.cancelBtn}
+                    onPress={() => { setDeleteConfirmVisible(false); setDeleteOtpStep(0); setDeleteOtp(""); }}
                   >
                     <Text style={{ color: "#374151", fontWeight: "bold" }}>Cancel</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={modalStyles.confirmBtn}
-                    onPress={handleRequestDeleteOtp}
-                  >
+                  <TouchableOpacity style={styles.confirmBtn} onPress={handleRequestDeleteOtp}>
                     <Text style={{ color: "#fff", fontWeight: "bold" }}>
                       {deleteLoading ? "Sending OTP..." : "Send OTP"}
                     </Text>
@@ -719,26 +751,22 @@ const ProfileScreen = ({ navigation }: any) => {
               ) : (
                 <>
                   <TextInput
-                    style={[sheetStyles.input, { width: 200 }]}
+                    style={[styles.sheetInput, { width: 200 }]}
                     placeholder="Enter OTP"
                     placeholderTextColor="#6366f1"
                     value={deleteOtp}
                     onChangeText={setDeleteOtp}
                     keyboardType="number-pad"
                   />
-                  <View style={modalStyles.modalBtns}>
+                  <View style={styles.modalBtns}>
                     <TouchableOpacity
-                      style={modalStyles.cancelBtn}
-                      onPress={() => {
-                        setDeleteConfirmVisible(false);
-                        setDeleteOtpStep(0);
-                        setDeleteOtp("");
-                      }}
+                      style={styles.cancelBtn}
+                      onPress={() => { setDeleteConfirmVisible(false); setDeleteOtpStep(0); setDeleteOtp(""); }}
                     >
                       <Text style={{ color: "#374151", fontWeight: "bold" }}>Cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={modalStyles.confirmBtn}
+                      style={styles.confirmBtn}
                       onPress={handleDeleteAccountWithOtp}
                       disabled={deleteLoading || !deleteOtp}
                     >
@@ -753,6 +781,7 @@ const ProfileScreen = ({ navigation }: any) => {
           </Modal>
         )}
       </ScrollView>
+
       <GlassyResultCard
         visible={resultCard.visible}
         type={resultCard.type}
@@ -762,53 +791,18 @@ const ProfileScreen = ({ navigation }: any) => {
       {renderActionModal()}
     </MainLayout>
   );
-};
-
-const sheetStyles = StyleSheet.create({
-  modalSheet: { justifyContent: "flex-end", margin: 0 },
-  sheetContent: {
-    backgroundColor: "rgba(15,23,42,0.96)",
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    padding: 28,
-    minHeight: 360,
-    borderColor: "white",
-    borderTopWidth: 0.1,
-    borderLeftWidth: 0.2,
-    borderRightWidth: 0.2,
-  },
-  glassyInner: { width: "100%", alignItems: "center", justifyContent: "center" },
-  sheetTitle: { color: "#F9FAFB", fontSize: 19, fontWeight: "bold", marginBottom: 22, marginTop: 10 },
-  input: { backgroundColor: "rgba(30,41,59,0.65)", color: "#F9FAFB", borderRadius: 13, padding: 17, fontSize: 16, width: "100%", marginBottom: 17, marginTop: 2 },
-  saveBtn: {
-    backgroundColor: "#6366f1",
-    borderRadius: 15,
-    paddingVertical: 13,
-    alignItems: "center",
-    width: "100%",
-    marginTop: 8,
-    marginBottom: 8,
-    shadowColor: "#6366f1",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 7,
-  },
-  cancelBtn: { backgroundColor: "rgba(148,163,184,0.26)", borderRadius: 12, paddingVertical: 10, alignItems: "center", width: "100%", marginBottom: 8, marginTop: 3 }
-});
+}
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, paddingTop: 30, paddingHorizontal: 18 },
   mainCard: { backgroundColor: "transparent", borderRadius: 22, padding: 5, marginBottom: 3, alignItems: "center" },
   avatarWrap: { marginBottom: 14, alignItems: "center" },
-  avatarCircles: { width: 95, height: 95, borderRadius: 48, backgroundColor: "#F3F4F6", justifyContent: "center", alignItems: "center" },
+  avatarCircle: { width: 95, height: 95, borderRadius: 48, backgroundColor: "#F3F4F6", justifyContent: "center", alignItems: "center" },
+  avatarMask: { width: 95, height: 95, borderRadius: 48, overflow: 'hidden', justifyContent: 'center', alignItems: 'center' },
+  avatarImageZoomed: { width: 110, height: 110, borderRadius: 65 },
   editBtn: { position: "absolute", right: 3, bottom: 3, backgroundColor: "#6366f1", borderRadius: 14, padding: 7, zIndex: 999 },
   userName: { color: "#F9FAFB", fontWeight: "bold", fontSize: 18, marginTop: 6 },
   userUsername: { color: "#9CA3AF", fontSize: 13 },
-  statRow: { flexDirection: "row", justifyContent: 'space-between', marginTop: 6, marginBottom: 7 },
-  statCard: { alignItems: 'center', paddingHorizontal: 12 },
-  statLabel: { color: "#9CA3AF", fontSize: 13 },
-  statValue: { color: "#E5E7EB", fontWeight: "bold", fontSize: 15 },
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: "#F9FAFB", marginTop: 16, marginBottom: 5 },
   settingCard: { backgroundColor: "rgba(15,23,42,0.34)", borderRadius: 14, padding: 13, marginBottom: 7, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   settingLabel: { color: "#F9FAFB", fontWeight: "bold", fontSize: 15, marginLeft: 13 },
@@ -821,40 +815,56 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 16,
     backgroundColor: "rgba(15, 23, 42, 0.0)",
     borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.4)",
-    justifyContent: "center", alignItems: "center", marginRight: 0,
+    justifyContent: "center", alignItems: "center",
     shadowColor: "#000", shadowOpacity: 0.15, shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 10, elevation: 4, marginLeft: 12, marginTop: 5
+    shadowRadius: 10, elevation: 4, marginLeft: 12, marginTop: 5,
   },
   pageTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "700", color: "#F9FAFB" },
   rightSpacer: { width: 40, height: 40 },
-  avatarImage: {
-    width: 95,
-    height: 95,
-    borderRadius: 48,
+  modalOverlay: {
+    position: "absolute", left: 0, top: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(30,41,59,0.7)", justifyContent: "center", alignItems: "center", zIndex: 1000,
   },
-  avatarCircle: {
-    width: 95,
-    height: 95,
-    borderRadius: 48,
-    backgroundColor: "#F3F4F6",
-    justifyContent: "center",
-    alignItems: "center",
+  glassyModal: {
+    backgroundColor: "rgba(15,23,42,0.82)", borderColor: "white",
+    borderWidth: 1, borderRadius: 28, padding: 26, alignItems: "center", width: 280,
+    shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 18, elevation: 18,
   },
-
-  avatarMask: {
-    width: 95,
-    height: 95,
-    borderRadius: 48,
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
+  confirmText: { color: "#F9FAFB", fontSize: 18, fontWeight: "700", marginBottom: 22, textAlign: "center" },
+  modalBtns: { flexDirection: "row", justifyContent: "space-evenly", width: '100%' },
+  cancelBtn: { backgroundColor: "rgba(228,227,236,1)", borderRadius: 12, paddingVertical: 9, paddingHorizontal: 23, marginRight: 10 },
+  confirmBtn: { backgroundColor: "#6366f1", borderRadius: 12, paddingVertical: 9, paddingHorizontal: 23 },
+  resultOverlay: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: "rgba(30,41,59,0.45)", justifyContent: "center", alignItems: "center", zIndex: 2000 },
+  resultCard: { backgroundColor: "rgba(15,23,42,0.94)", borderColor: "#fff", borderWidth: 1, borderRadius: 24, padding: 26, width: 270, alignItems: "center" },
+  resultMessage: { fontSize: 17, fontWeight: "bold", textAlign: "center", marginBottom: 18, marginTop: 2 },
+  resultOkBtn: { backgroundColor: "#6366f1", borderRadius: 14, paddingVertical: 9, paddingHorizontal: 34, marginTop: 2 },
+  glassyInner: { width: "100%", alignItems: "center", justifyContent: "center" },
+  sheetTitle: { color: "#F9FAFB", fontSize: 19, fontWeight: "bold", marginBottom: 22, marginTop: 10 },
+  sheetInput: { backgroundColor: "rgba(30,41,59,0.65)", color: "#F9FAFB", borderRadius: 13, padding: 17, fontSize: 16, width: "100%", marginBottom: 17, marginTop: 2 },
+  sheetSaveBtn: {
+    backgroundColor: "#6366f1", borderRadius: 15, paddingVertical: 13, alignItems: "center",
+    width: "100%", marginTop: 8, marginBottom: 8,
+    shadowColor: "#6366f1", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 7,
   },
-
-  avatarImageZoomed: {
-    width: 110,
-    height: 110,
-    borderRadius: 65,
+  sheetCancelBtn: { backgroundColor: "rgba(148,163,184,0.26)", borderRadius: 12, paddingVertical: 10, alignItems: "center", width: "100%", marginBottom: 8, marginTop: 3 },
+  toggleRow: {
+    width: "100%", borderRadius: 14, paddingVertical: 12, paddingHorizontal: 12,
+    marginTop: -6, marginBottom: 14, backgroundColor: "rgba(15,23,42,0.55)",
+    borderWidth: 1, borderColor: "rgba(148,163,184,0.35)", flexDirection: "row", alignItems: "center", justifyContent: "space-between",
   },
+  toggleTitle: { color: "#F9FAFB", fontWeight: "800", fontSize: 13 },
+  toggleSub: { color: "#9CA3AF", fontSize: 11, marginTop: 3, lineHeight: 14 },
+  togglePill: { width: 44, height: 24, borderRadius: 999, padding: 3, justifyContent: "center" },
+  pillOn: { backgroundColor: "rgba(34,197,94,0.45)" },
+  pillOff: { backgroundColor: "rgba(148,163,184,0.25)" },
+  toggleDot: { width: 18, height: 18, borderRadius: 999 },
+  dotOn: { backgroundColor: "#22c55e", alignSelf: "flex-end" },
+  dotOff: { backgroundColor: "#e5e7eb", alignSelf: "flex-start" },
+  sheetContent: {
+    backgroundColor: "rgba(15,23,42,0.96)", borderTopLeftRadius: 32, borderTopRightRadius: 32,
+    padding: 28, minHeight: 360, borderColor: "white", borderTopWidth: 0.1, borderLeftWidth: 0.2, borderRightWidth: 0.2,
+  },
+  modalSheet: { justifyContent: "flex-end", margin: 0 },
+  resultSoftCard: { backgroundColor: "rgba(30,41,59,0.61)", borderRadius: 16, position: "absolute", left: 20, right: 20, top: '45%', zIndex: 400 },
+  resultSoftOkBtn: { backgroundColor: "#6366f1", borderRadius: 10, alignSelf: "center", marginBottom: 12, marginTop: 5, paddingHorizontal: 32, paddingVertical: 9 },
 });
-
-export default ProfileScreen;

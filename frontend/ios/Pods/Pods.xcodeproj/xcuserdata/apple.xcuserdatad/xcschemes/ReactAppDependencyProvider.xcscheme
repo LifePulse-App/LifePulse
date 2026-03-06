@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "697ACB21C76542B0DB4AD8123ED3C2B9"
-               BuildableName = "ReactAppDependencyProvider.framework"
+               BuildableName = "libReactAppDependencyProvider.a"
                BlueprintName = "ReactAppDependencyProvider"
                ReferencedContainer = "container:Pods.xcodeproj">
             </BuildableReference>

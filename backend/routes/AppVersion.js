@@ -7,19 +7,19 @@ const router = express.Router();
  */
 const VERSION_POLICY = {
   android: {
-    latestVersion: '2.1.0',
+    latestVersion: '2.1.1',
     minSupportedVersion: '2.1.0',
     updateUrl: 'https://streaksphere.app',
     title: 'Update required',
     message: 'A new version is available. Please update your app to continue.',
   },
   ios: {
-    latestVersion: '2.1.0',
+    latestVersion: '2.1.1',
     minSupportedVersion: '2.1.0',
     updateUrl: 'https://streaksphere.app',
     title: 'Update required',
     message: 'A new version is available. Please update your app to continue.',
-  }
+  },
 };
 
 function cmp(a = '0.0.0', b = '0.0.0') {
@@ -50,11 +50,11 @@ router.get('/version', async (req, res) => {
       ok: true,
       updateAvailable,
       force,
-      latestVersion: policy.latestVersion,
-      minSupportedVersion: policy.minSupportedVersion,
+      latest: policy.latestVersion,                 // Matches frontend property "latest"
+      minSupported: policy.minSupportedVersion,     // Matches frontend property "minSupported"
+      updateUrl: policy.updateUrl,
       title: policy.title,
       message: policy.message,
-      updateUrl: policy.updateUrl,
     });
   } catch (e) {
     return res.status(500).json({ ok: false, message: 'Failed to check version' });

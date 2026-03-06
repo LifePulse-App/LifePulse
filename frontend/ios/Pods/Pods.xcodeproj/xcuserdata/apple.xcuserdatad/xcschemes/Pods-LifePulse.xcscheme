@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "4964FE844296926DAACCEE881A90BE41"
-               BuildableName = "Pods_LifePulse.framework"
+               BuildableName = "libPods-LifePulse.a"
                BlueprintName = "Pods-LifePulse"
                ReferencedContainer = "container:Pods.xcodeproj">
             </BuildableReference>

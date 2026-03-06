@@ -1,4 +1,4 @@
-framework module React_defaultsnativemodule {
+module react_nativemodule_defaults {
   umbrella header "React-defaultsnativemodule-umbrella.h"
 
   export *

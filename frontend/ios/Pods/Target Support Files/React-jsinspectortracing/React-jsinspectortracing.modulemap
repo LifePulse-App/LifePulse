@@ -1,4 +1,4 @@
-framework module jsinspector_moderntracing {
+module jsinspector_modern_tracing {
   umbrella header "React-jsinspectortracing-umbrella.h"
 
   export *

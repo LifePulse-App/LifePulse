@@ -36,10 +36,7 @@ type Friend = {
 
 const saveCache = async (key: string, friends: Friend[]) => {
   try {
-    await AsyncStorage.setItem(
-      key,
-      JSON.stringify({ ts: Date.now(), friends })
-    );
+    await AsyncStorage.setItem(key, JSON.stringify({ ts: Date.now(), friends }));
   } catch (e) {}
 };
 
@@ -48,7 +45,8 @@ const loadCache = async (key: string): Promise<Friend[] | null> => {
     const raw = await AsyncStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed?.friends ?? null;
+    // FIX 1: Check key existence rather than truthiness — an empty array [] is valid cache.
+    return "friends" in parsed ? parsed.friends : null;
   } catch {
     return null;
   }
@@ -60,6 +58,10 @@ export default function FriendsListScreen({ navigation }: any) {
   const cacheKey = `${FRIENDS_CACHE_PREFIX}:${currentUserId}`;
 
   const [search, setSearch] = useState("");
+
+  // FIX 2: Use a ref for offline status so loadFriends always reads the latest
+  // value synchronously without a stale closure.
+  const offlineRef = useRef(false);
   const [offline, setOffline] = useState(false);
 
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -68,33 +70,44 @@ export default function FriendsListScreen({ navigation }: any) {
 
   const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
-  const didSeedFromCacheRef = useRef(false);
 
+  // FIX 3: Track mount so useFocusEffect doesn't double-fire with useEffect on first render.
+  const hasMountedRef = useRef(false);
+
+  // FIX 4: Populate offlineRef immediately on mount via NetInfo.fetch(),
+  // not just on change events — so the very first loadFriends call has correct state.
   useEffect(() => {
+    NetInfo.fetch().then((state) => {
+      const isOffline = !(state.isConnected === true && state.isInternetReachable !== false);
+      offlineRef.current = isOffline;
+      setOffline(isOffline);
+    });
+
     const unsub = NetInfo.addEventListener((state) => {
-      const connected = state.isConnected === true;
-      const reachable = state.isInternetReachable === true;
-      setOffline(!connected || !reachable);
+      const isOffline = !(state.isConnected === true && state.isInternetReachable !== false);
+      offlineRef.current = isOffline;
+      setOffline(isOffline);
     });
     return () => unsub();
   }, []);
 
-  const seedFromCache = useCallback(async () => {
-    const cached = await loadCache(cacheKey);
-    if (cached) {
-      setFriends(cached); // ✅ always set cache (even empty)
-      didSeedFromCacheRef.current = true;
-    }
-  }, [cacheKey]);
-
   const loadFriends = useCallback(async () => {
     setErrorMsg(null);
 
-    await seedFromCache();
+    // FIX 5: Always load cache first, unconditionally — before any online/offline checks.
+    // This guarantees cached data is shown immediately regardless of network state.
+    const cached = await loadCache(cacheKey);
+    if (cached) {
+      setFriends(cached);
+    }
 
-    if (offline) {
-      if (!didSeedFromCacheRef.current) {
+    // FIX 6: Read offlineRef.current (synchronous) instead of offline state
+    // to avoid stale closure where offline is still false on first call.
+    if (offlineRef.current) {
+      if (!cached) {
         setErrorMsg("You are offline and no cached friends list is available yet.");
+      } else {
+        setErrorMsg(null); // Cache loaded fine — no error needed.
       }
       return;
     }
@@ -104,14 +117,19 @@ export default function FriendsListScreen({ navigation }: any) {
       const res = await socialApi.getFriends();
       const list: Friend[] = res?.data?.friends || [];
 
-      setFriends(list);
-      await saveCache(cacheKey, list); // ✅ per-user cache
-      didSeedFromCacheRef.current = true;
-    } catch (e: any) {
-      const msg =
-        e?.response?.data?.message || e?.message || "Failed to load friends list.";
+      // FIX 7: Guard against undefined/empty API response — don't overwrite good cache.
+      if (!res?.data?.friends) {
+        console.log("[FriendsList] API returned no friends data — keeping cache.");
+        if (!cached) setErrorMsg("No friends data available right now.");
+        setLoading(false);
+        return;
+      }
 
-      const cached = await loadCache(cacheKey);
+      setFriends(list);
+      await saveCache(cacheKey, list);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || "Failed to load friends list.";
+      // FIX 8: On error, keep the cache already set above — don't clear friends state.
       if (!cached) {
         setErrorMsg(msg);
       } else {
@@ -120,22 +138,36 @@ export default function FriendsListScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [offline, seedFromCache, cacheKey]);
+  }, [cacheKey]); // FIX 9: Removed `offline` and `seedFromCache` dependencies — using ref instead.
 
+  // FIX 10: Single mount load via useEffect.
+  useEffect(() => {
+    loadFriends();
+  }, [loadFriends]);
+
+  // FIX 11: useFocusEffect only re-loads on subsequent focus events (not first mount),
+  // preventing the double-fire race condition with the useEffect above.
   useFocusEffect(
     useCallback(() => {
+      if (!hasMountedRef.current) {
+        hasMountedRef.current = true;
+        return;
+      }
       loadFriends();
     }, [loadFriends])
   );
 
+  // FIX 12: Re-run loadFriends when coming back online so live data replaces cache.
+  // The offlineRef ensures loadFriends won't incorrectly block on a stale offline value.
   useEffect(() => {
-    loadFriends();
-  }, [offline, loadFriends]);
+    if (!offline) {
+      loadFriends();
+    }
+  }, [offline]); // intentionally only triggers on offline toggle, not on loadFriends change
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return friends;
-
     return friends.filter((f) => {
       const name = String(f.name || "").toLowerCase();
       const username = String(f.username || "").toLowerCase();
@@ -149,7 +181,6 @@ export default function FriendsListScreen({ navigation }: any) {
       item.avatarUrl ||
       (typeof item.avatar === "string" ? item.avatar : item.avatar?.url) ||
       "";
-
     if (!raw) return "";
     return raw.startsWith("http") ? raw : newUrl + raw;
   };
@@ -298,7 +329,6 @@ const styles = StyleSheet.create({
     borderRadius: 220,
     backgroundColor: "rgba(168, 85, 247, 0.28)",
   },
-
   topBar: { flexDirection: "row", alignItems: "center", marginBottom: 12, marginTop: Platform.OS === "android" ? 4 : 8 },
   iconGlass: {
     width: 40,
@@ -314,7 +344,6 @@ const styles = StyleSheet.create({
   netStatus: { fontSize: 12, marginTop: 2 },
   netOnline: { color: "#22c55e" },
   netOffline: { color: "#f59e0b" },
-
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -326,7 +355,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(148,163,184,0.3)",
   },
   searchInput: { flex: 1, color: "#fff", paddingVertical: 8, marginLeft: 6 },
-
   card: {
     backgroundColor: "rgba(255,255,255,0.05)",
     borderRadius: 12,
@@ -352,7 +380,6 @@ const styles = StyleSheet.create({
   },
   name: { color: "#fff", fontSize: 16, fontWeight: "700" },
   username: { color: "#94a3b8", marginTop: 2 },
-
   errorCard: {
     flexDirection: "row",
     alignItems: "center",

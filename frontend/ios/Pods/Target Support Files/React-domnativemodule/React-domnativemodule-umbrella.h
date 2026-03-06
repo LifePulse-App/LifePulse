@@ -10,8 +10,8 @@
 #endif
 #endif
 
-#import "nativemodule/dom/NativeDOM.h"
+#import "react/nativemodule/dom/NativeDOM.h"
 
-FOUNDATION_EXPORT double React_domnativemoduleVersionNumber;
-FOUNDATION_EXPORT const unsigned char React_domnativemoduleVersionString[];
+FOUNDATION_EXPORT double react_nativemodule_domVersionNumber;
+FOUNDATION_EXPORT const unsigned char react_nativemodule_domVersionString[];
 

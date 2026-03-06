@@ -17,8 +17,6 @@
   "exclude_files": "tests",
   "pod_target_xcconfig": {
     "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
-    "HEADER_SEARCH_PATHS": "\"$(PODS_TARGET_SRCROOT)/../../..\""
-  },
-  "module_name": "React_rendererconsistency",
-  "header_mappings_dir": "../../.."
+    "HEADER_SEARCH_PATHS": ""
+  }
 }

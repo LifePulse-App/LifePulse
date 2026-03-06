@@ -11,7 +11,8 @@ import 'react-native-gesture-handler';
 import { AppRegistry } from 'react-native';
 import notifee, { EventType } from '@notifee/react-native';
 
-import messaging from '@react-native-firebase/messaging';
+import { getApp } from '@react-native-firebase/app';
+import { getMessaging, setBackgroundMessageHandler } from '@react-native-firebase/messaging';
 
 import App from './App';
 import { name as appName } from './app.json';
@@ -42,13 +43,14 @@ function parseMessageIds(raw) {
 |--------------------------------------------------------------------------
 */
 
-messaging().setBackgroundMessageHandler(async remoteMessage => {
+const firebaseApp = getApp();
+const messagingInstance = getMessaging(firebaseApp);
+
+setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
   const data = remoteMessage?.data || {};
 
   if (data.type === 'chat') {
-    const incomingMessageId = String(
-      data.messageId || data.msgId || data._id || ''
-    );
+    const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
 
     if (incomingMessageId) {
       try {
@@ -78,11 +80,7 @@ messaging().setBackgroundMessageHandler(async remoteMessage => {
         sound: 'default',
         foregroundPresentationOptions: ['alert', 'sound', 'badge'],
       },
-      data: {
-        type: 'chat',
-        peerUserId: peerId,
-        peerName,
-      },
+      data: { type: 'chat', peerUserId: peerId, peerName },
     });
   }
 

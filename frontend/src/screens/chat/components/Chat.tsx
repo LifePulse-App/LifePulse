@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useContext } from "react";
-import { View, FlatList, TouchableOpacity, StyleSheet, TextInput, Image } from "react-native";
+import { View, FlatList, TouchableOpacity, StyleSheet, TextInput, Image, ActivityIndicator } from "react-native";
 import { Text } from "@rneui/themed";
 import { useFocusEffect } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
@@ -33,14 +33,17 @@ const formatLastTime = (iso?: string) => {
 const saveCache = async (userId: string, data: any[]) => {
   try {
     await AsyncStorage.setItem(`${CACHE_KEY}:${userId}`, JSON.stringify(data));
-  } catch {}
+  } catch (err) {
+    console.log('Cache save error', err);
+  }
 };
 
 const loadCache = async (userId: string): Promise<any[]> => {
   try {
     const raw = await AsyncStorage.getItem(`${CACHE_KEY}:${userId}`);
     return raw ? JSON.parse(raw) : [];
-  } catch {
+  } catch (err) {
+    console.log('Cache load error', err);
     return [];
   }
 };
@@ -66,23 +69,45 @@ const Avatar = ({ url }: { url?: string }) => {
 };
 
 export default function ChatListScreen({ navigation }: any) {
+  // State for context reload
+  const [myUserId, setMyUserId] = useState("");
+  const [userLoaded, setUserLoaded] = useState(false);
+
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<any[]>([]);
   const [offline, setOffline] = useState(false);
   const [version, setVersion] = useState(0);
+  const [loadingCache, setLoadingCache] = useState(true);
+  const [loadingApi, setLoadingApi] = useState(false);
 
   const user = useContext(AuthContext);
-  const myUserId = String(user?.User?.user?.id || user?.User?.user?._id || "");
 
+  // Track user id from context more robustly
   useEffect(() => {
-    if (!myUserId) return;
+    let resolvedId = "";
+    if (user?.User?.user?.id) resolvedId = String(user?.User?.user?.id);
+    else if (user?.User?.user?._id) resolvedId = String(user?.User?.user?._id);
+    setMyUserId(resolvedId);
+    setUserLoaded(!!resolvedId);
+  }, [user]);
+
+  // Load cache immediately when userId is set
+  useEffect(() => {
+    if (!myUserId) {
+      setLoadingCache(false);
+      return;
+    }
+    setLoadingCache(true);
     loadCache(myUserId).then((cached) => {
-      setRows(cached || []); // ✅ always set cached value (even empty)
+      setRows(cached || []); // always set cached value (even empty)
+      setLoadingCache(false);
     });
   }, [myUserId]);
 
+  // Online API fetch: only if userId available and not offline
   const loadOnline = useCallback(async () => {
     if (!myUserId || offline) return;
+    setLoadingApi(true);
 
     try {
       const [{ data: convRes }, friendsRes] = await Promise.all([
@@ -90,8 +115,15 @@ export default function ChatListScreen({ navigation }: any) {
         fetchFriends(),
       ]);
 
-      const friends = friendsRes?.data?.friends || [];
+      // Defensive: if either fails, throw
+      if (!convRes?.conversations || !Array.isArray(convRes.conversations)) {
+        throw new Error("Failed to load conversations");
+      }
+      if (!friendsRes?.data?.friends || !Array.isArray(friendsRes.data.friends)) {
+        throw new Error("Failed to load friends");
+      }
 
+      const friends = friendsRes?.data?.friends || [];
       const friendMap = new Map<
         string,
         { name: string; avatarUrl: string; avatarThumb: string; avatarPublicUrl: string }
@@ -131,44 +163,65 @@ export default function ChatListScreen({ navigation }: any) {
           new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime()
       );
 
-      setRows(mapped);
-      await saveCache(myUserId, mapped);
+      // Only setRows and saveCache if mapped has results.
+      if (mapped.length > 0) {
+        setRows(mapped);
+        await saveCache(myUserId, mapped);
+        console.log('API loaded, rows:', mapped.length);
+      } else {
+        // If API returns empty but cache exists, don't overwrite cache!
+        console.log('API returned empty list — cache not overwritten.');
+      }
+      setLoadingApi(false);
+
     } catch (e) {
+      setLoadingApi(false);
       console.log("load list error — using cache", e);
+      // DO NOT overwrite cache or setRows([])
     }
   }, [myUserId, offline]);
 
+  // Always track network status
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
       setOffline(!state.isConnected || state.isInternetReachable === false);
+      console.log('Network status changed:', state.isConnected, state.isInternetReachable);
     });
     return () => unsub();
   }, []);
 
+  // API fetch triggers on version change
   useEffect(() => {
-    loadOnline();
-  }, [loadOnline, version]);
+    if (myUserId && !offline) loadOnline();
+  }, [loadOnline, version, myUserId, offline]);
 
+  // Navigation focus: reload cache and try API fetch
   useEffect(() => {
     const unsub = navigation.addListener("focus", () => {
       if (!myUserId) return;
       loadCache(myUserId).then((cached) => {
-        setRows(cached || []); // ✅ always restore cache on focus
+        setRows(cached || []); // always restore cache on focus
+        setLoadingCache(false);
       });
       loadOnline();
+      console.log('Navigation focus event triggered.');
     });
     return unsub;
   }, [navigation, loadOnline, myUserId]);
 
+  // Every time screen gets focus (react navigation)
   useFocusEffect(
     useCallback(() => {
       if (!myUserId) return;
       loadCache(myUserId).then((cached) => {
-        setRows(cached || []); // ✅ restore every time screen becomes active
+        setRows(cached || []);
+        setLoadingCache(false);
+        console.log('Screen focus: Cache restored');
       });
     }, [myUserId])
   );
 
+  // Subscribe changes: force refresh
   useEffect(() => {
     const a = subscribeConversationChanges(() => setVersion((v) => v + 1));
     const b = subscribeUnreadChanges(() => setVersion((v) => v + 1));
@@ -178,9 +231,22 @@ export default function ChatListScreen({ navigation }: any) {
     };
   }, []);
 
+  // Filter for search
   const filtered = rows.filter((r) =>
     String(r.peerName || "").toLowerCase().includes(search.toLowerCase())
   );
+
+  // Loading UI
+  if (!userLoaded || loadingCache) {
+    return (
+      <MainLayout>
+        <View style={styles.root}>
+          <ActivityIndicator color="#6366f1" size="large" style={{ marginTop: 80 }} />
+          <Text style={{ color: "#fff", textAlign: "center", marginTop: 18 }}>Loading your cached chats...</Text>
+        </View>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -193,9 +259,6 @@ export default function ChatListScreen({ navigation }: any) {
           <View style={styles.topBar}>
             <View>
               <Text style={styles.title}>Chats</Text>
-              <Text style={[styles.netStatus, offline ? styles.netOffline : styles.netOnline]}>
-                {offline ? "Offline" : "Online"}
-              </Text>
             </View>
             <TouchableOpacity
               style={styles.iconBtn}
@@ -216,6 +279,12 @@ export default function ChatListScreen({ navigation }: any) {
             />
           </View>
 
+          {(loadingApi && !filtered.length) ? (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator color="#6366f1" size="large" />
+              <Text style={{ color: "#fff", marginTop: 12 }}>Fetching latest chats...</Text>
+            </View>
+          ) :
           <FlatList
             data={filtered}
             keyExtractor={(item) => `${item.conversationId}:${item.peerUserId}`}
@@ -259,13 +328,14 @@ export default function ChatListScreen({ navigation }: any) {
               </TouchableOpacity>
             )}
             ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-          />
+          />}
         </View>
       </View>
     </MainLayout>
   );
 }
 
+// Styles (same as yours)
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0f172a", padding: 12 },
   baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: "#020617" },

@@ -81,18 +81,16 @@ const MOOD_GROUPS = [
   },
 ];
 
-const MoodScreen = ({ navigation, route }: any) => {
-  const initialMoodId: string | null = route?.params?.currentMoodId || null;
+const MoodScreen = ({ navigation, route }) => {
+  const initialMoodId = route?.params?.currentMoodId || null;
 
-  const [selectedMoodId, setSelectedMoodId] = useState<string | null>(
-    initialMoodId
-  );
+  const [selectedMoodId, setSelectedMoodId] = useState(initialMoodId);
   const [submitting, setSubmitting] = useState(false);
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState(null);
   const [errorVisible, setErrorVisible] = useState(false);
 
-  const showError = (msg: string) => {
+  const showError = (msg) => {
     setErrorMessage(msg);
     setErrorVisible(true);
   };
@@ -102,7 +100,7 @@ const MoodScreen = ({ navigation, route }: any) => {
     setErrorMessage(null);
   };
 
-  const handleSelectMood = (moodId: string) => {
+  const handleSelectMood = (moodId) => {
     setSelectedMoodId(moodId);
   };
 
@@ -118,12 +116,13 @@ const MoodScreen = ({ navigation, route }: any) => {
 
       if (!res.data?.success) {
         showError(res.data?.message || "Failed to save mood");
+        setSubmitting(false);
         return;
       }
 
       // On success go back – dashboard will refetch and show latest mood
       navigation.goBack?.();
-    } catch (err: any) {
+    } catch (err) {
       console.log("Mood save error:", err);
       const msg =
         err?.response?.data?.message ||

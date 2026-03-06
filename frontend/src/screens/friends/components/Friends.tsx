@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useContext, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useContext, useCallback, useRef } from "react";
 import {
   View,
   TextInput,
@@ -11,6 +11,7 @@ import {
   Image,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import NetInfo from "@react-native-community/netinfo";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import MainLayout from "../../../shared/components/MainLayout";
@@ -90,6 +91,11 @@ const Friends = ({ navigation }: any) => {
   const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
+  // FIX 1: Use a ref for offline status so callbacks always read the latest
+  // value synchronously without needing it as a dependency.
+  const offlineRef = useRef(false);
+  const [offline, setOffline] = useState(false);
+
   const cacheKeys = useMemo(() => {
     const uid = String(currentUserId || "anon");
     return {
@@ -114,6 +120,23 @@ const Friends = ({ navigation }: any) => {
     }
   };
 
+  // FIX 2: Keep offlineRef in sync and fetch initial state immediately on mount
+  // so the ref is populated before the first fetch callbacks run.
+  useEffect(() => {
+    NetInfo.fetch().then((state) => {
+      const isOffline = !(state.isConnected && state.isInternetReachable !== false);
+      offlineRef.current = isOffline;
+      setOffline(isOffline);
+    });
+
+    const unsub = NetInfo.addEventListener((state) => {
+      const isOffline = !(state.isConnected && state.isInternetReachable !== false);
+      offlineRef.current = isOffline;
+      setOffline(isOffline);
+    });
+    return () => unsub();
+  }, []);
+
   const openProfilePreview = (u: any) => {
     if (!u?._id) return;
     navigation.navigate("ProfilePreview", {
@@ -130,6 +153,8 @@ const Friends = ({ navigation }: any) => {
     }
   }, [notification]);
 
+  // FIX 3: Load cache immediately on mount for instant offline experience.
+  // This runs once when cacheKeys are ready.
   useEffect(() => {
     (async () => {
       const [cachedSuggestions, cachedRequests] = await Promise.all([
@@ -142,32 +167,63 @@ const Friends = ({ navigation }: any) => {
   }, [cacheKeys]);
 
   const fetchSuggestions = useCallback(async () => {
+    // FIX 4: Read offlineRef.current (synchronous) instead of offline state
+    // to avoid stale closure bug where offline is still false on first render.
+    if (offlineRef.current) return;
+
     try {
       const res = await socialApi.getSuggestedUsers(10);
       const data = (res?.data?.suggestions ?? []).filter((u: any) => u?._id);
+
+      // FIX 5: Guard against empty/undefined API response — don't overwrite good cache.
+      if (!data || data.length === 0) {
+        console.log("[FRIENDS] fetchSuggestions: empty response — cache kept.");
+        return;
+      }
+
       setSuggestions(data);
       await saveCache(cacheKeys.suggestions, data);
     } catch (e) {
       console.log("[FRIENDS] fetchSuggestions error:", e);
+      // On error, keep whatever is already in state (loaded from cache above).
     }
-  }, [cacheKeys]);
+  }, [cacheKeys]); // FIX 6: removed `offline` dependency — using ref instead
 
   const fetchSearch = useCallback(async () => {
-    try {
-      const key = cacheKeys.search(search);
-      const cached = await loadCache<UserProfile[]>(key);
-      if (cached) setAllUsers(cached);
+    const key = cacheKeys.search(search);
 
+    // FIX 7: Always load cache first unconditionally before checking offline.
+    const cached = await loadCache<UserProfile[]>(key);
+    if (cached) setAllUsers(cached);
+
+    // FIX 8: Use offlineRef for synchronous offline check.
+    if (offlineRef.current) {
+      if (!cached) setAllUsers([]);
+      return;
+    }
+
+    try {
       const res = await socialApi.searchUsers(`q=${encodeURIComponent(search)}`);
       const data = (res?.data?.user ?? []).filter((u: any) => u?._id);
+
+      // FIX 9: Don't overwrite cache with empty API response.
+      if (!data || data.length === 0) {
+        if (!cached) setAllUsers([]);
+        return;
+      }
+
       setAllUsers(data);
       await saveCache(key, data);
     } catch (e) {
       console.log("[FRIENDS] fetchSearch error:", e);
+      if (!cached) setAllUsers([]);
     }
-  }, [search, cacheKeys]);
+  }, [search, cacheKeys]); // FIX 10: removed `offline` dependency — using ref instead
 
   const fetchRequests = useCallback(async () => {
+    // FIX 11: Use offlineRef for synchronous offline check.
+    if (offlineRef.current) return;
+
     try {
       const res = await socialApi.getPendingFriendRequests();
       const cleaned = (res?.data?.requests ?? [])
@@ -191,10 +247,17 @@ const Friends = ({ navigation }: any) => {
         })
         .filter((r: any) => r?.user?._id);
 
-      setFriendRequests(cleaned);
-      await saveCache(cacheKeys.friendRequests, cleaned);
-    } catch (e) {}
-  }, [cacheKeys]);
+      // FIX 12: Only update state and cache if API returned a valid result.
+      // If empty, keep existing state (which may have been loaded from cache).
+      if (cleaned.length > 0) {
+        setFriendRequests(cleaned);
+        await saveCache(cacheKeys.friendRequests, cleaned);
+      }
+    } catch (e) {
+      // On error, keep cache/results as-is.
+      console.log("[FRIENDS] fetchRequests error:", e);
+    }
+  }, [cacheKeys]); // FIX 13: removed `offline` dependency — using ref instead
 
   useEffect(() => {
     fetchSuggestions();
@@ -521,7 +584,7 @@ const Friends = ({ navigation }: any) => {
                 {isSearching ? (
                   <Text style={styles.emptyText}>Try a different name or username.</Text>
                 ) : (
-                  <Text style={styles.emptyText}>We’ll show suggestions here when they’re available.</Text>
+                  <Text style={styles.emptyText}>We'll show suggestions here when they're available.</Text>
                 )}
               </View>
             ) : (
@@ -699,7 +762,6 @@ const styles = StyleSheet.create({
   },
   listSeparator: { height: 1, backgroundColor: "rgba(31, 41, 55, 0.9)", marginVertical: 8 },
   userCard: { flexDirection: "row", alignItems: "center" },
-
   avatar: {
     width: 40,
     height: 40,
@@ -712,7 +774,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(191, 219, 254, 0.35)",
     overflow: "hidden",
   },
-
   userInfo: { flex: 1 },
   userName: { fontSize: 14, fontWeight: "600", color: "#E5E7EB" },
   userUsername: { fontSize: 12, color: "#9CA3AF" },

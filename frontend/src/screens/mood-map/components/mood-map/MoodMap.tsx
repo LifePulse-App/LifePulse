@@ -22,6 +22,7 @@ import socialApi from "../../../friends/services/api_friends";
 import MoodService from "../../../moodscreen/services/api_mood";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import NetInfo from "@react-native-community/netinfo";
 
 const SOCKET_URL = "http://YOUR_SERVER_IP:5000";
 const DARK_MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
@@ -39,6 +40,8 @@ const MoodMap = () => {
   const currentUserId = authContext?.User?.user?.id;
   const insets = useSafeAreaInsets();
 
+  const [offline, setOffline] = useState(false);
+
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
   const [moods, setMoods] = useState<any[]>([]);
   const cameraRef = useRef<typeof MapLibreGL.Camera>(null);
@@ -52,7 +55,6 @@ const MoodMap = () => {
   const [allFriends, setAllFriends] = useState<any[]>([]);
   const [worldMoods, setWorldMoods] = useState<any[]>([]);
 
-  const isTrackingRef = useRef(true);
   const socket = useMemo(() => io(SOCKET_URL), []);
 
   const saveCache = async (key: string, value: any) => {
@@ -81,6 +83,16 @@ const MoodMap = () => {
   ];
 
   useEffect(() => {
+    // Check offline status
+    const unsub = NetInfo.addEventListener((state) => {
+      const offlineNow = !state.isConnected || state.isInternetReachable === false;
+      setOffline(offlineNow);
+    });
+    return () => unsub();
+  }, []);
+
+  // --- OFFLINE-FIRST: Load cache before anything else ---
+  useEffect(() => {
     (async () => {
       const [cachedMyLoc, cachedFriendsLoc, cachedWorldMoods, cachedFriends, cachedShare] =
         await Promise.all([
@@ -90,12 +102,10 @@ const MoodMap = () => {
           loadCache<any[]>(CACHE_KEYS.allFriends),
           loadCache<{ shareEnabled: boolean; shareMode: ShareMode; selectedFriends: string[] }>(CACHE_KEYS.share),
         ]);
-
       if (cachedMyLoc) setMyLocation(cachedMyLoc);
       if (cachedFriendsLoc) setFriendLocations(cachedFriendsLoc);
       if (cachedWorldMoods) setWorldMoods(cachedWorldMoods);
       if (cachedFriends) setAllFriends(cachedFriends);
-
       if (cachedShare) {
         setShareEnabled(!!cachedShare.shareEnabled);
         setShareMode(cachedShare.shareMode || "all");
@@ -106,9 +116,9 @@ const MoodMap = () => {
 
   useEffect(() => {
     MapLibreGL.setAccessToken("");
-    MapLibreGL.setConnected(true);
   }, []);
 
+  // --- Socket for mood events ---
   useEffect(() => {
     socket.on("mood:bulk", (data) => setMoods(data));
     socket.on("mood:update", (data) => setMoods((prev) => [...prev, data]));
@@ -119,27 +129,40 @@ const MoodMap = () => {
     if (currentUserId) socket.emit("join", currentUserId);
   }, [socket, currentUserId]);
 
+  // --- Only call API for fresh map if online
   useEffect(() => {
+    if (offline) return;
     const loadAllFriends = async () => {
-      const res = await socialApi.getFriends();
-      const friends = res?.data?.friends || [];
-      setAllFriends(friends);
-      await saveCache(CACHE_KEYS.allFriends, friends);
+      try {
+        const res = await socialApi.getFriends();
+        const friends = res?.data?.friends || [];
+        if (friends.length > 0) {
+          setAllFriends(friends);
+          await saveCache(CACHE_KEYS.allFriends, friends);
+        }
+      } catch {}
     };
     loadAllFriends();
-  }, []);
+  }, [offline]);
 
   useEffect(() => {
+    if (offline) return;
     const loadWorldMoods = async () => {
-      const res = await MoodService.getWorldMoods();
-      const wm = res?.data?.data || [];
-      setWorldMoods(wm);
-      await saveCache(CACHE_KEYS.worldMoods, wm);
+      try {
+        const res = await MoodService.getWorldMoods();
+        const wm = res?.data?.data || [];
+        if (wm.length > 0) {
+          setWorldMoods(wm);
+          await saveCache(CACHE_KEYS.worldMoods, wm);
+        }
+      } catch {}
     };
     loadWorldMoods();
-    const id = setInterval(loadWorldMoods, 5000);
+    const id = setInterval(() => {
+      if (!offline) loadWorldMoods();
+    }, 5000);
     return () => clearInterval(id);
-  }, []);
+  }, [offline]);
 
   const worldMoodGeojson = useMemo(
     () => ({
@@ -153,7 +176,8 @@ const MoodMap = () => {
     [worldMoods]
   );
 
-  const requestLocationPermission = async () => {
+const requestLocationPermission = async () => {
+  if (Platform.OS === 'android') {
     const granted = await PermissionsAndroid.request(
       PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
       {
@@ -163,24 +187,29 @@ const MoodMap = () => {
       }
     );
     return granted === PermissionsAndroid.RESULTS.GRANTED;
-  };
+  } else {
+    // iOS
+    const status = await Geolocation.requestAuthorization('whenInUse');
+    return status === 'granted';
+  }
+};
 
+  // --- User location tracking and caching, but only send API if online ---
   useEffect(() => {
     let watchId: number | null = null;
-
     const startWatching = async () => {
       const ok = await requestLocationPermission();
       if (!ok) return;
-
       watchId = Geolocation.watchPosition(
         async (pos) => {
           const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
           setMyLocation(coords);
           await saveCache(CACHE_KEYS.myLocation, coords);
-
-          await locationApi.updateMyLocation(coords[0], coords[1]);
+          if (!offline) {
+            await locationApi.updateMyLocation(coords[0], coords[1]);
+          }
         },
-        (err) => console.log("watchPosition error", err),
+        (err) => {},
         {
           enableHighAccuracy: true,
           interval: 3000,
@@ -189,44 +218,54 @@ const MoodMap = () => {
         }
       );
     };
-
     startWatching();
     return () => {
       if (watchId !== null) Geolocation.clearWatch(watchId);
     };
-  }, []);
+  }, [offline]);
 
+  // --- Friends locations from API, cache, only if online ---
   useEffect(() => {
+    if (offline) return;
     const loadFriends = async () => {
-      const data = await locationApi.getFriendsLocations();
-      const locations = data?.data?.locations || [];
-      setFriendLocations(locations);
-      await saveCache(CACHE_KEYS.friendLocations, locations);
+      try {
+        const data = await locationApi.getFriendsLocations();
+        const locations = data?.data?.locations || [];
+        if (locations.length > 0) {
+          setFriendLocations(locations);
+          await saveCache(CACHE_KEYS.friendLocations, locations);
+        }
+      } catch {}
     };
     loadFriends();
-    const id = setInterval(loadFriends, 5000);
+    const id = setInterval(() => {
+      if (!offline) loadFriends();
+    }, 5000);
     return () => clearInterval(id);
-  }, []);
+  }, [offline]);
 
+  // --- Share settings logic, always stores cache, API only if online ---
   useEffect(() => {
     const applyShare = async () => {
-      if (!shareEnabled) {
-        await locationApi.setLocationShare("none", []);
-      } else if (shareMode === "custom") {
-        await locationApi.setLocationShare("custom", selectedFriends);
-      } else {
-        await locationApi.setLocationShare(shareMode, []);
-      }
-
-      await saveCache(CACHE_KEYS.share, {
-        shareEnabled,
-        shareMode,
-        selectedFriends,
-      });
+      try {
+        if (!offline) {
+          if (!shareEnabled) {
+            await locationApi.setLocationShare("none", []);
+          } else if (shareMode === "custom") {
+            await locationApi.setLocationShare("custom", selectedFriends);
+          } else {
+            await locationApi.setLocationShare(shareMode, []);
+          }
+        }
+        await saveCache(CACHE_KEYS.share, {
+          shareEnabled,
+          shareMode,
+          selectedFriends,
+        });
+      } catch {}
     };
-
     applyShare();
-  }, [shareEnabled, shareMode, selectedFriends]);
+  }, [offline, shareEnabled, shareMode, selectedFriends]);
 
   const friendMarkers = useMemo(
     () =>
@@ -240,21 +279,28 @@ const MoodMap = () => {
   );
 
   const toggleFriend = (id: string) => {
-    setSelectedFriends((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setSelectedFriends((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   const handleLocate = () => {
-    if (myLocation) {
+    if (myLocation && Platform.OS == "android") {
       cameraRef.current?.moveTo(myLocation, 10);
       cameraRef.current?.zoomTo(15, 10);
-    }
-  };
+    } else if (myLocation && cameraRef.current) {
+    cameraRef.current.setCamera({
+      centerCoordinate: myLocation,
+      zoomLevel: 15,
+      animationMode: "flyTo",
+      animationDuration: 1000,
+    });
+}
+};
 
   return (
     <MainLayout>
       <AppScreen style={styles.root}>
-        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-
         <View style={styles.topBar}>
           <AppText style={styles.headerText}>Mood Map</AppText>
           <View style={{ flexDirection: "row", gap: 8 }}>
@@ -277,7 +323,6 @@ const MoodMap = () => {
           logoEnabled={false}
         >
           <MapLibreGL.Camera ref={cameraRef} />
-
           {myLocation && (
             <MapLibreGL.PointAnnotation id="me" coordinate={myLocation}>
               <View style={styles.userDot} />
@@ -358,12 +403,10 @@ const MoodMap = () => {
           <Pressable style={styles.sheetBackdrop} onPress={() => setSettingsOpen(false)} />
           <View style={styles.sheet}>
             <AppText style={styles.sheetTitle}>Share My Location</AppText>
-
             <TouchableOpacity style={styles.toggleRow} onPress={() => setShareEnabled((v) => !v)}>
               <View style={[styles.checkbox, shareEnabled && styles.checkboxOn]} />
               <AppText style={styles.sheetText}>{shareEnabled ? "Enabled" : "Disabled"}</AppText>
             </TouchableOpacity>
-
             <View style={styles.section}>
               <AppText style={styles.sectionTitle}>Share With</AppText>
               {(["all", "none", "custom"] as ShareMode[]).map((mode) => (
@@ -375,7 +418,6 @@ const MoodMap = () => {
                 </TouchableOpacity>
               ))}
             </View>
-
             {shareMode === "custom" && (
               <View style={styles.section}>
                 <AppText style={styles.sectionTitle}>Select Friends</AppText>
@@ -398,10 +440,9 @@ export default MoodMap;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#020617" },
-
   topBar: {
     position: "absolute",
-    top: Platform.OS === "android" ? 20 : 56,
+    top: Platform.OS === "android" ? 20 : 10,
     left: 14,
     right: 14,
     zIndex: 20,
@@ -410,11 +451,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   headerText: { color: "#E5E7EB", fontWeight: "700", fontSize: 20 },
-
   mapFull: {
     ...StyleSheet.absoluteFillObject,
   },
-
   userDot: {
     width: 10,
     height: 10,
@@ -441,7 +480,6 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
   },
-
   locateBtn: {
     position: "absolute",
     right: 14,
@@ -456,8 +494,7 @@ const styles = StyleSheet.create({
     zIndex: 20,
     transform: [{ rotate: "270deg" }]
   },
-  locateIcon: { color: "#E5E7EB", fontSize: 18, marginBottom: 5 },
-
+  locateIcon: { color: "#E5E7EB", fontSize: 18, marginBottom: Platform.OS === "android" ? 5 : 0, },
   infoBtn: {
     width: 40,
     height: 40,
@@ -470,7 +507,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(15,23,42,0.55)",
   },
   settingsIcon: { color: "#E5E7EB", fontSize: 18 },
-
   sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
   sheet: {
     backgroundColor: "#0F172A",
@@ -484,7 +520,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
-
   sheetTitle: { color: "#E5E7EB", fontWeight: "700", fontSize: 18, marginBottom: 12 },
   sheetText: { color: "#E5E7EB", fontSize: 15 },
   section: { marginTop: 14 },

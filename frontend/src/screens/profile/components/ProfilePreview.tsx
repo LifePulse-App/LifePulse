@@ -70,28 +70,6 @@ const loadCache = async (key: string): Promise<PreviewResponse | null> => {
   }
 };
 
-const previewStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(15,23,42,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  centered: { alignItems: "center" },
-  previewImg: {
-    width: 330,
-    height: 330,
-    borderRadius: 250,
-    marginVertical: 20,
-  },
-  closeHint: {
-    color: "#94a3b8",
-    fontSize: 15,
-    textAlign: "center",
-    marginBottom: 12,
-  },
-});
-
 export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const userId = route.params?.userId;
   const [offline, setOffline] = useState(false);
@@ -133,18 +111,21 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     }));
   }, [userId, route.params?.name, route.params?.username]);
 
+  // --- Load preview from cache first, only API if online ---
   const load = useCallback(async () => {
     if (!userId) return;
 
     setErrorMsg(null);
     seedFromRoute();
 
+    // Always show cache immediately
     const cached = await loadCache(cacheKey(userId));
     if (cached) {
       setUser(cached.user);
       setFriendship(cached.friendship);
     }
 
+    // Only attempt API if online
     if (offline) return;
 
     setLoading(true);
@@ -169,6 +150,12 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setLoading(false);
     }
   }, [userId, offline, seedFromRoute, route.params?.name, route.params?.username]);
+
+  useEffect(() => {
+    // Always load cache on mount for offline/cold start
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offline, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -301,7 +288,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                   />
                 </TouchableOpacity>
               ) : (
-                // ✅ person icon fallback (instead of initials)
                 <Icon name="account" size={24} color="#E5E7EB" />
               )}
             </View>
@@ -538,4 +524,26 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   errorRetryText: { color: "#FEF2F2", fontSize: 11, fontWeight: "600" },
+});
+
+const previewStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(15,23,42,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  centered: { alignItems: "center" },
+  previewImg: {
+    width: 330,
+    height: 330,
+    borderRadius: 250,
+    marginVertical: 20,
+  },
+  closeHint: {
+    color: "#94a3b8",
+    fontSize: 15,
+    textAlign: "center",
+    marginBottom: 12,
+  },
 });

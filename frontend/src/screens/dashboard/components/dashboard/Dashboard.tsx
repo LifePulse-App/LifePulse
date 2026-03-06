@@ -244,6 +244,16 @@ const Dashboard = ({ navigation }: any) => {
     }, [fetchDashboardInBackground, refreshPendingCount, fetchTodayHabitsInBackground])
   );
 
+  // Auto-refresh habits every 10 seconds while dashboard screen is mounted
+useEffect(() => {
+  // Poll habits verification status
+  const interval = setInterval(() => {
+    fetchTodayHabitsInBackground();
+  }, 10000); // refresh every 10 seconds
+
+  return () => clearInterval(interval);
+}, [fetchTodayHabitsInBackground]);
+
   const handleRetry = () => {
     fetchDashboardInBackground();
     fetchTodayHabitsInBackground();

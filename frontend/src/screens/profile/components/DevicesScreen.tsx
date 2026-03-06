@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   ScrollView,
@@ -10,12 +10,14 @@ import { Text } from '@rneui/themed';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import DeviceInfo from 'react-native-device-info';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { loginStyles } from '../../login/components/Loginstyles';
 import api_Login from '../../login/services/api_Login';
 import AppText from '../../../components/Layout/AppText/AppText';
 import LoaderKitView from 'react-native-loader-kit';
 import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
+import NetInfo from '@react-native-community/netinfo';
 
 type DeviceInfoItem = {
   deviceId: string;
@@ -29,6 +31,8 @@ type DeviceInfoItem = {
     ip?: string;
   };
 };
+
+const DEVICES_CACHE_KEY = "devicescreen:authorizedDevices:v1";
 
 const DevicesScreen = () => {
   const styles = loginStyles();
@@ -45,6 +49,11 @@ const DevicesScreen = () => {
   const [targetDeviceId, setTargetDeviceId] = useState<string | null>(null);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
+  // FIX 1: Use a ref for offline status so loadDevices always reads the latest
+  // value synchronously — avoids stale closure on first render.
+  const offlineRef = useRef(false);
+  const [offline, setOffline] = useState(false);
+
   const showError = (message: string) => {
     setErrorMessage(message);
     setErrorVisible(true);
@@ -54,32 +63,104 @@ const DevicesScreen = () => {
     setErrorMessage(null);
   };
 
-  const loadDevices = async () => {
+  // FIX 2: Set up NetInfo listener AND fetch initial network state immediately
+  // on mount so offlineRef is populated before loadDevices runs.
+  useEffect(() => {
+    NetInfo.fetch().then((state) => {
+      const isOffline = !state.isConnected || state.isInternetReachable === false;
+      offlineRef.current = isOffline;
+      setOffline(isOffline);
+    });
+
+    const unsub = NetInfo.addEventListener((state) => {
+      const isOffline = !state.isConnected || state.isInternetReachable === false;
+      offlineRef.current = isOffline;
+      setOffline(isOffline);
+    });
+    return () => unsub();
+  }, []);
+
+  const loadDevices = useCallback(async () => {
+    // FIX 3: Always load cache first, unconditionally — before any online/offline checks.
+    // This guarantees cached data is shown immediately regardless of network state.
+    let hasCachedData = false;
+    try {
+      const raw = await AsyncStorage.getItem(DEVICES_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        // FIX 4: Check key existence rather than truthiness — an empty array is valid cache.
+        if (parsed && "devices" in parsed) {
+          setDevices(parsed.devices);
+          hasCachedData = true;
+          setLoading(false); // Show cached data immediately, don't wait for API.
+        }
+      }
+    } catch {}
+
+    // FIX 5: Read offlineRef.current synchronously instead of offline state
+    // to avoid stale closure where offline is still false on first render.
+    if (offlineRef.current) {
+      if (!hasCachedData) {
+        setLoading(false);
+      }
+      // Cache already set above if available — nothing more to do offline.
+      return;
+    }
+
+    // Online path: fetch live data.
+    setLoading(true);
     try {
       const id = await DeviceInfo.getUniqueId();
       setCurrentDeviceId(id);
 
       const res = await api_Login.getDevices();
       if (!res.ok) {
-        showError((res as any).data?.message || 'Failed to load devices');
+        // FIX 6: On API error, keep cache already set above — don't clear devices state.
+        if (!hasCachedData) {
+          showError((res as any).data?.message || 'Failed to load devices');
+        }
         setLoading(false);
         return;
       }
 
       const data: any = res.data;
-      console.log(data);
-      
-      setDevices(data.devices || []);
+      const list: DeviceInfoItem[] = data.devices || [];
+
+      // FIX 7: Guard against undefined/empty API response — don't overwrite good cache.
+      if (!data.devices) {
+        console.log("[Devices] API returned no devices data — keeping cache.");
+        if (!hasCachedData) setLoading(false);
+        setLoading(false);
+        return;
+      }
+
+      setDevices(list);
+      await AsyncStorage.setItem(
+        DEVICES_CACHE_KEY,
+        JSON.stringify({ ts: Date.now(), devices: list })
+      );
     } catch (e: any) {
-      showError('Unable to fetch devices. Please try again.');
+      // FIX 8: On error, keep the cache already set above — don't clear devices state.
+      console.log("[Devices] loadDevices error — keeping cache:", e?.message);
+      if (!hasCachedData) {
+        showError('Unable to fetch devices. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // FIX 9: No `offline` dependency — uses ref instead.
 
+  // FIX 10: Single clean mount effect — no dependency on offline state.
   useEffect(() => {
     loadDevices();
-  }, []);
+  }, [loadDevices]);
+
+  // FIX 11: Re-fetch when coming back online so live data replaces cached data.
+  useEffect(() => {
+    if (!offline) {
+      loadDevices();
+    }
+  }, [offline]); // intentionally only triggers on offline toggle
 
   const formatDateTime = (value?: string | Date) => {
     if (!value) return 'Unknown';
@@ -100,41 +181,23 @@ const DevicesScreen = () => {
   };
 
   const renderHeader = () => (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 18,
-        marginTop: 30,
-      }}
-    >
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 18, marginTop: 30 }}>
       <TouchableOpacity
         activeOpacity={0.8}
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: 16,
+          width: 40, height: 40, borderRadius: 16,
           backgroundColor: 'rgba(15,23,42,0.0)',
-          borderWidth: 1,
-          borderColor: 'rgba(148,163,184,0.4)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          marginLeft: 4,
+          borderWidth: 1, borderColor: 'rgba(148,163,184,0.4)',
+          justifyContent: 'center', alignItems: 'center', marginLeft: 4,
         }}
         onPress={() => navigation.goBack()}
       >
         <Icon name="arrow-left" size={24} color="#E5E7EB" />
       </TouchableOpacity>
-      <Text
-        style={{
-          flex: 1,
-          textAlign: 'center',
-          fontSize: 18,
-          fontWeight: '700',
-          color: '#F9FAFB',
-          marginRight: 40,
-        }}
-      >
+      <Text style={{
+        flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700',
+        color: '#F9FAFB', marginRight: 40,
+      }}>
         Authorized Devices
       </Text>
     </View>
@@ -198,24 +261,11 @@ const DevicesScreen = () => {
 
           <View style={styles.glassWrapper}>
             <View style={styles.glassContent}>
-              {/* Section title / subtitle inside card */}
               <View style={{ marginBottom: 10 }}>
-                <Text
-                  style={{
-                    color: '#020617',
-                    fontSize: 18,
-                    fontWeight: '700',
-                    marginBottom: 4,
-                  }}
-                >
+                <Text style={{ color: '#020617', fontSize: 18, fontWeight: '700', marginBottom: 4 }}>
                   Your active sessions
                 </Text>
-                <Text
-                  style={{
-                    color: 'white',
-                    fontSize: 13,
-                  }}
-                >
+                <Text style={{ color: 'white', fontSize: 13 }}>
                   These devices are currently logged into your account.
                 </Text>
               </View>
@@ -255,122 +305,53 @@ const DevicesScreen = () => {
                           elevation: 2,
                         }}
                       >
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            marginBottom: 4,
-                          }}
-                        >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                           <Icon
                             name={isCurrent ? 'cellphone' : 'tablet-cellphone'}
                             size={26}
                             color={isCurrent ? '#1D4ED8' : '#64748B'}
                           />
                           <View style={{ marginLeft: 10, flex: 1 }}>
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                marginBottom: 2,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  color: '#020617',
-                                  fontWeight: '700',
-                                  fontSize: 15,
-                                  flexShrink: 1,
-                                }}
-                              >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                              <Text style={{ color: '#020617', fontWeight: '700', fontSize: 15, flexShrink: 1 }}>
                                 {d.deviceName || 'Unknown device'}
                               </Text>
                               {isCurrent && (
-                                <View
-                                  style={{
-                                    marginLeft: 6,
-                                    paddingHorizontal: 8,
-                                    paddingVertical: 2,
-                                    borderRadius: 999,
-                                    backgroundColor: '#1D4ED8',
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      color: '#F9FAFB',
-                                      fontSize: 10,
-                                      fontWeight: '700',
-                                    }}
-                                  >
+                                <View style={{
+                                  marginLeft: 6, paddingHorizontal: 8, paddingVertical: 2,
+                                  borderRadius: 999, backgroundColor: '#1D4ED8',
+                                }}>
+                                  <Text style={{ color: '#F9FAFB', fontSize: 10, fontWeight: '700' }}>
                                     THIS DEVICE
                                   </Text>
                                 </View>
                               )}
                             </View>
-                            <Text
-                              style={{
-                                color: '#4B5563',
-                                fontSize: 13,
-                                marginBottom: 2,
-                              }}
-                            >
+                            <Text style={{ color: '#4B5563', fontSize: 13, marginBottom: 2 }}>
                               {d.deviceBrand || ''} {d.deviceModel || ''}
                             </Text>
-                            <Text
-                              style={{
-                                color: '#6B7280',
-                                fontSize: 12,
-                              }}
-                            >
+                            <Text style={{ color: '#6B7280', fontSize: 12 }}>
                               Last login: {formatDateTime(d.lastLogin)}
                             </Text>
-                            <Text
-                              style={{
-                                color: '#6B7280',
-                                fontSize: 12,
-                                marginTop: 2,
-                              }}
-                            >
+                            <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 2 }}>
                               Location: {locText}
                             </Text>
                           </View>
                         </View>
 
-                        {/* Logout button for non-current devices */}
                         {!isCurrent && (
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              justifyContent: 'flex-end',
-                              marginTop: 4,
-                            }}
-                          >
+                          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 }}>
                             <TouchableOpacity
                               onPress={() => openLogoutConfirm(d.deviceId)}
                               style={{
-                                paddingVertical: 6,
-                                paddingHorizontal: 12,
-                                borderRadius: 999,
-                                borderWidth: 1,
-                                borderColor: '#EF4444',
+                                paddingVertical: 6, paddingHorizontal: 12,
+                                borderRadius: 999, borderWidth: 1, borderColor: '#EF4444',
                                 backgroundColor: 'rgba(248,113,113,0.08)',
-                                flexDirection: 'row',
-                                alignItems: 'center',
+                                flexDirection: 'row', alignItems: 'center',
                               }}
                             >
-                              <Icon
-                                name="logout-variant"
-                                size={14}
-                                color="#EF4444"
-                                style={{ marginRight: 4 }}
-                              />
-                              <Text
-                                style={{
-                                  color: '#EF4444',
-                                  fontSize: 12,
-                                  fontWeight: '600',
-                                }}
-                              >
+                              <Icon name="logout-variant" size={14} color="#EF4444" style={{ marginRight: 4 }} />
+                              <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>
                                 Logout this device
                               </Text>
                             </TouchableOpacity>
@@ -387,69 +368,27 @@ const DevicesScreen = () => {
       </View>
 
       {confirmVisible && (
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            top: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(15,23,42,0.6)',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <View
-            style={{
-              width: 290,
-              borderRadius: 20,
-              backgroundColor: 'rgba(15,23,42,0.97)',
-              borderWidth: 1,
-              borderColor: 'rgba(148,163,184,0.6)',
-              padding: 22,
-            }}
-          >
-            <Text
-              style={{
-                color: '#F9FAFB',
-                fontSize: 16,
-                fontWeight: '700',
-                marginBottom: 8,
-                textAlign: 'center',
-              }}
-            >
+        <View style={{
+          position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
+          backgroundColor: 'rgba(15,23,42,0.6)', justifyContent: 'center', alignItems: 'center',
+        }}>
+          <View style={{
+            width: 290, borderRadius: 20,
+            backgroundColor: 'rgba(15,23,42,0.97)',
+            borderWidth: 1, borderColor: 'rgba(148,163,184,0.6)', padding: 22,
+          }}>
+            <Text style={{ color: '#F9FAFB', fontSize: 16, fontWeight: '700', marginBottom: 8, textAlign: 'center' }}>
               Logout this device?
             </Text>
-            <Text
-              style={{
-                color: '#E5E7EB',
-                fontSize: 13,
-                marginBottom: 18,
-                textAlign: 'center',
-              }}
-            >
-              This will sign out that device from your account. It will need to
-              log in again to regain access.
+            <Text style={{ color: '#E5E7EB', fontSize: 13, marginBottom: 18, textAlign: 'center' }}>
+              This will sign out that device from your account. It will need to log in again to regain access.
             </Text>
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                marginTop: 4,
-              }}
-            >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
               <TouchableOpacity
-                onPress={() => {
-                  setConfirmVisible(false);
-                  setTargetDeviceId(null);
-                }}
+                onPress={() => { setConfirmVisible(false); setTargetDeviceId(null); }}
                 style={{
-                  flex: 1,
-                  marginRight: 6,
-                  paddingVertical: 9,
-                  borderRadius: 12,
-                  backgroundColor: 'rgba(148,163,184,0.28)',
-                  alignItems: 'center',
+                  flex: 1, marginRight: 6, paddingVertical: 9, borderRadius: 12,
+                  backgroundColor: 'rgba(148,163,184,0.28)', alignItems: 'center',
                 }}
               >
                 <Text style={{ color: '#E5E7EB', fontWeight: '600' }}>Cancel</Text>
@@ -458,12 +397,8 @@ const DevicesScreen = () => {
                 onPress={performLogoutDevice}
                 disabled={logoutLoading}
                 style={{
-                  flex: 1,
-                  marginLeft: 6,
-                  paddingVertical: 9,
-                  borderRadius: 12,
-                  backgroundColor: '#EF4444',
-                  alignItems: 'center',
+                  flex: 1, marginLeft: 6, paddingVertical: 9, borderRadius: 12,
+                  backgroundColor: '#EF4444', alignItems: 'center',
                 }}
               >
                 {logoutLoading ? (

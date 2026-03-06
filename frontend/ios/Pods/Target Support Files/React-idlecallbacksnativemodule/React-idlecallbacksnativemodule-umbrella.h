@@ -10,8 +10,8 @@
 #endif
 #endif
 
-#import "nativemodule/idlecallbacks/NativeIdleCallbacks.h"
+#import "react/nativemodule/idlecallbacks/NativeIdleCallbacks.h"
 
-FOUNDATION_EXPORT double idlecallbacksnativemoduleVersionNumber;
-FOUNDATION_EXPORT const unsigned char idlecallbacksnativemoduleVersionString[];
+FOUNDATION_EXPORT double react_nativemodule_idlecallbacksVersionNumber;
+FOUNDATION_EXPORT const unsigned char react_nativemodule_idlecallbacksVersionString[];
 

@@ -32,8 +32,6 @@
       "$(PODS_ROOT)/RCT-Folly"
     ]
   },
-  "header_mappings_dir": "../",
-  "module_name": "React_jserrorhandler",
   "dependencies": {
     "React-jsi": [],
     "React-cxxreact": [],

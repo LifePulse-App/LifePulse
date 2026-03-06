@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "DE32677FA772BFFD0172EB7EE9E4E7E9"
-               BuildableName = "RNSVG.framework"
+               BuildableName = "libRNSVG.a"
                BlueprintName = "RNSVG"
                ReferencedContainer = "container:Pods.xcodeproj">
             </BuildableReference>

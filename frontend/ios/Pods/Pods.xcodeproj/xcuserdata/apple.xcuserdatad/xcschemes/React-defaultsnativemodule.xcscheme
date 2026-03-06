@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "78233AC74A2157BF11DB49007B4D8AB9"
-               BuildableName = "React_defaultsnativemodule.framework"
+               BuildableName = "libReact-defaultsnativemodule.a"
                BlueprintName = "React-defaultsnativemodule"
                ReferencedContainer = "container:Pods.xcodeproj">
             </BuildableReference>

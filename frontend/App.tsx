@@ -16,8 +16,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReactNativeBiometrics from 'react-native-biometrics';
 
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
-import { getMessaging, getToken, onMessage, onTokenRefresh } from '@react-native-firebase/messaging';
 import { getApp } from '@react-native-firebase/app';
+import { getMessaging, getToken, onMessage, onTokenRefresh } from '@react-native-firebase/messaging';
 
 import AuthContext from './src/auth/user/UserContext';
 import NavigationTheme from './src/navigation/main/NavigationTheme';
@@ -40,7 +40,6 @@ import { markDelivered, markAllPendingDelivered } from './src/screens/chat/servi
 
 import 'react-native-get-random-values';
 import { TextEncoder, TextDecoder } from 'text-encoding';
-import { log } from 'console';
 (global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
 
@@ -64,7 +63,6 @@ function parseMessageIds(raw: any): string[] {
   }
 }
 
-// ----------- THIS FUNCTION IS UPDATED FOR iOS SUPPORT -----------
 async function displayChatNotificationGroupedBySender(
   data: any,
   fallback?: { title?: string; body?: string }
@@ -73,7 +71,6 @@ async function displayChatNotificationGroupedBySender(
   const peerName = data.username || data.peerName || fallback?.title || 'Someone';
   const messageId = data.messageId || data.msgId || data._id || Date.now();
   const body = data.body || data.message || fallback?.body || 'Sent you a message';
-
   const groupId = `chat:${peerId}`;
   const summaryId = `chat-summary:${peerId}`;
 
@@ -91,11 +88,7 @@ async function displayChatNotificationGroupedBySender(
       sound: 'default',
       foregroundPresentationOptions: ['alert', 'sound', 'badge'],
     },
-    data: {
-      type: 'chat',
-      peerUserId: peerId,
-      peerName,
-    },
+    data: { type: 'chat', peerUserId: peerId, peerName },
   });
 
   await notifee.displayNotification({
@@ -113,16 +106,10 @@ async function displayChatNotificationGroupedBySender(
       sound: 'default',
       foregroundPresentationOptions: ['alert', 'sound', 'badge'],
     },
-    data: {
-      type: 'chat_summary',
-      peerUserId: peerId,
-      peerName,
-    },
+    data: { type: 'chat_summary', peerUserId: peerId, peerName },
   });
 }
-// ---------------------------------------------------------------
 
-// Unified notification permission for Android and iOS
 async function requestNotificationPermission() {
   if (Platform.OS === 'android' && Platform.Version >= 33) {
     await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
@@ -131,11 +118,11 @@ async function requestNotificationPermission() {
   }
 }
 
-// Helper for unregistering push token (call on sign out, etc)
 async function unregisterPushToken() {
   try {
-    const messagingInstance = getMessaging(getApp());
-    const token = await messagingInstance.getToken();
+    const firebaseApp = getApp();
+    const messagingInstance = getMessaging(firebaseApp);
+    const token = await getToken(messagingInstance);
     if (token) {
       await apiClient.post('/push/unregister', { token, platform: Platform.OS });
       console.log('[FCM] Unregistered token:', token);
@@ -157,7 +144,6 @@ const App = () => {
 
   const secretKeySetRef = useRef(false);
   const lastRegisteredTokenRef = useRef<string | null>(null);
-
   const deliveringAllRef = useRef(false);
   const lastDeliverAllAtRef = useRef(0);
 
@@ -165,10 +151,8 @@ const App = () => {
     const now = Date.now();
     if (now - lastDeliverAllAtRef.current < 15000) return;
     if (deliveringAllRef.current) return;
-
     deliveringAllRef.current = true;
     lastDeliverAllAtRef.current = now;
-
     try {
       await markAllPendingDelivered();
     } catch (e) {
@@ -211,7 +195,6 @@ const App = () => {
   useEffect(() => {
     async function checkInitialNotification() {
       const initial = await notifee.getInitialNotification();
-
       if (
         initial?.notification?.data?.type === 'chat' &&
         initial?.notification?.data?.peerUserId
@@ -234,17 +217,14 @@ const App = () => {
     }
   }, []);
 
-  // Support push events for both Android and iOS
   useEffect(() => {
     if (Platform.OS !== 'android' && Platform.OS !== 'ios') return;
 
     let unsubscribe: undefined | (() => void);
 
     const run = async () => {
-      if (Platform.OS === 'android') {
-        await notifee.requestPermission();
-      }
-      const messagingInstance = getMessaging(getApp());
+      const firebaseApp = getApp();
+      const messagingInstance = getMessaging(firebaseApp);
 
       return onMessage(messagingInstance, async remoteMessage => {
         const data = remoteMessage?.data || {};
@@ -258,11 +238,9 @@ const App = () => {
               console.log('markDelivered (foreground) failed', e);
             }
           }
-
           const activePeer = getActiveChatPeer();
           if (!activePeer || activePeer !== data.peerUserId) {
             notifyIncoming(data.peerUserId);
-
             await displayChatNotificationGroupedBySender(data, {
               title: remoteMessage?.notification?.title,
               body: remoteMessage?.notification?.body,
@@ -282,13 +260,9 @@ const App = () => {
     };
 
     run().then(unsub => (unsubscribe = unsub));
-
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+    return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
-  // Registration and refresh for both Android and iOS
   useEffect(() => {
     if (!User) return;
     if (Platform.OS !== 'android' && Platform.OS !== 'ios') return;
@@ -304,7 +278,8 @@ const App = () => {
     };
 
     const run = async () => {
-      const messagingInstance = getMessaging(getApp());
+      const firebaseApp = getApp();
+      const messagingInstance = getMessaging(firebaseApp);
       const token = await getToken(messagingInstance);
       await register(token);
 
@@ -313,11 +288,8 @@ const App = () => {
       });
     };
 
-    run().catch((e) => console.log('[FCM] token setup failed', e));
-
-    return () => {
-      if (unsubscribeTokenRefresh) unsubscribeTokenRefresh();
-    };
+    run().catch(e => console.log('[FCM] token setup failed', e));
+    return () => { if (unsubscribeTokenRefresh) unsubscribeTokenRefresh(); };
   }, [User]);
 
   useEffect(() => {
@@ -333,7 +305,6 @@ const App = () => {
 
         if (biometricEnabled === 'true' && savedUser) {
           const rnBiometrics = new ReactNativeBiometrics();
-
           const { success } = await rnBiometrics.simplePrompt({
             promptMessage: 'Unlock with Face ID / Fingerprint',
           });
@@ -357,10 +328,7 @@ const App = () => {
         await UserStorage.deleteUser();
         await UserStorage.clearTokens?.();
         navigationRef.current?.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'Login' }],
-          }),
+          CommonActions.reset({ index: 0, routes: [{ name: 'Login' }] }),
         );
       } finally {
         setIsCheckingBiometric(false);
@@ -374,12 +342,7 @@ const App = () => {
     success: (props: React.JSX.IntrinsicAttributes & BaseToastProps) => (
       <BaseToast
         {...props}
-        style={{
-          borderLeftColor: 'green',
-          backgroundColor: '#e6ffed',
-          width: '100%',
-          alignSelf: 'center',
-        }}
+        style={{ borderLeftColor: 'green', backgroundColor: '#e6ffed', width: '100%', alignSelf: 'center' }}
         contentContainerStyle={{ paddingHorizontal: 20 }}
         text1Style={{ fontSize: 13, fontWeight: '600', color: 'green' }}
       />
@@ -387,12 +350,7 @@ const App = () => {
     error: (props: React.JSX.IntrinsicAttributes & BaseToastProps) => (
       <BaseToast
         {...props}
-        style={{
-          borderLeftColor: 'red',
-          backgroundColor: '#ffeaea',
-          width: '100%',
-          alignSelf: 'center',
-        }}
+        style={{ borderLeftColor: 'red', backgroundColor: '#ffeaea', width: '100%', alignSelf: 'center' }}
         contentContainerStyle={{ paddingHorizontal: 20 }}
         text1Style={{ fontSize: 13, fontWeight: '600', color: 'red' }}
       />
@@ -401,22 +359,8 @@ const App = () => {
 
   if (isCheckingBiometric) {
     return (
-      <PaperProvider
-        theme={theme}
-        settings={{
-          icon: ({ name, size, color }) => (
-            <MaterialCommunityIcons name={name as string} size={size} color={color} />
-          ),
-        }}
-      >
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: '#020617',
-          }}
-        >
+      <PaperProvider theme={theme} settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#020617' }}>
           <ActivityIndicator size="large" color="#A855F7" />
         </View>
       </PaperProvider>
@@ -424,14 +368,7 @@ const App = () => {
   }
 
   return (
-    <PaperProvider
-      theme={theme}
-      settings={{
-        icon: ({ name, size, color }) => (
-          <MaterialCommunityIcons name={name as string} size={size} color={color} />
-        ),
-      }}
-    >
+    <PaperProvider theme={theme} settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
       <AuthContext.Provider value={{ User, setUser }}>
         <AppUpdateGate>
           {isBiometricVerified ? (

@@ -101,7 +101,7 @@ export const loginStyles = () => {
 
     // App name at top, like screenshot
     appNameWrapper: {
-      flex: 1.2,
+      flex: 1.5,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -155,15 +155,18 @@ export const loginStyles = () => {
     input: {
       width: '100%',
       height: 52,
-      borderTopStartRadius: 12,
-      borderTopEndRadius: 12,
+      borderTopLeftRadius: 12,
+      borderTopRightRadius: 12,
+      borderRadius: 12,
       backgroundColor: 'rgba(255,255,255,1)',
       paddingHorizontal: 12,
       marginBottom: 10,
     },
     passwordInput: {
       width: '100%',
-      height: 48,
+      height: 52,
+      borderTopLeftRadius: 12,
+      borderTopRightRadius: 12,
       borderRadius: 12,
       backgroundColor: 'rgba(255,255,255,1)',
       paddingHorizontal: 12,

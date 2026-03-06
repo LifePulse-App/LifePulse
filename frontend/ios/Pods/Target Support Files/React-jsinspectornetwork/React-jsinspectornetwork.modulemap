@@ -1,4 +1,4 @@
-framework module jsinspector_modernnetwork {
+module jsinspector_modern_network {
   umbrella header "React-jsinspectornetwork-umbrella.h"
 
   export *
