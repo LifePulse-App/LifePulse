@@ -18,10 +18,12 @@
   ],
   "header_dir": "react/utils",
   "exclude_files": "tests",
+  "module_name": "React_utils",
+  "header_mappings_dir": "../..",
   "pod_target_xcconfig": {
     "USE_HEADERMAP": "NO",
     "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
-    "HEADER_SEARCH_PATHS": "\"$(PODS_TARGET_SRCROOT)/../../\" $(PODS_ROOT)/glog $(PODS_ROOT)/boost $(PODS_ROOT)/DoubleConversion $(PODS_ROOT)/fast_float/include $(PODS_ROOT)/fmt/include $(PODS_ROOT)/SocketRocket $(PODS_ROOT)/RCT-Folly \"${PODS_CONFIGURATION_BUILD_DIR}/React-debug/React_debug.framework/Headers\"",
+    "HEADER_SEARCH_PATHS": "\"$(PODS_TARGET_SRCROOT)/../../\" \"$(PODS_TARGET_SRCROOT)/platform/ios\" $(PODS_ROOT)/glog $(PODS_ROOT)/boost $(PODS_ROOT)/DoubleConversion $(PODS_ROOT)/fast_float/include $(PODS_ROOT)/fmt/include $(PODS_ROOT)/SocketRocket $(PODS_ROOT)/RCT-Folly \"${PODS_CONFIGURATION_BUILD_DIR}/React-debug/React_debug.framework/Headers\"",
     "DEFINES_MODULE": "YES"
   },
   "dependencies": {

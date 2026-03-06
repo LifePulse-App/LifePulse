@@ -1,1 +1,0 @@
-../../../NVActivityIndicatorView-ObjC/NVActivityIndicatorView-ObjC/Classes/Animations/NVActivityIndicatorAnimationBallScale.h

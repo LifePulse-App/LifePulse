@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "5768DFA40F6926417DA5BBD7EF5A1B61"
-               BuildableName = "libAppCheckCore.a"
+               BuildableName = "AppCheckCore.framework"
                BlueprintName = "AppCheckCore"
                ReferencedContainer = "container:Pods.xcodeproj">
             </BuildableReference>

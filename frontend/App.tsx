@@ -40,6 +40,7 @@ import { markDelivered, markAllPendingDelivered } from './src/screens/chat/servi
 
 import 'react-native-get-random-values';
 import { TextEncoder, TextDecoder } from 'text-encoding';
+import { log } from 'console';
 (global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
 
@@ -63,6 +64,7 @@ function parseMessageIds(raw: any): string[] {
   }
 }
 
+// ----------- THIS FUNCTION IS UPDATED FOR iOS SUPPORT -----------
 async function displayChatNotificationGroupedBySender(
   data: any,
   fallback?: { title?: string; body?: string }
@@ -83,6 +85,11 @@ async function displayChatNotificationGroupedBySender(
       channelId: CHAT_CHANNEL_ID,
       groupId,
       pressAction: { id: 'default' },
+      sound: 'default',
+    },
+    ios: {
+      sound: 'default',
+      foregroundPresentationOptions: ['alert', 'sound', 'badge'],
     },
     data: {
       type: 'chat',
@@ -100,6 +107,11 @@ async function displayChatNotificationGroupedBySender(
       groupId,
       groupSummary: true,
       pressAction: { id: 'default' },
+      sound: 'default',
+    },
+    ios: {
+      sound: 'default',
+      foregroundPresentationOptions: ['alert', 'sound', 'badge'],
     },
     data: {
       type: 'chat_summary',
@@ -108,10 +120,28 @@ async function displayChatNotificationGroupedBySender(
     },
   });
 }
+// ---------------------------------------------------------------
 
+// Unified notification permission for Android and iOS
 async function requestNotificationPermission() {
   if (Platform.OS === 'android' && Platform.Version >= 33) {
     await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+  } else if (Platform.OS === 'ios') {
+    await notifee.requestPermission();
+  }
+}
+
+// Helper for unregistering push token (call on sign out, etc)
+async function unregisterPushToken() {
+  try {
+    const messagingInstance = getMessaging(getApp());
+    const token = await messagingInstance.getToken();
+    if (token) {
+      await apiClient.post('/push/unregister', { token, platform: Platform.OS });
+      console.log('[FCM] Unregistered token:', token);
+    }
+  } catch (e) {
+    console.log('Failed to unregister push token:', e);
   }
 }
 
@@ -204,11 +234,16 @@ const App = () => {
     }
   }, []);
 
+  // Support push events for both Android and iOS
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
+    if (Platform.OS !== 'android' && Platform.OS !== 'ios') return;
+
+    let unsubscribe: undefined | (() => void);
 
     const run = async () => {
-      await notifee.requestPermission();
+      if (Platform.OS === 'android') {
+        await notifee.requestPermission();
+      }
       const messagingInstance = getMessaging(getApp());
 
       return onMessage(messagingInstance, async remoteMessage => {
@@ -246,7 +281,6 @@ const App = () => {
       });
     };
 
-    let unsubscribe: undefined | (() => void);
     run().then(unsub => (unsubscribe = unsub));
 
     return () => {
@@ -254,16 +288,17 @@ const App = () => {
     };
   }, []);
 
+  // Registration and refresh for both Android and iOS
   useEffect(() => {
-    if (Platform.OS !== 'android') return;
     if (!User) return;
+    if (Platform.OS !== 'android' && Platform.OS !== 'ios') return;
 
     let unsubscribeTokenRefresh: undefined | (() => void);
 
     const register = async (token: string) => {
       if (!token) return;
       if (lastRegisteredTokenRef.current === token) return;
-      await apiClient.post('/push/register', { token, platform: 'android' });
+      await apiClient.post('/push/register', { token, platform: Platform.OS });
       lastRegisteredTokenRef.current = token;
       console.log('[FCM] Registered token:', token);
     };
@@ -307,6 +342,7 @@ const App = () => {
             setIsBiometricVerified(true);
           } else {
             setIsBiometricVerified(false);
+            await unregisterPushToken();
             await UserStorage.deleteUser();
             await UserStorage.clearTokens?.();
             resetToLogin();
@@ -317,6 +353,7 @@ const App = () => {
       } catch (e) {
         console.log('Biometric check failed:', e);
         setIsBiometricVerified(false);
+        await unregisterPushToken();
         await UserStorage.deleteUser();
         await UserStorage.clearTokens?.();
         navigationRef.current?.dispatch(

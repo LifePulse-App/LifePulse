@@ -12,6 +12,6 @@
 
 #import "jsinspector-modern/cdp/CdpJson.h"
 
-FOUNDATION_EXPORT double jsinspector_modern_cdpVersionNumber;
-FOUNDATION_EXPORT const unsigned char jsinspector_modern_cdpVersionString[];
+FOUNDATION_EXPORT double jsinspector_moderncdpVersionNumber;
+FOUNDATION_EXPORT const unsigned char jsinspector_moderncdpVersionString[];
 

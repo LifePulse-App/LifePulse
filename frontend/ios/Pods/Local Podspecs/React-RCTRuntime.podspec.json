@@ -16,10 +16,12 @@
   "compiler_flags": "-DRCT_NEW_ARCH_ENABLED=1",
   "header_dir": "React",
   "module_name": "RCTRuntime",
+  "header_mappings_dir": "./",
   "pod_target_xcconfig": {
     "OTHER_CFLAGS": "$(inherited)  -DRCT_NEW_ARCH_ENABLED=1",
     "DEFINES_MODULE": "YES",
     "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
+    "PUBLIC_HEADERS_FOLDER_PATH": "RCTRuntime.framework/Headers/React",
     "HEADER_SEARCH_PATHS": [
       "\"${PODS_CONFIGURATION_BUILD_DIR}/React-jsitooling/JSITooling.framework/Headers\"",
       "\"${PODS_CONFIGURATION_BUILD_DIR}/React-jsinspector/jsinspector_modern.framework/Headers\"",

@@ -1,1 +1,0 @@
-../../../NVActivityIndicatorView-ObjC/NVActivityIndicatorView-ObjC/Classes/NVActivityIndicatorView.h

@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "891E745EE87DD915D0AF75850406E6C7"
-               BuildableName = "libRNAppleAuthentication.a"
+               BuildableName = "RNAppleAuthentication.framework"
                BlueprintName = "RNAppleAuthentication"
                ReferencedContainer = "container:Pods.xcodeproj">
             </BuildableReference>

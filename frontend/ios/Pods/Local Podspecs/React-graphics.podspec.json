@@ -18,10 +18,13 @@
   ],
   "header_dir": "react/renderer/graphics",
   "frameworks": "UIKit",
+  "module_name": "React_graphics",
+  "header_mappings_dir": "../../..",
   "pod_target_xcconfig": {
     "USE_HEADERMAP": "NO",
     "HEADER_SEARCH_PATHS": [
       "\"$(PODS_TARGET_SRCROOT)/../../../\"",
+      "\"$(PODS_TARGET_SRCROOT)/platform/ios\"",
       "$(PODS_ROOT)/glog",
       "$(PODS_ROOT)/boost",
       "$(PODS_ROOT)/DoubleConversion",

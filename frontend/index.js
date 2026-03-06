@@ -2,6 +2,7 @@ import 'react-native-get-random-values';
 import { Buffer } from 'buffer';
 import { Crypto } from '@peculiar/webcrypto';
 
+// Polyfills
 if (!global.Buffer) global.Buffer = Buffer;
 if (!global.crypto) global.crypto = new Crypto();
 else if (!global.crypto.subtle) global.crypto.subtle = new Crypto().subtle;
@@ -9,8 +10,8 @@ else if (!global.crypto.subtle) global.crypto.subtle = new Crypto().subtle;
 import 'react-native-gesture-handler';
 import { AppRegistry } from 'react-native';
 import notifee, { EventType } from '@notifee/react-native';
-import { getApp } from '@react-native-firebase/app';
-import { getMessaging, setBackgroundMessageHandler } from '@react-native-firebase/messaging';
+
+import messaging from '@react-native-firebase/messaging';
 
 import App from './App';
 import { name as appName } from './app.json';
@@ -19,26 +20,36 @@ import {
   markMessagesSeenLocally,
   markMessagesDeliveredLocally,
 } from './src/screens/chat/services/ChatNotifications';
+
 import { markDelivered } from './src/screens/chat/services/api_chat';
 import { navigationRef } from './src/navigation/main/RootNavigation';
 
-const messagingInstance = getMessaging(getApp());
 
 function parseMessageIds(raw) {
   if (!raw) return [];
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    return Array.isArray(parsed) ? parsed.map((x) => String(x)) : [];
+    return Array.isArray(parsed) ? parsed.map(x => String(x)) : [];
   } catch {
     return [];
   }
 }
 
-setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
+
+/*
+|--------------------------------------------------------------------------
+| Background Messages (Firebase)
+|--------------------------------------------------------------------------
+*/
+
+messaging().setBackgroundMessageHandler(async remoteMessage => {
   const data = remoteMessage?.data || {};
 
   if (data.type === 'chat') {
-    const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
+    const incomingMessageId = String(
+      data.messageId || data.msgId || data._id || ''
+    );
+
     if (incomingMessageId) {
       try {
         await markDelivered([incomingMessageId]);
@@ -47,7 +58,6 @@ setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
       }
     }
 
-    // data-only path: show local notification
     const peerId = String(data.peerUserId || 'unknown');
     const peerName = data.username || data.peerName || 'Someone';
     const messageId = data.messageId || data.msgId || data._id || Date.now();
@@ -62,6 +72,11 @@ setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
         channelId: 'default',
         groupId,
         pressAction: { id: 'default' },
+        sound: 'default',
+      },
+      ios: {
+        sound: 'default',
+        foregroundPresentationOptions: ['alert', 'sound', 'badge'],
       },
       data: {
         type: 'chat',
@@ -81,13 +96,32 @@ setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
   }
 });
 
+
+/*
+|--------------------------------------------------------------------------
+| Notification Press (Background)
+|--------------------------------------------------------------------------
+*/
+
 notifee.onBackgroundEvent(async ({ type, detail }) => {
   if (type === EventType.PRESS) {
-    navigationRef.current?.navigate('chat', {
-             peerUserId: detail.notification.data.peerUserId,
-             peerName: detail.notification.data.peerName,
-           });
+    if (
+      detail?.notification?.data?.peerUserId &&
+      detail?.notification?.data?.peerName
+    ) {
+      navigationRef.current?.navigate('chat', {
+        peerUserId: detail.notification.data.peerUserId,
+        peerName: detail.notification.data.peerName,
+      });
+    }
   }
 });
+
+
+/*
+|--------------------------------------------------------------------------
+| Register App
+|--------------------------------------------------------------------------
+*/
 
 AppRegistry.registerComponent(appName, () => App);

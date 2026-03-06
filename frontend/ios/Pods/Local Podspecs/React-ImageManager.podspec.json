@@ -14,6 +14,8 @@
   },
   "source_files": "**/*.{m,mm,cpp,h}",
   "header_dir": "react/renderer/imagemanager",
+  "module_name": "React_ImageManager",
+  "header_mappings_dir": "./",
   "pod_target_xcconfig": {
     "USE_HEADERMAP": "NO",
     "HEADER_SEARCH_PATHS": [

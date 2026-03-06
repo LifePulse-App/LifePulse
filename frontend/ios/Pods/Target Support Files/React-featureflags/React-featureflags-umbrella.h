@@ -19,6 +19,6 @@
 #import "react/featureflags/ReactNativeFeatureFlagsOverridesOSSStable.h"
 #import "react/featureflags/ReactNativeFeatureFlagsProvider.h"
 
-FOUNDATION_EXPORT double react_featureflagsVersionNumber;
-FOUNDATION_EXPORT const unsigned char react_featureflagsVersionString[];
+FOUNDATION_EXPORT double React_featureflagsVersionNumber;
+FOUNDATION_EXPORT const unsigned char React_featureflagsVersionString[];
 

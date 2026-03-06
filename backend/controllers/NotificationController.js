@@ -5,7 +5,7 @@ import admin from '../firebaseAdmin.js';
 export const registerPushToken = async (req, res) => {
   try {
     const userId = req.user?._id;
-    const { token, platform = 'android' } = req.body;
+    const { token, platform } = req.body;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -44,7 +44,7 @@ export const registerPushToken = async (req, res) => {
 export const unregisterPushToken = async (req, res) => {
   try {
     const userId = req.user?._id;
-    const { token, platform = 'android' } = req.body;
+    const { token, platform } = req.body;
 
     if (!userId) {
       return res.status(401).json({ success: false, message: 'Unauthorized' });
@@ -65,29 +65,57 @@ export const unregisterPushToken = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to unregister push token' });
   }
 };
-
 async function sendNotificationFCM(tokens, payload) {
   for (const t of tokens) {
     try {
       const isChat = payload?.type === 'chat';
+      const isAndroid = t.platform === 'android';
+      const isIOS = t.platform === 'ios';
 
-      await admin.messaging().send({
+      const message = {
         token: t.token,
         data: Object.fromEntries(
           Object.entries(payload || {}).map(([k, v]) => [k, String(v ?? '')])
         ),
-        // ✅ REMOVE notification block to prevent duplicate system notification
-        android: {
+      };
+
+      // Android config
+      if (isAndroid) {
+        message.android = {
           priority: 'high',
-          // optional channel config; safe to keep/remove
           notification: isChat
             ? {
                 channelId: 'default',
                 sound: 'default',
               }
             : undefined,
-        },
-      });
+        };
+      }
+
+      // iOS/APNS config
+      if (isIOS) {
+        message.apns = {
+          payload: {
+            aps: {
+              alert: isChat
+                ? {
+                    title: payload.peerName || 'Someone',
+                    body: payload.body || 'Sent you a message',
+                  }
+                : undefined,
+              sound: isChat ? 'default' : undefined,
+              'mutable-content': 1,
+              // add badge and other properties as needed
+            },
+          },
+          headers: {
+            'apns-priority': '10', // High priority
+            // 'apns-topic': 'your.bundle.id', // Optionally set your iOS app bundle id
+          },
+        };
+      }
+
+      await admin.messaging().send(message);
     } catch (err) {
       if (
         err.code === 'messaging/registration-token-not-registered' ||
@@ -100,12 +128,15 @@ async function sendNotificationFCM(tokens, payload) {
     }
   }
 }
+
 /**
  * CHAT push
- * IMPORTANT: pass REAL message _id so receiver can call markDelivered([messageId])
  */
 export async function sendMsgNotification(toUserId, fromUserId, fromUsername, messageId, bodyText = 'Sent you a message') {
-  const tokens = await PushToken.find({ userId: toUserId, platform: 'android' }).lean();
+  const tokens = await PushToken.find({
+    userId: toUserId,
+    platform: { $in: ['android', 'ios'] },
+  }).lean();
   if (!tokens.length) return;
 
   await sendNotificationFCM(tokens, {
@@ -114,7 +145,7 @@ export async function sendMsgNotification(toUserId, fromUserId, fromUsername, me
     peerName: String(fromUsername || 'Someone'),
     username: String(fromUsername || 'Someone'),
     body: String(bodyText || 'Sent you a message'),
-    messageId: String(messageId), // ✅ REAL Mongo message _id
+    messageId: String(messageId),
   });
 }
 
@@ -122,7 +153,10 @@ export async function sendMsgNotification(toUserId, fromUserId, fromUsername, me
  * SEEN push
  */
 export async function sendSeenNotification(toUserId, peerUserId) {
-  const tokens = await PushToken.find({ userId: toUserId, platform: 'android' }).lean();
+  const tokens = await PushToken.find({
+    userId: toUserId,
+    platform: { $in: ['android', 'ios'] },
+  }).lean();
   if (!tokens.length) return;
 
   await sendNotificationFCM(tokens, {
@@ -132,12 +166,13 @@ export async function sendSeenNotification(toUserId, peerUserId) {
 }
 
 /**
- * DELIVERED push (like seen)
- * toUserId = sender (who should see double-tick update)
- * peerUserId = receiver (who delivered the message)
+ * DELIVERED push
  */
 export async function sendDeliveredNotification(toUserId, peerUserId, messageIds = []) {
-  const tokens = await PushToken.find({ userId: toUserId, platform: 'android' }).lean();
+  const tokens = await PushToken.find({
+    userId: toUserId,
+    platform: { $in: ['android', 'ios'] },
+  }).lean();
   if (!tokens.length) return;
 
   await sendNotificationFCM(tokens, {

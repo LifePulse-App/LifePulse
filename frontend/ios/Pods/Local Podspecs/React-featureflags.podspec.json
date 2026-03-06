@@ -17,6 +17,7 @@
   "pod_target_xcconfig": {
     "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
     "HEADER_SEARCH_PATHS": [
+      "\"$(PODS_TARGET_SRCROOT)/../..\"",
       "$(PODS_ROOT)/glog",
       "$(PODS_ROOT)/boost",
       "$(PODS_ROOT)/DoubleConversion",
@@ -27,6 +28,8 @@
     ],
     "DEFINES_MODULE": "YES"
   },
+  "module_name": "React_featureflags",
+  "header_mappings_dir": "../..",
   "dependencies": {
     "glog": [],
     "boost": [],

@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "1488B54289FC4F8B7BF7037750EE8B6B"
-               BuildableName = "libReact-jsinspectorcdp.a"
+               BuildableName = "jsinspector_moderncdp.framework"
                BlueprintName = "React-jsinspectorcdp"
                ReferencedContainer = "container:Pods.xcodeproj">
             </BuildableReference>

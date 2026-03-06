@@ -15,6 +15,6 @@
 #import "jsinspector-modern/network/NetworkReporter.h"
 #import "jsinspector-modern/network/NetworkTypes.h"
 
-FOUNDATION_EXPORT double jsinspector_modern_networkVersionNumber;
-FOUNDATION_EXPORT const unsigned char jsinspector_modern_networkVersionString[];
+FOUNDATION_EXPORT double jsinspector_modernnetworkVersionNumber;
+FOUNDATION_EXPORT const unsigned char jsinspector_modernnetworkVersionString[];
 

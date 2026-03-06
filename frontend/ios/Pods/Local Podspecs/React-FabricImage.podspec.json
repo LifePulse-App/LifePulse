@@ -21,6 +21,10 @@
     "HEADER_SEARCH_PATHS": [
       "\"$(PODS_TARGET_SRCROOT)/ReactCommon\"",
       "\"$(PODS_ROOT)/Headers/Private/Yoga\"",
+      "\"$(PODS_TARGET_SRCROOT)\"",
+      "\"$(PODS_TARGET_SRCROOT)/react/renderer/textlayoutmanager/platform/ios\"",
+      "\"$(PODS_TARGET_SRCROOT)/react/renderer/components/text/platform/cxx\"",
+      "\"$(PODS_TARGET_SRCROOT)/react/renderer/components/textinput/platform/ios\"",
       "\"${PODS_CONFIGURATION_BUILD_DIR}/React-ImageManager/React_ImageManager.framework/Headers\"",
       "\"${PODS_CONFIGURATION_BUILD_DIR}/React-ImageManager/React_ImageManager.framework/Headers/react/renderer/components/view/platform/cxx\"",
       "\"${PODS_CONFIGURATION_BUILD_DIR}/React-ImageManager/React_ImageManager.framework/Headers/react/renderer/imagemanager/platform/ios\"",
@@ -40,6 +44,8 @@
       "$(PODS_ROOT)/RCT-Folly"
     ]
   },
+  "header_mappings_dir": "./",
+  "module_name": "React_FabricImage",
   "dependencies": {
     "React-jsiexecutor": [
       "0.80.0"
