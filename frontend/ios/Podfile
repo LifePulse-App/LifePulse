@@ -43,19 +43,49 @@ target 'LifePulse' do
       :mac_catalyst_enabled => false
     )
 
-    # MapLibre post-install hook
+    # MapLibre post-install hook (keep this)
     $MLRN.post_install(installer) if defined?($MLRN)
 
-    # ⚡ Fix QuickCrypto NEON error on Intel Simulator
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |build_config|
-        # Exclude arm64 only for iOS simulator on Intel Macs
+        # ⚡ Fix QuickCrypto NEON error on Intel Simulator
         if `uname -m`.strip == "x86_64"
           build_config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
         end
 
         # Fix Firebase modular headers for New Architecture
         build_config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'
+        
+        # 🪄 CRITICAL FIX: Disable library distribution for ALL pods to prevent signature issues
+        # This prevents the .signature file from being generated in the first place
+        build_config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'
+      end
+      
+      # 🪄 Additional fix: Add build phase to clean signatures for maplibre specifically
+      if target.name == 'maplibre-react-native' || target.name.include?('MapLibre')
+        target.build_configurations.each do |config|
+          config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'NO'
+          config.build_settings['SKIP_INSTALL'] = 'NO'
+        end
+        
+        # Check if build phase already exists to avoid duplicates
+        existing_build_phases = target.build_phases.select { |bp| 
+          bp.respond_to?(:name) && bp.name && bp.name.include?('Remove signature')
+        }
+        
+        if existing_build_phases.empty?
+          # Add a pre-build script to remove signature files
+          build_phase = target.new_shell_script_build_phase('Remove signature files (Xcode workaround)')
+          build_phase.shell_script = <<-SCRIPT
+echo "Removing MapLibre signature files to prevent duplicate copy error..."
+rm -rf "${CONFIGURATION_BUILD_DIR}/MapLibre.xcframework-ios.signature"
+rm -rf "${CONFIGURATION_BUILD_DIR}/MapLibre.xcframework/_CodeSignature"
+rm -rf "${TARGET_BUILD_DIR}/MapLibre.xcframework-ios.signature"
+          SCRIPT
+          build_phase.shell_path = "/bin/sh"
+          # Move to beginning of build phases
+          target.build_phases.move(build_phase, 0)
+        end
       end
     end
   end

@@ -30,6 +30,9 @@ const Register = ({ navigation }: any) => {
   const [password, setPassword] = useState('');
   const [confirmpassword, setConfirmPassword] = useState('');
   const authContext = useContext(AuthContext);
+    const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorVisible, setErrorVisible] = useState(false);
@@ -231,12 +234,12 @@ const Register = ({ navigation }: any) => {
                 cursorColor='black'
               />
 
-              <TextInput
+             <TextInput
                 label="Password"
                 placeholder="Password"
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry
+                secureTextEntry={!showPassword}
                 style={styles.passwordInput}
                 mode="flat"
                 underlineColor="transparent"
@@ -244,6 +247,12 @@ const Register = ({ navigation }: any) => {
                 textColor="#111827"
                 placeholderTextColor="grey"
                 cursorColor='black'
+                right={
+                  <TextInput.Icon
+                    icon={showPassword ? 'eye-off' : 'eye'}
+                    onPress={() => setShowPassword(prev => !prev)}
+                  />
+                }
               />
 
               <TextInput
@@ -251,7 +260,7 @@ const Register = ({ navigation }: any) => {
                 placeholder="Confirm Password"
                 value={confirmpassword}
                 onChangeText={setConfirmPassword}
-                secureTextEntry
+                secureTextEntry={!showConfirmPassword}
                 style={styles.passwordInput}
                 mode="flat"
                 underlineColor="transparent"
@@ -259,8 +268,13 @@ const Register = ({ navigation }: any) => {
                 textColor="#111827"
                 placeholderTextColor="grey"
                 cursorColor='black'
-              />
-
+                right={
+                  <TextInput.Icon
+                    icon={showConfirmPassword ? 'eye-off' : 'eye'}
+                    onPress={() => setShowConfirmPassword(prev => !prev)}
+                  />
+                }
+                />
               {loading ? (
                 <View style={styles.loadingOverlay}>
                   <LoaderKitView

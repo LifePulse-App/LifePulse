@@ -248,11 +248,12 @@ const Dashboard = ({ navigation }: any) => {
 useEffect(() => {
   // Poll habits verification status
   const interval = setInterval(() => {
+    fetchDashboardInBackground();
     fetchTodayHabitsInBackground();
   }, 10000); // refresh every 10 seconds
 
   return () => clearInterval(interval);
-}, [fetchTodayHabitsInBackground]);
+}, [      fetchDashboardInBackground, fetchTodayHabitsInBackground]);
 
   const handleRetry = () => {
     fetchDashboardInBackground();

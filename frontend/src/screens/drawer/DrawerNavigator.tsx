@@ -32,7 +32,11 @@ const Drawer = createDrawerNavigator();
 
 // ✅ DrawerNavigator main
 const DrawerNavigator = () => (
-  <Drawer.Navigator>
+  <Drawer.Navigator
+  screenOptions={{
+      headerShown: false,
+      swipeEnabled: false,
+    }}>
     <Drawer.Screen name="Dashboard" component={Dashboard} options={{headerShown: false}} />
     <Drawer.Screen name="Student" component={StudentNavigator} options={{headerShown: false}} />
     <Drawer.Screen name="Employee" component={EmployeeNavigator} options={{headerShown: false}} />

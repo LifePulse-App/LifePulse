@@ -172,7 +172,7 @@ const Friends = ({ navigation }: any) => {
     if (offlineRef.current) return;
 
     try {
-      const res = await socialApi.getSuggestedUsers(10);
+      const res = await socialApi.getSuggestedUsers(5);
       const data = (res?.data?.suggestions ?? []).filter((u: any) => u?._id);
 
       // FIX 5: Guard against empty/undefined API response — don't overwrite good cache.
@@ -303,21 +303,30 @@ const Friends = ({ navigation }: any) => {
     setShowRemoveModal(null);
   };
 
-  const handleAcceptRequest = async (req: FollowRequest) => {
-    const id = req?.user?._id;
-    if (!id) return;
-    setLoadingActions(id);
-    try {
-      await socialApi.acceptFriendRequest(id);
-      setNotification({ type: "success", message: `Accepted request from ${req.user.name}` });
-      setFriendRequests((prev) => prev.filter((r) => r.user._id !== id));
-      isSearching ? await fetchSearch() : await fetchSuggestions();
-      await fetchRequests();
-    } catch (e) {
-      setNotification({ type: "error", message: "Couldn't accept request." });
-    }
-    setLoadingActions(null);
-  };
+const [acceptedIds, setAcceptedIds] = useState<string[]>([]);
+
+const handleAcceptRequest = async (req: FollowRequest) => {
+  const id = req?.user?._id;
+  if (!id) return;
+  setLoadingActions(id);
+  try {
+    await socialApi.acceptFriendRequest(id);
+    setNotification({ type: "success", message: `Accepted request from ${req.user.name}` });
+    setAcceptedIds((prev) => [...prev, id]); // Mark as accepted locally
+    setFriendRequests((prev) => prev.filter((r) => r.user._id !== id));
+    isSearching ? await fetchSearch() : await fetchSuggestions();
+    await fetchRequests();
+  } catch (e) {
+    setNotification({ type: "error", message: "Couldn't accept request." });
+  }
+  setLoadingActions(null);
+};
+
+// When rendering the Friend Requests list, filter out acceptedIds:
+const requestListToShow = (showAllRequests
+  ? friendRequests
+  : friendRequests.slice(0, 3)
+).filter(r => !acceptedIds.includes(r.user._id));
 
   const handleRejectRequest = async (req: FollowRequest) => {
     const id = req?.user?._id;
@@ -476,8 +485,6 @@ const Friends = ({ navigation }: any) => {
       </View>
     );
   };
-
-  const requestListToShow = showAllRequests ? friendRequests : friendRequests.slice(0, 3);
   const listData = isSearching ? searchResults : suggestions;
 
   const handleRemoveModalCancel = () => setShowRemoveModal(null);

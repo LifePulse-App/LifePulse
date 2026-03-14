@@ -163,15 +163,17 @@ export const pendingFriendRequests = catchAsyncErrors(async (req, res) => {
     .lean();
   if (!me) return res.status(404).json({ message: "User not found" });
 
-  res.json({
-    requests: (me.friendRequests || []).map(r => ({
+res.json({
+  requests: (me.friendRequests || [])
+    .filter(r => !me.friends.some(f => String(f.user) === String(r.user?._id)))
+    .map(r => ({
       _id: r.user?._id,
       name: r.user?.name,
       username: r.user?.username,
       avatar: r.user?.avatarUrl,
       requestedAt: r.requestedAt,
     })),
-  });
+});
 });
 
 /**
