@@ -861,7 +861,7 @@ const styles = StyleSheet.create({
   rightSpacer: { width: 40, height: 40 },
   modalOverlay: {
     position: "absolute", left: 0, top: 0, right: 0, bottom: 0,
-    backgroundColor: "rgba(30,41,59,0.7)", justifyContent: "center", alignItems: "center", zIndex: 1000,
+    backgroundColor: "rgba(30,41,59,0.6)", justifyContent: "center", alignItems: "center", zIndex: 1000,
   },
   glassyModal: {
     backgroundColor: "rgba(15,23,42,0.82)", borderColor: "white",
