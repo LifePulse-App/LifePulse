@@ -174,16 +174,24 @@ export default function NewChatScreen({ navigation }: any) {
                 >
                   {renderAvatar(item)}
 
-                  <View style={styles.rowTextWrap}>
-                    <Text style={styles.name} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    {item.username ? (
-                      <Text style={styles.sub} numberOfLines={1}>
-                        @{item.username}
-                      </Text>
-                    ) : null}
-                  </View>
+               <View style={styles.rowTextWrap}>
+  <View style={{ flexDirection: "row", alignItems: "center" }}>
+    <Text style={styles.name} numberOfLines={1}>
+      {item.name}
+    </Text>
+    {item.tick === "verified" && (
+      <Icon name="check-decagram" size={16} color="#3b82f6" style={{ marginLeft: 6, marginTop: 2 }} />
+    )}
+    {item.tick === "golden" && (
+      <Icon name="check-decagram" size={16} color="#fbbf24" style={{ marginLeft: 6, marginTop: 2 }} />
+    )}
+  </View>
+  {item.username ? (
+    <Text style={styles.sub} numberOfLines={1}>
+      @{item.username}
+    </Text>
+  ) : null}
+</View>
                 </TouchableOpacity>
               )}
               ItemSeparatorComponent={() => <View style={{ height: 8 }} />}

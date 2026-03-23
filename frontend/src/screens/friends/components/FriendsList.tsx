@@ -32,6 +32,7 @@ type Friend = {
   avatarUrl?: string;
   avatarThumbnailUrl?: string;
   since?: string;
+  tick?: string;
 };
 
 const saveCache = async (key: string, friends: Friend[]) => {
@@ -213,14 +214,32 @@ export default function FriendsListScreen({ navigation }: any) {
             )}
           </View>
 
-          <View style={{ flex: 1 }}>
-            <Text style={styles.name} numberOfLines={1}>
-              {item.name}
-            </Text>
-            <Text style={styles.username} numberOfLines={1}>
-              {item.username ? `@${item.username}` : "@"}
-            </Text>
-          </View>
+         <View style={{ flex: 1 }}>
+  <View style={{ flexDirection: "row", alignItems: "center" }}>
+    <Text style={styles.name} numberOfLines={1}>
+      {item.name}
+    </Text>
+    {item.tick === 'verified' && (
+      <Icon
+        name="check-decagram"
+        size={17}
+        color="#3b82f6"
+        style={{ marginLeft: 6, marginTop: 2 }}
+      />
+    )}
+    {item.tick === 'golden' && (
+      <Icon
+        name="check-decagram"
+        size={17}
+        color="#fbbf24"
+        style={{ marginLeft: 6, marginTop: 2 }}
+      />
+    )}
+  </View>
+  <Text style={styles.username} numberOfLines={1}>
+    {item.username ? `@${item.username}` : "@"}
+  </Text>
+</View>
         </View>
 
         <Icon name="chevron-right" size={22} color="#9CA3AF" />

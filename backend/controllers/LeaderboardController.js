@@ -69,7 +69,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
 
   const scope = normalizeScope(rawScope);
   const user = await User.findById(req.user._id).select(
-    'monthlyXp totalXp level currentTitle country city username name avatarUrl following friends'
+    'monthlyXp totalXp level currentTitle country city username name avatarUrl following friends tick'
   );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
@@ -78,7 +78,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
 
     const topPlayers = await User.find(
       { _id: { $in: friendIds } },
-      'username name monthlyXp level currentTitle country city avatarUrl'
+      'username name monthlyXp level currentTitle country city avatarUrl tick'
     )
       .sort({ monthlyXp: -1, _id: 1 })
       .limit(100)
@@ -106,6 +106,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
         country: u.country,
         city: u.city,
         avatarUrl: u.avatarUrl,
+        tick: u.tick
       })),
       currentUser: {
         userId: user._id,
@@ -118,6 +119,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
         country: user.country,
         city: user.city,
         avatarUrl: user.avatarUrl,
+        tick: user.tick
       },
     });
   }
@@ -126,7 +128,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
 
   const topPlayers = await User.find(
     { monthlyXp: { $gt: 0 }, ...scopeFilter },
-    'username name monthlyXp level currentTitle country city avatarUrl'
+    'username name monthlyXp level currentTitle country city avatarUrl tick'
   )
     .collation({ locale: 'en', strength: 2 })
     .sort({ monthlyXp: -1, _id: 1 })
@@ -155,6 +157,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
       country: u.country,
       city: u.city,
       avatarUrl: u.avatarUrl,
+      tick: u.tick
     })),
     currentUser: {
       userId: user._id,
@@ -167,6 +170,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
       country: user.country,
       city: user.city,
       avatarUrl: user.avatarUrl,
+      tick: user.tick
     },
   });
 });
@@ -179,7 +183,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
 
   const scope = normalizeScope(rawScope);
   const user = await User.findById(req.user._id).select(
-    'totalXp level currentTitle country city username name avatarUrl following friends'
+    'totalXp level currentTitle country city username name avatarUrl following friends tick'
   );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
@@ -188,7 +192,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
 
     const topPlayers = await User.find(
       { _id: { $in: friendIds } },
-      'username name totalXp level currentTitle country city avatarUrl'
+      'username name totalXp level currentTitle country city avatarUrl tick'
     )
       .sort({ totalXp: -1, _id: 1 })
       .limit(100)
@@ -216,6 +220,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
         country: u.country,
         city: u.city,
         avatarUrl: u.avatarUrl,
+        tick: u.tick,
       })),
       currentUser: {
         userId: user._id,
@@ -228,6 +233,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
         country: user.country,
         city: user.city,
         avatarUrl: user.avatarUrl,
+        tick: user.tick,
       },
     });
   }
@@ -236,7 +242,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
 
   const topPlayers = await User.find(
     { totalXp: { $gt: 0 }, ...scopeFilter },
-    'username name totalXp level currentTitle country city avatarUrl'
+    'username name totalXp level currentTitle country city avatarUrl tick'
   )
     .collation({ locale: 'en', strength: 2 })
     .sort({ totalXp: -1, _id: 1 })
@@ -265,6 +271,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
       country: u.country,
       city: u.city,
       avatarUrl: u.avatarUrl,
+      tick: u.tick,
     })),
     currentUser: {
       userId: user._id,
@@ -277,6 +284,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
       country: user.country,
       city: user.city,
       avatarUrl: user.avatarUrl,
+      tick: user.tick,
     },
   });
 });

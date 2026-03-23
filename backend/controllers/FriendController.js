@@ -1,6 +1,8 @@
 import User from "../models/UserSchema.js";
 import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import Mood from "../models/MoodSchema.js";
+import { sendToUser } from '../helpers/broadcastService.js';
+import { TEMPLATES } from '../utils/notificationTemplates.js';
 
 /**
  * Helpers
@@ -42,6 +44,13 @@ export const sendFriendRequest = catchAsyncErrors(async (req, res) => {
   // otherwise create outgoing request to them
   them.friendRequests.push({ user: currentUserId, requestedAt: new Date() });
   await them.save();
+  await sendToUser(toUserId, {
+  ...TEMPLATES.FRIEND_REQUEST_SENT(req.user.name),
+  extra: {
+    fromUserId: String(req.user._id),
+    fromName: String(req.user.name),
+  },
+});
   return res.json({ message: "Friend request sent", requestSent: true });
 });
 
@@ -65,6 +74,13 @@ export const acceptFriendRequest = catchAsyncErrors(async (req, res) => {
 
   await me.save();
   await them.save();
+  await sendToUser(originalRequesterId, {
+  ...TEMPLATES.FRIEND_REQUEST_ACCEPTED(req.user.name),
+  extra: {
+    fromUserId: String(req.user._id),
+    fromName: String(req.user.name),
+  },
+});
   return res.json({ message: "Request accepted", isFriend: true });
 });
 
@@ -136,7 +152,7 @@ export const friendStatus = catchAsyncErrors(async (req, res) => {
 export const listFriends = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const me = await User.findById(currentUserId)
-    .populate("friends.user", "name username avatarUrl")
+    .populate("friends.user", "name username avatarUrl tick")
     .lean();
   if (!me) return res.status(404).json({ message: "User not found" });
 
@@ -147,6 +163,7 @@ export const listFriends = catchAsyncErrors(async (req, res) => {
       name: f.user.name,
       username: f.user.username,
       avatar: f.user.avatarUrl,
+      tick: f.user.tick,
       since: f.since,
     }));
 
@@ -159,7 +176,7 @@ export const listFriends = catchAsyncErrors(async (req, res) => {
 export const pendingFriendRequests = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const me = await User.findById(currentUserId)
-    .populate("friendRequests.user", "name username avatarUrl")
+    .populate("friendRequests.user", "name username avatarUrl tick")
     .lean();
   if (!me) return res.status(404).json({ message: "User not found" });
 
@@ -171,6 +188,7 @@ res.json({
       name: r.user?.name,
       username: r.user?.username,
       avatar: r.user?.avatarUrl,
+      tick: r.user?.tick,
       requestedAt: r.requestedAt,
     })),
 });
@@ -189,7 +207,7 @@ export const searchUsers = catchAsyncErrors(async (req, res) => {
     _id: { $ne: currentUserId },
     $or: [{ username: searchRegex }, { name: searchRegex }],
   })
-    .select("name username avatarUrl friendRequests friends")
+    .select("name username avatarUrl friendRequests friends tick")
     .lean();
 
   const me = await User.findById(currentUserId).select("friendRequests friends").lean();
@@ -202,6 +220,7 @@ export const searchUsers = catchAsyncErrors(async (req, res) => {
       name: u.name,
       username: u.username,
       avatar: u.avatarUrl,
+      tick: u.tick,
       isFriend: friend,
       requestSent,
       requestIncoming: incoming,
@@ -224,7 +243,7 @@ export const suggestedFriends = catchAsyncErrors(async (req, res) => {
   const excludeIds = [currentUserId, ...(me.friends || []).map(f => String(f.user))];
 
   let users = await User.find({ _id: { $nin: excludeIds } })
-    .select("name username avatarUrl friendRequests friends")
+    .select("name username avatarUrl friendRequests friends tick")
     .limit(limit)
     .lean();
 
@@ -237,6 +256,7 @@ export const suggestedFriends = catchAsyncErrors(async (req, res) => {
       name: u.name,
       username: u.username,
       avatar: u.avatarUrl,
+      tick: u.tick,
       isFriend: friend,
       requestSent,
       requestIncoming: incoming,
@@ -252,7 +272,7 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
   const { userId } = req.params;
 
   const target = await User.findById(userId)
-    .select("name username avatarUrl avatarThumbnailUrl level currentTitle country city isPublic")
+    .select("name username avatarUrl avatarThumbnailUrl level currentTitle country city isPublic tick")
     .lean();
 
   if (!target) return res.status(404).json({ message: "User not found" });
@@ -309,6 +329,7 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
       mood: moodDoc?.mood || "",
       moodCreatedAt: moodDoc?.createdAt || null,
       moodExpiresAt: moodDoc?.expiresAt || null,
+      tick: target?.tick,
 
       // share setting
       isPublic: !!target.isPublic,

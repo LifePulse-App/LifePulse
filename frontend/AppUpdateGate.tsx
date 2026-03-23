@@ -40,7 +40,7 @@ export default function AppUpdateGate({ children }: any) {
         const currentVersion = DeviceInfo.getVersion();
         const platform = Platform.OS;
 
-        console.log(currentVersion, platform);
+        // console.log(currentVersion, platform);
         
 
         const res = await apiClient.get(
@@ -48,7 +48,7 @@ export default function AppUpdateGate({ children }: any) {
         );
         const d = res?.data || {};
 
-        console.log(d);
+        // console.log(d);
         
 
         // Defaults if not available

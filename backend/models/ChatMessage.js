@@ -23,6 +23,16 @@ const ChatMessageSchema = new mongoose.Schema(
       index: true,
     },
 
+    deletedForEveryone: { type: Boolean, default: false },
+
+    reactions: [
+  {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    emoji: { type: String },
+    reactedAt: { type: Date, default: Date.now },
+  }
+],
+
     // text is optional now (for media-only message)
     text: { type: String, default: "" },
 
@@ -33,6 +43,12 @@ const ChatMessageSchema = new mongoose.Schema(
       default: "text",
       index: true,
     },
+
+    replyTo: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "ChatMessage",
+  default: null,
+},
 
     media: {
       url: { type: String, default: "" },
@@ -46,7 +62,8 @@ const ChatMessageSchema = new mongoose.Schema(
     clientMessageId: { type: String, required: true, index: true },
     deliveredAt: { type: Date, default: null },
     seenAt: { type: Date, default: null },
-  },
+  }
+  ,
   { timestamps: true }
 );
 

@@ -474,9 +474,10 @@ useEffect(() => {
                   )}
                   renderItem={({ item }: any) => (
                     <TouchableOpacity
-                      activeOpacity={0.8}
-                      style={styles.habitRow}
-                    >
+    activeOpacity={0.8}
+    style={styles.habitRow}
+    // onPress={() => navigation.navigate('HabitDetail', { habit: item })}
+  >
                       <View style={styles.habitLeft}>
                         <View style={styles.habitIconWrap}>
                           <Icon name={item.icon || "check"} size={22} color="#C4B5FD" />

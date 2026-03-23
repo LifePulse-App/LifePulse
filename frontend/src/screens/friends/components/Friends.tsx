@@ -206,6 +206,9 @@ const Friends = ({ navigation }: any) => {
       const res = await socialApi.searchUsers(`q=${encodeURIComponent(search)}`);
       const data = (res?.data?.user ?? []).filter((u: any) => u?._id);
 
+      console.log(data);
+      
+
       // FIX 9: Don't overwrite cache with empty API response.
       if (!data || data.length === 0) {
         if (!cached) setAllUsers([]);
@@ -379,14 +382,34 @@ const requestListToShow = (showAllRequests
             )}
           </View>
 
-          <View style={styles.userInfo}>
-            <Text style={styles.userName} numberOfLines={1}>
-              {user.name ?? user.username}
-            </Text>
-            <Text style={styles.userUsername} numberOfLines={1}>
-              {user.username}
-            </Text>
-          </View>
+        <View style={styles.userInfo}>
+  <View style={{ flexDirection: "row", alignItems: "center" }}>
+    <Text style={styles.userName} numberOfLines={1}>
+      {user.name ?? user.username}
+    </Text>
+    {/* Blue tick */}
+    {user.tick === "verified" && (
+      <Icon
+        name="check-decagram"
+        size={18}
+        color="#3b82f6"
+        style={{ marginLeft: 6, marginTop: 2 }}
+      />
+    )}
+    {/* Golden tick */}
+    {user.tick === "golden" && (
+      <Icon
+        name="check-decagram"
+        size={18}
+        color="#fbbf24"
+        style={{ marginLeft: 6, marginTop: 2 }}
+      />
+    )}
+  </View>
+  <Text style={styles.userUsername} numberOfLines={1}>
+    {user.username}
+  </Text>
+</View>
         </TouchableOpacity>
 
         {isRequest ? (

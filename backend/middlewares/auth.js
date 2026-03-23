@@ -35,3 +35,15 @@ export const isAuthenticatedUser = catchAsyncErrors(async (req, res, next) => {
     return next(err);
   }
 });
+
+export const isAdmin = catchAsyncErrors(async (req, res, next) => {
+  if (!req.user) {
+    return next(new ErrorHandler("Unauthorized", 401));
+  }
+  // Add isAdmin field to your User model if you haven't already
+  // or use a role field: req.user.role === 'admin'
+  if (!req.user.isAdmin && req.user.role !== 'admin') {
+    return next(new ErrorHandler("Access denied. Admins only.", 403));
+  }
+  next();
+});

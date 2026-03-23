@@ -14,11 +14,11 @@ import Toast, { BaseToast, BaseToastProps } from 'react-native-toast-message';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReactNativeBiometrics from 'react-native-biometrics';
-
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import { getApp } from '@react-native-firebase/app';
 import { getMessaging, getToken, onMessage, onTokenRefresh } from '@react-native-firebase/messaging';
-
+import SystemNavigationBar from 'react-native-system-navigation-bar';
 import AuthContext from './src/auth/user/UserContext';
 import NavigationTheme from './src/navigation/main/NavigationTheme';
 import AuthNavigator from './src/navigation/main/AuthNavigator';
@@ -38,6 +38,9 @@ import {
 
 import { markDelivered, markAllPendingDelivered } from './src/screens/chat/services/api_chat';
 
+import { notificationNavState } from './index'; // not pendingNavigation!
+import { handleNotificationPress } from './handleNotificationPress'; // or use your util in index.js
+
 import 'react-native-get-random-values';
 import { TextEncoder, TextDecoder } from 'text-encoding';
 (global as any).TextEncoder = TextEncoder;
@@ -48,6 +51,17 @@ const CHAT_CHANNEL_ID = 'default';
 notifee.createChannel({
   id: CHAT_CHANNEL_ID,
   name: 'Default Channel',
+  importance: AndroidImportance.HIGH,
+  sound: 'default',
+  vibration: true,
+});
+
+// Add alongside your existing CHAT_CHANNEL_ID setup
+const APP_CHANNEL_ID = 'app_notifications';
+
+notifee.createChannel({
+  id: APP_CHANNEL_ID,
+  name: 'App Notifications',
   importance: AndroidImportance.HIGH,
   sound: 'default',
   vibration: true,
@@ -211,6 +225,38 @@ const App = () => {
   }, []);
 
   useEffect(() => {
+  if (Platform.OS === 'android') {
+    SystemNavigationBar.navigationHide();
+    SystemNavigationBar.stickyImmersive();
+  }
+}, []);
+
+// In the AppState listener useEffect, update it:
+useEffect(() => {
+  const sub = AppState.addEventListener('change', async state => {
+    if (state === 'active') {
+      await runMarkAllPendingDelivered('active');
+      
+      // ← ADD: Cancel all chat notifications when app opens
+      try {
+        const displayed = await notifee.getDisplayedNotifications();
+        const chatNotifs = displayed
+          .filter(n => 
+            n.notification?.data?.type === 'chat' ||
+            n.notification?.data?.type === 'chat_summary'
+          )
+          .map(n => n.id);
+        
+        await Promise.all(chatNotifs.map(id => notifee.cancelNotification(id)));
+      } catch (e) {
+        console.log('Failed to cancel chat notifications:', e);
+      }
+    }
+  });
+  return () => sub.remove();
+}, []);
+
+  useEffect(() => {
     if (!secretKeySetRef.current) {
       setSecretKey();
       secretKeySetRef.current = true;
@@ -298,6 +344,15 @@ const App = () => {
   }, [User]);
 
   useEffect(() => {
+  if (notificationNavState.pending) {
+    setTimeout(() => {
+      handleNotificationPress(notificationNavState.pending);
+      notificationNavState.pending = null; // ✅ allowed!
+    }, 600);
+  }
+}, [isBiometricVerified]);
+
+  useEffect(() => {
     const checkBiometric = async () => {
       try {
         const biometricEnabled = await AsyncStorage.getItem('biometricEnabled');
@@ -368,6 +423,7 @@ const App = () => {
   }
 
   return (
+     <GestureHandlerRootView style={{ flex: 1 }}>
     <PaperProvider theme={theme} settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
       <AuthContext.Provider value={{ User, setUser }}>
         <AppUpdateGate>
@@ -380,6 +436,7 @@ const App = () => {
         </AppUpdateGate>
       </AuthContext.Provider>
     </PaperProvider>
+    </GestureHandlerRootView>
   );
 };
 
