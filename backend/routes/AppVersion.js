@@ -40,6 +40,9 @@ router.get('/version', async (req, res) => {
     const platform = String(req.query.platform || 'android').toLowerCase();
     const currentVersion = String(req.query.currentVersion || '0.0.0');
 
+    console.log(platform, currentVersion);
+    
+
     // fallback: use android policy if platform unknown
     const policy = VERSION_POLICY[platform] || VERSION_POLICY.android;
 
