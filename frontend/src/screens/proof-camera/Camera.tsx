@@ -312,7 +312,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const handleTakePhoto = async () => {
     if (!habitId) {
       showMessage('Please select an activity before capturing proof.');
-      setHabitModalVisible(true);
+      // setHabitModalVisible(true);
       return;
     }
     if (!cameraRef.current) return;

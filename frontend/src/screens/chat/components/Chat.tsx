@@ -126,7 +126,7 @@ export default function ChatListScreen({ navigation }: any) {
       const friends = friendsRes?.data?.friends || [];
       const friendMap = new Map<
         string,
-        { name: string; avatarUrl: string; avatarThumb: string; avatarPublicUrl: string }
+        { name: string; avatarUrl: string; avatarThumb: string; avatarPublicUrl: string; tick: string;}
       >();
 
       for (const f of friends) {
@@ -136,6 +136,7 @@ export default function ChatListScreen({ navigation }: any) {
           avatarUrl: String(f.avatar || ""),
           avatarThumb: String(f.avatarThumbnailUrl || ""),
           avatarPublicUrl: String(f.avatar?.url || ""),
+           tick: f.tick || "none",
         });
       }
 
@@ -154,6 +155,7 @@ export default function ChatListScreen({ navigation }: any) {
           mood: c.mood || "",
           lastText: c.lastText || "",
           lastAt: c.lastAt || "",
+          tick: friend?.tick || "none",
           unread: Number(getUnread(peerId) || c.unread || 0),
         };
       });
@@ -167,7 +169,6 @@ export default function ChatListScreen({ navigation }: any) {
       if (mapped.length > 0) {
         setRows(mapped);
         await saveCache(myUserId, mapped);
-        console.log('API loaded, rows:', mapped.length);
       } else {
         // If API returns empty but cache exists, don't overwrite cache!
         console.log('API returned empty list — cache not overwritten.');
@@ -289,44 +290,62 @@ export default function ChatListScreen({ navigation }: any) {
             data={filtered}
             keyExtractor={(item) => `${item.conversationId}:${item.peerUserId}`}
             keyboardShouldPersistTaps="handled"
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() =>
-                  navigation.navigate("chat", {
-                    conversationId: item.conversationId,
-                    peerUserId: item.peerUserId,
-                    peerName: item.peerName,
-                    peerMood: item.mood,
-                    peerAvatarUrl: item.peerAvatarUrl,
-                  })
-                }
-              >
-                <Avatar url={item.peerAvatarUrl} />
+         renderItem={({ item }) => (
+  <TouchableOpacity
+    style={styles.row}
+    onPress={() =>
+      navigation.navigate("chat", {
+        conversationId: item.conversationId,
+        peerUserId: item.peerUserId,
+        peerName: item.peerName,
+        peerMood: item.mood,
+        peerAvatarUrl: item.peerAvatarUrl,
+      })
+    }
+  >
+    <Avatar url={item.peerAvatarUrl} />
+    <View style={styles.rowContent}>
+      <View style={styles.rowTop}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <Text style={styles.peer} numberOfLines={1}>
+            {item.peerName}
+          
+          {item.tick === "verified" && (
+            <Icon
+              name="check-decagram"
+              size={16}
+              color="#3b82f6"
+              style={{ marginLeft: 6, marginTop: 2 }}
+            />
+          )}
+          {item.tick === "golden" && (
+            <Icon
+              name="check-decagram"
+              size={16}
+              color="#fbbf24"
+              style={{ marginLeft: 6, marginTop: 2 }}
+            />
+          )}
+          </Text>
+        </View>
+        <Text style={styles.time}>{formatLastTime(item.lastAt)}</Text>
+      </View>
 
-                <View style={styles.rowContent}>
-                  <View style={styles.rowTop}>
-                    <Text style={styles.peer} numberOfLines={1}>
-                      {item.peerName}
-                    </Text>
-                    <Text style={styles.time}>{formatLastTime(item.lastAt)}</Text>
-                  </View>
-
-                  <View style={styles.rowTop}>
-                    <Text style={styles.snippet} numberOfLines={1}>
-                      {item.lastText || "No messages yet"}
-                    </Text>
-                    {item.unread > 0 && (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText} numberOfLines={1}>
-                          {item.unread > 99 ? "99+" : item.unread}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )}
+      <View style={styles.rowTop}>
+        <Text style={styles.snippet} numberOfLines={1}>
+          {item.lastText || "No messages yet"}
+        </Text>
+        {item.unread > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText} numberOfLines={1}>
+              {item.unread > 99 ? "99+" : item.unread}
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  </TouchableOpacity>
+)}
             ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           />}
         </View>
@@ -424,7 +443,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, color: "#fff", paddingVertical: 8, marginLeft: 6 },
 
-  peer: { color: "#fff", fontSize: 16, fontWeight: "700", flex: 1, marginRight: 8 },
+  peer: { color: "#fff", fontSize: 16, fontWeight: "700", flex: 1, marginRight: 8  },
   snippet: { color: "#94a3b8", marginTop: 4, flex: 1, marginRight: 8 },
   badge: {
     marginLeft: 8,

@@ -172,7 +172,7 @@ const Friends = ({ navigation }: any) => {
     if (offlineRef.current) return;
 
     try {
-      const res = await socialApi.getSuggestedUsers(10);
+      const res = await socialApi.getSuggestedUsers(5);
       const data = (res?.data?.suggestions ?? []).filter((u: any) => u?._id);
 
       // FIX 5: Guard against empty/undefined API response — don't overwrite good cache.
@@ -205,6 +205,9 @@ const Friends = ({ navigation }: any) => {
     try {
       const res = await socialApi.searchUsers(`q=${encodeURIComponent(search)}`);
       const data = (res?.data?.user ?? []).filter((u: any) => u?._id);
+
+      console.log(data);
+      
 
       // FIX 9: Don't overwrite cache with empty API response.
       if (!data || data.length === 0) {
@@ -303,21 +306,30 @@ const Friends = ({ navigation }: any) => {
     setShowRemoveModal(null);
   };
 
-  const handleAcceptRequest = async (req: FollowRequest) => {
-    const id = req?.user?._id;
-    if (!id) return;
-    setLoadingActions(id);
-    try {
-      await socialApi.acceptFriendRequest(id);
-      setNotification({ type: "success", message: `Accepted request from ${req.user.name}` });
-      setFriendRequests((prev) => prev.filter((r) => r.user._id !== id));
-      isSearching ? await fetchSearch() : await fetchSuggestions();
-      await fetchRequests();
-    } catch (e) {
-      setNotification({ type: "error", message: "Couldn't accept request." });
-    }
-    setLoadingActions(null);
-  };
+const [acceptedIds, setAcceptedIds] = useState<string[]>([]);
+
+const handleAcceptRequest = async (req: FollowRequest) => {
+  const id = req?.user?._id;
+  if (!id) return;
+  setLoadingActions(id);
+  try {
+    await socialApi.acceptFriendRequest(id);
+    setNotification({ type: "success", message: `Accepted request from ${req.user.name}` });
+    setAcceptedIds((prev) => [...prev, id]); // Mark as accepted locally
+    setFriendRequests((prev) => prev.filter((r) => r.user._id !== id));
+    isSearching ? await fetchSearch() : await fetchSuggestions();
+    await fetchRequests();
+  } catch (e) {
+    setNotification({ type: "error", message: "Couldn't accept request." });
+  }
+  setLoadingActions(null);
+};
+
+// When rendering the Friend Requests list, filter out acceptedIds:
+const requestListToShow = (showAllRequests
+  ? friendRequests
+  : friendRequests.slice(0, 3)
+).filter(r => !acceptedIds.includes(r.user._id));
 
   const handleRejectRequest = async (req: FollowRequest) => {
     const id = req?.user?._id;
@@ -370,14 +382,34 @@ const Friends = ({ navigation }: any) => {
             )}
           </View>
 
-          <View style={styles.userInfo}>
-            <Text style={styles.userName} numberOfLines={1}>
-              {user.name ?? user.username}
-            </Text>
-            <Text style={styles.userUsername} numberOfLines={1}>
-              {user.username}
-            </Text>
-          </View>
+        <View style={styles.userInfo}>
+  <View style={{ flexDirection: "row", alignItems: "center" }}>
+    <Text style={styles.userName} numberOfLines={1}>
+      {user.name ?? user.username}
+    </Text>
+    {/* Blue tick */}
+    {user.tick === "verified" && (
+      <Icon
+        name="check-decagram"
+        size={18}
+        color="#3b82f6"
+        style={{ marginLeft: 6, marginTop: 2 }}
+      />
+    )}
+    {/* Golden tick */}
+    {user.tick === "golden" && (
+      <Icon
+        name="check-decagram"
+        size={18}
+        color="#fbbf24"
+        style={{ marginLeft: 6, marginTop: 2 }}
+      />
+    )}
+  </View>
+  <Text style={styles.userUsername} numberOfLines={1}>
+    {user.username}
+  </Text>
+</View>
         </TouchableOpacity>
 
         {isRequest ? (
@@ -476,8 +508,6 @@ const Friends = ({ navigation }: any) => {
       </View>
     );
   };
-
-  const requestListToShow = showAllRequests ? friendRequests : friendRequests.slice(0, 3);
   const listData = isSearching ? searchResults : suggestions;
 
   const handleRemoveModalCancel = () => setShowRemoveModal(null);

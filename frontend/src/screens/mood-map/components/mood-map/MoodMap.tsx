@@ -24,6 +24,38 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import NetInfo from "@react-native-community/netinfo";
 
+// --- Single source of truth for mood colors ---
+const MOOD_COLORS = {
+  ecstatic: "#22c55e",
+  happy: "#4ade80",
+  grateful: "#86efac",
+  calm: "#38bdf8",
+  relaxed: "#60a5fa",
+  lovely: "#f472b6",
+  neutral: "#f59e0b",
+  meh: "#fbbf24",
+  tired: "#94a3b8",
+  confused: "#a855f7",
+  sad: "#3b82f6",
+  lonely: "#1d4ed8",
+  discouraged: "#1e40af",
+  numb: "#475569",
+  anxious: "#f97316",
+  stressed: "#ef4444",
+  overwhelmed: "#dc2626",
+  annoyed: "#f43f5e",
+  frustrated: "#e11d48",
+  angry: "#b91c1c",
+};
+
+const MOOD_LEGEND = Object.entries(MOOD_COLORS).map(([mood, color]) => ({ mood, color }));
+const moodMatchArray = [
+  "match",
+  ["get", "mood"],
+  ...Object.entries(MOOD_COLORS).flat(),
+  "#94a3b8",
+];
+
 const SOCKET_URL = "http://YOUR_SERVER_IP:5000";
 const DARK_MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
@@ -71,16 +103,6 @@ const MoodMap = () => {
       return null;
     }
   };
-
-  const MOOD_LEGEND = [
-    { mood: "ecstatic", color: "#22c55e" }, { mood: "happy", color: "#4ade80" }, { mood: "grateful", color: "#86efac" },
-    { mood: "calm", color: "#38bdf8" }, { mood: "relaxed", color: "#60a5fa" }, { mood: "lovely", color: "#f472b6" },
-    { mood: "neutral", color: "#f59e0b" }, { mood: "meh", color: "#fbbf24" }, { mood: "tired", color: "#94a3b8" },
-    { mood: "confused", color: "#a855f7" }, { mood: "sad", color: "#3b82f6" }, { mood: "lonely", color: "#1d4ed8" },
-    { mood: "discouraged", color: "#1e40af" }, { mood: "numb", color: "#475569" }, { mood: "anxious", color: "#f97316" },
-    { mood: "stressed", color: "#ef4444" }, { mood: "overwhelmed", color: "#dc2626" }, { mood: "annoyed", color: "#f43f5e" },
-    { mood: "frustrated", color: "#e11d48" }, { mood: "angry", color: "#b91c1c" },
-  ];
 
   useEffect(() => {
     // Check offline status
@@ -150,7 +172,7 @@ const MoodMap = () => {
     const loadWorldMoods = async () => {
       try {
         const res = await MoodService.getWorldMoods();
-        const wm = res?.data?.data || [];
+        const wm = res?.data?.data || [];        
         if (wm.length > 0) {
           setWorldMoods(wm);
           await saveCache(CACHE_KEYS.worldMoods, wm);
@@ -176,23 +198,23 @@ const MoodMap = () => {
     [worldMoods]
   );
 
-const requestLocationPermission = async () => {
-  if (Platform.OS === 'android') {
-    const granted = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-      {
-        title: "Location permission",
-        message: "We need your location to show your position on the map.",
-        buttonPositive: "OK",
-      }
-    );
-    return granted === PermissionsAndroid.RESULTS.GRANTED;
-  } else {
-    // iOS
-    const status = await Geolocation.requestAuthorization('whenInUse');
-    return status === 'granted';
-  }
-};
+  const requestLocationPermission = async () => {
+    if (Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+        {
+          title: "Location permission",
+          message: "We need your location to show your position on the map.",
+          buttonPositive: "OK",
+        }
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    } else {
+      // iOS
+      const status = await Geolocation.requestAuthorization('whenInUse');
+      return status === 'granted';
+    }
+  };
 
   // --- User location tracking and caching, but only send API if online ---
   useEffect(() => {
@@ -289,14 +311,14 @@ const requestLocationPermission = async () => {
       cameraRef.current?.moveTo(myLocation, 10);
       cameraRef.current?.zoomTo(15, 10);
     } else if (myLocation && cameraRef.current) {
-    cameraRef.current.setCamera({
-      centerCoordinate: myLocation,
-      zoomLevel: 15,
-      animationMode: "flyTo",
-      animationDuration: 1000,
-    });
-}
-};
+      cameraRef.current.setCamera({
+        centerCoordinate: myLocation,
+        zoomLevel: 15,
+        animationMode: "flyTo",
+        animationDuration: 1000,
+      });
+    }
+  };
 
   return (
     <MainLayout>
@@ -346,31 +368,7 @@ const requestLocationPermission = async () => {
                 circleRadius: 40,
                 circleBlur: 0.9,
                 circleOpacity: 0.4,
-                circleColor: [
-                  "match",
-                  ["get", "mood"],
-                  "ecstatic", "#22c55e",
-                  "happy", "#4ade80",
-                  "grateful", "#86efac",
-                  "calm", "#38bdf8",
-                  "relaxed", "#60a5fa",
-                  "lovely", "#f472b6",
-                  "neutral", "#f59e0b",
-                  "meh", "#fbbf24",
-                  "tired", "#94a3b8",
-                  "confused", "#a855f7",
-                  "sad", "#3b82f6",
-                  "lonely", "#1d4ed8",
-                  "discouraged", "#1e40af",
-                  "numb", "#475569",
-                  "anxious", "#f97316",
-                  "stressed", "#ef4444",
-                  "overwhelmed", "#dc2626",
-                  "annoyed", "#f43f5e",
-                  "frustrated", "#e11d48",
-                  "angry", "#b91c1c",
-                  "#94a3b8",
-                ],
+                circleColor: moodMatchArray,
               }}
             />
           </MapLibreGL.ShapeSource>

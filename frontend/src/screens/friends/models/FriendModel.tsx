@@ -12,6 +12,7 @@ export interface UserProfile {
   name?: string;
   isFollowing?: boolean;
   isRequestSent?: boolean;
+  tick?: string;
 }
   
   // For follow status check

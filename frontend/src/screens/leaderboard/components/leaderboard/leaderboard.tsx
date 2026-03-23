@@ -67,6 +67,7 @@ const LeaderboardScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showStoreNotice, setShowStoreNotice] = useState(false);
 
   const [editLocation, setEditLocation] = useState(false);
   const [selectedCountryCode, setSelectedCountryCode] = useState<string | undefined>(undefined);
@@ -441,13 +442,31 @@ const LeaderboardScreen = ({ navigation }: any) => {
         <RowAvatar url={item.avatarUrl || ""} />
 
         <View style={{ marginLeft: 10, flex: 1 }}>
-          <Text style={styles.name} numberOfLines={1}>
-            {item.name || item.username}
-          </Text>
-          <Text style={styles.sub} numberOfLines={1}>
-            {item.title ? `${item.title} (Lv ${item.level})` : `Lv ${item.level}`}
-          </Text>
-        </View>
+  <View style={{ flexDirection: "row", alignItems: "center" }}>
+    <Text style={styles.name} numberOfLines={1}>
+      {item.name || item.username}
+    </Text>
+    {item.tick === "verified" && (
+      <Icon
+        name="check-decagram"
+        size={16}
+        color="#3b82f6"
+        style={{ marginLeft: 6, marginTop: 2 }}
+      />
+    )}
+    {item.tick === "golden" && (
+      <Icon
+        name="check-decagram"
+        size={16}
+        color="#fbbf24"
+        style={{ marginLeft: 6, marginTop: 2 }}
+      />
+    )}
+  </View>
+  <Text style={styles.sub} numberOfLines={1}>
+    {item.title ? `${item.title} (Lv ${item.level})` : `Lv ${item.level}`}
+  </Text>
+</View>
       </View>
 
       <View style={{ alignItems: "flex-end" }}>
@@ -482,6 +501,9 @@ const LeaderboardScreen = ({ navigation }: any) => {
             <TouchableOpacity onPress={() => setShowRules(true)} style={styles.infoBtn}>
               <Icon name="information-outline" size={20} color="#E5E7EB" />
             </TouchableOpacity>
+      <TouchableOpacity onPress={() => setShowStoreNotice(true)} style={styles.storeBtn}>
+    <Icon name="shopping" size={20} color="#E5E7EB" />
+  </TouchableOpacity>
           </View>
 
           <View style={styles.tabs}>
@@ -712,6 +734,27 @@ const LeaderboardScreen = ({ navigation }: any) => {
           </View>
         </Modal>
       </View>
+      {showStoreNotice && (
+  <Modal transparent animationType="fade" visible onRequestClose={() => setShowStoreNotice(false)}>
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalCard}>
+        <Icon name="shopping" size={28} color="#6366f1" style={{ alignSelf: "center", marginBottom: 12 }} />
+        <Text style={styles.modalTitle}>Redeem Store</Text>
+        <Text style={styles.modalText}>
+          Redeem store will come soon! Stay tuned for exclusive rewards and offers!
+        </Text>
+        <View style={styles.modalButtons}>
+          <TouchableOpacity
+            style={[styles.modalBtn, styles.modalConfirm]}
+            onPress={() => setShowStoreNotice(false)}
+          >
+            <Text style={styles.modalBtnText}>Got it</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  </Modal>
+)}
     </MainLayout>
   );
 };
@@ -925,6 +968,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
   },
+  storeBtn: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: "rgba(148,163,184,0.5)",
+  justifyContent: "center",
+  alignItems: "center",
+  backgroundColor: "rgba(255,255,255,0.06)",
+  marginLeft: 8,
+},
   modalCancel: {
     borderColor: "rgba(148, 163, 184, 0.5)",
     backgroundColor: "rgba(255,255,255,0.05)",

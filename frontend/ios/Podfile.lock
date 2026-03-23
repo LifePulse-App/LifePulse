@@ -10,6 +10,8 @@ PODS:
     - GoogleUtilities/UserDefaults (~> 8.0)
     - PromisesObjC (~> 2.4)
   - boost (1.84.0)
+  - BVLinearGradient (2.8.3):
+    - React-Core
   - DoubleConversion (1.1.6)
   - fast_float (8.0.0)
   - FBLazyVector (0.80.0)
@@ -1906,6 +1908,8 @@ PODS:
     - React
   - react-native-get-random-values (1.11.0):
     - React-Core
+  - react-native-home-indicator (0.2.10):
+    - React-Core
   - react-native-image-picker (8.2.1):
     - boost
     - DoubleConversion
@@ -1935,7 +1939,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - react-native-keyboard-controller (1.20.7):
+  - react-native-keyboard-controller (1.21.1):
     - boost
     - DoubleConversion
     - fast_float
@@ -1954,7 +1958,7 @@ PODS:
     - React-hermes
     - React-ImageManager
     - React-jsi
-    - react-native-keyboard-controller/common (= 1.20.7)
+    - react-native-keyboard-controller/common (= 1.21.1)
     - React-NativeModulesApple
     - React-RCTFabric
     - React-renderercss
@@ -1965,7 +1969,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - react-native-keyboard-controller/common (1.20.7):
+  - react-native-keyboard-controller/common (1.21.1):
     - boost
     - DoubleConversion
     - fast_float
@@ -3243,6 +3247,7 @@ PODS:
 
 DEPENDENCIES:
   - boost (from `../node_modules/react-native/third-party-podspecs/boost.podspec`)
+  - BVLinearGradient (from `../node_modules/react-native-linear-gradient`)
   - DoubleConversion (from `../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec`)
   - fast_float (from `../node_modules/react-native/third-party-podspecs/fast_float.podspec`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
@@ -3300,6 +3305,7 @@ DEPENDENCIES:
   - "react-native-document-picker (from `../node_modules/@react-native-documents/picker`)"
   - react-native-geolocation-service (from `../node_modules/react-native-geolocation-service`)
   - react-native-get-random-values (from `../node_modules/react-native-get-random-values`)
+  - react-native-home-indicator (from `../node_modules/react-native-home-indicator`)
   - react-native-image-picker (from `../node_modules/react-native-image-picker`)
   - react-native-keyboard-controller (from `../node_modules/react-native-keyboard-controller`)
   - "react-native-netinfo (from `../node_modules/@react-native-community/netinfo`)"
@@ -3384,6 +3390,8 @@ SPEC REPOS:
 EXTERNAL SOURCES:
   boost:
     :podspec: "../node_modules/react-native/third-party-podspecs/boost.podspec"
+  BVLinearGradient:
+    :path: "../node_modules/react-native-linear-gradient"
   DoubleConversion:
     :podspec: "../node_modules/react-native/third-party-podspecs/DoubleConversion.podspec"
   fast_float:
@@ -3481,6 +3489,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-geolocation-service"
   react-native-get-random-values:
     :path: "../node_modules/react-native-get-random-values"
+  react-native-home-indicator:
+    :path: "../node_modules/react-native-home-indicator"
   react-native-image-picker:
     :path: "../node_modules/react-native-image-picker"
   react-native-keyboard-controller:
@@ -3604,6 +3614,7 @@ SPEC CHECKSUMS:
   AppAuth: 1c1a8afa7e12f2ec3a294d9882dfa5ab7d3cb063
   AppCheckCore: cc8fd0a3a230ddd401f326489c99990b013f0c4f
   boost: 7e761d76ca2ce687f7cc98e698152abd03a18f90
+  BVLinearGradient: cb006ba232a1f3e4f341bb62c42d1098c284da70
   DoubleConversion: cb417026b2400c8f53ae97020b2be961b59470cb
   fast_float: b32c788ed9c6a8c584d114d0047beda9664e7cc6
   FBLazyVector: 778b815a6fb3fa1599f581ffb9a5e85fad313c1d
@@ -3666,8 +3677,9 @@ SPEC CHECKSUMS:
   react-native-document-picker: bfbf5f649a98597ef6dfea3f93213c9267c93bd9
   react-native-geolocation-service: 32b2c2a3b91e70ce2a8d0c684801aaeb0a07e0ec
   react-native-get-random-values: d16467cf726c618e9c7a8c3c39c31faa2244bbba
+  react-native-home-indicator: 5d4c2596fe903b4399fb5df392913abf74665ad3
   react-native-image-picker: e9d833df19e87e25e38ddc0be3bad92f57307765
-  react-native-keyboard-controller: e344352c31c1eab7af19ed415b4f28c7b4a92114
+  react-native-keyboard-controller: 6a29f5cf0495c74d255421ce4c38ddff4248b1f0
   react-native-netinfo: cec9c4e86083cb5b6aba0e0711f563e2fbbff187
   react-native-pager-view: b9ba7f584ded35913d033e88e65067492b4736ce
   react-native-quick-base64: 6568199bb2ac8e72ecdfdc73a230fbc5c1d3aac4
@@ -3727,6 +3739,6 @@ SPEC CHECKSUMS:
   VisionCamera: 7187b3dac1ff3071234ead959ce311875748e14f
   Yoga: 0c4b7d2aacc910a1f702694fa86be830386f4ceb
 
-PODFILE CHECKSUM: 1e0b7a27eed0342756de2713850ff6885c0a8cf5
+PODFILE CHECKSUM: fa57f7cef75dac26d3b851d61ef803d27a811b73
 
 COCOAPODS: 1.16.2

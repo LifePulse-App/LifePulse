@@ -9,6 +9,7 @@ import Overdues from '../../screens/mood-map/components/overdues/Overdues';
 import UserNavigator from '../user/UserNavigator';
 import MoodScreen from '../../screens/moodscreen/comp/component/MoodScreen';
 import ProofVisionCameraScreen from '../../screens/proof-camera/Camera';
+import HabitDetailScreen from '../../screens/dashboard/components/dashboard/HabitDetailScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -22,7 +23,6 @@ const MainNavigator = () => (
     <Stack.Screen name="ProofCamera" component={ProofVisionCameraScreen} />
     <Stack.Screen name="UserList" component={UserList} />
     <Stack.Screen name="AnnualItemDetails" component={AnnualItemDetails} />
-
   </Stack.Navigator>
 );
 

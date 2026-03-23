@@ -17,7 +17,7 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>$(MARKETING_VERSION)</string>
+	<string>2.1.1</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleURLTypes</key>
@@ -45,7 +45,7 @@
 	<key>NSDocumentsFolderUsageDescription</key>
 	<string>This app needs access to your files for document sharing.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>This app needs your location to enhance your experience and offer relevant features.</string>
+	<string>This app needs your location to show mood-map</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app needs microphone access to record evidence.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

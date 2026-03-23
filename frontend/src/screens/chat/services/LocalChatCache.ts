@@ -21,6 +21,8 @@ export type CachedChatMessage = {
   clientMessageId?: string;
   deliveredAt?: string | null;
   seenAt?: string | null;
+  reactions?: Array<{ userId: string; emoji: string }>;
+  deletedForEveryone?: boolean;
 };
 
 const PREVIEWS_KEY = (myUserId: string) => `CHAT_CACHE_V2:PREVIEWS:${myUserId}`;
@@ -126,4 +128,45 @@ export async function clearAllChatCache(myUserId: string) {
   const prefixB = `CHAT_CACHE_V2:THREAD:${myUserId}:`;
   const toDelete = keys.filter((k) => k === prefixA || k.startsWith(prefixB));
   if (toDelete.length) await AsyncStorage.multiRemove(toDelete);
+}
+
+const DELETED_FOR_ME_KEY = (myUserId: string, conversationId: string) => 
+  `CHAT_CACHE_V2:DELETED_FOR_ME:${myUserId}:${conversationId}`;
+
+/**
+ * Add a message ID to deleted-for-me for this user/conversation.
+ */
+export async function addDeletedForMe(myUserId: string, conversationId: string, msgId: string) {
+  const ids = await getDeletedForMe(myUserId, conversationId);
+  ids.add(String(msgId));
+  await AsyncStorage.setItem(
+    DELETED_FOR_ME_KEY(myUserId, conversationId),
+    JSON.stringify(Array.from(ids))
+  );
+}
+
+/**
+ * Remove a message ID from deleted-for-me (if undo is needed).
+ */
+export async function removeDeletedForMe(myUserId: string, conversationId: string, msgId: string) {
+  const ids = await getDeletedForMe(myUserId, conversationId);
+  ids.delete(String(msgId));
+  await AsyncStorage.setItem(
+    DELETED_FOR_ME_KEY(myUserId, conversationId),
+    JSON.stringify(Array.from(ids))
+  );
+}
+
+/**
+ * Get the Set of deleted-for-me IDs for this user/conversation.
+ */
+export async function getDeletedForMe(myUserId: string, conversationId: string): Promise<Set<string>> {
+  const raw = await AsyncStorage.getItem(DELETED_FOR_ME_KEY(myUserId, conversationId));
+  if (!raw) return new Set();
+  try {
+    const parsed = JSON.parse(raw);
+    return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+  } catch {
+    return new Set();
+  }
 }

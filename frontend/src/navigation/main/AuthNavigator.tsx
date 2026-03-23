@@ -30,6 +30,7 @@ import AvatarCreatorScreen from '../../screens/profile/components/AvatarCreatorS
 import NewChatScreen from '../../screens/chat/components/NewChatScreen';
 import ChatScreen from '../../screens/chat/components/ChatScreen';
 import SavedAccountsScreen from '../../screens/login/components/SavedAccountsScreen';
+import { KeyboardProvider } from "react-native-keyboard-controller"
 
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');
@@ -200,6 +201,7 @@ const SplashScreen = () => {
 import SavedAccountsStorage from "../../auth/user/SavedAccountsStorage";
 import FriendsListScreen from '../../screens/friends/components/FriendsList';
 import ProfilePreviewScreen from '../../screens/profile/components/ProfilePreview';
+import HabitDetailScreen from '../../screens/dashboard/components/dashboard/HabitDetailScreen';
 
   const AuthNavigator = () => {
     const [initialRoute, setInitialRoute] = useState<'Login' | 'Drawer' | 'SavedAccounts' | null>(null);
@@ -276,6 +278,7 @@ import ProfilePreviewScreen from '../../screens/profile/components/ProfilePrevie
 <Stack.Screen name="AvatarCreator" component={AvatarCreatorScreen} />
 <Stack.Screen name="chat" component={ChatScreen} />
     <Stack.Screen name="ProfilePreview" component={ProfilePreviewScreen} options={{headerShown: false}}/>
+  <Stack.Screen name="HabitDetail" component={HabitDetailScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
   );
 };
