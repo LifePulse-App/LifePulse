@@ -54,3 +54,15 @@ export const uploadChatMediaMultiple = async (files: Array<{
     },
   });
 };
+
+// Add reaction
+export const reactToMessage = ({ messageId, emoji }) =>
+  api.post("/chat/messages/react", { messageId, emoji });
+
+// Remove reaction
+export const removeReaction = ({ messageId }) =>
+  api.post("/chat/messages/remove-reaction", { messageId });
+
+// Delete for everyone
+export const deleteForEveryone = ({ messageId }) =>
+  api.post("/chat/messages/deleteForEveryone", { messageId });

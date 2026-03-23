@@ -117,10 +117,15 @@ const userSchema = new mongoose.Schema(
           "Password must be at least 8 characters long and include one uppercase letter, one lowercase letter, and one number.",
       },
     },    
-    role: {
+    tick: {
       type: String,
-      default: "user",
+      enum: ["none", "verified", "golden"],
+      default: "none",
     },
+   // In your UserSchema.js, add:
+isAdmin: { type: Boolean, default: false },
+// OR
+role: { type: String, enum: ['user', 'admin'], default: 'user' },
     isVerified: {
       type: Boolean,
       default: false,

@@ -442,13 +442,31 @@ const LeaderboardScreen = ({ navigation }: any) => {
         <RowAvatar url={item.avatarUrl || ""} />
 
         <View style={{ marginLeft: 10, flex: 1 }}>
-          <Text style={styles.name} numberOfLines={1}>
-            {item.name || item.username}
-          </Text>
-          <Text style={styles.sub} numberOfLines={1}>
-            {item.title ? `${item.title} (Lv ${item.level})` : `Lv ${item.level}`}
-          </Text>
-        </View>
+  <View style={{ flexDirection: "row", alignItems: "center" }}>
+    <Text style={styles.name} numberOfLines={1}>
+      {item.name || item.username}
+    </Text>
+    {item.tick === "verified" && (
+      <Icon
+        name="check-decagram"
+        size={16}
+        color="#3b82f6"
+        style={{ marginLeft: 6, marginTop: 2 }}
+      />
+    )}
+    {item.tick === "golden" && (
+      <Icon
+        name="check-decagram"
+        size={16}
+        color="#fbbf24"
+        style={{ marginLeft: 6, marginTop: 2 }}
+      />
+    )}
+  </View>
+  <Text style={styles.sub} numberOfLines={1}>
+    {item.title ? `${item.title} (Lv ${item.level})` : `Lv ${item.level}`}
+  </Text>
+</View>
       </View>
 
       <View style={{ alignItems: "flex-end" }}>

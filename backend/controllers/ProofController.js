@@ -34,7 +34,7 @@ export const submitProof = async (req, res) => {
 
     // Send image to FastAPI AI verification
     const formData = new FormData();
-    formData.append("habitName", habit.key);
+    formData.append("habitKey", habit.key);
     formData.append("image", fs.createReadStream(req.file.path));
 
     const aiRes = await axios.post("https://api-ai.streaksphere.app/verify", formData, {
@@ -42,7 +42,7 @@ export const submitProof = async (req, res) => {
     });
 
     proof.status = aiRes.data.verified ? "verified" : "rejected";
-    proof.points = aiRes.data.verified ? 10 : 0;
+    proof.points = aiRes.data.verified ? 50 : 1;
     proof.verified = !!aiRes.data.verified;
     proof.aiScore = aiRes.data.score;
     if (proof.verified) proof.verifiedAt = new Date();
@@ -56,6 +56,8 @@ export const submitProof = async (req, res) => {
       status: proof.status,
       points: proof.points,
       proofId: proof._id,
+      predictedActivity: aiRes.data.predictedActivity,
+      predictedScore: aiRes.data.score
     });
   } catch (error) {
     console.error("Submit Proof Error:", error);

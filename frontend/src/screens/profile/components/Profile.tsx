@@ -440,6 +440,12 @@ const settingSections = [
     items: [
       { icon: "security", label: "Two-factor Authentication", route: "Enable2FA" },
       { icon: "devices", label: "Devices in which you are logged in", route: "Devices" },
+      {
+  icon: "check-decagram",
+  label: "Verify Yourself",
+  route: "VerifySelf",
+  disabled: true, // Custom flag for disabled
+},
     ],
   },
   {
@@ -668,33 +674,65 @@ export default function ProfileScreen({ navigation }) {
                 <Icon name="pencil" size={17} color="#fff" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.userName}>{profile?.name}</Text>
-            <Text style={styles.userUsername}>@{profile?.username}</Text>
+          // Name + tick row
+<View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+  <Text style={styles.userName}>
+    {profile?.name}
+  </Text>
+  {profile?.tick === "verified" && (
+    <Icon name="check-decagram" size={20} color="#3b82f6" style={{ marginLeft: 7, marginTop: 2 }} />
+  )}
+  {profile?.tick === "golden" && (
+    <Icon name="check-decagram" size={20} color="#fbbf24" style={{ marginLeft: 5, marginTop: 7 }} />
+  )}
+</View>
+{/* Username, optionally with tick */}
+<View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 4 }}>
+  <Text style={styles.userUsername}>@{profile?.username}</Text>
+  {/* You can duplicate badge here if desired
+  {profile?.tick === "verified" && (
+    <Icon name="check-decagram" size={15} color="#3b82f6" style={{ marginLeft: 6 }} />
+  )}
+  {profile?.tick === "golden" && (
+    <Icon name="check-decagram" size={15} color="#fbbf24" style={{ marginLeft: 6 }} />
+  )} */}
+</View>
           </View>
         </View>
 
         {settingSections.map(section => (
           <View key={section.title}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
-            {section.items.map(item => (
-              <TouchableOpacity
-                key={item.route}
-                style={styles.settingCard}
-                onPress={() => {
-                  if (["Enable2FA", "Devices", "HelpSupport", "ReportProblem", "LegalPolicy"].includes(item.route)) {
-                    navigation.navigate(item.route);
-                  } else {
-                    setActiveModal(item.route);
-                  }
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Icon name={item.icon} size={24} color="#A855F7" />
-                  <Text style={styles.settingLabel}>{item.label}</Text>
-                </View>
-                <Icon name="chevron-right" size={22} color="#9CA3AF" />
-              </TouchableOpacity>
-            ))}
+      {section.items.map(item => (
+  <TouchableOpacity
+    key={item.route}
+    style={[
+      styles.settingCard,
+      item.disabled && { opacity: 0.5 } // faded if disabled
+    ]}
+    disabled={item.disabled}
+    onPress={() => {
+      if (!item.disabled) {
+        if (["Enable2FA", "Devices", "HelpSupport", "ReportProblem", "LegalPolicy"].includes(item.route)) {
+          navigation.navigate(item.route);
+        } else {
+          setActiveModal(item.route);
+        }
+      }
+      // Optionally: show toast/alert if clicked while disabled
+    }}
+    activeOpacity={item.disabled ? 1 : 0.7}
+  >
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Icon name={item.icon} size={24} color={item.disabled ? "#A855F7" : "#A855F7"} />
+      <Text style={styles.settingLabel}>{item.label}</Text>
+      {item.disabled && (
+        <Text style={{ color: "#64748b", fontWeight: "600", marginLeft: 9 }}>Coming soon</Text>
+      )}
+    </View>
+    <Icon name="chevron-right" size={22} color="#9CA3AF" />
+  </TouchableOpacity>
+))}
           </View>
         ))}
 

@@ -10,6 +10,9 @@ import {
   listConversationPreviews,
   markDeliveredAll,
   uploadChatMedia,
+  reactToMessage,
+  removeReaction,
+  deleteForEveryone,
 } from "../controllers/ChatController.js";
 
 const router = express.Router();
@@ -55,5 +58,9 @@ router.post("/messages/upload", isAuthenticatedUser, upload.single("file"), uplo
 
 // multi file (new): field name files[]
 router.post("/messages/upload-multiple", isAuthenticatedUser, upload.array("files", MAX_FILES), uploadChatMedia);
+
+router.post("/messages/react", isAuthenticatedUser, reactToMessage);
+router.post("/messages/remove-reaction", isAuthenticatedUser, removeReaction);
+router.post("/messages/deleteForEveryone", isAuthenticatedUser, deleteForEveryone);
 
 export default router;

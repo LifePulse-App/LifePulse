@@ -31,6 +31,7 @@ const normalizeMessageBody = (body) => {
     receiverId,
     clientMessageId,
     notifyUser = true,
+    replyTo
   } = body || {};
 
   const type = allowedTypes.includes(String(messageType)) ? String(messageType) : "text";
@@ -55,6 +56,7 @@ const normalizeMessageBody = (body) => {
     receiverId,
     clientMessageId,
     notifyUser,
+    replyTo
   };
 };
 
@@ -186,7 +188,7 @@ export const openDirectConversation = async (req, res) => {
 export const sendMessage = async (req, res) => {
   try {
     const senderId = req.user._id;
-
+  
     const {
       type,
       text,
@@ -195,6 +197,7 @@ export const sendMessage = async (req, res) => {
       receiverId,
       clientMessageId,
       notifyUser,
+      replyTo,
     } = normalizeMessageBody(req.body);
 
     if (!conversationId || !receiverId || !clientMessageId) {
@@ -237,6 +240,7 @@ export const sendMessage = async (req, res) => {
         receiverId: recvObj,
         text: type === "text" ? String(text) : String(text || ""),
         messageType: type,
+        replyTo,
         media:
           type === "text"
             ? undefined
@@ -252,6 +256,8 @@ export const sendMessage = async (req, res) => {
       });
       createdNow = true;
     }
+
+    req.io.to(`conversation:${conversationId}`).emit("chat-message", msg);
 
     if (createdNow && notifyUser && String(senderId) !== String(recvObj)) {
       const fromUsername = req.user?.name || req.user?.username || "Someone";
@@ -291,11 +297,15 @@ export const getThread = async (req, res) => {
     if (!isMember) return res.status(403).json({ message: "Not a participant" });
 
     const limit = Math.min(parseInt(String(limitRaw), 10), 200);
-    const q = { conversationId: convoObj };
+    const q = { conversationId: convoObj, deletedForEveryone: { $ne: true } };
     if (beforeRaw) q.createdAt = { $lt: new Date(String(beforeRaw)) };
 
-    const messages = await ChatMessage.find(q).sort({ createdAt: 1 }).limit(limit).lean();
-    res.json({ messages });
+  const messages = await ChatMessage.find(q)
+  .populate("replyTo", "text messageType media senderId")
+  .sort({ createdAt: 1 })
+  .limit(limit)
+  .lean();
+res.json({ messages }); // reactions included by default if schema has it
   } catch (err) {
     console.error("[chat] getThread error", err);
     res.status(500).json({ message: "Internal error" });
@@ -318,7 +328,7 @@ export const markDelivered = async (req, res) => {
       receiverId: me,
       deliveredAt: null,
     })
-      .select("_id senderId receiverId")
+     .select("_id senderId receiverId conversationId")
       .lean();
 
     if (!msgs.length) {
@@ -341,6 +351,13 @@ export const markDelivered = async (req, res) => {
 
     for (const [senderId, deliveredMsgIds] of bySender.entries()) {
       await sendDeliveredNotification(senderId, me, deliveredMsgIds);
+    }
+
+    for (const msg of msgs) {
+      req.io.to(`conversation:${msg.conversationId}`).emit("msg-delivered", {
+        msgId: String(msg._id),
+        userId: String(me),
+      });
     }
 
     res.json({ success: true, count: msgIdsToUpdate.length });
@@ -384,6 +401,11 @@ export const markSeen = async (req, res) => {
     if (changed > 0) {
       await sendSeenNotification(peerObj, me);
     }
+
+req.io.to(`conversation:${conversationId}`).emit("msg-seen", {
+  msgId: lastSeenMessageId, // ✅ cleaner
+  userId: String(me),
+});
 
     res.json({ success: true, count: changed });
   } catch (err) {
@@ -451,7 +473,7 @@ export const markDeliveredAll = async (req, res) => {
     const pending = await ChatMessage.find({
       receiverId: me,
       deliveredAt: null,
-    }).select("_id senderId").lean();
+    }).select("_id senderId conversationId").lean(); // <-- get conversationId!
 
     if (!pending.length) return res.json({ success: true, count: 0 });
 
@@ -462,6 +484,16 @@ export const markDeliveredAll = async (req, res) => {
       { $set: { deliveredAt: new Date() } }
     );
 
+    // Emit socket events for each delivered message
+    for (const msg of pending) {
+      // Emit to the conversation room; msg.senderId can use for sender notification if needed
+      req.io.to(`conversation:${msg.conversationId}`).emit("msg-delivered", {
+        msgId: String(msg._id),
+        userId: String(me),
+      });
+    }
+
+    // Send push notifications (optional, as you had before)
     const bySender = new Map();
     for (const m of pending) {
       const s = String(m.senderId);
@@ -477,5 +509,124 @@ export const markDeliveredAll = async (req, res) => {
   } catch (e) {
     console.error("[chat] markDeliveredAll error", e);
     return res.status(500).json({ message: "Internal error" });
+  }
+};
+
+export const reactToMessage = async (req, res) => {
+  try {
+    const me = req.user._id;
+    const { messageId, emoji } = req.body;
+    if (!messageId || !emoji) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    const msg = await ChatMessage.findById(messageId);
+    if (!msg) return res.status(404).json({ message: "Message not found" });
+
+    // 🔒 Authorization check
+    const isParticipant =
+      String(msg.senderId) === String(me) ||
+      String(msg.receiverId) === String(me);
+
+    if (!isParticipant) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    // Replace old reaction
+    msg.reactions = msg.reactions.filter(
+      (r) => String(r.userId) !== String(me)
+    );
+
+    msg.reactions.push({
+      userId: me,
+      emoji,
+      reactedAt: new Date(),
+    });
+
+    await msg.save();
+
+    req.io.to(`conversation:${msg.conversationId}`).emit("msg-reacted", {
+      msgId: String(msg._id),
+      userId: String(me),
+      emoji,
+    });
+
+    res.json({ success: true, reactions: msg.reactions });
+  } catch (e) {
+    console.error("[chat] reactToMessage error", e);
+    res.status(500).json({ message: "Internal error" });
+  }
+};
+
+export const removeReaction = async (req, res) => {
+  try {
+    const me = req.user._id;
+    const { messageId } = req.body;
+
+    if (!messageId) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    const msg = await ChatMessage.findById(messageId);
+    if (!msg) return res.status(404).json({ message: "Message not found" });
+
+    // 🔒 Authorization
+    const isParticipant =
+      String(msg.senderId) === String(me) ||
+      String(msg.receiverId) === String(me);
+
+    if (!isParticipant) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    msg.reactions = msg.reactions.filter(
+      (r) => String(r.userId) !== String(me)
+    );
+
+    await msg.save();
+
+    // 🔥 IMPORTANT: emit change
+    req.io.to(`conversation:${msg.conversationId}`).emit("msg-reacted", {
+      msgId: String(msg._id),
+      userId: String(me),
+      emoji: null,
+    });
+
+    res.json({ success: true, reactions: msg.reactions });
+  } catch (e) {
+    console.error("[chat] removeReaction error", e);
+    res.status(500).json({ message: "Internal error" });
+  }
+};
+
+export const deleteForEveryone = async (req, res) => {
+  try {
+    const me = req.user._id;
+    const { messageId } = req.body;
+
+    if (!messageId) {
+      return res.status(400).json({ message: "Missing fields" });
+    }
+
+    const msg = await ChatMessage.findById(messageId);
+    if (!msg) return res.status(404).json({ message: "Message not found" });
+
+    // 🔒 Only sender can delete for everyone
+    if (String(msg.senderId) !== String(me)) {
+      return res.status(403).json({ message: "Only sender can delete this message" });
+    }
+
+    msg.deletedForEveryone = true;
+    await msg.save();
+
+    // 🔥 realtime delete
+    req.io.to(`conversation:${msg.conversationId}`).emit("msg-deleted", {
+      msgId: String(msg._id),
+    });
+
+    res.json({ success: true });
+  } catch (e) {
+    console.error("[chat] deleteForEveryone error", e);
+    res.status(500).json({ message: "Internal error" });
   }
 };

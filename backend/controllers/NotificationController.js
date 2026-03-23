@@ -69,8 +69,8 @@ async function sendNotificationFCM(tokens, payload) {
   for (const t of tokens) {
     try {
       const isChat = payload?.type === 'chat';
-      const isAndroid = t.platform === 'android';
       const isIOS = t.platform === 'ios';
+      const isAndroid = t.platform === 'android';
 
       const message = {
         token: t.token,
@@ -79,38 +79,30 @@ async function sendNotificationFCM(tokens, payload) {
         ),
       };
 
-      // Android config
+      // Android: high priority, NO notification key (your notifee handler shows it)
       if (isAndroid) {
         message.android = {
           priority: 'high',
-          notification: isChat
-            ? {
-                channelId: 'default',
-                sound: 'default',
-              }
-            : undefined,
         };
       }
 
-      // iOS/APNS config
+      // iOS: still needs apns alert since notifee background handler
+      // may not run on iOS for data-only messages
       if (isIOS) {
         message.apns = {
           payload: {
             aps: {
-              alert: isChat
-                ? {
-                    title: payload.peerName || 'Someone',
-                    body: payload.body || 'Sent you a message',
-                  }
-                : undefined,
+              alert: isChat ? {
+                title: payload.peerName || 'Someone',
+                body: payload.body || 'Sent you a message',
+              } : undefined,
               sound: isChat ? 'default' : undefined,
               'mutable-content': 1,
-              // add badge and other properties as needed
+              'content-available': 1,
             },
           },
           headers: {
-            'apns-priority': '10', // High priority
-            // 'apns-topic': 'your.bundle.id', // Optionally set your iOS app bundle id
+            'apns-priority': '10',
           },
         };
       }
