@@ -63,7 +63,7 @@ import PushRoutes from "./routes/NotificationRoutes.js";
 import LocationRoutes from "./routes/LocationRoutes.js";
 import ChatRoutes from "./routes/ChatRoutes.js";
 import appVersionRoutes from './routes/AppVersion.js';
-import adminNotifyRoutes from './routes/adminNotificationRoutes.js';
+import adminNotifyRoutes from './routes/AdminNotificationRoutes.js';
 
 // --- Attach io to req
 app.use((req, res, next) => {
