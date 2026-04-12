@@ -146,8 +146,8 @@ export const listNearbySpots = async (req, res) => {
         if (!Number.isFinite(Number(s.bearingDeg))) return true;
 
         // console.log( s.distanceMeters );
-        // console.log(Number(heading))
-        // console.log(Number(s.bearingDeg))
+        console.log("Heading",Number(heading))
+        console.log("Bearing deg",Number(s.bearingDeg))
         // console.log(angularDiff(Number(heading), Number(s.bearingDeg)));
 
         return angularDiff(Number(heading), Number(s.bearingDeg)) <= headingTolerance;
