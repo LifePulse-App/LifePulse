@@ -202,6 +202,8 @@ import SavedAccountsStorage from "../../auth/user/SavedAccountsStorage";
 import FriendsListScreen from '../../screens/friends/components/FriendsList';
 import ProfilePreviewScreen from '../../screens/profile/components/ProfilePreview';
 import HabitDetailScreen from '../../screens/dashboard/components/dashboard/HabitDetailScreen';
+import ArPortalScreen from '../../screens/AR-Model/components/ar_screen';
+import ARCameraView from '../../screens/AR-Model/components/ar_screen';
 
   const AuthNavigator = () => {
     const [initialRoute, setInitialRoute] = useState<'Login' | 'Drawer' | 'SavedAccounts' | null>(null);
@@ -277,6 +279,7 @@ import HabitDetailScreen from '../../screens/dashboard/components/dashboard/Habi
 <Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
 <Stack.Screen name="AvatarCreator" component={AvatarCreatorScreen} />
 <Stack.Screen name="chat" component={ChatScreen} />
+    <Stack.Screen name="ArPortal" component={ARCameraView} options={{headerShown: false}}/>
     <Stack.Screen name="ProfilePreview" component={ProfilePreviewScreen} options={{headerShown: false}}/>
   <Stack.Screen name="HabitDetail" component={HabitDetailScreen} options={{ headerShown: false }} />
     </Stack.Navigator>
