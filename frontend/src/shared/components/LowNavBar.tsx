@@ -21,19 +21,23 @@ const LowNavBAr = () => {
     return () => unsub();
   }, []);
 
+  // Added AR Portal tab here (key: 'arportal')
   const routes = [
     { key: 'attendance', title: 'Map', icon: { active: 'map-marker', inactive: 'map-marker-outline' }, },
     { key: 'home', title: 'Home', icon: { active: 'home', inactive: 'home-outline' }, },
+    // AR Portal tab:
+    { key: 'arportal', title: 'AR Portal', icon: { active: 'cube', inactive: 'cube-outline' } }, // or use 'augmented-reality'
     { key: 'results', title: 'LeaderBoard', icon: { active: 'chart-box', inactive: 'chart-box-outline' }, },
     { key: 'chat', title: 'Chat', icon: { active: 'chat', inactive: 'chat-outline' }, },
   ];
 
   const getIndexFromRoute = () => {
     switch (route.name) {
-      case 'StudentList': return 0;
-      case 'Dashboard': return 1;
-      case 'EmployeeList': return 2;
-      case 'Chat': return 3;
+      case 'StudentList': return 0;       // Map
+      case 'Dashboard': return 1;         // Home
+      case 'ArPortal': return 2;          // AR Portal
+      case 'EmployeeList': return 3;      // LeaderBoard
+      case 'Chat': return 4;              // Chat
       default: return 1;
     }
   };
@@ -51,6 +55,9 @@ const LowNavBAr = () => {
         break;
       case 'home':
         navigation.navigate('Dashboard');
+        break;
+      case 'arportal':
+        navigation.navigate('ArPortal');        // <---- Must match your screen name in navigation stack!
         break;
       case 'results':
         navigation.navigate('Employee');
@@ -71,6 +78,7 @@ const LowNavBAr = () => {
         const iconConfig = r.icon as { active: string; inactive: string };
         const iconName = focused ? iconConfig.active : iconConfig.inactive;
 
+        // Unread badge only for chat
         const showBadge = r.key === 'chat' && unreadChats > 0;
 
         return (

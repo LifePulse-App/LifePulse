@@ -7,15 +7,15 @@ const router = express.Router();
  */
 const VERSION_POLICY = {
   android: {
-    latestVersion: '3.0.0',
-    minSupportedVersion: '2.1.0',
+    latestVersion: '4.0.0',
+    minSupportedVersion: '4.0.0',
     updateUrl: 'https://streaksphere.app',
     title: 'Update required',
     message: 'A new version is available. Please update your app to continue.',
   },
   ios: {
-    latestVersion: '3.0.0',
-    minSupportedVersion: '2.1.0',
+    latestVersion: '4.0.0',
+    minSupportedVersion: '4.0.0',
     updateUrl: 'https://streaksphere.app',
     title: 'Update required',
     message: 'A new version is available. Please update your app to continue.',
@@ -39,6 +39,7 @@ router.get('/version', async (req, res) => {
   try {
     const platform = String(req.query.platform || 'android').toLowerCase();
     const currentVersion = String(req.query.currentVersion || '0.0.0');
+    
 
     // fallback: use android policy if platform unknown
     const policy = VERSION_POLICY[platform] || VERSION_POLICY.android;

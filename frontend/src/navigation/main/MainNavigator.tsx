@@ -10,6 +10,7 @@ import UserNavigator from '../user/UserNavigator';
 import MoodScreen from '../../screens/moodscreen/comp/component/MoodScreen';
 import ProofVisionCameraScreen from '../../screens/proof-camera/Camera';
 import HabitDetailScreen from '../../screens/dashboard/components/dashboard/HabitDetailScreen';
+import ArPortalScreen from '../../screens/AR-Model/components/ar_screen';
 
 const Stack = createNativeStackNavigator();
 

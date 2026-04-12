@@ -173,3 +173,48 @@ export async function sendDeliveredNotification(toUserId, peerUserId, messageIds
     messageIds: JSON.stringify((messageIds || []).map(String)),
   });
 }
+
+/**
+ * Notify portal OWNER(s) when a new join request is sent.
+ * @param {ObjectId} portalCreatorId 
+ * @param {String} portalName
+ * @param {String} requesterName
+ */
+export async function sendPrivatePortalJoinRequestNotification(portalCreatorId, portalName, requesterName) {
+  const tokens = await PushToken.find({
+    userId: portalCreatorId,
+    platform: { $in: ['android', 'ios'] },
+  }).lean();
+  if (!tokens.length) return;
+
+  await sendNotificationFCM(tokens, {
+    type: 'ar_private_portal_join_request',
+    title: `Join Request for ${portalName}`,
+    body: `${requesterName} requested to join your AR portal.`,
+    portalName: portalName,
+  });
+}
+
+/**
+ * Notify applicant when their join request is accepted/rejected
+ * @param {ObjectId} userId 
+ * @param {String} portalName 
+ * @param {Boolean} isApproved 
+ */
+export async function sendJoinRequestReviewedNotification(userId, portalName, isApproved = true) {
+  const tokens = await PushToken.find({
+    userId,
+    platform: { $in: ['android', 'ios'] },
+  }).lean();
+  if (!tokens.length) return;
+
+  await sendNotificationFCM(tokens, {
+    type: 'ar_private_portal_join_reviewed',
+    title: `Your join request for ${portalName}`,
+    body: isApproved
+      ? `You have been approved to join ${portalName}!`
+      : `Your request to join ${portalName} was rejected.`,
+    portalName: portalName,
+    approved: String(isApproved),
+  });
+}

@@ -64,6 +64,8 @@ import LocationRoutes from "./routes/LocationRoutes.js";
 import ChatRoutes from "./routes/ChatRoutes.js";
 import appVersionRoutes from './routes/AppVersion.js';
 import adminNotifyRoutes from './routes/AdminNotificationRoutes.js';
+import ArPortalRoutes from "./routes/ArPortalRoutes.js";
+import ArPrivatePortalRoutes from "./routes/ArPrivatePortalRoutes.js";
 
 // --- Attach io to req
 app.use((req, res, next) => {
@@ -85,6 +87,8 @@ app.use("/api/friends", FriendRoutes);
 app.use("/api/push", PushRoutes);
 app.use("/api/location", LocationRoutes);
 app.use("/api/chat", ChatRoutes);
+app.use("/api/ar-portal", ArPortalRoutes);
+app.use("/api/ar-private-portal", ArPrivatePortalRoutes);
 app.use("/api/admin/notify", adminNotifyRoutes);
 
 // --- Health
@@ -126,6 +130,12 @@ io.on("connection", (socket) => {
     socket.to(`conversation:${conversationId}`).emit("stop-typing", { userId });
   });
 
+   socket.join("ar-global-portal"); // all AR users in one room
+
+  socket.on("join-ar-private-portal", (portalId) => {
+    socket.join(`ar-private-portal:${portalId}`);
+  });
+  
   socket.on("disconnect", () => {
     //  console.log("❌ Disconnected:", socket.id);
   });
