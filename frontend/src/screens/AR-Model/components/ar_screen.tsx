@@ -341,6 +341,7 @@ export default function ARCameraView({ navigation }: any) {
         name,
         geo: { lat: myLoc.lat, lon: myLoc.lon },
         radiusMeters: NEARBY_RADIUS_M,
+        heading: rawHeading
       });
 
       setCreateOpen(false);
