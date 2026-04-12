@@ -14,14 +14,8 @@ function isLastDayOfMonth() {
 
 export function startNotificationJobs() {
 
-  // ── Daily challenge — 7 AM every day
-  cron.schedule('0 7 * * *', async () => {
-    console.log('[CRON] Daily challenge');
-    await broadcastToAll(TEMPLATES.DAILY_CHALLENGE());
-  });
-
-  // ── Streak reminder — 8 PM every day
-  cron.schedule('0 20 * * *', async () => {
+  // ── Streak reminder — 9 PM every day
+  cron.schedule('0 21 * * *', async () => {
     console.log('[CRON] Streak reminder');
     try {
       const users = await User.find({
@@ -57,8 +51,8 @@ export function startNotificationJobs() {
     } catch (e) { console.error('[CRON] Leaderboard error:', e.message); }
   });
 
-  // ── Mood map update — every 6 hours
-  cron.schedule('0 */6 * * *', async () => {
+  // ── Mood map update — every 24 hours
+  cron.schedule('0 0 * * *', async () => {
     console.log('[CRON] Mood map update');
     try {
       await broadcastToAll(TEMPLATES.MOOD_MAP_UPDATE());
