@@ -3,11 +3,26 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>StreakSphere – Activity Tracker · MoodMap · AR Chat · E2E Encrypted</title>
+<title>StreakSphere - Activity & Mood Tracking App</title>
 <meta name="description" content="StreakSphere goes beyond habits — track every activity, monitor live moods, chat with end-to-end encryption, and experience AR-powered accountability."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet"/>
+<meta property="og:title" content="StreakSphere" />
+<link rel="icon" type="image/png" href="logo.png">
+<meta property="og:description"
+content="Activity tracker, MoodMap analytics, encrypted chat, and AR accountability platform." />
+
+<meta property="og:image"
+content="https://www.streaksphere.app/logo.png" />
+
+<meta property="og:url"
+content="https://www.streaksphere.app/" />
+
+<meta property="og:type" content="website" />
+
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="canonical" href="https://www.streaksphere.app/" />
 <style>
 :root{
   --bg:#06080f;--bg2:#0b1022;
@@ -711,6 +726,22 @@ window.addEventListener('scroll', () => {
   sections.forEach(s => { if(window.scrollY >= s.offsetTop - 140) cur = s.id; });
   navLinks.forEach(l => { l.style.color = l.getAttribute('href') === '#'+cur ? 'var(--text)' : ''; });
 }, {passive:true});
+</script>
+<script type="application/ld+json">
+{
+  "@context":"https://schema.org",
+  "@type":"SoftwareApplication",
+  "name":"StreakSphere",
+  "applicationCategory":"ProductivityApplication",
+  "operatingSystem":"Android, iOS",
+  "url":"https://www.streaksphere.app",
+  "description":"StreakSphere is an activity tracking and productivity platform with MoodMap analytics, encrypted chat, and AR accountability.",
+  "image":"https://www.streaksphere.app/logo.png",
+  "publisher":{
+    "@type":"Organization",
+    "name":"StreakSphere"
+  }
+}
 </script>
 </body>
 </html>
