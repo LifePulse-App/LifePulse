@@ -801,7 +801,7 @@ tickIconSmall: {
     borderWidth: 1, borderColor: "rgba(148,163,184,0.1)",
     overflow: "hidden",
   },
-  statGradient: { alignItems: "center", paddingVertical: 16, gap: 5 },
+  statGradient: { alignItems: "center", paddingVertical: 20, gap: 5 },
   statValue: { color: "#f1f5f9", fontSize: 18, fontWeight: "800" },
   statLabel: {
     color: "#475569", fontSize: 9,
@@ -815,7 +815,7 @@ tickIconSmall: {
   },
   moodCardGradient: {
     flexDirection: "row", alignItems: "center",
-    paddingVertical: 14, paddingHorizontal: 16, gap: 14,
+    paddingVertical: 20, paddingHorizontal: 16, gap: 14,
   },
   moodIconWrap: {
     width: 46, height: 46, borderRadius: 14,
@@ -837,7 +837,7 @@ tickIconSmall: {
   },
   locationCardGradient: {
     flexDirection: "row", alignItems: "center",
-    paddingVertical: 14, paddingHorizontal: 16, gap: 14,
+    paddingVertical: 14, paddingHorizontal: 20, gap: 14,
   },
   locationIconWrap: {
     width: 46, height: 46, borderRadius: 14,
