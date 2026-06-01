@@ -272,7 +272,17 @@ resetPasswordCodeExpire: Date,
 pendingEmail: { type: String },
 emailChangeOtp: { type: String },
 emailChangeOtpExpire: { type: Date },
+timezone: {
+  type: String,
+  default: 'UTC',
+},
+
+lastStreakReminderAt: Date,
+lastStreakEndingAt: Date,
+lastWeeklyRecapAt: Date,
+lastWelcomeNotificationAt: Date,
   },
+  
   
   { timestamps: true }
 );

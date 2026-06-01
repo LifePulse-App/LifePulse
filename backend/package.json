@@ -13,6 +13,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@react-email/components": "^1.0.12",
+    "@react-email/render": "^2.0.8",
     "apple-signin-auth": "^2.0.0",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.2",
@@ -33,6 +35,7 @@
     "nodemailer": "^7.0.6",
     "otplib": "^12.0.1",
     "qrcode": "^1.5.4",
+    "resend": "^6.12.3",
     "socket.io": "^4.8.3",
     "validator": "^13.15.15"
   },

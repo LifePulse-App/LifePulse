@@ -10,6 +10,7 @@ import { authenticator } from "otplib";
 import QRCode from "qrcode";
 import { decryptTOTPSecret, encryptTOTPSecret } from "../utils/crypto2fa.js";
 import { lookupIpLocation } from "../utils/geoip.js";
+import {sendLoginAlertEmail} from "../helpers/emails.js";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -140,7 +141,7 @@ if (!passwordRegex.test(password)) {
     const otp = user.generateVerificationCode();
 
     // Send OTP
-    await sendVerificationEmail(email, otp);
+    await sendVerificationEmail(email, otp, user.name || user.username || user.email);
 
     await user.save({ validateBeforeSave: false });
 
@@ -205,7 +206,7 @@ export const resendVerificationOtp = catchAsyncErrors(async (req, res, next) => 
     user.otpResendCount += 1;
 
     // Send OTP email
-    await sendVerificationEmail(user.email, otp);
+    await sendVerificationEmail(email, otp, user.name || user.username || user.email);
 
     await user.save({ validateBeforeSave: false });
 
@@ -267,6 +268,22 @@ export const login = catchAsyncErrors(async (req, res, next) => {
       deviceBrand,
       req,
     });
+
+const forwarded = req.headers["x-forwarded-for"];
+const ip = Array.isArray(forwarded)
+  ? forwarded[0]
+  : forwarded?.split(",")[0] || req.socket.remoteAddress || "";
+
+const location = await lookupIpLocation(ip);
+
+await sendLoginAlertEmail({
+  to: user.email,
+  username: user.name || user.username || user.email,
+  deviceInfo: { deviceId, deviceName, deviceModel, deviceBrand },
+  location: location ? `${location.city || ""} ${location.region || ""} ${location.country || ""}`.trim() : "Unknown",
+  ip,
+  time: new Date().toUTCString()
+});
 
     res.status(200).json({ success: true, requires2fa: false, ...tokens });
   } catch (err) {
@@ -433,7 +450,7 @@ export const forgotPassword = catchAsyncErrors(async (req, res, next) => {
     await user.save({ validateBeforeSave: false });
 
     // Send email with code
-    await sendResetPasswordEmail(user.email, resetCode);
+    await sendResetPasswordEmail(user.email, resetCode, user.name || user.username || user.email);
 
     // OPTIONAL: send WhatsApp message as well
     // await sendWhatsAppResetCode(user.phoneNumber, resetCode);
@@ -715,6 +732,22 @@ export const verify2FALogin = catchAsyncErrors(async (req, res, next) => {
       deviceBrand: undefined,
       req,
     });
+
+    const forwarded = req.headers["x-forwarded-for"];
+const ip = Array.isArray(forwarded)
+  ? forwarded[0]
+  : forwarded?.split(",")[0] || req.socket.remoteAddress || "";
+
+const location = await lookupIpLocation(ip);
+
+await sendLoginAlertEmail({
+  to: user.email,
+  username: user.name || user.username || user.email,
+  deviceInfo: { deviceId, deviceName, deviceModel, deviceBrand },
+  location: location ? `${location.city || ""} ${location.region || ""} ${location.country || ""}`.trim() : "Unknown",
+  ip,
+  time: new Date().toISOString()
+});
 
     const tokens = await sendTokens(res, user, payload.deviceId || "Unknown");
 

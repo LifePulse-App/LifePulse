@@ -271,16 +271,23 @@ export const recalculateXp = async (userId) => {
     verified: true,
   }).populate("habit");
 
-  for (const proof of verifiedProofs) {
-    const habit = proof.habit;
-    if (!habit) continue;
-    const type = (habit.habitName || "").trim().toLowerCase();
-    if (HABIT_XP[type]) {
-      totalXp += HABIT_XP[type].base + HABIT_XP[type].verified;
-    } else {
-      totalXp += 10;
-    }
+for (const proof of verifiedProofs) {
+  const habit = proof.habit;
+  if (!habit) continue;
+
+  const type = (habit.habitName || "").trim().toLowerCase();
+
+  // 1) Habit XP
+  if (HABIT_XP[type]) {
+    totalXp += HABIT_XP[type].base + HABIT_XP[type].verified;
+  } else {
+    totalXp += 10;
   }
+
+  // 2) AI proof points bonus (50 -> +49)
+  const proofPoints = Number(proof.points || 0);
+  totalXp += Math.max(0, proofPoints - 1);
+}
 
   // Mood XP (one per calendar day)
   const moodDayAgg = await Mood.aggregate([
@@ -311,16 +318,23 @@ export const recalculateXp = async (userId) => {
     createdAt: { $gte: startOfMonth },
   }).populate("habit");
 
-  for (const proof of verifiedProofsMonth) {
-    const habit = proof.habit;
-    if (!habit) continue;
-    const type = (habit.habitName || "").trim().toLowerCase();
-    if (HABIT_XP[type]) {
-      monthlyXp += HABIT_XP[type].base + HABIT_XP[type].verified;
-    } else {
-      monthlyXp += 10;
-    }
+for (const proof of verifiedProofsMonth) {
+  const habit = proof.habit;
+  if (!habit) continue;
+
+  const type = (habit.habitName || "").trim().toLowerCase();
+
+  // 1) Habit XP
+  if (HABIT_XP[type]) {
+    monthlyXp += HABIT_XP[type].base + HABIT_XP[type].verified;
+  } else {
+    monthlyXp += 10;
   }
+
+  // 2) AI proof points bonus
+  const proofPoints = Number(proof.points || 0);
+  monthlyXp += Math.max(0, proofPoints - 1);
+}
 
   const moodDayAggMonth = await Mood.aggregate([
     { $match: { user: objectId, createdAt: { $gte: startOfMonth } } },
