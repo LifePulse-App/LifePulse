@@ -16,7 +16,7 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 const apiClient = create({
-  baseURL: 'http://10.90.16.124:40000/api',
+  baseURL: 'http://192.168.18.143:40000/api',
   headers: { 'Content-Type': 'application/json' },
 });
 

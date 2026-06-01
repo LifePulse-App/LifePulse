@@ -87,7 +87,7 @@ export const requestPasswordChangeOtp = catchAsyncErrors(async (req, res, next) 
   user.passwordChangeOtp = hashed;
   user.passwordChangeOtpExpire = Date.now() + 2 * 60 * 1000; // 15 minutes
 
-  await sendVerificationEmail(user.email, otp);
+  await sendVerificationEmail(user.email, otp, user.username);
   await user.save();
 
   res.status(200).json({
