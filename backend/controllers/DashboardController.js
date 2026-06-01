@@ -48,11 +48,14 @@ const HABIT_XP = {
 export const getDashboard = async (req, res) => {
   try {
     const userId = req.user._id;
-    const user = await User.findById(userId).select("name xp streak");
+
+    // include totalXp/level/currentTitle if you want, but at least totalXp
+    const user = await User.findById(userId).select(
+      "name xp totalXp streak level currentTitle"
+    );
+
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     const now = new Date();
@@ -67,7 +70,7 @@ export const getDashboard = async (req, res) => {
       createdAt: { $gte: startOfToday, $lt: endOfToday },
     });
 
-    // ---- Streak logic (increment when at least one proof today) ----
+    // ---- Streak logic ----
     const lastUpdated = user.streak?.lastUpdated
       ? new Date(user.streak.lastUpdated)
       : null;
@@ -75,138 +78,65 @@ export const getDashboard = async (req, res) => {
     let streakCount = user.streak?.count || 0;
 
     if (!lastUpdated) {
-      // first time using streak
       streakCount = hasTodayVerifiedProof ? 1 : 0;
     } else {
-      const startOfLast = lastUpdated ? toUtcMidnight(lastUpdated) : null;
-      startOfLast.setHours(0, 0, 0, 0);
+      const startOfLast = toUtcMidnight(lastUpdated);
 
-       const daysDiff = Math.floor(
-           (startOfToday.getTime() - startOfLast.getTime()) / (1000 * 60 * 60 * 24)
-         );
+      const daysDiff = Math.floor(
+        (startOfToday.getTime() - startOfLast.getTime()) / (1000 * 60 * 60 * 24)
+      );
 
       if (daysDiff === 0) {
-        // same calendar day
-        if (streakCount === 0 && hasTodayVerifiedProof) {
-          // first ever proof today
-          streakCount = 1;
-        }
-        // otherwise keep streakCount as is
+        if (streakCount === 0 && hasTodayVerifiedProof) streakCount = 1;
       } else if (daysDiff === 1) {
-        // yesterday was last updated day
-        if (hasTodayVerifiedProof) {
-          // continuous streak
-          streakCount = (streakCount || 0) + 1;
-        } else {
-          // no proof today yet: you can keep streak as-is or decide to reset later
-          // here we keep it for now; it will reset if user skips a full day and comes back
-        }
+        if (hasTodayVerifiedProof) streakCount = (streakCount || 0) + 1;
       } else if (daysDiff > 1) {
-        // gap of >= 2 days -> streak broken
         streakCount = hasTodayVerifiedProof ? 1 : 0;
       }
     }
 
-      if (hasTodayVerifiedProof) {
-          user.streak = { count: streakCount, lastUpdated: now };
-          await user.save();
-        } else {
-          // preserve lastUpdated and streakCount if no proof today
-          user.streak = { count: streakCount, lastUpdated: user.streak?.lastUpdated || null };
-        }
-
-    // ---- Calculate XP (single source of truth here) ----
-    let totalXp = 0;
-
-    // 1) XP from verified proofs + their habits (global catalog)
-    const verifiedProofs = await Proof.find({
-      user: userId,
-      verified: true,
-    }).populate("habit");
-
-      let rewardEarned = 0;
-      for (const proof of verifiedProofs) {
-      const habit = proof.habit;
-      if (!habit) continue;
-
-      const type = (habit.habitName || "").trim().toLowerCase();
-
-      if (HABIT_XP[type]) {
-        totalXp += HABIT_XP[type].base + HABIT_XP[type].verified;
-        rewardEarned += 5; 
-      } else {
-        totalXp += 10;
-        rewardEarned += 2
-      }
+    // only save when we actually update streak
+    if (hasTodayVerifiedProof) {
+      user.streak = { count: streakCount, lastUpdated: now };
+      await user.save();
     }
 
-    user.rewardBalance = (user.rewardBalance || 0) + rewardEarned;
+    // ---- XP progress: READ ONLY from stored totals ----
+    const storedTotalXp = Number(user.totalXp ?? user.xp ?? 0);
+    const xpProgress = calculateXpProgress(storedTotalXp);
 
-    // 2) Mood XP based on DISTINCT days with at least one mood
-    const moodDayAgg = await Mood.aggregate([
-      { $match: { user: userId } },
-      {
-        $group: {
-          _id: {
-            year: { $year: "$createdAt" },
-            month: { $month: "$createdAt" },
-            day: { $dayOfMonth: "$createdAt" },
-          },
-        },
-      },
-    ]);
-    const uniqueMoodDays = moodDayAgg.length;
-    totalXp += uniqueMoodDays * 10;
-
-    user.xp = totalXp;
-    await user.save();
-
-  const xpProgress = calculateXpProgress(totalXp);
-   user.level = xpProgress.level;
-  user.currentTitle = xpProgress.title;
-  await user.save();
-
-    // ---- Streak title ----
     const streakTitle = getStreakTitle(streakCount);
 
     // ---- Quick logs & secondary cards ----
-    const [
-      recentMood,
-      recentHabit,
-      recentProof,
-      reflectionDayAgg,
-      habitCompletionRate,
-    ] = await Promise.all([
-      Mood.findOne({ user: userId }).sort({ createdAt: -1 }),
-      Habit.findOne().sort({ createdAt: -1 }), // global habit
-      Proof.findOne({ user: userId }).sort({ createdAt: -1 }),
-      Mood.aggregate([
-        { $match: { user: userId } },
-        {
-          $group: {
-            _id: {
-              year: { $year: "$createdAt" },
-              month: { $month: "$createdAt" },
-              day: { $dayOfMonth: "$createdAt" },
+    const [recentMood, recentHabit, recentProof, reflectionDayAgg, habitCompletionRate] =
+      await Promise.all([
+        Mood.findOne({ user: userId }).sort({ createdAt: -1 }),
+        Habit.findOne().sort({ createdAt: -1 }),
+        Proof.findOne({ user: userId }).sort({ createdAt: -1 }),
+        Mood.aggregate([
+          { $match: { user: userId } },
+          {
+            $group: {
+              _id: {
+                year: { $year: "$createdAt" },
+                month: { $month: "$createdAt" },
+                day: { $dayOfMonth: "$createdAt" },
+              },
             },
           },
-        },
-      ]),
-      Proof.countDocuments({ user: userId }),
-    ]);
+        ]),
+        Proof.countDocuments({ user: userId }),
+      ]);
 
     const reflectionCount = reflectionDayAgg.length;
 
-    // ---- Current mood logic (reset at 12 AM) ----
+    // ---- Current mood logic ----
     let currentMood = null;
     if (recentMood) {
       const moodDate = new Date(recentMood.createdAt);
-      const startOfMoodDay = toUtcMidnight(moodDate);   // was local setHours
+      const startOfMoodDay = toUtcMidnight(moodDate);
       if (startOfMoodDay.getTime() === startOfToday.getTime()) {
-        currentMood = {
-          mood: recentMood.mood,
-          createdAt: recentMood.createdAt,
-        };
+        currentMood = { mood: recentMood.mood, createdAt: recentMood.createdAt };
       }
     }
 
@@ -216,7 +146,7 @@ export const getDashboard = async (req, res) => {
       habitCompletionRate,
     };
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: {
         greeting: `Welcome back, ${user.name}!`,
@@ -237,8 +167,6 @@ export const getDashboard = async (req, res) => {
     });
   } catch (error) {
     console.error("Dashboard Error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to load dashboard" });
+    return res.status(500).json({ success: false, message: "Failed to load dashboard" });
   }
 };

@@ -4,7 +4,6 @@ import mongoose from "mongoose";
 import apiKeyMiddleware from './middlewares/api-middleware.js';
 import dotenv from "dotenv";
 import cookieParser from 'cookie-parser';
-import nodemailer from "nodemailer";
 import errorMiddleware from "./utils/errorMiddleware.js";
 import cron from 'node-cron';
 import os from "os";
@@ -25,17 +24,6 @@ mongoose.connect(process.env.MONGO_URI)
     startNotificationJobs(); // ← add this line
   })
   .catch(err => console.error("DB Error:", err));
-
-// --- Mail
-export const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 
 // --- Static
 const HOME_DIR = os.homedir();
