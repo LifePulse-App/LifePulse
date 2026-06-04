@@ -276,13 +276,23 @@ const ip = Array.isArray(forwarded)
 
 const location = await lookupIpLocation(ip);
 
+const now = new Date();
+
+const localDateTime = new Intl.DateTimeFormat('en-US', {
+  timeZone: user.timezone || 'UTC',
+  dateStyle: 'medium',
+  timeStyle: 'medium',
+}).format(now);
+
 await sendLoginAlertEmail({
   to: user.email,
   username: user.name || user.username || user.email,
   deviceInfo: { deviceId, deviceName, deviceModel, deviceBrand },
-  location: location ? `${location.city || ""} ${location.region || ""} ${location.country || ""}`.trim() : "Unknown",
+  location: location
+    ? `${location.city || ""} ${location.region || ""} ${location.country || ""}`.trim()
+    : "Unknown",
   ip,
-  time: new Date().toUTCString()
+  time: localDateTime, // user-local date+time
 });
 
     res.status(200).json({ success: true, requires2fa: false, ...tokens });

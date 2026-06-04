@@ -39,7 +39,6 @@ async function sendInBatches(users, callback) {
 // Main Scheduler
 // ─────────────────────────────────────────────
 export function startNotificationJobs() {
-
   // =====================================================
   // 🔥 STREAK REMINDER (8 PM LOCAL USER TIME)
   // =====================================================
@@ -48,7 +47,7 @@ export function startNotificationJobs() {
 
     try {
       const users = await User.find({
-        streak: { $gt: 0 },
+        'streak.count': { $gt: 0 },
         'notifications.pauseStreak': { $ne: true },
       })
         .select('_id name streak timezone lastStreakReminderAt')
@@ -69,7 +68,7 @@ export function startNotificationJobs() {
       await sendInBatches(targets, async (u) => {
         await sendToUser(
           u._id,
-          TEMPLATES.STREAK_REMINDER(u.name, u.streak)
+          TEMPLATES.STREAK_REMINDER(u.name, u.streak?.count ?? 0)
         );
 
         await User.updateOne(
@@ -77,7 +76,6 @@ export function startNotificationJobs() {
           { $set: { lastStreakReminderAt: new Date() } }
         );
       });
-
     } catch (e) {
       console.error('[CRON] Streak reminder error:', e.message);
     }
@@ -91,7 +89,7 @@ export function startNotificationJobs() {
 
     try {
       const users = await User.find({
-        streak: { $gt: 0 },
+        'streak.count': { $gt: 0 },
         'notifications.pauseStreak': { $ne: true },
       })
         .select('_id name streak timezone lastStreakEndingAt')
@@ -112,7 +110,7 @@ export function startNotificationJobs() {
       await sendInBatches(targets, async (u) => {
         await sendToUser(
           u._id,
-          TEMPLATES.STREAK_ENDING(u.name, u.streak)
+          TEMPLATES.STREAK_ENDING(u.name, u.streak?.count ?? 0)
         );
 
         await User.updateOne(
@@ -120,7 +118,6 @@ export function startNotificationJobs() {
           { $set: { lastStreakEndingAt: new Date() } }
         );
       });
-
     } catch (e) {
       console.error('[CRON] Streak ending error:', e.message);
     }
@@ -133,9 +130,7 @@ export function startNotificationJobs() {
     console.log('[CRON] Monthly leaderboard refresh');
 
     try {
-      await broadcastToAll(
-        TEMPLATES.LEADERBOARD_REFRESH()
-      );
+      await broadcastToAll(TEMPLATES.LEADERBOARD_REFRESH());
     } catch (e) {
       console.error('[CRON] Leaderboard error:', e.message);
     }
@@ -148,9 +143,7 @@ export function startNotificationJobs() {
     console.log('[CRON] Mood map update');
 
     try {
-      await broadcastToAll(
-        TEMPLATES.MOOD_MAP_UPDATE()
-      );
+      await broadcastToAll(TEMPLATES.MOOD_MAP_UPDATE());
     } catch (e) {
       console.error('[CRON] Mood map error:', e.message);
     }
@@ -192,7 +185,6 @@ export function startNotificationJobs() {
           { $set: { lastWeeklyRecapAt: new Date() } }
         );
       });
-
     } catch (e) {
       console.error('[CRON] Weekly recap error:', e.message);
     }
@@ -205,9 +197,7 @@ export function startNotificationJobs() {
     console.log('[CRON] Welcome back');
 
     try {
-      const sevenDaysAgo = new Date(
-        Date.now() - 7 * 24 * 60 * 60 * 1000
-      );
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
       const users = await User.find({
         lastActiveAt: { $lt: sevenDaysAgo },
@@ -220,21 +210,13 @@ export function startNotificationJobs() {
         .lean();
 
       await sendInBatches(users, async (u) => {
-        await sendToUser(
-          u._id,
-          TEMPLATES.WELCOME_BACK(u.name)
-        );
+        await sendToUser(u._id, TEMPLATES.WELCOME_BACK(u.name));
 
         await User.updateOne(
           { _id: u._id },
-          {
-            $set: {
-              lastWelcomeNotificationAt: new Date(),
-            },
-          }
+          { $set: { lastWelcomeNotificationAt: new Date() } }
         );
       });
-
     } catch (e) {
       console.error('[CRON] Welcome back error:', e.message);
     }
