@@ -13,6 +13,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@gorhom/bottom-sheet": "^5.2.14",
     "@invertase/react-native-apple-authentication": "^2.4.1",
     "@maplibre/maplibre-react-native": "^10.4.2",
     "@notifee/react-native": "^9.1.8",
@@ -68,6 +69,7 @@
     "react-native-device-info": "^14.1.1",
     "react-native-dropdown-picker": "^5.4.6",
     "react-native-emoji-selector": "^0.2.0",
+    "react-native-fast-image": "^8.6.3",
     "react-native-file-viewer": "^2.1.5",
     "react-native-fs": "^2.20.0",
     "react-native-geolocation-service": "^5.3.1",

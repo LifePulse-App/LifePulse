@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useContext } from "react";
+import React, { useEffect, useMemo, useRef, useState, useContext, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -23,6 +23,10 @@ import MoodService from "../../../moodscreen/services/api_mood";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import NetInfo from "@react-native-community/netinfo";
+import BottomSheet, {
+  BottomSheetBackdrop,
+  BottomSheetView,
+} from "@gorhom/bottom-sheet";
 
 // --- Single source of truth for mood colors ---
 const MOOD_COLORS = {
@@ -71,6 +75,41 @@ const MoodMap = () => {
   const authContext = useContext(AuthContext);
   const currentUserId = authContext?.User?.user?.id;
   const insets = useSafeAreaInsets();
+  const legendSheetRef = useRef<BottomSheet>(null);
+const settingsSheetRef = useRef<BottomSheet>(null);const bottomSheetRef = useRef(null);
+
+const legendSnapPoints = useMemo(() => ["25%"], []);
+const settingsSnapPoints = useMemo(() => ["30%"], []);
+
+const closeAllSheets = () => {
+  legendSheetRef.current?.close();
+  settingsSheetRef.current?.close();
+};
+
+const openLegend = () => {
+  closeAllSheets();
+  legendSheetRef.current?.expand();
+};
+
+const closeLegend = () => legendSheetRef.current?.close();
+
+const openSettings = () => {
+  closeAllSheets();
+  settingsSheetRef.current?.expand();
+};
+const closeSettings = () => settingsSheetRef.current?.close();
+
+const renderBackdrop = useCallback(
+  (props) => (
+    <BottomSheetBackdrop
+      {...props}
+      appearsOnIndex={0}
+      disappearsOnIndex={-1}
+      opacity={0.6}   // 👈 control dullness here
+    />
+  ),
+  []
+);
 
   const [offline, setOffline] = useState(false);
 
@@ -306,19 +345,22 @@ const MoodMap = () => {
     );
   };
 
-  const handleLocate = () => {
-    if (myLocation && Platform.OS == "android") {
-      cameraRef.current?.moveTo(myLocation, 10);
-      cameraRef.current?.zoomTo(15, 10);
-    } else if (myLocation && cameraRef.current) {
-      cameraRef.current.setCamera({
-        centerCoordinate: myLocation,
-        zoomLevel: 15,
-        animationMode: "flyTo",
-        animationDuration: 1000,
-      });
-    }
-  };
+const handleLocate = () => {
+  if (!myLocation || !cameraRef.current) return;
+
+  cameraRef.current.setCamera({
+    centerCoordinate: myLocation,
+    zoomLevel: 15,
+    animationMode: "easeTo",
+    animationDuration: 700,
+  });
+
+  setTimeout(() => {
+    cameraRef.current?.setCamera({
+      animationMode: "none",
+    });
+  }, 750);
+};
 
   return (
     <MainLayout>
@@ -326,10 +368,10 @@ const MoodMap = () => {
         <View style={styles.topBar}>
           <AppText style={styles.headerText}>Mood Map</AppText>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <TouchableOpacity style={styles.infoBtn} onPress={() => setLegendOpen(true)}>
+            <TouchableOpacity style={styles.infoBtn} onPress={openLegend}>
               <Icon name="information-outline" size={18} color="#E5E7EB" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.infoBtn} onPress={() => setSettingsOpen(true)}>
+            <TouchableOpacity style={styles.infoBtn} onPress={openSettings}>
               <AppText style={styles.settingsIcon}>⚙</AppText>
             </TouchableOpacity>
           </View>
@@ -384,51 +426,97 @@ const MoodMap = () => {
           <AppText style={styles.locateIcon}>➤</AppText>
         </TouchableOpacity>
 
-        <Modal transparent visible={legendOpen} animationType="fade">
-          <Pressable style={styles.sheetBackdrop} onPress={() => setLegendOpen(false)} />
-          <View style={styles.legendSheet}>
-            <AppText style={styles.sheetTitle}>Mood Colors</AppText>
-            {MOOD_LEGEND.map((m) => (
-              <View key={m.mood} style={styles.legendRow}>
-                <View style={[styles.legendDot, { backgroundColor: m.color }]} />
-                <AppText style={styles.sheetText}>{m.mood}</AppText>
-              </View>
-            ))}
-          </View>
-        </Modal>
+        <BottomSheet
+        enableOverDrag={false}
+  ref={legendSheetRef}
+  index={-1}
+  snapPoints={legendSnapPoints}
+  enablePanDownToClose
+  backgroundStyle={{ backgroundColor: "#0F172A" }}
+handleIndicatorStyle={{ display: "none"}}
+backdropComponent={renderBackdrop} 
+>
+  <BottomSheetView style={{ padding: 20 }}>
+    <AppText style={styles.sheetTitle}>Mood Colors</AppText>
 
-        <Modal transparent visible={settingsOpen} animationType="slide">
-          <Pressable style={styles.sheetBackdrop} onPress={() => setSettingsOpen(false)} />
-          <View style={styles.sheet}>
-            <AppText style={styles.sheetTitle}>Share My Location</AppText>
-            <TouchableOpacity style={styles.toggleRow} onPress={() => setShareEnabled((v) => !v)}>
-              <View style={[styles.checkbox, shareEnabled && styles.checkboxOn]} />
-              <AppText style={styles.sheetText}>{shareEnabled ? "Enabled" : "Disabled"}</AppText>
-            </TouchableOpacity>
-            <View style={styles.section}>
-              <AppText style={styles.sectionTitle}>Share With</AppText>
-              {(["all", "none", "custom"] as ShareMode[]).map((mode) => (
-                <TouchableOpacity key={mode} style={styles.toggleRow} onPress={() => setShareMode(mode)}>
-                  <View style={[styles.radio, shareMode === mode && styles.radioOn]} />
-                  <AppText style={styles.sheetText}>
-                    {mode === "all" ? "All Friends" : mode === "none" ? "None" : "Custom"}
-                  </AppText>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {shareMode === "custom" && (
-              <View style={styles.section}>
-                <AppText style={styles.sectionTitle}>Select Friends</AppText>
-                {allFriends.map((f: any) => (
-                  <TouchableOpacity key={f._id} style={styles.toggleRow} onPress={() => toggleFriend(f._id)}>
-                    <View style={[styles.checkbox, selectedFriends.includes(f._id) && styles.checkboxOn]} />
-                    <AppText style={styles.sheetText}>{f.name || f.username || "Friend"}</AppText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        </Modal>
+    {MOOD_LEGEND.map((m) => (
+      <View key={m.mood} style={styles.legendRow}>
+        <View style={[styles.legendDot, { backgroundColor: m.color }]} />
+        <AppText style={styles.sheetText}>{m.mood}</AppText>
+      </View>
+    ))}
+  </BottomSheetView>
+</BottomSheet>
+
+       <BottomSheet
+       enableOverDrag={false}
+  ref={settingsSheetRef}
+  index={-1}
+  snapPoints={settingsSnapPoints}
+  enablePanDownToClose
+  backgroundStyle={{ backgroundColor: "#0F172A" }}
+handleIndicatorStyle={{ display: "none"}}
+backdropComponent={renderBackdrop} 
+>
+  <BottomSheetView style={{ padding: 20 }}>
+    <AppText style={styles.sheetTitle}>Share My Location</AppText>
+
+    <TouchableOpacity
+      style={styles.toggleRow}
+      onPress={() => setShareEnabled((v) => !v)}
+    >
+      <View style={[styles.checkbox, shareEnabled && styles.checkboxOn]} />
+      <AppText style={styles.sheetText}>
+        {shareEnabled ? "Enabled" : "Disabled"}
+      </AppText>
+    </TouchableOpacity>
+
+    <View style={styles.section}>
+      <AppText style={styles.sectionTitle}>Share With</AppText>
+
+      {(["all", "none", "custom"] as ShareMode[]).map((mode) => (
+        <TouchableOpacity
+          key={mode}
+          style={styles.toggleRow}
+          onPress={() => setShareMode(mode)}
+        >
+          <View style={[styles.radio, shareMode === mode && styles.radioOn]} />
+          <AppText style={styles.sheetText}>
+            {mode === "all"
+              ? "All Friends"
+              : mode === "none"
+              ? "None"
+              : "Custom"}
+          </AppText>
+        </TouchableOpacity>
+      ))}
+    </View>
+
+    {shareMode === "custom" && (
+      <View style={styles.section}>
+        <AppText style={styles.sectionTitle}>Select Friends</AppText>
+
+        {allFriends.map((f: any) => (
+          <TouchableOpacity
+            key={f._id}
+            style={styles.toggleRow}
+            onPress={() => toggleFriend(f._id)}
+          >
+            <View
+              style={[
+                styles.checkbox,
+                selectedFriends.includes(f._id) && styles.checkboxOn,
+              ]}
+            />
+            <AppText style={styles.sheetText}>
+              {f.name || f.username || "Friend"}
+            </AppText>
+          </TouchableOpacity>
+        ))}
+      </View>
+    )}
+  </BottomSheetView>
+</BottomSheet>
       </AppScreen>
     </MainLayout>
   );
@@ -513,11 +601,15 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
   },
   legendSheet: {
-    backgroundColor: "#0F172A",
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
+  position: "absolute",
+  bottom: 0,
+  left: 0,
+  right: 0,
+  backgroundColor: "#0F172A",
+  padding: 20,
+  borderTopLeftRadius: 20,
+  borderTopRightRadius: 20,
+},
   sheetTitle: { color: "#E5E7EB", fontWeight: "700", fontSize: 18, marginBottom: 12 },
   sheetText: { color: "#E5E7EB", fontSize: 15 },
   section: { marginTop: 14 },

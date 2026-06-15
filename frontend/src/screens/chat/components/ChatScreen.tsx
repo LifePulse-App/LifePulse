@@ -12,11 +12,12 @@ import {
   ActivityIndicator,
   PermissionsAndroid,
   Platform,
-  KeyboardAvoidingView,
   Animated,
   TouchableWithoutFeedback,
   Dimensions,
 } from "react-native";
+import Reanimated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import NetInfo from "@react-native-community/netinfo";
 import { Swipeable, TapGestureHandler } from 'react-native-gesture-handler';
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -676,6 +677,21 @@ export default function ChatScreen({ route, navigation }: any) {
 const highlightAnim = useRef(new Animated.Value(0)).current;
   const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
+
+const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
+const bottomInset = useSharedValue(insets.bottom);
+
+// Keep it in sync if insets change (rare but safe):
+useEffect(() => {
+  bottomInset.value = insets.bottom;
+}, [insets.bottom]);
+
+const fakeView = useAnimatedStyle(() => {
+  const kbHeight = Math.abs(keyboardHeight.value);
+  return {
+    height: kbHeight > 0 ? kbHeight : bottomInset.value,
+  };
+});
 
   const socketRef = useRef(null);
 
@@ -1589,248 +1605,214 @@ return (
 
   const keyExtractor = useCallback((item: Item) => item.id, []);
 
-  return (
-    <SafeAreaView style={styles.safe} edges={["left", "right"]}>
-      <View style={{ flex: 1, backgroundColor: "#020617" }}>
-        <View style={styles.root}>
-          <View style={styles.baseBackground} />
-          <View style={styles.glowTop} />
-          <View style={styles.glowBottom} />
+// 4. Replace your entire return JSX structure with this:
+return (
+  <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
+    {/* Decorative — absolutely positioned */}
 
-          {!!glassError && (
-            <View style={styles.errorCard}>
-              <Icon name="alert-circle-outline" size={18} color="#FEE2E2" />
-              <Text style={styles.errorText}>{glassError}</Text>
-            </View>
-          )}
-
-         <KeyboardAvoidingView
-  style={styles.innerContainer}
-  behavior={Platform.OS === "ios" ? "padding" : "padding"}
-  keyboardVerticalOffset={0}
->
-            <View style={styles.container}>
-              <View style={styles.topBar}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-                  <Icon name="arrow-left" size={22} color="#fff" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.titlePressable}
-                  activeOpacity={0.7}
-                  onPress={() => navigation.navigate("ProfilePreview", { userId: String(peerUserId) })}
-                >
-                  {resolvedPeerAvatar && !avatarFailed ? (
-                    <Image
-                      source={{ uri: newUrl + resolvedPeerAvatar }}
-                      style={styles.headerAvatar}
-                      onError={() => setAvatarFailed(true)}
-                    />
-                  ) : (
-                    <View style={styles.headerAvatarFallback}>
-                      <Icon name="account" size={18} color="#cbd5e1" />
-                    </View>
-                  )}
-                  <Text numberOfLines={1} style={styles.title}>
-                    {peerName || "Friend"} {peerMood ? `[ is ${peerMood} ] ` : ""}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {peerTyping && (
-                <Text style={{ color: '#fff', fontStyle: 'italic', marginLeft: 32 }}>
-                  {peerName || "Friend"} is typing...
-                </Text>
-              )}
-
-<FlatList
-  ref={flatListRef}
-  onScrollToIndexFailed={onScrollToIndexFailed}
-  data={items}
-  keyExtractor={keyExtractor}
-  renderItem={renderItem}
-  inverted={true}                        // ← KEY CHANGE: starts at bottom, no animation
-  contentContainerStyle={{
-    paddingTop: 8,
-    paddingBottom: 20,
-  }}
-  keyboardShouldPersistTaps="handled"
-  nestedScrollEnabled
-  showsVerticalScrollIndicator={false}
-  removeClippedSubviews={false}
-  initialNumToRender={20}
-  windowSize={10}
-  maxToRenderPerBatch={5}
-  updateCellsBatchingPeriod={50}
-  onScroll={(e) => {
-    const { contentOffset } = e.nativeEvent;
-    // inverted: offset 0 = visual bottom
-    isNearBottomRef.current = contentOffset.y < 100;
-  }}
-  scrollEventThrottle={16}
-  // NO onContentSizeChange needed — inverted handles initial position
-/>
-
-</View>
-            
-<View style={[styles.inputBar, { 
-    paddingBottom: Platform.OS === "ios" ? Math.max(insets.bottom, 8) : insets.bottom 
-  }]}>
-    {/* REPLY PREVIEW - Shows which message you're replying to */}
-
-{replyToMessage && (
-  <TouchableOpacity 
-    activeOpacity={0.8}
-    onPress={() => {
-      // Jump to original message when tapping reply preview
-      if (replyToMessage._id) {
-        scrollToMessage(replyToMessage._id);
-      }
-    }}
-    style={styles.replyPreviewContainer}
-  >
-    <View style={styles.replyPreviewLeftBorder} />
-    
-    {replyToMessage.messageType !== 'text' && replyToMessage.media?.url && (
-      <View style={styles.replyPreviewThumbnail}>
-        {replyToMessage.messageType === 'image' ? (
-          <Image 
-            source={{ uri: getMediaUrlCb(replyToMessage) }} 
-            style={styles.replyPreviewThumbImage} 
-          />
-        ) : replyToMessage.messageType === 'video' ? (
-          <View style={styles.replyPreviewThumbVideo}>
-            <Image 
-              source={{ uri: getMediaUrlCb(replyToMessage) }} 
-              style={styles.replyPreviewThumbImage} 
-              blurRadius={2}
-            />
-            <View style={styles.replyPreviewPlayIcon}>
-              <Icon name="play" size={12} color="#fff" />
-            </View>
-          </View>
-        ) : null}
+    {!!glassError && (
+      <View style={styles.errorCard}>
+        <Icon name="alert-circle-outline" size={18} color="#FEE2E2" />
+        <Text style={styles.errorText}>{glassError}</Text>
       </View>
     )}
-    
-    <View style={styles.replyPreviewContent}>
-      <Text style={styles.replyPreviewName} numberOfLines={1}>
-        {String(replyToMessage.fromUserId) === String(myUserId) ? "You" : peerName}
-      </Text>
-      <Text style={styles.replyPreviewText} numberOfLines={1}>
-        {replyToMessage.messageType === 'image' ? '📷 Photo' :
-         replyToMessage.messageType === 'video' ? '🎥 Video' :
-         replyToMessage.messageType === 'document' ? '📎 Document' :
-         replyToMessage.plaintext || 'Message'}
-      </Text>
-    </View>
-    
-    <TouchableOpacity 
-      style={styles.replyPreviewClose} 
-      onPress={(e) => {
-        e.stopPropagation(); // Prevent triggering parent onPress
-        setReplyToMessage(null);
-        resetAllSwipes();
-      }}
-      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-    >
-      <Icon name="close" size={16} color="#94a3b8" />
-    </TouchableOpacity>
-  </TouchableOpacity>
-)}
-    
-    <View style={styles.inputRow}>
-      <TextInput
-        style={[styles.input, replyToMessage && styles.inputWithReply]}
-        placeholder={offline ? "Offline: message will stay local" : "Type a message"}
-        placeholderTextColor="#94a3b8"
-        value={input}
-        onChangeText={handleInputChange}
-        multiline
-      />
-      {sendingMedia ? (
-        <View style={styles.sendBtn}><ActivityIndicator size="small" color="#fff" /></View>
-      ) : (
-        <>
-          <TouchableOpacity style={styles.attachBtn} onPress={() => setSheetOpen(true)}>
-            <Icon name="paperclip" size={20} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.sendBtn} onPress={send}>
-            <Icon name="send" size={20} color="#fff" />
-          </TouchableOpacity>
-        </>
-      )}
-    </View>
-  </View>
-  
 
-          <Modal visible={imageViewerVisible} transparent animationType="fade" onRequestClose={() => setImageViewerVisible(false)}>
-            <View style={styles.imageViewerRoot}>
-              <TouchableOpacity style={styles.imageViewerClose} onPress={() => setImageViewerVisible(false)}>
-                <Icon name="close" size={24} color="#fff" />
-              </TouchableOpacity>
-              <Image source={{ uri: activeImageUrl }} style={styles.imageViewerImage} resizeMode="contain" />
-            </View>
-          </Modal>
-
-          <Modal visible={sheetOpen} transparent animationType="fade" onRequestClose={() => setSheetOpen(false)}>
-            <Pressable style={styles.sheetOverlay} onPress={() => setSheetOpen(false)} />
-            <View style={styles.sheetCard}>
-              <Text style={styles.sheetTitle}>Attach</Text>
-              <View style={styles.sheetGrid}>
-                <TouchableOpacity style={styles.sheetTile} onPress={openCameraPhoto}>
-                  <Icon name="camera-outline" size={24} color="#fff" />
-                  <Text style={styles.sheetTileText}>Camera</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.sheetTile} onPress={openCameraVideo}>
-                  <Icon name="video-outline" size={24} color="#fff" />
-                  <Text style={styles.sheetTileText}>Record</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.sheetTile} onPress={pickFromGallery}>
-                  <Icon name="image-multiple-outline" size={24} color="#fff" />
-                  <Text style={styles.sheetTileText}>Gallery</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.sheetTile} onPress={pickDocuments}>
-                  <Icon name="file-document-outline" size={24} color="#fff" />
-                  <Text style={styles.sheetTileText}>Document</Text>
-                </TouchableOpacity>
+    {/* Messages + input in a plain flex column */}
+    <View style={{ flex: 1 }}>
+      
+      {/* Top bar + FlatList */}
+      <View style={styles.container}>
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+            <Icon name="arrow-left" size={22} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.titlePressable}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate("ProfilePreview", { userId: String(peerUserId) })}
+          >
+            {resolvedPeerAvatar && !avatarFailed ? (
+              <Image
+                source={{ uri: newUrl + resolvedPeerAvatar }}
+                style={styles.headerAvatar}
+                onError={() => setAvatarFailed(true)}
+              />
+            ) : (
+              <View style={styles.headerAvatarFallback}>
+                <Icon name="account" size={18} color="#cbd5e1" />
               </View>
-              <Text style={styles.sheetHint}>Max 10 files • 50MB each</Text>
+            )}
+            <Text numberOfLines={1} style={styles.title}>
+              {peerName || "Friend"} {peerMood ? `[ is ${peerMood} ] ` : ""}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {peerTyping && (
+          <Text style={{ color: '#fff', fontStyle: 'italic', marginLeft: 32 }}>
+            {peerName || "Friend"} is typing...
+          </Text>
+        )}
+
+        <FlatList
+          ref={flatListRef}
+          onScrollToIndexFailed={onScrollToIndexFailed}
+          data={items}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          inverted={true}
+          contentContainerStyle={{ paddingTop: 8, paddingBottom: 12 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={false}
+          initialNumToRender={20}
+          windowSize={10}
+          maxToRenderPerBatch={5}
+          updateCellsBatchingPeriod={50}
+          onScroll={(e) => {
+            isNearBottomRef.current = e.nativeEvent.contentOffset.y < 100;
+          }}
+          scrollEventThrottle={16}
+        />
+      </View>
+
+      {/* Input bar */}
+      <View style={styles.inputBar}>
+        {replyToMessage && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => replyToMessage._id && scrollToMessage(replyToMessage._id)}
+            style={styles.replyPreviewContainer}
+          >
+            <View style={styles.replyPreviewLeftBorder} />
+            {replyToMessage.messageType !== 'text' && replyToMessage.media?.url && (
+              <View style={styles.replyPreviewThumbnail}>
+                {replyToMessage.messageType === 'image' ? (
+                  <Image source={{ uri: getMediaUrlCb(replyToMessage) }} style={styles.replyPreviewThumbImage} />
+                ) : replyToMessage.messageType === 'video' ? (
+                  <View style={styles.replyPreviewThumbVideo}>
+                    <Image source={{ uri: getMediaUrlCb(replyToMessage) }} style={styles.replyPreviewThumbImage} blurRadius={2} />
+                    <View style={styles.replyPreviewPlayIcon}>
+                      <Icon name="play" size={12} color="#fff" />
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+            )}
+            <View style={styles.replyPreviewContent}>
+              <Text style={styles.replyPreviewName} numberOfLines={1}>
+                {String(replyToMessage.fromUserId) === String(myUserId) ? "You" : peerName}
+              </Text>
+              <Text style={styles.replyPreviewText} numberOfLines={1}>
+                {replyToMessage.messageType === 'image' ? '📷 Photo' :
+                 replyToMessage.messageType === 'video' ? '🎥 Video' :
+                 replyToMessage.messageType === 'document' ? '📎 Document' :
+                 replyToMessage.plaintext || 'Message'}
+              </Text>
             </View>
-          </Modal>
-         </KeyboardAvoidingView>
+            <TouchableOpacity
+              style={styles.replyPreviewClose}
+              onPress={(e) => { e.stopPropagation(); setReplyToMessage(null); resetAllSwipes(); }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Icon name="close" size={16} color="#94a3b8" />
+            </TouchableOpacity>
+          </TouchableOpacity>
+        )}
+        <View style={styles.inputRow}>
+          <TextInput
+            style={[styles.input, replyToMessage && styles.inputWithReply]}
+            placeholder={offline ? "Offline: message will stay local" : "Type a message"}
+            placeholderTextColor="#94a3b8"
+            value={input}
+            onChangeText={handleInputChange}
+            multiline
+          />
+          {sendingMedia ? (
+            <View style={styles.sendBtn}><ActivityIndicator size="small" color="#fff" /></View>
+          ) : (
+            <>
+              <TouchableOpacity style={styles.attachBtn} onPress={() => setSheetOpen(true)}>
+                <Icon name="paperclip" size={20} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.sendBtn} onPress={send}>
+                <Icon name="send" size={20} color="#fff" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
 
-      {activeMenu && (
-        <MsgActionMenu
-          menu={activeMenu}
-          newUrl={newUrl}
-          myUserId={myUserId}
-          currentReaction={reactions[activeMenu.msgId]}
-          onReact={handleReact}
-          onDeleteForEveryone={activeMenu.isMe ? handleDeleteForEveryone : undefined}
-          onDeleteForMe={handleDeleteForMe}
-          onDismiss={dismissMenu}
-          openEmojiPicker={openEmojiPicker}
-        />
-      )}
+      {/* ✅ This is the magic — a Reanimated view that grows/shrinks 
+          perfectly in sync with the keyboard, zero JS delay */}
+      <Reanimated.View style={[fakeView, { backgroundColor: "#020617" }]} />
 
-      <Modal visible={emojiPickerVisible} transparent animationType="slide" onRequestClose={() => setEmojiPickerVisible(false)}>
-        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.48)' }}>
-          <View style={{ backgroundColor: '#192134', padding: 8, borderTopLeftRadius: 18, borderTopRightRadius: 18 }}>
-            <EmojiSelector
-              onEmojiSelected={handleEmojiPickerSelect}
-              showSearchBar={true}
-              showTabs={true}
-              showHistory={true}
-              category={Categories.all}
-              columns={8}
-            />
-          </View>
+    </View>
+
+    {/* Modals — unchanged */}
+    <Modal visible={imageViewerVisible} transparent animationType="fade" onRequestClose={() => setImageViewerVisible(false)}>
+      <View style={styles.imageViewerRoot}>
+        <TouchableOpacity style={styles.imageViewerClose} onPress={() => setImageViewerVisible(false)}>
+          <Icon name="close" size={24} color="#fff" />
+        </TouchableOpacity>
+        <Image source={{ uri: activeImageUrl }} style={styles.imageViewerImage} resizeMode="contain" />
+      </View>
+    </Modal>
+
+    <Modal visible={sheetOpen} transparent animationType="fade" onRequestClose={() => setSheetOpen(false)}>
+      <Pressable style={styles.sheetOverlay} onPress={() => setSheetOpen(false)} />
+      <View style={styles.sheetCard}>
+        <Text style={styles.sheetTitle}>Attach</Text>
+        <View style={styles.sheetGrid}>
+          <TouchableOpacity style={styles.sheetTile} onPress={openCameraPhoto}>
+            <Icon name="camera-outline" size={24} color="#fff" />
+            <Text style={styles.sheetTileText}>Camera</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.sheetTile} onPress={openCameraVideo}>
+            <Icon name="video-outline" size={24} color="#fff" />
+            <Text style={styles.sheetTileText}>Record</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.sheetTile} onPress={pickFromGallery}>
+            <Icon name="image-multiple-outline" size={24} color="#fff" />
+            <Text style={styles.sheetTileText}>Gallery</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.sheetTile} onPress={pickDocuments}>
+            <Icon name="file-document-outline" size={24} color="#fff" />
+            <Text style={styles.sheetTileText}>Document</Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
-    </SafeAreaView>
-  );
+        <Text style={styles.sheetHint}>Max 10 files • 50MB each</Text>
+      </View>
+    </Modal>
+
+    {activeMenu && (
+      <MsgActionMenu
+        menu={activeMenu}
+        newUrl={newUrl}
+        myUserId={myUserId}
+        currentReaction={reactions[activeMenu.msgId]}
+        onReact={handleReact}
+        onDeleteForEveryone={activeMenu.isMe ? handleDeleteForEveryone : undefined}
+        onDeleteForMe={handleDeleteForMe}
+        onDismiss={dismissMenu}
+        openEmojiPicker={openEmojiPicker}
+      />
+    )}
+
+    <Modal visible={emojiPickerVisible} transparent animationType="slide" onRequestClose={() => setEmojiPickerVisible(false)}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.48)' }}>
+        <View style={{ backgroundColor: '#192134', padding: 8, borderTopLeftRadius: 18, borderTopRightRadius: 18 }}>
+          <EmojiSelector
+            onEmojiSelected={handleEmojiPickerSelect}
+            showSearchBar showTabs showHistory
+            category={Categories.all}
+            columns={8}
+          />
+        </View>
+      </View>
+    </Modal>
+  </SafeAreaView>
+);
 }
 
 const styles = StyleSheet.create({
@@ -1970,8 +1952,8 @@ const styles = StyleSheet.create({
   glowBottom: { position: "absolute", bottom: -140, right: -40, width: 240, height: 240, borderRadius: 240, backgroundColor: "rgba(168, 85, 247, 0.22)" },
   errorCard: { position: "absolute", top: 16, left: 12, right: 12, zIndex: 20, flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 14, backgroundColor: "rgba(127, 29, 29, 0.45)", borderWidth: 1, borderColor: "rgba(248, 113, 113, 0.5)" },
   errorText: { color: "#FEE2E2", marginLeft: 8, fontSize: 12, flex: 1 },
-  container: { flex: 1, paddingTop: 16, paddingHorizontal: 12 },
-  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 1, paddingVertical: 6, marginTop: Platform.OS === "ios" ? 35 : 15 },
+container: { flex: 1, paddingTop: 16, paddingHorizontal: 12 },
+  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 1, paddingVertical: 6, marginTop: 0 },
   iconBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.06)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(148,163,184,0.35)", marginRight: 8 },
   titlePressable: { flex: 1, marginLeft: 12, marginRight: 10, paddingVertical: 4, flexDirection: "row", alignItems: "center" },
   headerAvatar: { width: 34, height: 34, borderRadius: 17, marginRight: 10, borderWidth: 1, borderColor: "rgba(148,163,184,0.35)", backgroundColor: "rgba(255,255,255,0.08)" },
@@ -2017,8 +1999,20 @@ docRow: {
   metaRowMedia: { position: "absolute", right: 0, bottom: 6, flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 },
   tickIcon: { marginRight: 4 },
   timeText: { color: "rgba(255,255,255,0.9)", fontSize: 11, marginRight: 4 },
-  inputBar: { paddingTop: 8, backgroundColor: "transparent" },
-  inputRow: { flexDirection: "row", paddingLeft: 10, paddingRight: 10, alignItems: "center", backgroundColor: "transparent" },
+  inputBar: {
+  paddingTop: 8,
+  paddingBottom: 20,  // iOS needs home bar gap
+  backgroundColor: "#020617",
+  borderTopWidth: 1,
+  borderTopColor: "rgba(148,163,184,0.12)",
+},
+inputRow: { 
+  flexDirection: "row", 
+  paddingLeft: 10, 
+  paddingRight: 10, 
+  alignItems: "center", 
+  backgroundColor: "transparent"  // ✅ this one is fine — parent handles bg
+},
   attachBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.08)", alignItems: "center", justifyContent: "center", marginRight: 8, borderWidth: 1, borderColor: "rgba(148,163,184,0.35)" },
   input: { flex: 1, color: "#fff", paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 12, marginRight: 8, maxHeight: 140, borderWidth: 1, borderColor: "rgba(148,163,184,0.5)" },
   sendBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "#6366f1", alignItems: "center", justifyContent: "center" },

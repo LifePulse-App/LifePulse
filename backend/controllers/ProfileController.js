@@ -463,17 +463,23 @@ export const uploadAvatar = catchAsyncErrors(async (req, res, next) => {
   
   const avatarUrl = `/avatars/${req.file.filename}`;
   // Optionally delete previous avatar here (recommended for cleanup!)
-  await User.findByIdAndUpdate(
-    req.user._id,
-    { avatarUrl },
-    { new: true }
-  );
+  const user = await User.findByIdAndUpdate(
+  req.user._id,
+  {
+    avatarUrl,
+    $inc: { avatarVersion: 1 }, // 🔥 force refresh
+  },
+  { new: true }
+);
+
+res.json(user);
+  
   res.json({ success: true, url: avatarUrl });
 });
 
 // 4. Controller: Get current avatar of a user (by auth)
 export const getMyAvatar = catchAsyncErrors(async (req, res, next) => {
-  const user = await User.findById(req.user._id).select("avatarUrl");
+  const user = await User.findById(req.user._id).select("avatarUrl avatarVersion");
   if (!user) return next(new ErrorHandler("User not found", 404));
   res.json({ success: true, avatarUrl: user.avatarUrl });
 });
@@ -481,7 +487,7 @@ export const getMyAvatar = catchAsyncErrors(async (req, res, next) => {
 // controllers/avatarController.js
 export const getUserProfile = catchAsyncErrors(async (req, res, next) => {
   const { userId } = req.params;
-  const user = await User.findById(userId).select("name username avatarUrl");
+  const user = await User.findById(userId).select("name username avatarUrl avatarVersion");
   if (!user) return next(new ErrorHandler("User not found", 404));
   res.json({ success: true, user });
 });

@@ -204,6 +204,7 @@ import ProfilePreviewScreen from '../../screens/profile/components/ProfilePrevie
 import HabitDetailScreen from '../../screens/dashboard/components/dashboard/HabitDetailScreen';
 import ArPortalScreen from '../../screens/AR-Model/components/ar_screen';
 import ARCameraView from '../../screens/AR-Model/components/ar_screen';
+import ProfileScreen from '../../screens/profile/components/Profile';
 
   const AuthNavigator = () => {
     const [initialRoute, setInitialRoute] = useState<'Login' | 'Drawer' | 'SavedAccounts' | null>(null);
@@ -257,7 +258,10 @@ import ARCameraView from '../../screens/AR-Model/components/ar_screen';
 
   return (
     <Stack.Navigator
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: false, animation: 'slide_from_right',
+    gestureEnabled: true,
+    fullScreenGestureEnabled: true,
+    animationDuration: 200 }}
       initialRouteName={initialRoute}
     >
       <Stack.Screen name="Login" component={Login} />
@@ -278,10 +282,32 @@ import ARCameraView from '../../screens/AR-Model/components/ar_screen';
 <Stack.Screen name="LegalPolicy" component={LegalPolicyScreen} />
 <Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
 <Stack.Screen name="AvatarCreator" component={AvatarCreatorScreen} />
-<Stack.Screen name="chat" component={ChatScreen} />
+<Stack.Screen name="chat" component={ChatScreen} options={{
+    unmountOnBlur: false,
+    freezeOnBlur: true
+  }}/>
+  <Stack.Screen name="NewChat" component={NewChatScreen} options={{
+    unmountOnBlur: false,
+    freezeOnBlur: true
+  }}/>
     <Stack.Screen name="ArPortal" component={ARCameraView} options={{headerShown: false}}/>
-    <Stack.Screen name="ProfilePreview" component={ProfilePreviewScreen} options={{headerShown: false}}/>
+    <Stack.Screen name="ProfilePreview" component={ProfilePreviewScreen} options={{
+    unmountOnBlur: false,
+    freezeOnBlur: true
+  }}/>
   <Stack.Screen name="HabitDetail" component={HabitDetailScreen} options={{ headerShown: false }} />
+  <Stack.Screen name="Profile" component={ProfileScreen} options={{
+    unmountOnBlur: false,
+    freezeOnBlur: true
+  }} />
+  <Stack.Screen name="Friends" component={Friends} options={{
+    unmountOnBlur: false,
+    freezeOnBlur: true
+  }} />
+  <Stack.Screen name="FriendsManage" component={FriendsListScreen} options={{
+    unmountOnBlur: false,
+    freezeOnBlur: true
+  }} />
     </Stack.Navigator>
   );
 };

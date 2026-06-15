@@ -13,6 +13,7 @@ import {
   reactToMessage,
   removeReaction,
   deleteForEveryone,
+  markListened,
 } from "../controllers/ChatController.js";
 
 const router = express.Router();
@@ -52,6 +53,7 @@ router.get("/messages/thread/:conversationId", isAuthenticatedUser, getThread);
 router.patch("/messages/delivered", isAuthenticatedUser, markDelivered);
 router.patch("/messages/seen", isAuthenticatedUser, markSeen);
 router.post("/messages/mark-delivered-all", isAuthenticatedUser, markDeliveredAll);
+router.post("/messages/listened", isAuthenticatedUser, markListened);
 
 // single file (existing compatibility)
 router.post("/messages/upload", isAuthenticatedUser, upload.single("file"), uploadChatMedia);

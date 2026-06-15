@@ -12,6 +12,8 @@ import MainLayout from "../../../shared/components/MainLayout";
 import AuthContext from "../../../auth/user/UserContext";
 import { getUnread, subscribeUnreadChanges, subscribeConversationChanges } from "../services/ChatNotifications";
 import apiClient from "../../../auth/api-client/api_client";
+import FastImage from "react-native-fast-image";
+import { getAvatar } from "../../../storage/AvatarManager";
 
 const CACHE_KEY = "chat_list_cache";
 
@@ -51,21 +53,38 @@ const loadCache = async (userId: string): Promise<any[]> => {
 const baseUrl = apiClient.getBaseURL();
 const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
-const Avatar = ({ url }: { url?: string }) => {
-  if (url) {
-    return (
-      <Image
-        source={{ uri: newUrl + url }}
-        style={styles.avatar}
-      />
-    );
-  } else {
-    return (
-      <View style={styles.avatarFallback}>
-        <Icon name="account" size={22} color="#cbd5e1" />
-      </View>
-    );
-  }
+const Avatar = ({ userId, url, avatarVersion }) => {
+  const [localUri, setLocalUri] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const load = async () => {
+      const img = await getAvatar(
+        userId,
+        url,
+        avatarVersion
+      );
+
+      if (mounted) {
+        setLocalUri(img);
+      }
+    };
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
+  }, [userId, url, avatarVersion]);
+
+  return localUri ? (
+    <FastImage source={{ uri: localUri }} style={styles.avatar} />
+  ) : (
+    <View style={styles.avatarFallback}>
+      <Icon name="account" size={22} color="#cbd5e1" />
+    </View>
+  );
 };
 
 export default function ChatListScreen({ navigation }: any) {
@@ -126,7 +145,7 @@ export default function ChatListScreen({ navigation }: any) {
       const friends = friendsRes?.data?.friends || [];
       const friendMap = new Map<
         string,
-        { name: string; avatarUrl: string; avatarThumb: string; avatarPublicUrl: string; tick: string;}
+        { name: string; avatarUrl: string; avatarThumb: string; avatarPublicUrl: string; tick: string; avatarVersion: Date;}
       >();
 
       for (const f of friends) {
@@ -136,6 +155,7 @@ export default function ChatListScreen({ navigation }: any) {
           avatarUrl: String(f.avatar || ""),
           avatarThumb: String(f.avatarThumbnailUrl || ""),
           avatarPublicUrl: String(f.avatar?.url || ""),
+          avatarVersion: f.avatarVersion,
            tick: f.tick || "none",
         });
       }
@@ -152,6 +172,7 @@ export default function ChatListScreen({ navigation }: any) {
           peerUserId: peerId,
           peerName: c.peerName || friend?.name || "Friend",
           peerAvatarUrl: String(resolvedAvatar || ""),
+           avatarVersion: friend?.avatarVersion,
           mood: c.mood || "",
           lastText: c.lastText || "",
           lastAt: c.lastAt || "",
@@ -303,7 +324,11 @@ export default function ChatListScreen({ navigation }: any) {
       })
     }
   >
-    <Avatar url={item.peerAvatarUrl} />
+ <Avatar
+  userId={item.peerUserId}
+  url={item.peerAvatarUrl}
+  avatarVersion={item.avatarUpdatedAt}
+/>
     <View style={styles.rowContent}>
       <View style={styles.rowTop}>
         <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>

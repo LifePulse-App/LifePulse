@@ -152,7 +152,7 @@ export const friendStatus = catchAsyncErrors(async (req, res) => {
 export const listFriends = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const me = await User.findById(currentUserId)
-    .populate("friends.user", "name username avatarUrl tick")
+    .populate("friends.user", "name username avatarUrl tick avatarVersion")
     .lean();
   if (!me) return res.status(404).json({ message: "User not found" });
 
@@ -272,7 +272,7 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
   const { userId } = req.params;
 
   const target = await User.findById(userId)
-    .select("name username avatarUrl avatarThumbnailUrl level currentTitle country city isPublic tick")
+    .select("name username avatarUrl avatarVersion avatarThumbnailUrl level currentTitle country city isPublic tick")
     .lean();
 
   if (!target) return res.status(404).json({ message: "User not found" });

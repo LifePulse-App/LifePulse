@@ -7,6 +7,7 @@ require Pod::Executable.execute_command('node', ['-p',
   )', __dir__]).strip
 
 platform :ios, '16.0'
+use_modular_headers!
 
 # 🔥 Enable New Architecture
 ENV['RCT_NEW_ARCH_ENABLED'] = '1'

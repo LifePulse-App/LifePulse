@@ -20,7 +20,7 @@ const toObjectId = (v) => {
   }
 };
 
-const allowedTypes = ["text", "image", "video", "document"];
+const allowedTypes = ["text", "image", "video", "document", "audio"];
 
 const normalizeMessageBody = (body) => {
   const {
@@ -64,12 +64,14 @@ const getPushBody = (msg) => {
   if (msg.messageType === "image") return "📷 Photo";
   if (msg.messageType === "video") return "🎥 Video";
   if (msg.messageType === "document") return "📎 Document";
+  if (msg.messageType === "audio") return "🎤 Voice message";
   return String(msg.text || "");
 };
 
 const detectMessageTypeFromMime = (mimeType = "") => {
   if (mimeType.startsWith("image/")) return "image";
   if (mimeType.startsWith("video/")) return "video";
+  if (mimeType.startsWith("audio/")) return "audio";
   return "document";
 };
 
@@ -627,6 +629,52 @@ export const deleteForEveryone = async (req, res) => {
     res.json({ success: true });
   } catch (e) {
     console.error("[chat] deleteForEveryone error", e);
+    res.status(500).json({ message: "Internal error" });
+  }
+};
+
+export const markListened = async (req, res) => {
+  try {
+    const me = req.user._id;
+    const { messageId } = req.body;
+
+    if (!messageId) {
+      return res.status(400).json({ message: "messageId required" });
+    }
+
+    const msg = await ChatMessage.findById(messageId);
+
+    if (!msg) {
+      return res.status(404).json({ message: "Message not found" });
+    }
+
+    // only receiver can mark listened
+    if (String(msg.receiverId) !== String(me)) {
+      return res.status(403).json({ message: "Not allowed" });
+    }
+
+    // only audio messages
+    if (msg.messageType !== "audio") {
+      return res.status(400).json({ message: "Only audio messages can be marked listened" });
+    }
+
+    msg.listenedAt = new Date();
+    await msg.save();
+
+    // realtime update
+    req.io.to(`conversation:${msg.conversationId}`).emit("msg-listened", {
+      msgId: String(msg._id),
+      userId: String(me),
+      listenedAt: msg.listenedAt,
+    });
+
+    res.json({
+      success: true,
+      messageId: msg._id,
+      listenedAt: msg.listenedAt,
+    });
+  } catch (err) {
+    console.error("[chat] markListened error", err);
     res.status(500).json({ message: "Internal error" });
   }
 };
