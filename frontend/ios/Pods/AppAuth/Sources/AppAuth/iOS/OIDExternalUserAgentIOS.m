@@ -114,7 +114,7 @@ NS_ASSUME_NONNULL_BEGIN
         }
         strongSelf->_webAuthenticationVC = nil;
         if (callbackURL) {
-          [strongSelf->_session resumeExternalUserAgentFlowWithURL:callbackURL];
+          [strongSelf->_session resumeExternalUserAgentFlowWithURL:callbackURL error:nil];
         } else {
           NSError *safariError =
               [OIDErrorUtilities errorWithCode:OIDErrorCodeUserCanceledAuthorizationFlow
@@ -133,12 +133,9 @@ NS_ASSUME_NONNULL_BEGIN
       openedUserAgent = [authenticationVC start];
     }
   }
-  // If all else failed use the local browser.
-  if (!openedUserAgent){
-    [[UIApplication sharedApplication] openURL:requestURL
-                                       options:@{}
-                             completionHandler:nil];
-    openedUserAgent = YES;
+  if (!openedUserAgent) {
+    [self cleanUp];
+    return NO;
   }
 
   return openedUserAgent;

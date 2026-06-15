@@ -11,6 +11,7 @@ import path from "path";
 import http from "http";
 import { Server } from "socket.io";
 import { startNotificationJobs } from './jobs/scheduledNotifications.js';
+import { registerCaptureEventHandlers } from './sockets/captureEvent.sockets.js';
 
 // --- ENV
 const app = express();
@@ -117,6 +118,8 @@ io.on("connection", (socket) => {
   socket.on("stop-typing", ({ conversationId, userId }) => {
     socket.to(`conversation:${conversationId}`).emit("stop-typing", { userId });
   });
+
+    registerCaptureEventHandlers(io, socket);
 
    socket.join("ar-global-portal"); // all AR users in one room
 

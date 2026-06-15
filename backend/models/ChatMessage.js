@@ -39,7 +39,7 @@ const ChatMessageSchema = new mongoose.Schema(
     // NEW
     messageType: {
       type: String,
-      enum: ["text", "image", "video", "document"],
+      enum: ["text", "image", "video", "document", "audio"],
       default: "text",
       index: true,
     },
@@ -62,6 +62,7 @@ const ChatMessageSchema = new mongoose.Schema(
     clientMessageId: { type: String, required: true, index: true },
     deliveredAt: { type: Date, default: null },
     seenAt: { type: Date, default: null },
+    listenedAt: { type: Date, default: null },
   }
   ,
   { timestamps: true }

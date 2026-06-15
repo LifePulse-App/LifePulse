@@ -102,7 +102,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const [friendship, setFriendship] = useState<Friendship | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [avatarPreviewVisible, setAvatarPreviewVisible] = useState(false);
-
+const [localAvatar, setLocalAvatar] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const scaleAnim = useRef(new Animated.Value(0.94)).current;
@@ -205,7 +205,9 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const levelColors = getLevelColor(user?.level);
   const levelTitle = getLevelTitle(user?.level);
 
-  const avatarUri = user?.avatarUrl
+const avatarUri = localAvatar
+  ? localAvatar
+  : user?.avatarUrl
     ? user.avatarUrl.startsWith("http")
       ? user.avatarUrl
       : newUrl + user.avatarUrl
@@ -260,6 +262,19 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const hasMood = !!user?.mood;
   const locationHidden = user?.canSeeLocation === false;
   const hasLocation = !!locationText && !locationHidden;
+
+  useEffect(() => {
+  const loadLocalAvatar = async () => {
+    if (!userId) return;
+
+    const saved = await AsyncStorage.getItem(`avatar:${userId}`);
+    if (saved) {
+      setLocalAvatar(saved);
+    }
+  };
+
+  loadLocalAvatar();
+}, [userId]);
 
   return (
     <View style={styles.root}>

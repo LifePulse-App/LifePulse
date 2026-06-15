@@ -27,6 +27,7 @@ import UserStorage from './src/auth/user/UserStorage';
 import apiClient, { setSecretKey } from './src/auth/api-client/api_client';
 import { navigationRef, resetToLogin } from './src/navigation/main/RootNavigation';
 import AppUpdateGate from './AppUpdateGate';
+import { enableScreens } from 'react-native-screens';
 
 import {
   loadChatNotificationState,
@@ -43,6 +44,7 @@ import { handleNotificationPress } from './handleNotificationPress'; // or use y
 
 import 'react-native-get-random-values';
 import { TextEncoder, TextDecoder } from 'text-encoding';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 (global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
 
@@ -230,6 +232,8 @@ const App = () => {
     SystemNavigationBar.stickyImmersive();
   }
 }, []);
+
+enableScreens(true);
 
 // In the AppState listener useEffect, update it:
 useEffect(() => {
@@ -423,6 +427,7 @@ useEffect(() => {
   }
 
   return (
+    <KeyboardProvider>
      <GestureHandlerRootView style={{ flex: 1 }}>
     <PaperProvider theme={theme} settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
       <AuthContext.Provider value={{ User, setUser }}>
@@ -437,6 +442,7 @@ useEffect(() => {
       </AuthContext.Provider>
     </PaperProvider>
     </GestureHandlerRootView>
+    </KeyboardProvider>
   );
 };
 

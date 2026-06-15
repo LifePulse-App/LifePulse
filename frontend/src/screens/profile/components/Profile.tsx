@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { View, TouchableOpacity, StyleSheet, ScrollView, TextInput, Image } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
@@ -13,8 +13,11 @@ import SavedAccountsStorage from "../../../auth/user/SavedAccountsStorage";
 import apiClient from "../../../auth/api-client/api_client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
+import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
+import FastImage from 'react-native-fast-image';
+import { getAvatar } from "../../../storage/AvatarManager";
 
-const PROFILE_CACHE_KEY = "profile_cache_v1";
+const PROFILE_CACHE_KEY = 'sbjkshiuhuw'
 
 const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }) => {
   if (!visible) return null;
@@ -132,9 +135,6 @@ function EditProfileModal({ user, onClose, setResultCard, onChange }) {
       <TouchableOpacity style={styles.sheetSaveBtn} onPress={onSave} disabled={loading}>
         <Text style={{ color: "#fff", fontWeight: "bold" }}>{loading ? "Saving..." : "Save"}</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
-        <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Cancel</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -241,9 +241,6 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }) {
           </TouchableOpacity>
         </>
       )}
-      <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
-        <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Cancel</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -270,9 +267,6 @@ function ChangeNumberModal({ user, onClose, setResultCard }) {
       <TextInput style={styles.sheetInput} placeholder="Phone Number" placeholderTextColor="#6366f1" value={number} keyboardType="phone-pad" onChangeText={setNumber} />
       <TouchableOpacity style={styles.sheetSaveBtn} onPress={onSave} disabled={loading}>
         <Text style={{ color: "#fff", fontWeight: "bold" }}>{loading ? "Saving..." : "Update"}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
-        <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Cancel</Text>
       </TouchableOpacity>
     </View>
   );
@@ -342,9 +336,6 @@ function LinkedAccountModal({ onClose, onChange }) {
   return (
     <View style={styles.glassyInner}>
       <Text style={styles.sheetTitle}>Change Email</Text>
-      <Text style={{ color: "#fff", marginTop: 30, fontSize: 16, marginBottom: 20 }}>
-        Registered Email: <Text style={{ fontWeight: "bold", color: "#6366f1" }}>{email}</Text>
-      </Text>
       {stage === 1 ? (
         <>
           <TextInput
@@ -463,8 +454,37 @@ export default function ProfileScreen({ navigation }) {
   const user = authContext?.User?.user;
   const userId = user?.id;
   const [profile, setProfile] = useState(null);
-  const avatarUrl = profile?.avatarUrl || profile?.avatarThumbnailUrl;
+  const [avatarUrl, setAvatarUrl] = useState(null);
   const [activeModal, setActiveModal] = useState(null);
+  const [avatarVersion, setAvatarVersion] = useState(null);
+  const sheetRef = useRef<BottomSheet>(null);
+const snapPoints = useMemo(() => ["60%"], []);
+
+const openSheet = useCallback((type) => {
+  sheetRef.current?.close(); // 👈 force reset first
+
+  setTimeout(() => {
+    setActiveModal(type);
+    sheetRef.current?.snapToIndex(0);
+  }, 50);
+}, []);
+
+const closeSheet = useCallback(() => {
+  sheetRef.current?.close();
+  setActiveModal(null);
+}, []);
+
+const renderBackdrop = useCallback(
+  (props) => (
+    <BottomSheetBackdrop
+      {...props}
+      appearsOnIndex={0}
+      disappearsOnIndex={-1}
+      opacity={0.6}   // 👈 control dullness here
+    />
+  ),
+  []
+);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
@@ -522,6 +542,7 @@ export default function ProfileScreen({ navigation }) {
       const { avatarThumbnailUrl } = avatarRes?.data || {};
       const merged = { ...fetchedUser, avatarThumbnailUrl };
       setProfile(merged);
+      setAvatarVersion(fetchedUser.avatarVersion);
       await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
     } catch (e) {
       // On error, keep whatever is already in state (loaded from cache below).
@@ -566,6 +587,21 @@ export default function ProfileScreen({ navigation }) {
       fetchProfileOnline();
     }
   }, [offline]); // intentionally only triggers on offline toggle
+
+useEffect(() => {
+  const loadAvatar = async () => {
+    if (!profile?._id) return;
+
+    const finalAvatar = await getAvatar(
+      profile._id,
+      profile?.avatarUrl || profile?.avatarThumbnailUrl
+    );
+
+    setAvatarUrl(finalAvatar);
+  };
+
+  loadAvatar();
+}, [profile?._id, avatarVersion]);
 
   const confirmLogout = async () => {
     const userData = authContext?.User;
@@ -620,32 +656,60 @@ export default function ProfileScreen({ navigation }) {
   };
 
   const renderActionModal = () => {
-    if (!activeModal) return null;
     const ModalComponent = actionComponents[activeModal];
     return (
-      <Modal
-        isVisible={!!activeModal}
-        onBackdropPress={() => setActiveModal(null)}
-        style={styles.modalSheet}
-        backdropOpacity={0.41}
-        useNativeDriver
-      >
-        <View style={styles.sheetContent}>
-          <ModalComponent
-            user={profile}
-            onClose={() => setActiveModal(null)}
-            setResultCard={setResultCard}
-            onChange={fetchProfileOnline}
-          />
-        </View>
-      </Modal>
+<BottomSheet
+enableOverDrag={false}
+  ref={sheetRef}
+  index={-1}
+  snapPoints={snapPoints}
+  enablePanDownToClose
+  onClose={() => setActiveModal(null)}
+  backgroundStyle={{ backgroundColor: "#0F172A" }}
+  handleIndicatorStyle={{ display: "none"}}
+  backdropComponent={renderBackdrop} 
+>
+  <BottomSheetView style={{ padding: 20 }}>
+    {activeModal === "EditProfile" && (
+      <EditProfileModal
+        user={profile}
+        onClose={closeSheet}
+        setResultCard={setResultCard}
+        onChange={fetchProfileOnline}
+      />
+    )}
+
+    {activeModal === "ChangePassword" && (
+      <ChangePasswordModal
+        onClose={closeSheet}
+        setResultCard={setResultCard}
+        onChange={fetchProfileOnline}
+      />
+    )}
+
+    {activeModal === "ChangeNumber" && (
+      <ChangeNumberModal
+        user={profile}
+        onClose={closeSheet}
+        setResultCard={setResultCard}
+      />
+    )}
+
+    {activeModal === "LinkedAccount" && (
+      <LinkedAccountModal
+        onClose={closeSheet}
+        onChange={fetchProfileOnline}
+      />
+    )}
+  </BottomSheetView>
+</BottomSheet>
     );
   };
 
   return (
     <MainLayout>
       <View style={styles.topBar}>
-        <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass} onPress={() => navigation.goBack()}>
+        <TouchableOpacity activeOpacity={0.8}  style={styles.iconGlass} onPress={() => navigation.goBack()}>
           <Icon name="arrow-left" size={24} color="#E5E7EB" />
         </TouchableOpacity>
         <Text style={styles.pageTitle}>Profile</Text>
@@ -658,11 +722,15 @@ export default function ProfileScreen({ navigation }) {
             <View style={styles.avatarCircle}>
               {avatarUrl ? (
                 <View style={styles.avatarMask}>
-                  <Image
-                    source={{ uri: avatarUrl.startsWith("http") ? avatarUrl : newUrl + avatarUrl }}
-                    style={styles.avatarImageZoomed}
-                    resizeMode="cover"
-                  />
+                 <FastImage
+  style={styles.avatarImageZoomed}
+  source={{
+    uri: avatarUrl.startsWith("http") ? newUrl + avatarUrl : avatarUrl,
+    priority: FastImage.priority.high,
+    cache: FastImage.cacheControl.immutable,
+  }}
+  resizeMode={FastImage.resizeMode.cover}
+/>
                 </View>
               ) : (
                 <Icon name="account-circle-outline" size={70} color="#6366f1" />
@@ -716,7 +784,7 @@ export default function ProfileScreen({ navigation }) {
         if (["Enable2FA", "Devices", "HelpSupport", "ReportProblem", "LegalPolicy"].includes(item.route)) {
           navigation.navigate(item.route);
         } else {
-          setActiveModal(item.route);
+         openSheet(item.route);
         }
       }
       // Optionally: show toast/alert if clicked while disabled
@@ -774,12 +842,6 @@ export default function ProfileScreen({ navigation }) {
               </Text>
               {deleteOtpStep === 0 ? (
                 <View style={styles.modalBtns}>
-                  <TouchableOpacity
-                    style={styles.cancelBtn}
-                    onPress={() => { setDeleteConfirmVisible(false); setDeleteOtpStep(0); setDeleteOtp(""); }}
-                  >
-                    <Text style={{ color: "#374151", fontWeight: "bold" }}>Cancel</Text>
-                  </TouchableOpacity>
                   <TouchableOpacity style={styles.confirmBtn} onPress={handleRequestDeleteOtp}>
                     <Text style={{ color: "#fff", fontWeight: "bold" }}>
                       {deleteLoading ? "Sending OTP..." : "Send OTP"}
@@ -797,12 +859,6 @@ export default function ProfileScreen({ navigation }) {
                     keyboardType="number-pad"
                   />
                   <View style={styles.modalBtns}>
-                    <TouchableOpacity
-                      style={styles.cancelBtn}
-                      onPress={() => { setDeleteConfirmVisible(false); setDeleteOtpStep(0); setDeleteOtp(""); }}
-                    >
-                      <Text style={{ color: "#374151", fontWeight: "bold" }}>Cancel</Text>
-                    </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.confirmBtn}
                       onPress={handleDeleteAccountWithOtp}

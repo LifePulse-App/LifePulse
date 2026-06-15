@@ -19,7 +19,7 @@ import AuthContext from '../../../auth/user/UserContext';
 import DeviceInfo from 'react-native-device-info';
 import LoaderKitView from 'react-native-loader-kit';
 
-const SUPPORT_EMAIL = 'infostreaksphere@gmail.com';
+const SUPPORT_EMAIL = 'suppart@streaksphere.app';
 
 const ReportProblemScreen = () => {
   const navigation = useNavigation<any>();

@@ -249,6 +249,10 @@ deleteAccountOtpExpire: Date,
       type: String,
       default: '',
     }, // Ready Player Me avatar URL (e.g. https://models.readyplayer.me/xxxx.glb)
+    avatarVersion: {
+      type: Number,
+      default: 1
+    }, 
     
     avatarMetadata: {
       type: Object,
