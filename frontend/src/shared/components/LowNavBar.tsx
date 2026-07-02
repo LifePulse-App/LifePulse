@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Keyboard } from 'react-native';
 import styles from '../styling/styles';
 import { BottomNavigation } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -13,12 +13,22 @@ const LowNavBAr = () => {
   const route = useRoute();
 
   const [unreadChats, setUnreadChats] = useState(getUnreadChatCount());
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeUnreadChanges(() => {
       setUnreadChats(getUnreadChatCount());
     });
     return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
   }, []);
 
   // Added AR Portal tab here (key: 'arportal')
@@ -68,11 +78,15 @@ const LowNavBAr = () => {
     }
   };
 
+  if (keyboardVisible) return null;
+
   return (
-    <BottomNavigation
+    <BottomNavigation.Bar
       navigationState={{ index, routes }}
-      onIndexChange={handleNavigation}
-      renderScene={() => null}
+      onTabPress={({ route }) => {
+        const i = routes.findIndex((r) => r.key === route.key);
+        handleNavigation(i);
+      }}
       renderIcon={({ route, color, focused }) => {
         const r = route as any;
         const iconConfig = r.icon as { active: string; inactive: string };
@@ -113,10 +127,8 @@ const LowNavBAr = () => {
       }}
       activeIndicatorStyle={{ backgroundColor: 'transparent' }}
       labeled={false}
-      shifting={false}
-      barStyle={styles.bottomBar}
+      style={styles.bottomBar}
       safeAreaInsets={{ bottom: 0 }}
-      keyboardHidesNavigationBar={true}
     />
   );
 };

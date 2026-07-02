@@ -2,6 +2,7 @@ import { createNavigationContainerRef } from '@react-navigation/native';
 import UserStorage from '../../auth/user/UserStorage';
 import sharedApi from '../../shared/services/shared-api';
 import SavedAccountsStorage from "../../auth/user/SavedAccountsStorage";
+import { disconnectSocket } from '../../auth/api-client/socket';
 
 export const navigationRef = createNavigationContainerRef<any>();
 
@@ -22,6 +23,7 @@ export const logout = async (currentUserId: string) => {
     if (currentUserId && refreshToken) {
       await sharedApi.LogoutUser(currentUserId, refreshToken);
     }
+    disconnectSocket()
     await UserStorage.clearTokens();
     await UserStorage.deleteUser();
     resetToLogin();

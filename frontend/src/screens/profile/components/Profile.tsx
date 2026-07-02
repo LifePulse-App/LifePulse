@@ -13,9 +13,10 @@ import SavedAccountsStorage from "../../../auth/user/SavedAccountsStorage";
 import apiClient from "../../../auth/api-client/api_client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import NetInfo from "@react-native-community/netinfo";
-import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from "@gorhom/bottom-sheet";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import FastImage from 'react-native-fast-image';
 import { getAvatar } from "../../../storage/AvatarManager";
+import { disconnectSocket } from "../../../auth/api-client/socket";
 
 const PROFILE_CACHE_KEY = 'sbjkshiuhuw'
 
@@ -457,34 +458,28 @@ export default function ProfileScreen({ navigation }) {
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [activeModal, setActiveModal] = useState(null);
   const [avatarVersion, setAvatarVersion] = useState(null);
-  const sheetRef = useRef<BottomSheet>(null);
-const snapPoints = useMemo(() => ["60%"], []);
 
-const openSheet = useCallback((type) => {
-  sheetRef.current?.close(); // 👈 force reset first
+  // --- TrueSheet ref + detents (replaces @gorhom/bottom-sheet ref + snapPoints) ---
+  const sheetRef = useRef<TrueSheet>(null);
+  const logoutSheetRef = useRef<TrueSheet>(null);
+  const sheetDetents = useMemo(() => [0.5], []);
 
-  setTimeout(() => {
+  // NOTE: TrueSheet's present()/dismiss() return promises, so we can properly
+  // await the dismiss before swapping content + presenting again instead of
+  // relying on a setTimeout race (the old "force reset" hack).
+  const openSheet = useCallback(async (type) => {
+    // If a sheet is already open with different content, dismiss first so the
+    // sheet visibly resets before swapping the active modal content.
+    await sheetRef.current?.dismiss();
     setActiveModal(type);
-    sheetRef.current?.snapToIndex(0);
-  }, 50);
-}, []);
+    await sheetRef.current?.present();
+  }, []);
 
-const closeSheet = useCallback(() => {
-  sheetRef.current?.close();
-  setActiveModal(null);
-}, []);
+  const closeSheet = useCallback(async () => {
+    await sheetRef.current?.dismiss();
+    setActiveModal(null);
+  }, []);
 
-const renderBackdrop = useCallback(
-  (props) => (
-    <BottomSheetBackdrop
-      {...props}
-      appearsOnIndex={0}
-      disappearsOnIndex={-1}
-      opacity={0.6}   // 👈 control dullness here
-    />
-  ),
-  []
-);
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
@@ -504,6 +499,14 @@ const renderBackdrop = useCallback(
 
   // FIX 2: Track mount to prevent useFocusEffect double-firing with the initial load.
   const hasMountedRef = useRef(false);
+
+  const openLogoutSheet = async () => {
+  await logoutSheetRef.current?.present();
+};
+
+const closeLogoutSheet = async () => {
+  await logoutSheetRef.current?.dismiss();
+};
 
   // FIX 3: Set up NetInfo listener AND fetch initial state immediately on mount,
   // so offlineRef is populated before the first profile load runs.
@@ -615,6 +618,7 @@ useEffect(() => {
     }
     await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
     await logout(userId);
+    disconnectSocket()
     authContext?.setUser(null);
     UserStorage.clearTokens();
     UserStorage.deleteUser();
@@ -656,55 +660,118 @@ useEffect(() => {
   };
 
   const renderActionModal = () => {
-    const ModalComponent = actionComponents[activeModal];
     return (
-<BottomSheet
-enableOverDrag={false}
-  ref={sheetRef}
-  index={-1}
-  snapPoints={snapPoints}
-  enablePanDownToClose
-  onClose={() => setActiveModal(null)}
-  backgroundStyle={{ backgroundColor: "#0F172A" }}
-  handleIndicatorStyle={{ display: "none"}}
-  backdropComponent={renderBackdrop} 
->
-  <BottomSheetView style={{ padding: 20 }}>
-    {activeModal === "EditProfile" && (
-      <EditProfileModal
-        user={profile}
-        onClose={closeSheet}
-        setResultCard={setResultCard}
-        onChange={fetchProfileOnline}
-      />
-    )}
+      <TrueSheet
+        ref={sheetRef}
+        detents={sheetDetents}
+        cornerRadius={30}
+        backgroundColor="#0F172A"
+        grabber={false}
+        onDismiss={() => setActiveModal(null)}
+      >
+        <View style={{ padding: 20 }}>
+          {activeModal === "EditProfile" && (
+            <EditProfileModal
+              user={profile}
+              onClose={closeSheet}
+              setResultCard={setResultCard}
+              onChange={fetchProfileOnline}
+            />
+          )}
 
-    {activeModal === "ChangePassword" && (
-      <ChangePasswordModal
-        onClose={closeSheet}
-        setResultCard={setResultCard}
-        onChange={fetchProfileOnline}
-      />
-    )}
+          {activeModal === "ChangePassword" && (
+            <ChangePasswordModal
+              onClose={closeSheet}
+              setResultCard={setResultCard}
+              onChange={fetchProfileOnline}
+            />
+          )}
 
-    {activeModal === "ChangeNumber" && (
-      <ChangeNumberModal
-        user={profile}
-        onClose={closeSheet}
-        setResultCard={setResultCard}
-      />
-    )}
+          {activeModal === "ChangeNumber" && (
+            <ChangeNumberModal
+              user={profile}
+              onClose={closeSheet}
+              setResultCard={setResultCard}
+            />
+          )}
 
-    {activeModal === "LinkedAccount" && (
-      <LinkedAccountModal
-        onClose={closeSheet}
-        onChange={fetchProfileOnline}
-      />
-    )}
-  </BottomSheetView>
-</BottomSheet>
+          {activeModal === "LinkedAccount" && (
+            <LinkedAccountModal
+              onClose={closeSheet}
+              onChange={fetchProfileOnline}
+            />
+          )}
+        </View>
+      </TrueSheet>
     );
   };
+
+  const renderLogoutSheet = () => {
+  return (
+    <TrueSheet
+      ref={logoutSheetRef}
+      detents={[0.3]}
+      cornerRadius={28}
+      backgroundColor="#0F172A"
+      grabber={false}
+    >
+      <View style={{ padding: 20, alignItems: "center" }}>
+        
+        <Text style={{
+          color: "#F9FAFB",
+          fontSize: 18,
+          fontWeight: "bold",
+          marginBottom: 10
+        }}>
+          Confirm Logout
+        </Text>
+
+        <Text style={{
+          color: "#9CA3AF",
+          textAlign: "center",
+          marginBottom: 25
+        }}>
+          Are you sure you want to logout from your account?
+        </Text>
+
+        <TouchableOpacity
+          style={{
+            backgroundColor: "#ef4444",
+            width: "100%",
+            padding: 14,
+            borderRadius: 14,
+            marginBottom: 10,
+            alignItems: "center"
+          }}
+          onPress={async () => {
+            await closeLogoutSheet();
+            confirmLogout();
+          }}
+        >
+          <Text style={{ color: "#fff", fontWeight: "bold" }}>
+            Logout
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={{
+            backgroundColor: "rgba(148,163,184,0.25)",
+            width: "100%",
+            padding: 14,
+            borderRadius: 14,
+            alignItems: "center"
+          }}
+          onPress={closeLogoutSheet}
+        >
+          <Text style={{ color: "#CBD5E1", fontWeight: "bold" }}>
+            Cancel
+          </Text>
+        </TouchableOpacity>
+
+      </View>
+    </TrueSheet>
+  );
+};
 
   return (
     <MainLayout>
@@ -804,15 +871,10 @@ enableOverDrag={false}
           </View>
         ))}
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={() => setLogoutModalVisible(true)} activeOpacity={0.86}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={openLogoutSheet} >
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
-        <GlassyConfirmModal
-          visible={logoutModalVisible}
-          message="Are you sure you want to logout?"
-          onConfirm={confirmLogout}
-          onCancel={() => setLogoutModalVisible(false)}
-        />
+
 
         <TouchableOpacity style={styles.deleteBtn} onPress={() => {
           setDeleteConfirmVisible(true);
@@ -883,6 +945,7 @@ enableOverDrag={false}
         onClose={() => setResultCard({ ...resultCard, visible: false })}
       />
       {renderActionModal()}
+      {renderLogoutSheet()}
     </MainLayout>
   );
 }

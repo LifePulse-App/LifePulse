@@ -20,7 +20,7 @@ import AppText from "../../../components/Layout/AppText/AppText";
 import Geolocation from "react-native-geolocation-service";
 import CompassHeading from "react-native-compass-heading";
 
-import { Camera, useCameraDevice } from "react-native-vision-camera";
+import { Camera, useCameraDevice, useCameraPermission } from "react-native-vision-camera";
 
 import {
   listNearbyArSpots,
@@ -157,29 +157,24 @@ export default function ARCameraView({ navigation }: any) {
     }).start();
   }, [composeOpen]);
 
-  const askPermissions = async () => {
-    try {
-      const status = await Camera.getCameraPermissionStatus();
-      if (status === "granted") {
-        setCamPerm("granted");
-      } else {
-        const newStatus = await Camera.requestCameraPermission();
-        setCamPerm(newStatus);
-      }
-
-      if (Platform.OS === "android") {
-        const ok = await requestAndroidLocationPermission();
-        setLocPermOk(ok);
-      } else {
-        const loc = await Geolocation.requestAuthorization("whenInUse");
-        setLocPermOk(loc === "granted");
-      }
-    } catch (e) {
-      console.log("[AR] permission error", e);
-    } finally {
-      setCamReady(true);
+  useEffect(() => {
+  (async () => {
+    if (Platform.OS === "android") {
+      const ok = await requestAndroidLocationPermission();
+      setLocPermOk(ok);
+    } else {
+      setLocPermOk(true); // iOS handled differently (if plist exists)
     }
-  };
+  })();
+}, []);
+
+const { hasPermission, requestPermission } = useCameraPermission();
+
+const askPermissions = async () => {
+  const ok = await requestPermission();
+  setCamPerm(ok ? "granted" : "denied");
+  setCamReady(true)
+};
 
   useEffect(() => {
     askPermissions();
@@ -473,7 +468,7 @@ export default function ARCameraView({ navigation }: any) {
 
   return (
     <View style={styles.root}>
-      <Camera style={StyleSheet.absoluteFillObject} device={device} isActive={!composeOpen} />
+      <Camera style={StyleSheet.absoluteFill} device={device} isActive={!composeOpen} />
 
       {!!toast && (
         <View

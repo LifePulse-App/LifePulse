@@ -1,15 +1,25 @@
 // components/MainLayout.tsx
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import LowNavBAr from './LowNavBar'; // Fixed import path
+import { View, StyleSheet, Platform } from 'react-native';
+import LowNavBAr from './LowNavBar'; 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
+  // Checks if the device is iOS 26 or newer
+  const isIOS26Plus =
+    Platform.OS === 'ios' &&
+    parseInt(Platform.Version, 10) >= 26;
+
   return (
     <SafeAreaView style={styles.container}>
-    <View style={styles.content}>{children}</View>
-    <LowNavBAr />
-  </SafeAreaView>
+      {/* Main Content Area */}
+      <View style={styles.content}>
+        {children}
+      </View>
+      
+      {/* Render navigation bar only if the device is NOT iOS 26+ */}
+      {!isIOS26Plus && <LowNavBAr />}
+    </SafeAreaView>
   );
 };
 
@@ -19,7 +29,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#050816'
   },
   content: {
-    flex: 11,
+    flex: 1, 
     backgroundColor: 'transparent'
   },
 });

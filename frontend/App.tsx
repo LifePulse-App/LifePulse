@@ -9,7 +9,6 @@ import {
   PermissionsAndroid,
   AppState,
 } from 'react-native';
-import { DefaultTheme, MD3DarkTheme, PaperProvider } from 'react-native-paper';
 import Toast, { BaseToast, BaseToastProps } from 'react-native-toast-message';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -45,6 +44,8 @@ import { handleNotificationPress } from './handleNotificationPress'; // or use y
 import 'react-native-get-random-values';
 import { TextEncoder, TextDecoder } from 'text-encoding';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { PaperProvider } from 'react-native-paper';
+import { connectSocket, disconnectSocket, getSocket } from './src/auth/api-client/socket';
 (global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
 
@@ -150,10 +151,6 @@ async function unregisterPushToken() {
 
 const App = () => {
   const [User, setUser] = useState<user | undefined>();
-
-  const colorScheme = useColorScheme();
-  const isDarkMode = colorScheme === 'dark';
-  const theme = isDarkMode ? MD3DarkTheme : DefaultTheme;
 
   const [isBiometricVerified, setIsBiometricVerified] = useState(false);
   const [isCheckingBiometric, setIsCheckingBiometric] = useState(true);
@@ -279,11 +276,24 @@ useEffect(() => {
       return onMessage(messagingInstance, async remoteMessage => {
         const data = remoteMessage?.data || {};
 
-        if (data.type === 'chat' && data.peerUserId) {
+if (data.type === 'chat' && data.peerUserId) {
           const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
           if (incomingMessageId) {
             try {
-              await markDelivered([incomingMessageId]);
+              // Get the live socket instance
+              const socket = getSocket();
+              
+              if (socket?.connected && data.conversationId) {
+                // ⚡ PURE WEBSOCKET: If app is active and socket is alive, emit delivery instantly
+                socket.emit("mark-delivered", {
+                  messageIds: [incomingMessageId],
+                  myUserId: User?.id || User?._id,
+                  conversationId: data.conversationId
+                });
+              } else {
+                // 🛡️ FALLBACK: If socket dropped (network switch), use HTTP
+                await markDelivered([incomingMessageId]);
+              }
             } catch (e) {
               console.log('markDelivered (foreground) failed', e);
             }
@@ -356,6 +366,17 @@ useEffect(() => {
   }
 }, [isBiometricVerified]);
 
+// Add this useEffect inside the App component
+useEffect(() => {
+  if (User) {
+    // User is logged in -> boot up the socket pipeline
+    connectSocket().catch(e => console.log('Socket boot error:', e));
+  } else {
+    // User is logged out -> kill the connection
+    disconnectSocket();
+  }
+}, [User]);
+
   useEffect(() => {
     const checkBiometric = async () => {
       try {
@@ -418,7 +439,7 @@ useEffect(() => {
 
   if (isCheckingBiometric) {
     return (
-      <PaperProvider theme={theme} settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
+      <PaperProvider settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#020617' }}>
           <ActivityIndicator size="large" color="#A855F7" />
         </View>
@@ -429,11 +450,11 @@ useEffect(() => {
   return (
     <KeyboardProvider>
      <GestureHandlerRootView style={{ flex: 1 }}>
-    <PaperProvider theme={theme} settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
+    <PaperProvider settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
       <AuthContext.Provider value={{ User, setUser }}>
         <AppUpdateGate>
           {isBiometricVerified ? (
-            <NavigationContainer theme={NavigationTheme} ref={navigationRef}>
+            <NavigationContainer ref={navigationRef}>
               <AuthNavigator />
             </NavigationContainer>
           ) : null}

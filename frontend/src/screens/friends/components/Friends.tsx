@@ -722,7 +722,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   root: { flex: 1 },
-  baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: "#020617" },
+  baseBackground: { ...StyleSheet.absoluteFill, backgroundColor: "#020617" },
   glowTop: {
     position: "absolute",
     top: -120,

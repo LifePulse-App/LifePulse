@@ -4,7 +4,7 @@ import Location from "../models/LocationSchema.js";
 
 // POST /api/moods
 // body: { mood: string }
-const MOOD_TTL_MS = 24 * 60 * 60 * 1000; // 2 hours
+const MOOD_TTL_MS = 24 * 60 * 60 * 1000;
 
 export const createMood = async (req, res) => {
   try {
@@ -29,6 +29,17 @@ export const createMood = async (req, res) => {
       mood,
       expiresAt: new Date(Date.now() + MOOD_TTL_MS),
     });
+
+    const location = await Location.findOne({ user: userId });
+
+if (location?.coords) {
+    req.io.emit("mood:update", {
+        mood: moodDoc.mood,
+        coords: location.coords,
+        createdAt: moodDoc.createdAt,
+        expiresAt: moodDoc.expiresAt,
+    });
+}
 
     return res.status(201).json({
       success: true,

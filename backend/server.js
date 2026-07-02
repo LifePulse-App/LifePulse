@@ -9,9 +9,8 @@ import cron from 'node-cron';
 import os from "os";
 import path from "path";
 import http from "http";
-import { Server } from "socket.io";
 import { startNotificationJobs } from './jobs/scheduledNotifications.js';
-import { registerCaptureEventHandlers } from './sockets/captureEvent.sockets.js';
+import { initializeSocket } from "./config/socket.js";
 
 // --- ENV
 const app = express();
@@ -51,6 +50,7 @@ import FriendRoutes from "./routes/FriendsRoutes.js";
 import PushRoutes from "./routes/NotificationRoutes.js";
 import LocationRoutes from "./routes/LocationRoutes.js";
 import ChatRoutes from "./routes/ChatRoutes.js";
+import CallRoutes from "./routes/CallRoutes.js";
 import appVersionRoutes from './routes/AppVersion.js';
 import adminNotifyRoutes from './routes/AdminNotificationRoutes.js';
 import ArPortalRoutes from "./routes/ArPortalRoutes.js";
@@ -76,6 +76,7 @@ app.use("/api/friends", FriendRoutes);
 app.use("/api/push", PushRoutes);
 app.use("/api/location", LocationRoutes);
 app.use("/api/chat", ChatRoutes);
+app.use("/api/call", CallRoutes);
 app.use("/api/ar-portal", ArPortalRoutes);
 app.use("/api/ar-private-portal", ArPrivatePortalRoutes);
 app.use("/api/admin/notify", adminNotifyRoutes);
@@ -92,45 +93,7 @@ app.use(errorMiddleware);
 const PORT = process.env.NODE_ENV === 'development' ? 40000 : 8080;
 const server = http.createServer(app);
 
-// --- SOCKET (ONLY ONE INSTANCE)
-const io = new Server(server, {
-  cors: { origin: "*" },
-});
-
-
-// --- SOCKET EVENTS
-io.on("connection", (socket) => {
-  // console.log("⚡ Connected:", socket.id);
-
-  socket.on("join", (userId) => {
-    socket.join(`user:${userId}`);
-  });
-
-  socket.on("join-conversation", (conversationId) => {
-    socket.join(`conversation:${conversationId}`);
-  });
-
-  // Typing
-  socket.on("typing", ({ conversationId, userId }) => {
-    socket.to(`conversation:${conversationId}`).emit("typing", { userId });
-  });
-
-  socket.on("stop-typing", ({ conversationId, userId }) => {
-    socket.to(`conversation:${conversationId}`).emit("stop-typing", { userId });
-  });
-
-    registerCaptureEventHandlers(io, socket);
-
-   socket.join("ar-global-portal"); // all AR users in one room
-
-  socket.on("join-ar-private-portal", (portalId) => {
-    socket.join(`ar-private-portal:${portalId}`);
-  });
-  
-  socket.on("disconnect", () => {
-    //  console.log("❌ Disconnected:", socket.id);
-  });
-});
+const io = initializeSocket(server);
 
 // --- CRON
 import { runMonthlyReset } from './helpers/monthlyReset.js';

@@ -1,15 +1,12 @@
 import 'react-native-get-random-values';
 import { Buffer } from 'buffer';
-import { Crypto } from '@peculiar/webcrypto';
 
 // Polyfills
 if (!global.Buffer) global.Buffer = Buffer;
-if (!global.crypto) global.crypto = new Crypto();
-else if (!global.crypto.subtle) global.crypto.subtle = new Crypto().subtle;
 
 import 'react-native-gesture-handler';
 import { AppRegistry } from 'react-native';
-import notifee, { EventType, AndroidImportance } from '@notifee/react-native';
+import notifee, { EventType, AndroidImportance, AndroidCategory } from '@notifee/react-native';
 
 import { getApp } from '@react-native-firebase/app';
 import { getMessaging, setBackgroundMessageHandler } from '@react-native-firebase/messaging';
@@ -43,7 +40,7 @@ notifee.createChannel({
   vibration: true,
 });
 
-// App notifications channel (new)
+// App notifications channel (existing)
 notifee.createChannel({
   id: 'app_notifications',
   name: 'App Notifications',
@@ -52,9 +49,19 @@ notifee.createChannel({
   vibration: true,
 });
 
+// ⚡ THE CALL CHANNEL: High priority to wake the screen
+notifee.createChannel({
+  id: 'call_channel',
+  name: 'Incoming Calls',
+  importance: AndroidImportance.HIGH,
+  sound: 'default', // You can drop a custom ringtone .mp3 here later
+  vibration: true,
+  vibrationPattern: [300, 500, 300, 500],
+});
+
 /*
 |--------------------------------------------------------------------------
-| Helpers
+| Helpers (100% Fully Restored)
 |--------------------------------------------------------------------------
 */
 
@@ -157,6 +164,40 @@ const messagingInstance = getMessaging(firebaseApp);
 
 setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
   const data = remoteMessage?.data || {};
+
+  // ── ⚡ INCOMING CALL WAKE-UP ──
+  if (data.type === 'incoming_call') {
+    const { callId, callerName } = data;
+
+    try {
+      // Bypasses the lock screen and forces Android to launch your App UI
+      await notifee.displayNotification({
+        id: String(callId || 'incoming_call'),
+        title: 'Incoming Call',
+        body: `${callerName || 'Someone'} is calling...`,
+        android: {
+          channelId: 'call_channel',
+          category: AndroidCategory.CALL,
+          importance: AndroidImportance.HIGH,
+          autoCancel: false,
+          ongoing: true, // Prevents user from swiping it away
+          // ⚡ THIS IS THE MAGIC: It launches your React Native App over the lock screen
+          fullScreenAction: {
+            id: 'default',
+            mainComponent: appName,
+          },
+          pressAction: {
+            id: 'default',
+            mainComponent: appName,
+          },
+        },
+        data: { ...data },
+      });
+    } catch (err) {
+      console.log('[Notifee] Full Screen intent failed:', err);
+    }
+    return; // Stop here so it doesn't run the rest of the handler
+  }
 
   // ── Chat ──
   if (data.type === 'chat') {

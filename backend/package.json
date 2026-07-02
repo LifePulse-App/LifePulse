@@ -1,6 +1,6 @@
 {
-  "name": "StreakSphere-App",
-  "version": "1.0.0",
+  "name": "StreakSphere",
+  "version": "4.0.0",
   "type": "module",
   "main": "server.js",
   "scripts": {

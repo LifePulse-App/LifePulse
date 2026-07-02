@@ -10,6 +10,7 @@ import api_Login from "../services/api_Login";
 import { setAuthHeaders, setSecretKey } from "../../../auth/api-client/api_client";
 import UserStorage from "../../../auth/user/UserStorage";
 import { loginStyles } from "./Loginstyles";
+import { connectSocket } from "../../../auth/api-client/socket";
 
 const SavedAccountsScreen = ({ navigation }: any) => {
   const styles = loginStyles();
@@ -81,6 +82,8 @@ const SavedAccountsScreen = ({ navigation }: any) => {
       await UserStorage.setUser(user);
       if (user.accessToken) await UserStorage.setAccessToken(user.accessToken);
       if (user.refreshToken) await UserStorage.setRefreshToken(user.refreshToken);
+
+      await connectSocket()
 
       navigation.dispatch(
         CommonActions.reset({
