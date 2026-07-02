@@ -114,6 +114,23 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
 
+io.engine.on("connection_error", (err) => {
+  console.log("ENGINE CONNECTION ERROR");
+  console.log(err);
+});
+
+io.on("connection", (socket) => {
+  console.log("CONNECTED:", socket.id);
+
+  socket.conn.on("close", (reason) => {
+    console.log("CONNECTION CLOSED:", reason);
+  });
+
+  socket.on("disconnect", (reason) => {
+    console.log("DISCONNECTED:", reason);
+  });
+});
+
 // --- START
 server.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);

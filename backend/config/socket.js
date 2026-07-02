@@ -9,7 +9,10 @@ export function initializeSocket(server) {
     cors: {
       origin: "*",
       methods: ["GET", "POST"],
-    },
+credentials: true
+  },
+  transports: ['websocket', 'polling'], // Allow the server to accept the forced websocket
+  allowEIO3: true
   });
   io.use(socketAuth)
   registerSocketEvents(io);
