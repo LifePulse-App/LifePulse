@@ -20,7 +20,6 @@ callId =>
 }
 */
 
-
 const CALL_TIMEOUT = 30000;
 
 const generateCallId = () =>
@@ -58,7 +57,7 @@ const cleanupCall = (callId) => {
     const call = activeCalls.get(callId);
     if (!call) return;
     if (call.timeout) clearTimeout(call.timeout);
-    if (call.ringingTimeout) clearTimeout(call.ringingTimeout); // ⚡ NEW
+    // ⚡ FIX: Removed ringingTimeout logic to ensure the full 30s ring cycle
     activeCalls.delete(callId);
 };
 
@@ -121,35 +120,23 @@ export default function registerCallSocket(io, socket) {
 
             const callId = generateCallId();
 
-            const ringingTimeout = setTimeout(async () => {
-        const current = activeCalls.get(callId);
-        if (!current || current.status !== "connecting") return;
-
-        // If the device never fired "call:ringing" within 10s, they have no internet.
-        emitToUser(io, current.callerId, "call:no-answer", { 
-            callId, 
-            callerId: current.callerId, 
-            receiverId: current.receiverId, 
-            conversationId: current.conversationId 
-        });
-        
-        try {
-            await Call.create({
-                callId, caller: current.callerId, receiver: current.receiverId,
-                conversationId: current.conversationId, type: current.type,
-                status: "missed", startedAt: new Date(current.startedAt), endedAt: new Date(), duration: 0
-            });
-        } catch (err) { console.error(err); }
-
-        cleanupCall(callId);
-    }, 10000); // 10 seconds to confirm network connectivity
-
             const timeout = setTimeout(async() => {
                 const current = activeCalls.get(callId);
                 if (!current) return;
 
-                emitToUser(io, current.callerId, "call:no-answer", { callId });
-                emitToUser(io, current.receiverId, "call:missed", { callId, callerId: current.callerId });
+                // ⚡ FIX: Enriched payloads so the Call Logs get correctly saved on the frontend
+                emitToUser(io, current.callerId, "call:no-answer", { 
+                    callId, 
+                    callerId: current.callerId, 
+                    receiverId: current.receiverId, 
+                    conversationId: current.conversationId 
+                });
+                emitToUser(io, current.receiverId, "call:missed", { 
+                    callId, 
+                    callerId: current.callerId, 
+                    receiverId: current.receiverId, 
+                    conversationId: current.conversationId 
+                });
 
                 try {
                     await Call.create({
@@ -171,13 +158,12 @@ export default function registerCallSocket(io, socket) {
             }, CALL_TIMEOUT);
 
             activeCalls.set(callId, {
-        callId, callerId, receiverId, callerSocketId: socket.id,
-        receiverSocketId: receiverSockets && receiverSockets.size > 0 ? [...receiverSockets][0] : null,
-        type, conversationId, startedAt: Date.now(),
-        status: "connecting", // ⚡ CHANGED from "ringing" to "connecting"
-        ringingTimeout,       // ⚡ NEW
-        timeout
-    });
+                callId, callerId, receiverId, callerSocketId: socket.id,
+                receiverSocketId: receiverSockets && receiverSockets.size > 0 ? [...receiverSockets][0] : null,
+                type, conversationId, startedAt: Date.now(),
+                status: "connecting", 
+                timeout
+            });
 
             const caller = await User.findById(callerId).select("name username avatar avatarUrl tick");
 
@@ -216,16 +202,15 @@ export default function registerCallSocket(io, socket) {
                         });
                     } catch (e) {
                         console.error("🔴 FCM Wakeup Failed:", e);
-                        cleanupCall(callId);
-                        return callback({ success: false, message: "User offline" });
+                        // ⚡ FIX: Removed cleanupCall & return false. Let it timeout naturally.
                     }
                 } else {
-                    // No sockets and no push token
-                    cleanupCall(callId);
-                    return callback({ success: false, message: "User offline" });
+                    console.log("🟠 USER OFFLINE: No FCM Token found. Waiting for timeout.");
+                    // ⚡ FIX: Removed cleanupCall & return false. Let it timeout naturally.
                 }
             }
 
+            // ⚡ FIX: Always return success: true so the caller's outgoing screen stays active!
             callback({ success: true, callId });
 
         } catch (err) {
@@ -469,10 +454,7 @@ export default function registerCallSocket(io, socket) {
         const call = activeCalls.get(callId);
         if (!call) return;
 
-        if (call.ringingTimeout) {
-            clearTimeout(call.ringingTimeout);
-            call.ringingTimeout = null;
-        }
+        // Note: ringingTimeout was removed for full 30s ringing
         
         call.status = "ringing";
         activeCalls.set(callId, call);
@@ -506,11 +488,11 @@ export default function registerCallSocket(io, socket) {
         } else if (isCallerDisconnecting) {
             status = "cancelled";
             endedEvent = "call:cancelled";
-            endedPayload = { callId: activeCall.callId };
+            endedPayload = { callId: activeCall.callId, callerId: activeCall.callerId, receiverId: activeCall.receiverId, conversationId: activeCall.conversationId };
         } else {
             status = "missed";
             endedEvent = "call:missed";
-            endedPayload = { callId: activeCall.callId, callerId: activeCall.callerId };
+            endedPayload = { callId: activeCall.callId, callerId: activeCall.callerId, receiverId: activeCall.receiverId, conversationId: activeCall.conversationId };
         }
 
         try {
