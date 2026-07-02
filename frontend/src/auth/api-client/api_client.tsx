@@ -17,7 +17,7 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 const apiClient = create({
-  baseURL: 'http://192.168.18.178:40000/api',
+  baseURL: 'https://api-dev.streaksphere.app/api',
   headers: { 'Content-Type': 'application/json' },
 });
 

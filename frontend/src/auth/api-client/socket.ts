@@ -39,7 +39,6 @@ export const connectSocket = async () => {
         }
 
         socket = io(wsBase, {
-            transports: ["websocket"],
             autoConnect: true,
             reconnection: true,
             reconnectionAttempts: Infinity,
