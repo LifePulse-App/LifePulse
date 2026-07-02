@@ -6,6 +6,7 @@ import Adjustment from '../../screens/mood-map/components/adjustment/Adjustment'
 import StudentTabNavigator from './StudentTabNavigator';
 import AnnualItemDetails from '../../screens/mood-map/components/overdues/AnnualItemDetails';
 import AdjustmentDetailScreen from '../../screens/mood-map/components/adjustment-details/AdjustmentDetailScreen';
+import MoodScreen from '../../screens/moodscreen/comp/component/MoodScreen';
 
 // Define stack type if needed (optional for now)
 const Stack = createNativeStackNavigator();
@@ -13,6 +14,7 @@ const Stack = createNativeStackNavigator();
 const StudentNavigator = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="StudentList" component={StudentList} />
+    <Stack.Screen name="MoodScreen" component={MoodScreen} />
     <Stack.Screen name="StudentTabNavigator" component={StudentTabNavigator} />
     <Stack.Screen name="Adjustment" component={Adjustment} />
     <Stack.Screen name="AdjustmentDetailScreen" component={AdjustmentDetailScreen} />

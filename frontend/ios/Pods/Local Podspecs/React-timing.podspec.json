@@ -1,6 +1,6 @@
 {
   "name": "React-timing",
-  "version": "0.80.0",
+  "version": "0.86.0",
   "summary": "React Native timing primitives",
   "homepage": "https://reactnative.dev/",
   "license": "MIT",
@@ -10,13 +10,19 @@
   },
   "source": {
     "git": "https://github.com/facebook/react-native.git",
-    "tag": "v0.80.0"
+    "tag": "v0.86.0"
   },
-  "source_files": "*.{cpp,h}",
+  "source_files": "**/*.h",
   "header_dir": "react/timing",
   "pod_target_xcconfig": {
     "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
-    "HEADER_SEARCH_PATHS": "",
+    "HEADER_SEARCH_PATHS": "\"${PODS_ROOT}/React-debug\"",
     "DEFINES_MODULE": "YES"
+  },
+  "dependencies": {
+    "React-debug": []
+  },
+  "resource_bundles": {
+    "React-timing_privacy": "PrivacyInfo.xcprivacy"
   }
 }

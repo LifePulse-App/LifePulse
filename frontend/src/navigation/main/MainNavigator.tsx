@@ -18,7 +18,7 @@ const MainNavigator = () => (
   <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade',
     gestureEnabled: true,
     fullScreenGestureEnabled: true,
-    animationDuration: 200 }}>
+    animationDuration: 20 }}>
     <Stack.Screen name="Dashboard" component={Dashboard} />
     <Stack.Screen name="MoodScreen" component={MoodScreen} />
     <Stack.Screen name="Student" component={StudentList} />

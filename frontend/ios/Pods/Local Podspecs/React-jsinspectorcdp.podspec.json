@@ -1,6 +1,6 @@
 {
   "name": "React-jsinspectorcdp",
-  "version": "0.80.0",
+  "version": "0.86.0",
   "summary": "Common helper functions for working with CDP messages in jsinspector-modern",
   "homepage": "https://reactnative.dev/",
   "license": "MIT",
@@ -10,31 +10,20 @@
   },
   "source": {
     "git": "https://github.com/facebook/react-native.git",
-    "tag": "v0.80.0"
+    "tag": "v0.86.0"
   },
-  "source_files": "*.{cpp,h}",
+  "source_files": "*.h",
   "header_dir": "jsinspector-modern/cdp",
   "pod_target_xcconfig": {
-    "HEADER_SEARCH_PATHS": [
-      "$(PODS_ROOT)/glog",
-      "$(PODS_ROOT)/boost",
-      "$(PODS_ROOT)/DoubleConversion",
-      "$(PODS_ROOT)/fast_float/include",
-      "$(PODS_ROOT)/fmt/include",
-      "$(PODS_ROOT)/SocketRocket",
-      "$(PODS_ROOT)/RCT-Folly"
-    ],
+    "HEADER_SEARCH_PATHS": "",
     "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
-    "DEFINES_MODULE": "YES"
+    "DEFINES_MODULE": "YES",
+    "OTHER_CFLAGS": "$(inherited) -ivfsoverlay $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml",
+    "OTHER_CPLUSPLUSFLAGS": "$(inherited) -ivfsoverlay $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml",
+    "OTHER_SWIFT_FLAGS": "$(inherited) -Xcc -ivfsoverlay -Xcc $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml"
   },
   "dependencies": {
-    "glog": [],
-    "boost": [],
-    "DoubleConversion": [],
-    "fast_float": [],
-    "fmt": [],
-    "RCT-Folly": [],
-    "SocketRocket": [],
-    "RCT-Folly/Fabric": []
+    "ReactNativeDependencies": [],
+    "React-Core-prebuilt": []
   }
 }

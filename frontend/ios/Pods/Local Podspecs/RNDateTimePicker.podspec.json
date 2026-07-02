@@ -1,6 +1,6 @@
 {
   "name": "RNDateTimePicker",
-  "version": "8.4.5",
+  "version": "9.1.0",
   "summary": "DateTimePicker component for React Native",
   "description": "DateTimePicker component for React Native",
   "license": "MIT",
@@ -12,7 +12,7 @@
   },
   "source": {
     "git": "https://github.com/react-native-community/datetimepicker",
-    "tag": "v8.4.5"
+    "tag": "v9.1.0"
   },
   "source_files": "ios/**/*.{h,m,mm,cpp}",
   "requires_arc": true,
@@ -37,20 +37,14 @@
     "React-jsi": [],
     "React-renderercss": [],
     "hermes-engine": [],
-    "React-hermes": [],
-    "glog": [],
-    "boost": [],
-    "DoubleConversion": [],
-    "fast_float": [],
-    "fmt": [],
-    "RCT-Folly": [],
-    "SocketRocket": [],
-    "RCT-Folly/Fabric": []
+    "ReactNativeDependencies": [],
+    "React-Core-prebuilt": []
   },
   "pod_target_xcconfig": {
     "HEADER_SEARCH_PATHS": "\"$(PODS_ROOT)/Headers/Private/Yoga\"",
     "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
-    "OTHER_CPLUSPLUSFLAGS": "$(inherited) -DRCT_NEW_ARCH_ENABLED=1 ",
-    "OTHER_SWIFT_FLAGS": "$(inherited) -DRCT_NEW_ARCH_ENABLED"
+    "OTHER_CPLUSPLUSFLAGS": "$(inherited) -DRCT_NEW_ARCH_ENABLED=1  -ivfsoverlay $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml",
+    "OTHER_SWIFT_FLAGS": "$(inherited) -DRCT_NEW_ARCH_ENABLED -Xcc -ivfsoverlay -Xcc $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml",
+    "OTHER_CFLAGS": "$(inherited) -ivfsoverlay $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml"
   }
 }

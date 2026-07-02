@@ -30,6 +30,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const okMime =
       file.mimetype.startsWith("image/") ||
+      file.mimetype.startsWith("audio/") ||
       file.mimetype.startsWith("video/") ||
       file.mimetype === "application/pdf" ||
       file.mimetype === "application/msword" ||

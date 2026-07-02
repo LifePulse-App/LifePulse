@@ -16,6 +16,9 @@ import {
   Camera,
   useCameraDevices,
   CameraDevice,
+  useCameraPermission,
+  useCameraDevice,
+  usePhotoOutput
 } from 'react-native-vision-camera';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AppActivityIndicator from '../../components/Layout/AppActivityIndicator/AppActivityIndicator';
@@ -75,9 +78,8 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
   const authContext = useContext(AuthContext);
 
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [uploading, setUploading] = useState(false);
-
+const { hasPermission, requestPermission } = useCameraPermission();
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitSections, setHabitSections] = useState<HabitSection[]>([]);
   const [habitId, setHabitId] = useState<string | null>(
@@ -112,10 +114,9 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
   }, []);
 
   // Camera refs and state
-  const cameraRef = useRef<Camera | null>(null);
-  const devices = useCameraDevices();
+ const photoOutput = usePhotoOutput();
   const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>('back');
-  const device: CameraDevice | undefined = devices.find(d => d.position === cameraPosition) ?? devices[0];
+  const device = useCameraDevice(cameraPosition);
 
   // Zoom state
   const [zoom, setZoom] = useState(MIN_ZOOM);
@@ -140,17 +141,11 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
   }, []);
 
   // Camera permissions
-  useEffect(() => {
-    (async () => {
-      const status = await Camera.getCameraPermissionStatus();
-      if (status === 'granted') {
-        setHasPermission(true);
-        return;
-      }
-      const newStatus = await Camera.requestCameraPermission();
-      setHasPermission(newStatus === 'granted');
-    })();
-  }, []);
+useEffect(() => {
+  if (!hasPermission) {
+    requestPermission();
+  }
+}, [hasPermission]);
 
   const groupHabits = (items: Habit[]): HabitSection[] => {
     const byGroup: Record<string, Habit[]> = {};
@@ -309,24 +304,38 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  const handleTakePhoto = async () => {
+const handleTakePhoto = async () => {
     if (!habitId) {
       showMessage('Please select an activity before capturing proof.');
-      // setHabitModalVisible(true);
       return;
     }
-    if (!cameraRef.current) return;
+    
     try {
-      const photo = await cameraRef.current.takePhoto({
-        qualityPrioritization: 'balanced',
-        flash: 'off',
-      });
-      const filePath = `file://${photo.path}`;
+      if (isMountedRef.current) setUploading(true);
+
+      // FIX: Pass the required callbacks object as the 2nd parameter
+      const photo = await photoOutput.capturePhoto(
+        {
+          flashMode: 'off', 
+        },
+        {
+          // You can leave this empty to satisfy TypeScript, 
+          // or use hooks like `onShutter: () => console.log('Click!')` in the future.
+        }
+      );
+      
+      const path = await photo.saveToTemporaryFileAsync();
+      const filePath = `file://${path}`;
+      
+      photo.dispose();
+
       uploadProof(filePath, habitId);
       navigation.goBack();
     } catch (err) {
       console.error('Capture error:', err);
       showMessage('Failed to capture photo. Please try again.');
+    } finally {
+      if (isMountedRef.current) setUploading(false);
     }
   };
 
@@ -421,14 +430,14 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={styles.baseBackground} />
       <View style={styles.glowTop} />
       <View style={styles.glowBottom} />
-      <View style={StyleSheet.absoluteFillObject} {...panResponder.panHandlers}>
+      <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers}>
         <Camera
-          ref={cameraRef}
-          style={StyleSheet.absoluteFillObject}
+     
+          style={StyleSheet.absoluteFill}
           device={device}
           isActive={true}
-          photo={true}
-          zoom={zoom}
+          outputs={[photoOutput]}
+
         />
       </View>
       <View style={styles.overlay}>
@@ -466,7 +475,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
         <View style={styles.bottomBar}>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.zoomButton}
             onPress={() => {
               const newZoom = Math.max(MIN_ZOOM, zoom - 0.5);
@@ -476,11 +485,11 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
             }}
           >
             <Icon name="minus" size={20} color="#E5E7EB" />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
           <TouchableOpacity style={styles.shutterOuterGlass} onPress={handleTakePhoto} activeOpacity={0.8}>
             <View style={styles.shutterInner} />
           </TouchableOpacity>
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.zoomButton}
             onPress={() => {
               const newZoom = Math.min(MAX_ZOOM, zoom + 0.5);
@@ -490,7 +499,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
             }}
           >
             <Icon name="plus" size={20} color="#E5E7EB" />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
       </View>
       {renderHabitList()}
@@ -501,7 +510,7 @@ const ProofVisionCameraScreen: React.FC<Props> = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#020617' },
-  baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: '#020617' },
+  baseBackground: { ...StyleSheet.absoluteFill, backgroundColor: '#020617' },
   glowTop: {
     position: 'absolute', top: -120, left: -40, width: 260, height: 260,
     borderRadius: 260, backgroundColor: 'rgba(59, 130, 246, 0.35)',
@@ -511,7 +520,7 @@ const styles = StyleSheet.create({
     borderRadius: 260, backgroundColor: 'rgba(168, 85, 247, 0.35)',
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     paddingTop: Platform.OS === 'android' ? 40 : 60,
     paddingHorizontal: 20,
   },

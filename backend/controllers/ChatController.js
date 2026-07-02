@@ -20,7 +20,7 @@ const toObjectId = (v) => {
   }
 };
 
-const allowedTypes = ["text", "image", "video", "document", "audio"];
+const allowedTypes = ["text", "image", "video", "document", "audio", "voice"];
 
 const normalizeMessageBody = (body) => {
   const {
@@ -31,7 +31,7 @@ const normalizeMessageBody = (body) => {
     receiverId,
     clientMessageId,
     notifyUser = true,
-    replyTo
+    replyTo,
   } = body || {};
 
   const type = allowedTypes.includes(String(messageType)) ? String(messageType) : "text";
@@ -44,7 +44,10 @@ const normalizeMessageBody = (body) => {
         size: Number(media.size || 0),
         name: String(media.name || ""),
         thumbnailUrl: String(media.thumbnailUrl || ""),
-        duration: Number(media.duration || 0),
+        // FIX: was `media.duration` (frontend never sends that key) -> now reads `durationMs`
+        durationMs: Number(media.durationMs || 0),
+        // FIX: peaks were dropped before saving; now passed through
+        peaks: Array.isArray(media.peaks) ? media.peaks.map(Number) : [],
       }
     : null;
 
@@ -56,15 +59,15 @@ const normalizeMessageBody = (body) => {
     receiverId,
     clientMessageId,
     notifyUser,
-    replyTo
+    replyTo,
   };
 };
 
 const getPushBody = (msg) => {
-  if (msg.messageType === "image") return "📷 Photo";
-  if (msg.messageType === "video") return "🎥 Video";
-  if (msg.messageType === "document") return "📎 Document";
-  if (msg.messageType === "audio") return "🎤 Voice message";
+  if (msg.messageType === "image") return "sent a Photo";
+  if (msg.messageType === "video") return "sent a Video";
+  if (msg.messageType === "document") return "sent a Document";
+  if (msg.messageType === "audio" || msg.messageType === "voice") return "sent a Voice message";
   return String(msg.text || "");
 };
 
@@ -75,7 +78,7 @@ const detectMessageTypeFromMime = (mimeType = "") => {
   return "document";
 };
 
-const saveOneFile = async (file) => {
+const saveOneFile = async (file, durationMs, peaks) => {
   const HOME_DIR = os.homedir();
   const CHAT_DIR = path.join(HOME_DIR, "uploads", "chat");
   await fs.promises.mkdir(CHAT_DIR, { recursive: true });
@@ -96,18 +99,16 @@ const saveOneFile = async (file) => {
     size: Number(file.size || 0),
     name: String(file.originalname || fileName),
     thumbnailUrl: "",
-    duration: 0,
+    // FIX: was always 0 (`duration: 0` hardcoded) -> now uses uploaded durationMs/peaks
+    durationMs: Number(durationMs || 0),
+    peaks: Array.isArray(peaks) ? peaks.map(Number) : [],
     messageType: detectMessageTypeFromMime(String(file.mimetype || "")),
   };
 };
 
 export const uploadChatMedia = async (req, res) => {
   try {
-    const files = Array.isArray(req.files)
-      ? req.files
-      : req.file
-      ? [req.file]
-      : [];
+    const files = Array.isArray(req.files) ? req.files : req.file ? [req.file] : [];
 
     if (!files.length) {
       return res.status(400).json({ message: "file(s) is required" });
@@ -125,13 +126,23 @@ export const uploadChatMedia = async (req, res) => {
       }
     }
 
+    // FIX: durationMs/peaks were sent by frontend (form fields) but never read on this route
+    const durationMs = Number(req.body?.durationMs || 0);
+    let peaks = [];
+    if (req.body?.peaks) {
+      try {
+        peaks = JSON.parse(req.body.peaks);
+      } catch {
+        peaks = [];
+      }
+    }
+
     const uploaded = [];
     for (const f of files) {
-      const one = await saveOneFile(f);
+      const one = await saveOneFile(f, durationMs, peaks);
       uploaded.push(one);
     }
 
-    // backward compatibility for old single-file frontend
     if (uploaded.length === 1) {
       const first = uploaded[0];
       return res.status(200).json({
@@ -143,7 +154,8 @@ export const uploadChatMedia = async (req, res) => {
           size: first.size,
           name: first.name,
           thumbnailUrl: first.thumbnailUrl,
-          duration: first.duration,
+          durationMs: first.durationMs,
+          peaks: first.peaks,
         },
         files: uploaded,
       });
@@ -160,7 +172,6 @@ export const uploadChatMedia = async (req, res) => {
   }
 };
 
-// ----- your existing exports below (unchanged) -----
 export const openDirectConversation = async (req, res) => {
   try {
     const me = req.user._id;
@@ -190,7 +201,7 @@ export const openDirectConversation = async (req, res) => {
 export const sendMessage = async (req, res) => {
   try {
     const senderId = req.user._id;
-  
+
     const {
       type,
       text,
@@ -252,7 +263,8 @@ export const sendMessage = async (req, res) => {
                 size: media.size,
                 name: media.name,
                 thumbnailUrl: media.thumbnailUrl,
-                duration: media.duration,
+                durationMs: media.durationMs,
+                peaks: media.peaks,
               },
         clientMessageId: String(clientMessageId),
       });
@@ -263,13 +275,7 @@ export const sendMessage = async (req, res) => {
 
     if (createdNow && notifyUser && String(senderId) !== String(recvObj)) {
       const fromUsername = req.user?.name || req.user?.username || "Someone";
-      await sendMsgNotification(
-        recvObj,
-        senderId,
-        fromUsername,
-        msg._id,
-        getPushBody(msg)
-      );
+      await sendMsgNotification(recvObj, senderId, fromUsername, msg._id, getPushBody(msg));
     }
 
     res.json({
@@ -302,12 +308,12 @@ export const getThread = async (req, res) => {
     const q = { conversationId: convoObj, deletedForEveryone: { $ne: true } };
     if (beforeRaw) q.createdAt = { $lt: new Date(String(beforeRaw)) };
 
-  const messages = await ChatMessage.find(q)
-  .populate("replyTo", "text messageType media senderId")
-  .sort({ createdAt: 1 })
-  .limit(limit)
-  .lean();
-res.json({ messages }); // reactions included by default if schema has it
+    const messages = await ChatMessage.find(q)
+      .populate("replyTo", "text messageType media senderId")
+      .sort({ createdAt: 1 })
+      .limit(limit)
+      .lean();
+    res.json({ messages });
   } catch (err) {
     console.error("[chat] getThread error", err);
     res.status(500).json({ message: "Internal error" });
@@ -330,7 +336,7 @@ export const markDelivered = async (req, res) => {
       receiverId: me,
       deliveredAt: null,
     })
-     .select("_id senderId receiverId conversationId")
+      .select("_id senderId receiverId conversationId")
       .lean();
 
     if (!msgs.length) {
@@ -404,10 +410,10 @@ export const markSeen = async (req, res) => {
       await sendSeenNotification(peerObj, me);
     }
 
-req.io.to(`conversation:${conversationId}`).emit("msg-seen", {
-  msgId: lastSeenMessageId, // ✅ cleaner
-  userId: String(me),
-});
+    req.io.to(`conversation:${conversationId}`).emit("msg-seen", {
+      msgId: lastSeenMessageId,
+      userId: String(me),
+    });
 
     res.json({ success: true, count: changed });
   } catch (err) {
@@ -447,6 +453,8 @@ export const listConversationPreviews = async (req, res) => {
         if (last.messageType === "image") lastText = "📷 Photo";
         else if (last.messageType === "video") lastText = "🎥 Video";
         else if (last.messageType === "document") lastText = "📎 Document";
+        // FIX: voice/audio fell through to `last.text` (empty string) -> preview was blank.
+        else if (last.messageType === "voice" || last.messageType === "audio") lastText = "🎤 Voice message";
         else lastText = last.text || "";
       }
 
@@ -475,7 +483,9 @@ export const markDeliveredAll = async (req, res) => {
     const pending = await ChatMessage.find({
       receiverId: me,
       deliveredAt: null,
-    }).select("_id senderId conversationId").lean(); // <-- get conversationId!
+    })
+      .select("_id senderId conversationId")
+      .lean();
 
     if (!pending.length) return res.json({ success: true, count: 0 });
 
@@ -486,16 +496,13 @@ export const markDeliveredAll = async (req, res) => {
       { $set: { deliveredAt: new Date() } }
     );
 
-    // Emit socket events for each delivered message
     for (const msg of pending) {
-      // Emit to the conversation room; msg.senderId can use for sender notification if needed
       req.io.to(`conversation:${msg.conversationId}`).emit("msg-delivered", {
         msgId: String(msg._id),
         userId: String(me),
       });
     }
 
-    // Send push notifications (optional, as you had before)
     const bySender = new Map();
     for (const m of pending) {
       const s = String(m.senderId);
@@ -525,19 +532,14 @@ export const reactToMessage = async (req, res) => {
     const msg = await ChatMessage.findById(messageId);
     if (!msg) return res.status(404).json({ message: "Message not found" });
 
-    // 🔒 Authorization check
     const isParticipant =
-      String(msg.senderId) === String(me) ||
-      String(msg.receiverId) === String(me);
+      String(msg.senderId) === String(me) || String(msg.receiverId) === String(me);
 
     if (!isParticipant) {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    // Replace old reaction
-    msg.reactions = msg.reactions.filter(
-      (r) => String(r.userId) !== String(me)
-    );
+    msg.reactions = msg.reactions.filter((r) => String(r.userId) !== String(me));
 
     msg.reactions.push({
       userId: me,
@@ -572,22 +574,17 @@ export const removeReaction = async (req, res) => {
     const msg = await ChatMessage.findById(messageId);
     if (!msg) return res.status(404).json({ message: "Message not found" });
 
-    // 🔒 Authorization
     const isParticipant =
-      String(msg.senderId) === String(me) ||
-      String(msg.receiverId) === String(me);
+      String(msg.senderId) === String(me) || String(msg.receiverId) === String(me);
 
     if (!isParticipant) {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    msg.reactions = msg.reactions.filter(
-      (r) => String(r.userId) !== String(me)
-    );
+    msg.reactions = msg.reactions.filter((r) => String(r.userId) !== String(me));
 
     await msg.save();
 
-    // 🔥 IMPORTANT: emit change
     req.io.to(`conversation:${msg.conversationId}`).emit("msg-reacted", {
       msgId: String(msg._id),
       userId: String(me),
@@ -613,7 +610,6 @@ export const deleteForEveryone = async (req, res) => {
     const msg = await ChatMessage.findById(messageId);
     if (!msg) return res.status(404).json({ message: "Message not found" });
 
-    // 🔒 Only sender can delete for everyone
     if (String(msg.senderId) !== String(me)) {
       return res.status(403).json({ message: "Only sender can delete this message" });
     }
@@ -621,7 +617,6 @@ export const deleteForEveryone = async (req, res) => {
     msg.deletedForEveryone = true;
     await msg.save();
 
-    // 🔥 realtime delete
     req.io.to(`conversation:${msg.conversationId}`).emit("msg-deleted", {
       msgId: String(msg._id),
     });
@@ -648,20 +643,17 @@ export const markListened = async (req, res) => {
       return res.status(404).json({ message: "Message not found" });
     }
 
-    // only receiver can mark listened
     if (String(msg.receiverId) !== String(me)) {
       return res.status(403).json({ message: "Not allowed" });
     }
 
-    // only audio messages
-    if (msg.messageType !== "audio") {
-      return res.status(400).json({ message: "Only audio messages can be marked listened" });
+    if (msg.messageType !== "audio" && msg.messageType !== "voice") {
+      return res.status(400).json({ message: "Only audio/voice messages can be marked listened" });
     }
 
     msg.listenedAt = new Date();
     await msg.save();
 
-    // realtime update
     req.io.to(`conversation:${msg.conversationId}`).emit("msg-listened", {
       msgId: String(msg._id),
       userId: String(me),

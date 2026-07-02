@@ -382,7 +382,7 @@ export default function ChatListScreen({ navigation }: any) {
 // Styles (same as yours)
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0f172a", padding: 12 },
-  baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: "#020617" },
+  baseBackground: { ...StyleSheet.absoluteFill, backgroundColor: "#020617" },
   glowTop: {
     position: "absolute",
     top: -120,

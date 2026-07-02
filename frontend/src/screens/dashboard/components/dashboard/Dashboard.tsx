@@ -740,7 +740,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   baseBackground: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "#020617",
   },
   glowTop: {
