@@ -131,15 +131,19 @@ process.on('uncaughtException', (err) => {
 });
 
 io.on("connection", (socket) => {
-  socket.conn.on("close", (reason) => {
-    console.log("ENGINE CLOSE:", reason);
-  });
+    console.log("Connected", socket.id);
 
-  socket.conn.on("upgrade", () => {
-    console.log("UPGRADED TO:", socket.conn.transport.name);
-  });
+    socket.on("disconnect", (reason) => {
+        console.log("Disconnected:", reason);
+    });
 
-  console.log("Initial transport:", socket.conn.transport.name);
+    socket.conn.on("close", (reason) => {
+        console.log("Engine close:", reason);
+    });
+
+    socket.conn.on("error", (err) => {
+        console.log(err);
+    });
 });
 
 // --- START
