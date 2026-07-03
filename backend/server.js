@@ -23,11 +23,6 @@ dotenv.config({
   path: path.join(__dirname, `.env.${process.env.NODE_ENV}`),
 });
 
-console.log("ENV:", process.env.NODE_ENV);
-console.log("PORT:", process.env.PORT);
-console.log("MONGO:", process.env.MONGO_URI);
-console.log("Key:", process.env.API_KEY);
-
 
 // --- DB
 mongoose.connect(process.env.MONGO_URI)
