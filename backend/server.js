@@ -10,7 +10,7 @@ import os from "os";
 import path from "path";
 import http from "http";
 import { startNotificationJobs } from './jobs/scheduledNotifications.js';
-import { initializeSocket } from "./config/socket.js";
+import { getIO, initializeSocket } from "./config/socket.js";
 
 // --- ENV
 const app = express();
@@ -58,7 +58,7 @@ import ArPrivatePortalRoutes from "./routes/ArPrivatePortalRoutes.js";
 
 // --- Attach io to req
 app.use((req, res, next) => {
-  req.io = io;
+  req.io = getIO();
   next();
 });
 
