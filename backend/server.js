@@ -130,6 +130,18 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
 
+io.on("connection", (socket) => {
+  socket.conn.on("close", (reason) => {
+    console.log("ENGINE CLOSE:", reason);
+  });
+
+  socket.conn.on("upgrade", () => {
+    console.log("UPGRADED TO:", socket.conn.transport.name);
+  });
+
+  console.log("Initial transport:", socket.conn.transport.name);
+});
+
 // --- START
 // server.listen(PORT, () => {
 //   console.log(`🚀 Server running on http://localhost:${PORT}`);
