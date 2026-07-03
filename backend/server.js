@@ -14,10 +14,19 @@ import { getIO, initializeSocket } from "./config/socket.js";
 
 // --- ENV
 const app = express();
-const envFile = `.env.${process.env.NODE_ENV || ''}`;
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 dotenv.config({
-    path: path.join(__dirname, `.env.${process.env.NODE_ENV}`)
+  path: path.join(__dirname, `.env.${process.env.NODE_ENV}`),
 });
+
+console.log("ENV:", process.env.NODE_ENV);
+console.log("PORT:", process.env.PORT);
+console.log("MONGO:", process.env.MONGO_URI);
+console.log("Key:", process.env.API_KEY);
 
 
 // --- DB
