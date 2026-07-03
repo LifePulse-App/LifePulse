@@ -130,21 +130,6 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
 
-io.on("connection", (socket) => {
-    console.log("Connected", socket.id);
-
-    socket.on("disconnect", (reason) => {
-        console.log("Disconnected:", reason);
-    });
-
-    socket.conn.on("close", (reason) => {
-        console.log("Engine close:", reason);
-    });
-
-    socket.conn.on("error", (err) => {
-        console.log(err);
-    });
-});
 
 // --- START
 // server.listen(PORT, () => {
