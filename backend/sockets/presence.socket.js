@@ -3,9 +3,18 @@ export default function registerPresenceSocket(io, socket) {
 
   socket.join(`user:${userId}`);
 
-  console.log(`User ${userId} connected`);
+  console.log(`🟢 User ${userId} connected`);
 
-  socket.on("disconnect", () => {
-    console.log(`User ${userId} disconnected`);
+  socket.on("disconnect", (reason) => {
+    console.log(`🔴 User ${userId} disconnected`);
+    console.log("Disconnect reason:", reason);
+  });
+
+  socket.conn.on("close", (reason) => {
+    console.log("Engine.IO close:", reason);
+  });
+
+  socket.conn.on("error", (err) => {
+    console.log("Engine.IO error:", err);
   });
 }
