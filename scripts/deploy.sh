@@ -4,6 +4,7 @@ ENV=${1:-production}
 BASE_PATH="/home/server-pc/actions-runner/_work/StreakSphere/StreakSphere"
 NODE_BACKEND_PATH="$BASE_PATH/backend"
 AI_PATH="$BASE_PATH/ai"
+PROJECT_ROOT="$BASE_PATH"
 APP_NAME="StreakSphere"
 
 echo "🚀 Deploying $APP_NAME in $ENV mode..."
@@ -25,19 +26,26 @@ npm install --legacy-peer-deps
 # -------------------------------------
 echo "🔄 Restarting Backend..."
 
+cd "$PROJECT_ROOT" || {
+    echo "❌ Project root not found!"
+    exit 1
+}
+
 if [ "$ENV" == "development" ]; then
-    TARGET_NAME="$APP_NAME-dev"
-    TARGET_SCRIPT="server-dev.js"
+    APPS="StreakSphere-dev-1,StreakSphere-dev-2"
 else
-    TARGET_NAME="$APP_NAME-prod"
-    TARGET_SCRIPT="server-prod.js"
+    APPS="StreakSphere-prod-1,StreakSphere-prod-2,StreakSphere-prod-3,StreakSphere-prod-4,StreakSphere-prod-5,StreakSphere-prod-6,StreakSphere-prod-7,StreakSphere-prod-8,StreakSphere-prod-9,StreakSphere-prod-10,StreakSphere-prod-11,StreakSphere-prod-12"
 fi
 
-# Delete only the process being deployed
-pm2 delete "$TARGET_NAME" >/dev/null 2>&1 || true
+FIRST_APP=$(echo "$APPS" | cut -d',' -f1)
 
-# Start selected environment
-pm2 start "$TARGET_SCRIPT" --name "$TARGET_NAME" -i max
+if pm2 describe "$FIRST_APP" >/dev/null 2>&1; then
+    echo "♻️ Reloading existing PM2 apps..."
+    pm2 reload ecosystem.config.js --only "$APPS" --update-env
+else
+    echo "🚀 Starting PM2 apps..."
+    pm2 start ecosystem.config.js --only "$APPS"
+fi
 
 # -------------------------------------
 # 3️⃣ Prepare AI Environment
@@ -55,13 +63,13 @@ if [ ! -d "venv" ]; then
     python3 -m venv venv
 fi
 
-# Upgrade pip
+echo "⬆️ Upgrading pip..."
 ./venv/bin/pip install --upgrade pip
 
-# Detect GPU
-echo "🔍 Checking for GPU..."
-if ./venv/bin/python -c "import torch; exit(0)"; then
-    echo "⚠️ Torch already installed, skipping torch install."
+echo "🔍 Checking for PyTorch..."
+
+if ./venv/bin/python -c "import torch" >/dev/null 2>&1; then
+    echo "✅ PyTorch already installed."
 else
     if command -v nvidia-smi >/dev/null 2>&1; then
         echo "🔥 GPU detected. Installing CUDA PyTorch..."
@@ -72,7 +80,6 @@ else
     fi
 fi
 
-# Install remaining requirements
 if [ -f "requirements.txt" ]; then
     echo "📦 Installing AI dependencies..."
     ./venv/bin/pip install -r requirements.txt
@@ -83,21 +90,22 @@ fi
 # -------------------------------------
 echo "🔄 Restarting AI Model..."
 
-pm2 delete "$APP_NAME-ai" >/dev/null 2>&1 || true
-
-# Kill anything using port 8000
-sudo fuser -k 8000/tcp >/dev/null 2>&1 || true
-
-pm2 start ./venv/bin/python \
-    --name "$APP_NAME-ai" \
-    --cwd "$AI_PATH" \
-    -- -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
+if pm2 describe "$APP_NAME-ai" >/dev/null 2>&1; then
+    pm2 restart "$APP_NAME-ai"
+else
+    pm2 start ./venv/bin/python \
+        --name "$APP_NAME-ai" \
+        --cwd "$AI_PATH" \
+        -- -m uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2
+fi
 
 # -------------------------------------
 # 5️⃣ Save PM2 State
 # -------------------------------------
+echo "💾 Saving PM2 state..."
 pm2 save >/dev/null 2>&1
 
 echo "-----------------------------------------"
 echo "✅ Deployment completed successfully."
+
 pm2 status

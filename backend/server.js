@@ -90,10 +90,24 @@ app.get('/health', (req, res) => {
 app.use(errorMiddleware);
 
 // --- Server
-const PORT = process.env.NODE_ENV === 'development' ? 40000 : 8080;
+const PORT = Number(process.env.PORT);
+
 const server = http.createServer(app);
 
-const io = initializeSocket(server);
+(async () => {
+
+  const io = await initializeSocket(server);
+
+  app.use((req, res, next) => {
+    req.io = io;
+    next();
+  });
+
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+  });
+
+})();
 
 // --- CRON
 import { runMonthlyReset } from './helpers/monthlyReset.js';
@@ -114,24 +128,7 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
 
-io.engine.on("connection_error", (err) => {
-  console.log("ENGINE CONNECTION ERROR");
-  console.log(err);
-});
-
-io.on("connection", (socket) => {
-  console.log("CONNECTED:", socket.id);
-
-  socket.conn.on("close", (reason) => {
-    console.log("CONNECTION CLOSED:", reason);
-  });
-
-  socket.on("disconnect", (reason) => {
-    console.log("DISCONNECTED:", reason);
-  });
-});
-
 // --- START
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
+// server.listen(PORT, () => {
+//   console.log(`🚀 Server running on http://localhost:${PORT}`);
+// });
