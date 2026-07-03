@@ -15,7 +15,10 @@ import { getIO, initializeSocket } from "./config/socket.js";
 // --- ENV
 const app = express();
 const envFile = `.env.${process.env.NODE_ENV || ''}`;
-dotenv.config({ path: envFile });
+dotenv.config({
+    path: path.join(__dirname, `.env.${process.env.NODE_ENV}`)
+});
+
 
 // --- DB
 mongoose.connect(process.env.MONGO_URI)
