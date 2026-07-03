@@ -4,6 +4,8 @@ import UserStorage from "../user/UserStorage";
 
 const wsBase = apiClient.getBaseURL().replace(/\/api\/?$/, "");
 
+console.log(wsBase);
+
 let socket: Socket | null = null;
 let connectPromise: Promise<Socket | null> | null = null; // ⚡ THE LOCK
 
@@ -37,15 +39,17 @@ export const connectSocket = async () => {
             connectPromise = null;
             return null; 
         }
+socket = io(wsBase, {
+    transports: ["websocket"],
 
-        socket = io(wsBase, {
-            autoConnect: true,
-            reconnection: true,
-            reconnectionAttempts: Infinity,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: 5000,
-            auth: { token },
-        });
+    autoConnect: true,
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+
+    auth: { token },
+});
 
         socket.on("connect", () => console.log("✅ Socket Connected"));
         socket.on("disconnect", reason => console.log("❌ Socket Disconnected:", reason));
