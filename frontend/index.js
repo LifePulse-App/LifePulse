@@ -205,9 +205,9 @@ setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
     if (incomingMessageId) {
       try {
         setSecretKey();
-        const tokens = await UserStorage.getTokens?.();
-        if (tokens?.accessToken) {
-          apiClient.setAuthToken?.(tokens.accessToken);
+        const tokens = await UserStorage.getAccessToken();
+        if (tokens) {
+          apiClient.setAuthToken(tokens);
         }
         await markDelivered([incomingMessageId]);
         console.log('[BGHandler] ✅ Delivered:', incomingMessageId);

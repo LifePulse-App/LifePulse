@@ -308,12 +308,15 @@ export const getThread = async (req, res) => {
     const q = { conversationId: convoObj, deletedForEveryone: { $ne: true } };
     if (beforeRaw) q.createdAt = { $lt: new Date(String(beforeRaw)) };
 
+    // ⚡ CRITICAL FIX: Sort by -1 to get the NEWEST messages, then limit
     const messages = await ChatMessage.find(q)
       .populate("replyTo", "text messageType media senderId")
-      .sort({ createdAt: 1 })
+      .sort({ createdAt: -1 }) 
       .limit(limit)
       .lean();
-    res.json({ messages });
+      
+    // ⚡ Reverse the array so the frontend receives them oldest-to-newest
+    res.json({ messages: messages.reverse() });
   } catch (err) {
     console.error("[chat] getThread error", err);
     res.status(500).json({ message: "Internal error" });
