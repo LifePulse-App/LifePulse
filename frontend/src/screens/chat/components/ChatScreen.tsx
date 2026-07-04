@@ -1514,35 +1514,67 @@ useEffect(() => {
       if (String(userId) === String(peerUserId)) setPeerTyping(false);
     };
 
-    const handleMsgDelivered = ({ msgId }: any) => {
-      setMessages(prev => prev.map(m => 
-        String(m._id) === msgId 
-          ? { ...m, deliveredAt: new Date().toISOString(), tickState: "delivered" } 
-          : m
-      ));
+    const handleMsgDelivered = (payload: any) => {
+      // ⚡ Support both single msgId and array of messageIds
+      const idsToUpdate = payload.messageIds || (payload.msgId ? [payload.msgId] : []);
+      if (!idsToUpdate.length) return;
+      const now = new Date().toISOString();
+
+      setMessages(prev => prev.map(m => {
+        if (idsToUpdate.includes(String(m._id))) {
+          const updated = { ...m, deliveredAt: m.deliveredAt || now, tickState: m.seenAt ? "seen" : "delivered" };
+          
+          // ⚡ CRITICAL: Save the double-tick to the SQLite Cache!
+          upsertThreadMessageV2(String(myUserId), String(conversationId), {
+            _id: String(updated._id),
+            conversationId: String(conversationId),
+            senderId: String(updated.fromUserId),
+            receiverId: String(updated.toUserId),
+            text: String(updated.plaintext),
+            messageType: updated.messageType,
+            media: updated.media,
+            createdAt: updated.createdAt,
+            clientMessageId: updated.clientMessageId,
+            deliveredAt: updated.deliveredAt,
+            seenAt: updated.seenAt
+          }).catch(() => {});
+
+          return updated;
+        }
+        return m;
+      }));
     };
 
-    const handleMsgSeen = ({ msgId }: any) => {
-      setMessages(prev => {
-        const seenMsgIndex = prev.findIndex(m => String(m._id) === msgId);
-        if (seenMsgIndex === -1) return prev; 
-        
-        const seenMsg = prev[seenMsgIndex];
+    const handleMsgSeen = (payload: any) => {
+      const idsToUpdate = payload.messageIds || (payload.msgId ? [payload.msgId] : []);
+      const now = new Date().toISOString();
 
-        return prev.map(m => {
-          const isSentByMe = String(m.fromUserId) === String(myUserId);
-          const isOlderOrEqual = new Date(m.createdAt) <= new Date(seenMsg.createdAt);
-          
-          if (isSentByMe && isOlderOrEqual) {
-            return { 
-              ...m, 
-              seenAt: m.seenAt || new Date().toISOString(), 
-              tickState: "seen" 
-            };
-          }
-          return m;
-        });
-      });
+      setMessages(prev => prev.map(m => {
+        const isSentByMe = String(m.fromUserId) === String(myUserId);
+        
+        // If it explicitly matches the ID, OR if it's an older message we sent
+        if (isSentByMe && (!idsToUpdate.length || idsToUpdate.includes(String(m._id)) || !m.seenAt)) {
+          const updated = { ...m, seenAt: m.seenAt || now, tickState: "seen" };
+
+          // ⚡ CRITICAL: Save the blue-tick to the SQLite Cache!
+          upsertThreadMessageV2(String(myUserId), String(conversationId), {
+            _id: String(updated._id),
+            conversationId: String(conversationId),
+            senderId: String(updated.fromUserId),
+            receiverId: String(updated.toUserId),
+            text: String(updated.plaintext),
+            messageType: updated.messageType,
+            media: updated.media,
+            createdAt: updated.createdAt,
+            clientMessageId: updated.clientMessageId,
+            deliveredAt: updated.deliveredAt || now, // If it's seen, it must be delivered
+            seenAt: updated.seenAt
+          }).catch(() => {});
+
+          return updated;
+        }
+        return m;
+      }));
     };
 
     const handleMsgDeleted = ({ msgId }: any) => {
@@ -1755,78 +1787,92 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
   }, [peerUserId, conversationId, myUserId, offline]);
 
   const loadThread = useCallback(async () => {
-    if (!conversationId || !myUserId) return;
-    const cached = await loadThreadCacheV2(String(myUserId), String(conversationId));
+  if (!conversationId || !myUserId) return;
 
-    if (cached.length) {
-      setMessages(dedupeMessages(normalizeServer(cached.map((m: any) => ({
-        _id: m._id, senderId: m.senderId, receiverId: m.receiverId, text: m.text,
-        messageType: m.messageType || "text", media: m.media || null, createdAt: m.createdAt,
-        clientMessageId: m.clientMessageId, deliveredAt: m.deliveredAt, seenAt: m.seenAt,
-      })))));
-    } else { setMessages([]); }
+  // 1. ⚡ INSTANT LOAD: Grab from local SQLite cache instantly so the screen is never blank
+  const cached = await loadThreadCacheV2(String(myUserId), String(conversationId));
+  if (cached.length) {
+    setMessages(dedupeMessages(normalizeServer(cached.map((m: any) => ({
+      _id: m._id, senderId: m.senderId, receiverId: m.receiverId, text: m.text,
+      messageType: m.messageType || "text", media: m.media || null, createdAt: m.createdAt,
+      clientMessageId: m.clientMessageId, deliveredAt: m.deliveredAt, seenAt: m.seenAt,
+    })))));
+  } else { 
+    setMessages([]); 
+  }
 
-    if (offline) return;
-    try {
-      const { data } = await fetchThread(String(conversationId), { limit: 200 });
-      const serverMsgs = data?.messages || [];
-      if (serverMsgs.length) {
-        await saveThreadCacheV2(String(myUserId), String(conversationId), serverMsgs.map((m: any) => ({
-          _id: String(m._id), conversationId: String(conversationId),
-          senderId: String(m.senderId), receiverId: String(m.receiverId),
-          text: String(m.text || ""), messageType: String(m.messageType || "text"),
-          media: m.media || null, createdAt: m.createdAt, clientMessageId: m.clientMessageId,
-          deliveredAt: m.deliveredAt || null, seenAt: m.seenAt || null,
-        })));
-        const normalizedServer = normalizeServer(serverMsgs);
-        setMessages((prev) => {
-          const serverClientIds = new Set(normalizedServer.map((m: any) => m.clientMessageId).filter(Boolean).map((x: any) => String(x)));
-          const serverIds = new Set(normalizedServer.map((m: any) => String(m._id)));
-          const stillPendingLocal = prev.filter((m: any) => {
-            const isLocalId = String(m._id).startsWith("loc:");
-            return isLocalId && !serverIds.has(String(m._id)) &&
-              !(m.clientMessageId && serverClientIds.has(String(m.clientMessageId)));
-          });
-          return dedupeMessages([...normalizedServer, ...stillPendingLocal]);
+  if (offline) return;
+
+  // 2. ⚡ SILENT BACKGROUND SYNC: Fetch from MongoDB without blocking the UI
+  try {
+    const { data } = await fetchThread(String(conversationId), { limit: 200 });
+    const serverMsgs = data?.messages || [];
+    
+    if (serverMsgs.length) {
+      const normalizedServer = normalizeServer(serverMsgs);
+      
+      // Update UI silently
+      setMessages((prev) => {
+        const serverClientIds = new Set(normalizedServer.map((m: any) => m.clientMessageId).filter(Boolean).map((x: any) => String(x)));
+        const serverIds = new Set(normalizedServer.map((m: any) => String(m._id)));
+        const stillPendingLocal = prev.filter((m: any) => {
+          const isLocalId = String(m._id).startsWith("loc:");
+          return isLocalId && !serverIds.has(String(m._id)) && !(m.clientMessageId && serverClientIds.has(String(m.clientMessageId)));
         });
-        const last = serverMsgs[serverMsgs.length - 1];
-        const previewText =
-          last?.messageType === "image" ? "sent a Photo"
-          : last?.messageType === "video" ? "sent a video"
-          : (last?.messageType === "voice" || last?.messageType === "audio") ? "sent a voice message"
-          : last?.messageType === "document" ? "sent a document"
-          : String(last.text || "");
-        await upsertPreviewV2(String(myUserId), {
-          conversationId: String(conversationId), peerUserId: String(peerUserId),
-          peerName: String(peerName || "Friend"), mood: String(peerMood || ""),
-          lastText: previewText, lastAt: String(last.createdAt || new Date().toISOString()), unread: 0,
-        });
-        const incomingUndelivered = serverMsgs
-          .filter((m: any) => String(m.receiverId) === String(myUserId) && !m.deliveredAt)
-          .map((m: any) => String(m._id));
-        if (incomingUndelivered.length) await markDelivered(incomingUndelivered);
-        const incoming = serverMsgs.filter((m: any) => String(m.receiverId) === String(myUserId));
-        if (incoming.length) {
-          await markSeen({ conversationId: String(conversationId), peerUserId: String(peerUserId), lastSeenMessageId: String(incoming[incoming.length - 1]._id) });
-        }
-        notifyConversationChanged();
-      }
-    } catch (e) {
-      console.log("fetchThread failed", e);
+        return dedupeMessages([...normalizedServer, ...stillPendingLocal]);
+      });
+
+      // Update Cache silently
+      await saveThreadCacheV2(String(myUserId), String(conversationId), serverMsgs.map((m: any) => ({
+        _id: String(m._id), conversationId: String(conversationId),
+        senderId: String(m.senderId), receiverId: String(m.receiverId),
+        text: String(m.text || ""), messageType: String(m.messageType || "text"),
+        media: m.media || null, createdAt: m.createdAt, clientMessageId: m.clientMessageId,
+        deliveredAt: m.deliveredAt || null, seenAt: m.seenAt || null,
+      })));
+
+      const last = serverMsgs[serverMsgs.length - 1];
+      const previewText =
+        last?.messageType === "image" ? "sent a Photo"
+        : last?.messageType === "video" ? "sent a video"
+        : (last?.messageType === "voice" || last?.messageType === "audio") ? "sent a voice message"
+        : last?.messageType === "document" ? "sent a document"
+        : String(last.text || "");
+        
+      await upsertPreviewV2(String(myUserId), {
+        conversationId: String(conversationId), peerUserId: String(peerUserId),
+        peerName: String(peerName || "Friend"), mood: String(peerMood || ""),
+        lastText: previewText, lastAt: String(last.createdAt || new Date().toISOString()), unread: 0,
+      });
+
+      // ⚡ CRITICAL FIX: Removed the slow `markSeen` and `markDelivered` HTTP calls from here!
+      // WebSockets handle this perfectly down below.
       notifyConversationChanged();
     }
-  }, [conversationId, myUserId, peerUserId, peerName, peerMood, offline, normalizeServer]);
+  } catch (e) {
+    console.log("fetchThread failed", e);
+    notifyConversationChanged();
+  }
+}, [conversationId, myUserId, peerUserId, peerName, peerMood, offline, normalizeServer]);
 
+// ⚡ FIX 1: Automatically fetch thread AS SOON AS conversationId resolves
+  useEffect(() => {
+    if (conversationId) {
+      loadThread();
+    }
+  }, [conversationId, loadThread]);
+
+  // ⚡ FIX 2: Only re-fetch if the user navigates away and comes back
   useEffect(() => {
     const unsub = navigation.addListener("focus", async () => {
-      didInitialAutoScrollRef.current = false;
-      await loadThread();
+      if (didInitialAutoScrollRef.current && conversationId) {
+        await loadThread();
+      }
+      didInitialAutoScrollRef.current = true;
     });
-    (async () => {
-      await loadThread();
-    })();
+    
     return unsub;
-  }, [navigation, loadThread]);
+  }, [navigation, loadThread, conversationId]);
 
   useEffect(() => {
     if (socketRef.current && conversationId) {
@@ -1841,32 +1887,32 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
   }, []);
 
 // ⚡ PURE WEBSOCKET READ RECEIPTS ⚡
-  useEffect(() => {
-    if (!conversationId || !myUserId || offline) return;
-    
-    const latestIncoming = messages
-      .filter(m => String(m.toUserId) === String(myUserId) && !m.seenAt)
-      .slice(-1)[0];
+useEffect(() => {
+  if (!conversationId || !myUserId || offline) return;
+  
+  const latestIncoming = messages
+    .filter(m => String(m.toUserId) === String(myUserId) && !m.seenAt)
+    .slice(-1)[0];
 
-    if (latestIncoming) {
-      // 1. Optimistic Local Update (Stops infinite re-renders)
-      setMessages(prev => prev.map(m => 
-        (String(m.toUserId) === String(myUserId) && !m.seenAt)
-          ? { ...m, seenAt: new Date().toISOString() }
-          : m
-      ));
-
-      // 2. Fire pure WebSocket event instead of HTTP API call!
-      if (socketRef.current) {
-        socketRef.current.emit("mark-seen", {
-          conversationId: String(conversationId),
-          peerUserId: String(peerUserId),
-          lastSeenMessageId: String(latestIncoming._id),
-          myUserId: String(myUserId)
-        });
-      }
+  if (latestIncoming) {
+    // 1. Fire pure WebSocket event instantly (Backend DB checks this automatically)
+    if (socketRef.current) {
+      socketRef.current.emit("mark-seen", {
+        conversationId: String(conversationId),
+        peerUserId: String(peerUserId),
+        lastSeenMessageId: String(latestIncoming._id),
+        myUserId: String(myUserId)
+      });
     }
-  }, [messages, conversationId, myUserId, peerUserId, offline]);
+
+    // 2. Optimistic Local Update (Silences the UI pop)
+    setMessages(prev => prev.map(m => 
+      (String(m.toUserId) === String(myUserId) && !m.seenAt)
+        ? { ...m, seenAt: new Date().toISOString() }
+        : m
+    ));
+  }
+}, [messages.length, conversationId, myUserId, peerUserId, offline]); // ⚡ FIX: Bind to messages.length to prevent infinite loops
 
   useEffect(() => {
     if (!conversationId || !myUserId) return;
@@ -1979,7 +2025,20 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
           ? { ...mm, _id: String(srv._id), createdAt: srv.createdAt || mm.createdAt, media: { ...uploaded.media, ...(srv.media || {}) }, messageType: srv.messageType || mm.messageType, tickState: srv.seenAt ? "seen" : srv.deliveredAt ? "delivered" : "sent", deliveredAt: srv.deliveredAt || null, seenAt: srv.seenAt || null }
           : mm
       )));
-    }
+  
+    upsertThreadMessageV2(String(myUserId), String(conversationId), {
+          _id: String(srv._id),
+          conversationId: String(conversationId),
+          senderId: String(myUserId),
+          receiverId: String(peerUserId),
+          text: String(text),
+          messageType: "text",
+          createdAt: srv.createdAt || now,
+          clientMessageId: String(clientMessageId),
+          deliveredAt: srv.deliveredAt || null,
+          seenAt: srv.seenAt || null,
+        }).catch(() => {});
+      }
   }, [conversationId, myUserId, peerUserId, peerName, peerMood]);
 
   const processAndSendFiles = useCallback(async (files: Array<{ uri: string; type?: string; name?: string; fileSize?: number }>) => {
@@ -2181,8 +2240,21 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
               }
             : m
         )));
+        upsertThreadMessageV2(String(myUserId), String(conversationId), {
+          _id: String(srv._id),
+          conversationId: String(conversationId),
+          senderId: String(myUserId),
+          receiverId: String(peerUserId),
+          text: String(text),
+          messageType: "text",
+          createdAt: srv.createdAt || now,
+          clientMessageId: String(clientMessageId),
+          deliveredAt: srv.deliveredAt || null,
+          seenAt: srv.seenAt || null,
+        }).catch(() => {});
       }
-    } catch {
+      }
+    catch {
       showGlassyError("Failed to send message");
     }
   }, [

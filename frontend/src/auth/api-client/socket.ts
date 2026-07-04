@@ -4,8 +4,6 @@ import UserStorage from "../user/UserStorage";
 
 const wsBase = apiClient.getBaseURL().replace(/\/api\/?$/, "");
 
-console.log(wsBase);
-
 let socket: Socket | null = null;
 let connectPromise: Promise<Socket | null> | null = null; // ⚡ THE LOCK
 
@@ -18,7 +16,7 @@ export const setSocketInCallStatus = (status: boolean) => {
 export const connectSocket = async () => {
     // 1. If socket already exists, just return/wake it
     if (socket) {
-        if (!socket.connected) {
+        if (!socket.connected && !socket.active) {
             console.log("🔄 Waking up existing socket...");
             socket.connect();
         }
@@ -41,15 +39,15 @@ export const connectSocket = async () => {
         }
 socket = io(wsBase, {
     transports: ["websocket"],
-
-    autoConnect: true,
+    autoConnect: false,
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
-
     auth: { token },
 });
+
+socket.connect();
 
         socket.on("connect", () => console.log("✅ Socket Connected"));
         socket.on("disconnect", reason => console.log("❌ Socket Disconnected:", reason));
@@ -69,15 +67,16 @@ export const updateSocketToken = (newToken: string) => {
         console.log("🔄 Updating socket auth token...");
         socket.auth = { token: newToken };
         
-        // ⚡ ONLY disconnect and restart if we are NOT in an active call
         if (!isSocketInCall) {
             console.log("Safely restarting socket with new token.");
             socket.disconnect();
+            
+            // ⚡ Give the network layer time to cleanly drop the TCP link
             setTimeout(() => {
                 if (socket && !socket.connected) {
                     socket.connect();
                 }
-            }, 250); 
+            }, 1500); 
         } else {
             console.log("⚠️ In an active call! Token updated, but keeping current TCP link alive.");
         }
