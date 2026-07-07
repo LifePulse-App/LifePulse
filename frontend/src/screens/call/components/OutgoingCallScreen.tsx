@@ -44,6 +44,10 @@ export const OutgoingCallScreen = () => {
   } else if (status === 'no-answer') {
     statusText = "No Response";
     statusColor = "#ef4444"; 
+  } else if (status === 'rejected') {
+    // ⚡ FIX 3B: Add the rejected UI state!
+    statusText = "Call Declined";
+    statusColor = "#ef4444"; // Red
   }
 
   let routeIcon = "phone-in-talk";

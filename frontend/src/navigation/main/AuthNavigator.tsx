@@ -236,6 +236,7 @@ import { CallProvider } from '../../screens/call/context/CallProvider';
 import { OutgoingCallScreen } from '../../screens/call/components/OutgoingCallScreen';
 import { IncomingCallScreen } from '../../screens/call/components/IncomingCallScreen';
 import { VoiceCallScreen } from '../../screens/call/components/VoiceCallScreen';
+import { CallComingScreen } from '../../screens/call/components/CallComingScreen';
 
   const AuthNavigator = () => {
     const [initialRoute, setInitialRoute] = useState<'Login' | 'AppTabs' | 'Drawer' | 'SavedAccounts' | null>(null);
@@ -376,7 +377,16 @@ return (
           component={FriendsListScreen}
           options={{ unmountOnBlur: false, freezeOnBlur: true }}
         />
-       
+       <Stack.Screen 
+  name="IncomingCallScreen" 
+  component={CallComingScreen} 
+  options={{ 
+    headerShown: false, 
+    // This animation makes it slide up from the bottom like a native call
+    presentation: 'fullScreenModal',
+    animation: 'slide_from_bottom' 
+  }} 
+/>
       </Stack.Navigator>
       </CallProvider>
 );

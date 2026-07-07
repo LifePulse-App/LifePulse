@@ -8,6 +8,7 @@ import {
   Platform,
   PermissionsAndroid,
   AppState,
+  DeviceEventEmitter, // ⚡ Added to dispatch wake up events
 } from 'react-native';
 import Toast, { BaseToast, BaseToastProps } from 'react-native-toast-message';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -15,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReactNativeBiometrics from 'react-native-biometrics';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
+
 import { getApp } from '@react-native-firebase/app';
 import { getMessaging, getToken, onMessage, onTokenRefresh } from '@react-native-firebase/messaging';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
@@ -37,9 +39,8 @@ import {
 } from './src/screens/chat/services/ChatNotifications';
 
 import { markDelivered, markAllPendingDelivered } from './src/screens/chat/services/api_chat';
-
-import { notificationNavState } from './index'; // not pendingNavigation!
-import { handleNotificationPress } from './handleNotificationPress'; // or use your util in index.js
+import { notificationNavState } from './index'; 
+import { handleNotificationPress } from './handleNotificationPress'; 
 
 import 'react-native-get-random-values';
 import { TextEncoder, TextDecoder } from 'text-encoding';
@@ -59,7 +60,6 @@ notifee.createChannel({
   vibration: true,
 });
 
-// Add alongside your existing CHAT_CHANNEL_ID setup
 const APP_CHANNEL_ID = 'app_notifications';
 
 notifee.createChannel({
@@ -127,9 +127,12 @@ async function displayChatNotificationGroupedBySender(
   });
 }
 
+// ⚡ CLEANED: Only asks for POST_NOTIFICATIONS on launch
 async function requestNotificationPermission() {
-  if (Platform.OS === 'android' && Platform.Version >= 33) {
-    await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+  if (Platform.OS === 'android') {
+    if (Platform.Version >= 33) {
+      await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+    }
   } else if (Platform.OS === 'ios') {
     await notifee.requestPermission();
   }
@@ -184,39 +187,57 @@ const App = () => {
     const sub = AppState.addEventListener('change', async state => {
       if (state === 'active') {
         await runMarkAllPendingDelivered('active');
+        
+        try {
+          const displayed = await notifee.getDisplayedNotifications();
+          const chatNotifs = displayed
+            .filter(n => 
+              n.notification?.data?.type === 'chat' ||
+              n.notification?.data?.type === 'chat_summary'
+            )
+            .map(n => n.id);
+          
+          await Promise.all(chatNotifs.map(id => notifee.cancelNotification(id)));
+        } catch (e) {
+          console.log('Failed to cancel chat notifications:', e);
+        }
       }
     });
     return () => sub.remove();
   }, []);
 
+  // ⚡ FIX: Emits Wake Up for calls, only navigates for chats
   useEffect(() => {
     const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
-      if (
-        type === EventType.PRESS &&
-        detail?.notification?.data?.type === 'chat' &&
-        detail?.notification?.data?.peerUserId
-      ) {
-        navigationRef.current?.navigate('chat', {
-          peerUserId: detail.notification.data.peerUserId,
-          peerName: detail.notification.data.peerName,
-        });
+      if (type === EventType.PRESS && detail?.notification?.data) {
+        const data = detail.notification.data;
+if (data.type === 'chat' && data.peerUserId) {
+          navigationRef.current?.navigate('chat', {
+            peerUserId: data.peerUserId,
+            peerName: data.peerName,
+          });
+        }
       }
     });
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
+  // ⚡ FIX: Boot-up lock screen interceptor
+ useEffect(() => {
     async function checkInitialNotification() {
       const initial = await notifee.getInitialNotification();
-      if (
-        initial?.notification?.data?.type === 'chat' &&
-        initial?.notification?.data?.peerUserId
-      ) {
+      if (initial?.notification?.data) {
+        const data = initial.notification.data;
+
         setTimeout(() => {
-          navigationRef.current?.navigate('chat', {
-            peerUserId: initial.notification.data.peerUserId,
-            peerName: initial.notification.data.peerName,
-          });
+          // ⚡ FIX: Removed incoming_call logic entirely. 
+          // Only handle chats here. CallProvider handles calls automatically!
+          if (data.type === 'chat' && data.peerUserId) {
+            navigationRef.current?.navigate('chat', {
+              peerUserId: data.peerUserId,
+              peerName: data.peerName,
+            });
+          }
         }, 600);
       }
     }
@@ -224,38 +245,13 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-  if (Platform.OS === 'android') {
-    SystemNavigationBar.navigationHide();
-    SystemNavigationBar.stickyImmersive();
-  }
-}, []);
-
-enableScreens(true);
-
-// In the AppState listener useEffect, update it:
-useEffect(() => {
-  const sub = AppState.addEventListener('change', async state => {
-    if (state === 'active') {
-      await runMarkAllPendingDelivered('active');
-      
-      // ← ADD: Cancel all chat notifications when app opens
-      try {
-        const displayed = await notifee.getDisplayedNotifications();
-        const chatNotifs = displayed
-          .filter(n => 
-            n.notification?.data?.type === 'chat' ||
-            n.notification?.data?.type === 'chat_summary'
-          )
-          .map(n => n.id);
-        
-        await Promise.all(chatNotifs.map(id => notifee.cancelNotification(id)));
-      } catch (e) {
-        console.log('Failed to cancel chat notifications:', e);
-      }
+    if (Platform.OS === 'android') {
+      SystemNavigationBar.navigationHide();
+      SystemNavigationBar.stickyImmersive();
     }
-  });
-  return () => sub.remove();
-}, []);
+  }, []);
+
+  enableScreens(true);
 
   useEffect(() => {
     if (!secretKeySetRef.current) {
@@ -276,22 +272,19 @@ useEffect(() => {
       return onMessage(messagingInstance, async remoteMessage => {
         const data = remoteMessage?.data || {};
 
-if (data.type === 'chat' && data.peerUserId) {
+        if (data.type === 'chat' && data.peerUserId) {
           const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
           if (incomingMessageId) {
             try {
-              // Get the live socket instance
               const socket = getSocket();
               
               if (socket?.connected && data.conversationId) {
-                // ⚡ PURE WEBSOCKET: If app is active and socket is alive, emit delivery instantly
                 socket.emit("mark-delivered", {
                   messageIds: [incomingMessageId],
                   myUserId: User?.id || User?._id,
                   conversationId: data.conversationId
                 });
               } else {
-                // 🛡️ FALLBACK: If socket dropped (network switch), use HTTP
                 await markDelivered([incomingMessageId]);
               }
             } catch (e) {
@@ -358,24 +351,21 @@ if (data.type === 'chat' && data.peerUserId) {
   }, [User]);
 
   useEffect(() => {
-  if (notificationNavState.pending) {
-    setTimeout(() => {
-      handleNotificationPress(notificationNavState.pending);
-      notificationNavState.pending = null; // ✅ allowed!
-    }, 600);
-  }
-}, [isBiometricVerified]);
+    if (notificationNavState.pending) {
+      setTimeout(() => {
+        handleNotificationPress(notificationNavState.pending);
+        notificationNavState.pending = null; 
+      }, 600);
+    }
+  }, [isBiometricVerified]);
 
-// Add this useEffect inside the App component
-useEffect(() => {
-  if (User) {
-    // User is logged in -> boot up the socket pipeline
-    connectSocket().catch(e => console.log('Socket boot error:', e));
-  } else {
-    // User is logged out -> kill the connection
-    disconnectSocket();
-  }
-}, [User]);
+  useEffect(() => {
+    if (User) {
+      connectSocket().catch(e => console.log('Socket boot error:', e));
+    } else {
+      disconnectSocket();
+    }
+  }, [User]);
 
   useEffect(() => {
     const checkBiometric = async () => {
