@@ -21,6 +21,9 @@ import AuthContext from "../../../auth/user/UserContext";
 import { UserProfile, FollowRequest } from "../models/FriendModel";
 import apiClient from "../../../auth/api-client/api_client";
 
+// ⚡ IMPORT AVATAR MANAGER
+import { getAvatar } from "../../../storage/AvatarManager";
+
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
 const ICON_GLASS_BG = "rgba(15, 23, 42, 0)";
@@ -85,14 +88,15 @@ const Friends = ({ navigation }: any) => {
   const [loadingActions, setLoadingActions] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showRemoveModal, setShowRemoveModal] = useState<{ user: UserProfile | null } | null>(null);
+  
+  // ⚡ ADDED: Avatar Map to hold local file URIs
+  const [avatarMap, setAvatarMap] = useState<Record<string, string | null>>({});
 
   const isSearching = search.trim().length > 0;
 
   const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
-  // FIX 1: Use a ref for offline status so callbacks always read the latest
-  // value synchronously without needing it as a dependency.
   const offlineRef = useRef(false);
   const [offline, setOffline] = useState(false);
 
@@ -120,8 +124,6 @@ const Friends = ({ navigation }: any) => {
     }
   };
 
-  // FIX 2: Keep offlineRef in sync and fetch initial state immediately on mount
-  // so the ref is populated before the first fetch callbacks run.
   useEffect(() => {
     NetInfo.fetch().then((state) => {
       const isOffline = !(state.isConnected && state.isInternetReachable !== false);
@@ -153,8 +155,6 @@ const Friends = ({ navigation }: any) => {
     }
   }, [notification]);
 
-  // FIX 3: Load cache immediately on mount for instant offline experience.
-  // This runs once when cacheKeys are ready.
   useEffect(() => {
     (async () => {
       const [cachedSuggestions, cachedRequests] = await Promise.all([
@@ -167,36 +167,27 @@ const Friends = ({ navigation }: any) => {
   }, [cacheKeys]);
 
   const fetchSuggestions = useCallback(async () => {
-    // FIX 4: Read offlineRef.current (synchronous) instead of offline state
-    // to avoid stale closure bug where offline is still false on first render.
     if (offlineRef.current) return;
 
     try {
       const res = await socialApi.getSuggestedUsers(5);
       const data = (res?.data?.suggestions ?? []).filter((u: any) => u?._id);
 
-      // FIX 5: Guard against empty/undefined API response — don't overwrite good cache.
-      if (!data || data.length === 0) {
-        console.log("[FRIENDS] fetchSuggestions: empty response — cache kept.");
-        return;
-      }
+      if (!data || data.length === 0) return;
 
       setSuggestions(data);
       await saveCache(cacheKeys.suggestions, data);
     } catch (e) {
       console.log("[FRIENDS] fetchSuggestions error:", e);
-      // On error, keep whatever is already in state (loaded from cache above).
     }
-  }, [cacheKeys]); // FIX 6: removed `offline` dependency — using ref instead
+  }, [cacheKeys]);
 
   const fetchSearch = useCallback(async () => {
     const key = cacheKeys.search(search);
 
-    // FIX 7: Always load cache first unconditionally before checking offline.
     const cached = await loadCache<UserProfile[]>(key);
     if (cached) setAllUsers(cached);
 
-    // FIX 8: Use offlineRef for synchronous offline check.
     if (offlineRef.current) {
       if (!cached) setAllUsers([]);
       return;
@@ -206,10 +197,6 @@ const Friends = ({ navigation }: any) => {
       const res = await socialApi.searchUsers(`q=${encodeURIComponent(search)}`);
       const data = (res?.data?.user ?? []).filter((u: any) => u?._id);
 
-      console.log(data);
-      
-
-      // FIX 9: Don't overwrite cache with empty API response.
       if (!data || data.length === 0) {
         if (!cached) setAllUsers([]);
         return;
@@ -221,10 +208,9 @@ const Friends = ({ navigation }: any) => {
       console.log("[FRIENDS] fetchSearch error:", e);
       if (!cached) setAllUsers([]);
     }
-  }, [search, cacheKeys]); // FIX 10: removed `offline` dependency — using ref instead
+  }, [search, cacheKeys]); 
 
   const fetchRequests = useCallback(async () => {
-    // FIX 11: Use offlineRef for synchronous offline check.
     if (offlineRef.current) return;
 
     try {
@@ -250,17 +236,14 @@ const Friends = ({ navigation }: any) => {
         })
         .filter((r: any) => r?.user?._id);
 
-      // FIX 12: Only update state and cache if API returned a valid result.
-      // If empty, keep existing state (which may have been loaded from cache).
       if (cleaned.length > 0) {
         setFriendRequests(cleaned);
         await saveCache(cacheKeys.friendRequests, cleaned);
       }
     } catch (e) {
-      // On error, keep cache/results as-is.
       console.log("[FRIENDS] fetchRequests error:", e);
     }
-  }, [cacheKeys]); // FIX 13: removed `offline` dependency — using ref instead
+  }, [cacheKeys]);
 
   useEffect(() => {
     fetchSuggestions();
@@ -274,6 +257,49 @@ const Friends = ({ navigation }: any) => {
       setAllUsers([]);
     }
   }, [search, isSearching, fetchSearch]);
+
+  // ⚡ ADDED: Preload Avatars Logic
+  useEffect(() => {
+    let isMounted = true;
+
+    const preloadAvatars = async () => {
+      // Combine all currently visible users
+      const combined = [
+        ...suggestions,
+        ...allUsers,
+        ...friendRequests.map((r) => r.user),
+      ].filter((u) => u && u._id);
+
+      // Deduplicate by ID
+      const uniqueUsers = Array.from(new Map(combined.map((item) => [item._id, item])).values());
+
+      const entries = await Promise.all(
+        uniqueUsers.map(async (u: any) => {
+          const raw =
+            u.avatarThumbnailUrl ||
+            u.avatarUrl ||
+            (typeof u.avatar === "string" ? u.avatar : u.avatar?.url) ||
+            "";
+
+          const local = await getAvatar(u._id, raw);
+          return [u._id, local];
+        })
+      );
+
+      if (!isMounted) return;
+
+      const map = Object.fromEntries(entries);
+      setAvatarMap(map);
+    };
+
+    if (suggestions.length || allUsers.length || friendRequests.length) {
+      preloadAvatars();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [suggestions, allUsers, friendRequests]);
 
   const searchResults = useMemo(() => (isSearching ? allUsers : []), [allUsers, isSearching]);
 
@@ -306,30 +332,29 @@ const Friends = ({ navigation }: any) => {
     setShowRemoveModal(null);
   };
 
-const [acceptedIds, setAcceptedIds] = useState<string[]>([]);
+  const [acceptedIds, setAcceptedIds] = useState<string[]>([]);
 
-const handleAcceptRequest = async (req: FollowRequest) => {
-  const id = req?.user?._id;
-  if (!id) return;
-  setLoadingActions(id);
-  try {
-    await socialApi.acceptFriendRequest(id);
-    setNotification({ type: "success", message: `Accepted request from ${req.user.name}` });
-    setAcceptedIds((prev) => [...prev, id]); // Mark as accepted locally
-    setFriendRequests((prev) => prev.filter((r) => r.user._id !== id));
-    isSearching ? await fetchSearch() : await fetchSuggestions();
-    await fetchRequests();
-  } catch (e) {
-    setNotification({ type: "error", message: "Couldn't accept request." });
-  }
-  setLoadingActions(null);
-};
+  const handleAcceptRequest = async (req: FollowRequest) => {
+    const id = req?.user?._id;
+    if (!id) return;
+    setLoadingActions(id);
+    try {
+      await socialApi.acceptFriendRequest(id);
+      setNotification({ type: "success", message: `Accepted request from ${req.user.name}` });
+      setAcceptedIds((prev) => [...prev, id]); 
+      setFriendRequests((prev) => prev.filter((r) => r.user._id !== id));
+      isSearching ? await fetchSearch() : await fetchSuggestions();
+      await fetchRequests();
+    } catch (e) {
+      setNotification({ type: "error", message: "Couldn't accept request." });
+    }
+    setLoadingActions(null);
+  };
 
-// When rendering the Friend Requests list, filter out acceptedIds:
-const requestListToShow = (showAllRequests
-  ? friendRequests
-  : friendRequests.slice(0, 3)
-).filter(r => !acceptedIds.includes(r.user._id));
+  const requestListToShow = (showAllRequests
+    ? friendRequests
+    : friendRequests.slice(0, 3)
+  ).filter(r => !acceptedIds.includes(r.user._id));
 
   const handleRejectRequest = async (req: FollowRequest) => {
     const id = req?.user?._id;
@@ -352,16 +377,8 @@ const requestListToShow = (showAllRequests
     const user = isRequest ? (item as FollowRequest).user : (item as UserProfile);
     if (!user || !user._id) return null;
 
-    const rawAvatar =
-      (user as any).avatarThumbnailUrl ||
-      (user as any).avatarUrl ||
-      (user as any).avatar?.url ||
-      "";
-    const avatarUri = rawAvatar
-      ? rawAvatar.startsWith("http")
-        ? rawAvatar
-        : newUrl + rawAvatar
-      : "";
+    // ⚡ ADDED: Fetch the resolved local URI from our map
+    const uri = avatarMap[user._id];
 
     return (
       <View style={styles.userCard}>
@@ -371,9 +388,10 @@ const requestListToShow = (showAllRequests
           onPress={() => openProfilePreview(user)}
         >
           <View style={styles.avatar}>
-            {avatarUri ? (
+            {/* ⚡ UPDATED: Uses standard Image tag and the local URI */}
+            {uri ? (
               <Image
-                source={{ uri: avatarUri }}
+                source={{ uri }}
                 style={{ width: 40, height: 40, borderRadius: 999 }}
                 resizeMode="cover"
               />
@@ -382,34 +400,22 @@ const requestListToShow = (showAllRequests
             )}
           </View>
 
-        <View style={styles.userInfo}>
-  <View style={{ flexDirection: "row", alignItems: "center" }}>
-    <Text style={styles.userName} numberOfLines={1}>
-      {user.name ?? user.username}
-    </Text>
-    {/* Blue tick */}
-    {user.tick === "verified" && (
-      <Icon
-        name="check-decagram"
-        size={18}
-        color="#3b82f6"
-        style={{ marginLeft: 6, marginTop: 2 }}
-      />
-    )}
-    {/* Golden tick */}
-    {user.tick === "golden" && (
-      <Icon
-        name="check-decagram"
-        size={18}
-        color="#fbbf24"
-        style={{ marginLeft: 6, marginTop: 2 }}
-      />
-    )}
-  </View>
-  <Text style={styles.userUsername} numberOfLines={1}>
-    {user.username}
-  </Text>
-</View>
+          <View style={styles.userInfo}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={styles.userName} numberOfLines={1}>
+                {user.name ?? user.username}
+              </Text>
+              {user.tick === "verified" && (
+                <Icon name="check-decagram" size={18} color="#3b82f6" style={{ marginLeft: 6, marginTop: 2 }} />
+              )}
+              {user.tick === "golden" && (
+                <Icon name="check-decagram" size={18} color="#fbbf24" style={{ marginLeft: 6, marginTop: 2 }} />
+              )}
+            </View>
+            <Text style={styles.userUsername} numberOfLines={1}>
+              {user.username}
+            </Text>
+          </View>
         </TouchableOpacity>
 
         {isRequest ? (

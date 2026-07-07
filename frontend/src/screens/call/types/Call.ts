@@ -1,4 +1,4 @@
-export type CallStatusType = 'idle' | 'initiating' | 'ringing' | 'connected' | 'reconnecting' | 'disconnected' | 'busy' | 'no-answer';
+export type CallStatusType = 'idle' | 'initiating' | 'ringing' | 'connected' | 'reconnecting' | 'disconnected' | 'busy' | 'no-answer' | 'rejected';
 
 export interface CallUser {
   id: string;

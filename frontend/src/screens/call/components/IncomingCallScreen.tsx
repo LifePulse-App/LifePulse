@@ -36,7 +36,6 @@ export const IncomingCallScreen = () => {
   const { currentSession, acceptCall, rejectCall } = callContext;
   const { remoteUser } = currentSession;
 
-  console.log(remoteUser);
   
 
   return (

@@ -5,7 +5,7 @@ import { Buffer } from 'buffer';
 if (!global.Buffer) global.Buffer = Buffer;
 
 import 'react-native-gesture-handler';
-import { AppRegistry } from 'react-native';
+import { AppRegistry, Platform } from 'react-native';
 import notifee, { EventType, AndroidImportance, AndroidCategory } from '@notifee/react-native';
 
 import { getApp } from '@react-native-firebase/app';
@@ -31,7 +31,7 @@ import apiClient from './src/auth/api-client/api_client';
 |--------------------------------------------------------------------------
 */
 
-// Chat channel (existing)
+// Chat channel
 notifee.createChannel({
   id: 'default',
   name: 'Chat Notifications',
@@ -40,7 +40,7 @@ notifee.createChannel({
   vibration: true,
 });
 
-// App notifications channel (existing)
+// App notifications channel
 notifee.createChannel({
   id: 'app_notifications',
   name: 'App Notifications',
@@ -49,19 +49,19 @@ notifee.createChannel({
   vibration: true,
 });
 
-// ⚡ THE CALL CHANNEL: High priority to wake the screen
+// ⚡ V2 FIX: Creating a BRAND NEW channel to force Android to respect the ringtone
 notifee.createChannel({
-  id: 'call_channel',
+  id: 'call_channel_v2',
   name: 'Incoming Calls',
   importance: AndroidImportance.HIGH,
-  sound: 'default', // You can drop a custom ringtone .mp3 here later
+  sound: 'ringtone', 
   vibration: true,
-  vibrationPattern: [300, 500, 300, 500],
+  vibrationPattern: [300, 1000, 300, 1000], 
 });
 
 /*
 |--------------------------------------------------------------------------
-| Helpers (100% Fully Restored)
+| Helpers 
 |--------------------------------------------------------------------------
 */
 
@@ -141,7 +141,6 @@ function handleNotificationPress(data) {
       } else if (type === 'weekly_recap' || type === 'points_milestone') {
         navigationRef.current?.navigate('Profile');
       } else {
-        // admin_broadcast, welcome_back, general → Home
         navigationRef.current?.navigate('Home');
       }
     } catch (e) {
@@ -150,7 +149,6 @@ function handleNotificationPress(data) {
   }, 300);
 }
 
-// Store pending navigation for when app is killed and opened via notification
 export const notificationNavState = { pending: null };
 
 /*
@@ -165,23 +163,22 @@ const messagingInstance = getMessaging(firebaseApp);
 setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
   const data = remoteMessage?.data || {};
 
-  // ── ⚡ INCOMING CALL WAKE-UP ──
+  // ── ⚡ WHATSAPP-STYLE CUSTOM WAKE UP ──
   if (data.type === 'incoming_call') {
     const { callId, callerName } = data;
 
     try {
-      // Bypasses the lock screen and forces Android to launch your App UI
       await notifee.displayNotification({
-        id: String(callId || 'incoming_call'),
+        id: String(callId),
         title: 'Incoming Call',
-        body: `${callerName || 'Someone'} is calling...`,
+        body: `${callerName} is calling...`,
         android: {
-          channelId: 'call_channel',
-          category: AndroidCategory.CALL,
+          channelId: 'call_channel_v2', // ⚡ Uses new channel
+          category: AndroidCategory.CALL, 
           importance: AndroidImportance.HIGH,
-          autoCancel: false,
-          ongoing: true, // Prevents user from swiping it away
-          // ⚡ THIS IS THE MAGIC: It launches your React Native App over the lock screen
+          autoCancel: true,
+          ongoing: false, 
+          loopSound: true, 
           fullScreenAction: {
             id: 'default',
             mainComponent: appName,
@@ -190,13 +187,32 @@ setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
             id: 'default',
             mainComponent: appName,
           },
+          // ⚡ ADDED: Banner Action Buttons
+          actions: [
+            {
+              title: 'Decline',
+              pressAction: { id: 'decline_call' },
+            },
+            {
+              title: 'Answer',
+              pressAction: { id: 'answer_call', mainComponent: appName },
+            },
+          ],
         },
         data: { ...data },
       });
     } catch (err) {
       console.log('[Notifee] Full Screen intent failed:', err);
     }
-    return; // Stop here so it doesn't run the rest of the handler
+    return; 
+  }
+
+  // ⚡ NEW FIX: The Caller Hung Up or Timed Out! Stops the ghost ringing.
+  if (data.type === 'call_ended' || data.type === 'call_missed' || data.type === 'call_cancelled') {
+    if (data.callId) {
+      await notifee.cancelNotification(String(data.callId));
+    }
+    return;
   }
 
   // ── Chat ──
@@ -266,13 +282,53 @@ setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
 */
 
 notifee.onBackgroundEvent(async ({ type, detail }) => {
-  if (type === EventType.PRESS && detail?.notification?.data) {
-    const data = detail.notification.data;
+  const { notification, pressAction } = detail;
+  const data = notification?.data;
+  
 
+  // 1. User clicked "Decline" from the banner while app was killed
+  if (type === EventType.ACTION_PRESS && pressAction?.id === 'decline_call') {
+    if (notification?.id) {
+      await notifee.cancelNotification(notification.id);
+    }
+    
+    // ⚡ FIX: Tell backend via REST API since socket is dead
+    if (data?.callId) {
+      try {
+        const tokens = await UserStorage.getAccessToken();
+        apiClient.setAuthToken(tokens);
+        setSecretKey()
+        if (tokens) {
+          // Send request to your backend to reject the call
+          await apiClient.post('/call/reject-offline', { callId: data.callId });
+        }
+      } catch (e) {
+        console.log('[Notifee] Failed to reject call via API', e);
+      }
+    }
+    return;
+  }
+
+  // 2. User clicked "Answer" from the banner
+  if (type === EventType.ACTION_PRESS && pressAction?.id === 'answer_call') {
+    // ⚡ FIX: We save this intent so CallProvider knows they explicitly want to answer!
+    if (notification?.id) {
+      await notifee.cancelNotification(notification.id);
+    }
+
+    if (data) {
+      data.autoAccept = true; 
+      notificationNavState.pending = data; 
+    }
+    return;
+  }
+
+  // Handle standard push routing for chat
+  if (type === EventType.PRESS && data) {
     if (navigationRef.current) {
       handleNotificationPress(data);
     } else {
-      notificationNavState.pending = data; // ✅ mutate property, not assignment
+      notificationNavState.pending = data;
     }
   }
 });

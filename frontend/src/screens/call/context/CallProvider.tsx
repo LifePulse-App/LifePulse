@@ -16,6 +16,8 @@ import { OutgoingCallScreen } from '../components/OutgoingCallScreen';
 import { CallContext } from './CallContext';
 import Sound from 'react-native-sound';
 import apiClient from '../../../auth/api-client/api_client';
+import notifee from '@notifee/react-native';
+import { notificationNavState } from '../../../../index';
 
   const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
@@ -152,7 +154,7 @@ const handleIncomingCall = (payload: any) => {
           status: 'ringing',
           isIncoming: true,
         });
-        InCallManager.startRingtone('_DEFAULT', [1000, 500, 1000, 500], 'default', 30);
+        InCallManager.startRingtone('ringtone', [1000, 500, 1000, 500], 'default', 30);
         activeSocket.emit("call:ringing", { callId: payload.callId });
       };
 
@@ -253,6 +255,96 @@ const handleIncomingCall = (payload: any) => {
     };
   }, []);
 
+  // ⚡ FIX: The Call Interceptor (Handles Lock Screen & Banner Taps)
+  useEffect(() => {
+    
+    const checkPendingCalls = async () => {
+      // 1. Did the phone wake up from a locked screen?
+      const initial = await notifee.getInitialNotification();
+      const initialData = initial?.notification?.data;
+
+      // 2. Did the user tap "Answer" while the app was backgrounded?
+      const pendingData = notificationNavState.pending;
+
+      const callData = initialData?.type === 'incoming_call' ? initialData : 
+                       (pendingData?.type === 'incoming_call' ? pendingData : null);
+
+      if (callData) {
+        console.log('[CallProvider] Intercepted pending call:', callData);
+        
+        activeCallIdRef.current = callData.callId;
+        
+        // Clear the pending state so it doesn't fire twice
+        notificationNavState.pending = null;
+
+        // Mount the UI immediately!
+        setCurrentSession({
+          sessionId: callData.callId,
+          remoteUser: { 
+            id: callData.callerId, 
+            name: callData.callerName || 'User', 
+            avatar: '' 
+          },
+          status: 'ringing',
+          isIncoming: true,
+        });
+
+        // Start playing the ringing sound
+        InCallManager.startRingtone('ringtone', [1000, 500, 1000, 500], 'default', 30);
+
+        // If they explicitly tapped "Answer" on the banner, auto-accept!
+        if (callData.autoAccept) {
+          console.log('[CallProvider] Auto-accepting call from banner tap');
+          // Wait 1.5 seconds for socket to finish connecting, then accept
+          setTimeout(() => {
+            const socket = getSocket();
+            if (socket && socket.connected) {
+              socket.emit("call:accept", { callId: callData.callId });
+            } else {
+               // Fallback: Try one more time if socket is slow
+               setTimeout(() => getSocket()?.emit("call:accept", { callId: callData.callId }), 1000);
+            }
+          }, 1500);
+        }
+      }
+    };
+
+    // Run the check when the provider mounts
+    checkPendingCalls();
+
+    // ⚡ FIX: Gracefully handle offline remote terminations via FCM Push
+    const terminateListener = DeviceEventEmitter.addListener('TERMINATE_CALL', (data) => {
+        if (activeCallIdRef.current === data.callId) {
+            console.log("Call terminated via Push Notification Event:", data.type);
+            
+            // If they explicitly rejected, show the UI before cleaning up
+            if (data.type === 'call_rejected') {
+                setCurrentSession(prev => prev ? { ...prev, status: 'rejected' } : null);
+                
+                outgoingToneRef.current?.stop(() => {
+                    outgoingToneRef.current?.release();
+                    outgoingToneRef.current = null;
+                });
+                
+                playEndTone(); // Play the hangup beep
+                
+                // Wait 2.5 seconds so the caller sees "Call Declined"
+                setTimeout(() => {
+                    cleanupCallSession();
+                }, 2500);
+            } else {
+                // If it was just a normal hangup or miss, clean up instantly
+                cleanupCallSession();
+            }
+        }
+    });
+
+    return () => {
+        terminateListener.remove();
+    };
+
+  }, []); // Run once on mount
+
  const startCall = async (targetUser: CallUser, conversationId: string) => {
     const hasPermission = await PermissionService.checkAndRequestAudioPermission();
     if (!hasPermission) return;
@@ -270,8 +362,12 @@ outgoingToneRef.current = playOutgoingTone();
     getSocket()?.emit("call:start", { receiverId: targetUser.id, type: "audio", conversationId }, (response: any) => {
       if (response.success) {
         activeCallIdRef.current = response.callId;
-        // Keep status as 'initiating' (Calling...). It will only change to 'ringing' when the handleCallRinging listener fires!
-        setCurrentSession((prev) => prev ? { ...prev, sessionId: response.callId } : null);
+        // ⚡ FIX: Apply the 'ringing' status immediately from the backend response
+        setCurrentSession((prev) => prev ? { 
+            ...prev, 
+            sessionId: response.callId,
+            status: response.status || 'ringing' 
+        } : null);
       } else if (response.message === "User busy") {
         // ⚡ HANDLE BUSY STATE
         setCurrentSession((prev) => prev ? { ...prev, status: 'busy' } : null);

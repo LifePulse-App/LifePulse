@@ -245,6 +245,30 @@ deleteAccountOtpExpire: Date,
         since: { type: Date, default: Date.now },
       },
     ],
+    // ⚡ NEW: Relationship System Fields
+    partner: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    partnerSince: { type: Date, default: null },
+    partnerGracePeriodEnd: { type: Date, default: null },
+    relationshipIncoming: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        requestedAt: { type: Date, default: Date.now }
+      }
+    ],
+    relationshipOutgoing: [
+      {
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        requestedAt: { type: Date, default: Date.now }
+      }
+    ],
+    relationshipHistory: [
+      {
+        partnerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        partnerName: String, // Stored as a string in case the user deletes their account
+        startedAt: Date,
+        endedAt: { type: Date, default: Date.now },
+      }
+    ],
     avatarUrl: {
       type: String,
       default: '',

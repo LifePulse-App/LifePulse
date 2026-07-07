@@ -39,8 +39,25 @@ const buildAvatarThumbnailUrl = (modelUrl) => {
 // Get profile
 export const getProfile = catchAsyncErrors(async (req, res, next) => {
   const user = await User.findById(req.user._id)
-    .select("-password -resetPasswordCode -resetPasswordCodeExpire -verificationCode -verificationCodeExpire");
+    // ⚡ 1. Explicitly hide ALL sensitive tokens and OTPs
+    .select(
+      "-password -resetPasswordCode -resetPasswordCodeExpire -verificationCode -verificationCodeExpire -refreshTokens -twoFactor.secret -deleteAccountOtp -deleteAccountOtpExpire -emailChangeOtp -emailChangeOtpExpire -pendingEmail"
+    )
+    .populate("partner", "name username avatarUrl avatarThumbnailUrl")
+    // ⚡ 2. Use Object Syntax for nested arrays to guarantee it populates correctly
+    .populate({
+      path: "relationshipIncoming.user",
+      select: "name username avatarUrl avatarThumbnailUrl"
+    })
+    .populate({
+      path: "relationshipOutgoing.user",
+      select: "name username avatarUrl avatarThumbnailUrl"
+    })
+    // ⚡ 3. Force pure JSON output so nested arrays don't get stripped by Mongoose
+    .lean(); 
+
   if (!user) return next(new ErrorHandler("User not found", 404));
+  
   res.status(200).json({ success: true, user });
 });
 

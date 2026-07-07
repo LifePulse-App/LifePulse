@@ -204,6 +204,58 @@ const deleteAccountWithOtp = async (otp: string) => {
 };
 
 
+
+// Send a relationship request to a specific user
+const sendRelationshipRequest = async (targetUserId: string) => {
+  try {
+    return await client.post(`/relationship/request/${targetUserId}`);
+  } catch (error: any) {
+    if (!error.response) throw new Error('Server is offline, try again later.');
+    throw error;
+  }
+};
+
+// Accept an incoming relationship request
+const acceptRelationshipRequest = async (targetUserId: string) => {
+  try {
+    return await client.post(`/relationship/accept/${targetUserId}`);
+  } catch (error: any) {
+    if (!error.response) throw new Error('Server is offline, try again later.');
+    throw error;
+  }
+};
+
+// Cancel an outgoing request or decline an incoming request
+const cancelRelationshipRequest = async (targetUserId: string) => {
+  try {
+    return await client.post(`/relationship/cancel/${targetUserId}`);
+  } catch (error: any) {
+    if (!error.response) throw new Error('Server is offline, try again later.');
+    throw error;
+  }
+};
+
+// Suspend a relationship (Starts the 24-hour grace period timer)
+const removeRelationship = async () => {
+  try {
+    return await client.post('/relationship/remove');
+  } catch (error: any) {
+    if (!error.response) throw new Error('Server is offline, try again later.');
+    throw error;
+  }
+};
+
+// Restore a suspended relationship (Before the 24 hours runs out)
+const restoreRelationship = async () => {
+  try {
+    return await client.post('/relationship/restore');
+  } catch (error: any) {
+    if (!error.response) throw new Error('Server is offline, try again later.');
+    throw error;
+  }
+};
+
+
 export default {
   getProfile,
   editProfile,
@@ -225,5 +277,10 @@ export default {
   updateAvatarUrl,
   updateAvatarImage,
   deleteAvatar,
-  deleteAccountWithOtp
+  deleteAccountWithOtp,
+  cancelRelationshipRequest,
+  acceptRelationshipRequest,
+  sendRelationshipRequest,
+  removeRelationship,
+  restoreRelationship
 };
