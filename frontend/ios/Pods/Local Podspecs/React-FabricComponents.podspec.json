@@ -1,6 +1,6 @@
 {
   "name": "React-FabricComponents",
-  "version": "0.80.0",
+  "version": "0.86.0",
   "summary": "Fabric Components for React Native.",
   "homepage": "https://reactnative.dev/",
   "license": "MIT",
@@ -10,31 +10,16 @@
   },
   "source": {
     "git": "https://github.com/facebook/react-native.git",
-    "tag": "v0.80.0"
+    "tag": "v0.86.0"
   },
-  "source_files": "dummyFile.cpp",
+  "source_files": "",
   "pod_target_xcconfig": {
-    "USE_HEADERMAP": "YES",
     "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
     "DEFINES_MODULE": "YES",
-    "HEADER_SEARCH_PATHS": [
-      "\"$(PODS_TARGET_SRCROOT)/ReactCommon\"",
-      "\"$(PODS_ROOT)/Headers/Private/Yoga\"",
-      "\"$(PODS_TARGET_SRCROOT)\"",
-      "\"${PODS_CONFIGURATION_BUILD_DIR}/React-rendererdebug/React_rendererdebug.framework/Headers\"",
-      "\"${PODS_CONFIGURATION_BUILD_DIR}/React-graphics/React_graphics.framework/Headers\"",
-      "\"${PODS_CONFIGURATION_BUILD_DIR}/React-graphics/React_graphics.framework/Headers/react/renderer/graphics/platform/ios\"",
-      "\"${PODS_CONFIGURATION_BUILD_DIR}/React-Fabric/React_Fabric.framework/Headers\"",
-      "\"${PODS_CONFIGURATION_BUILD_DIR}/React-Fabric/React_Fabric.framework/Headers/react/renderer/components/view/platform/cxx\"",
-      "\"${PODS_CONFIGURATION_BUILD_DIR}/React-Fabric/React_Fabric.framework/Headers/react/renderer/imagemanager/platform/ios\"",
-      "$(PODS_ROOT)/glog",
-      "$(PODS_ROOT)/boost",
-      "$(PODS_ROOT)/DoubleConversion",
-      "$(PODS_ROOT)/fast_float/include",
-      "$(PODS_ROOT)/fmt/include",
-      "$(PODS_ROOT)/SocketRocket",
-      "$(PODS_ROOT)/RCT-Folly"
-    ]
+    "HEADER_SEARCH_PATHS": "\"$(PODS_TARGET_SRCROOT)/ReactCommon\" \"$(PODS_ROOT)/Headers/Private/Yoga\" \"$(PODS_TARGET_SRCROOT)\" \"${PODS_ROOT}/React-RCTFBReactNativeSpec\" \"${PODS_ROOT}/React-rendererdebug\" \"${PODS_ROOT}/React-graphics\" \"${PODS_ROOT}/React-graphics/react/renderer/graphics/platform/ios\" \"${PODS_ROOT}/React-Fabric\" \"${PODS_ROOT}/React-Fabric/react/renderer/components/scrollview/platform/cxx\" \"${PODS_ROOT}/React-Fabric/react/renderer/components/scrollview/platform/ios\" \"${PODS_ROOT}/React-Fabric/react/renderer/components/view/platform/cxx\" \"${PODS_ROOT}/React-Fabric/react/renderer/imagemanager/platform/ios\"",
+    "OTHER_CFLAGS": "$(inherited) -ivfsoverlay $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml",
+    "OTHER_CPLUSPLUSFLAGS": "$(inherited) -ivfsoverlay $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml",
+    "OTHER_SWIFT_FLAGS": "$(inherited) -Xcc -ivfsoverlay -Xcc $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml"
   },
   "dependencies": {
     "React-jsiexecutor": [],
@@ -50,86 +35,91 @@
     "React-runtimescheduler": [],
     "React-cxxreact": [],
     "Yoga": [],
+    "React-RCTFBReactNativeSpec": [],
     "React-rendererdebug": [],
     "React-graphics": [],
     "React-Fabric": [],
     "hermes-engine": [],
-    "React-hermes": [],
-    "glog": [],
-    "boost": [],
-    "DoubleConversion": [],
-    "fast_float": [],
-    "fmt": [],
-    "RCT-Folly": [],
-    "SocketRocket": [],
-    "RCT-Folly/Fabric": []
+    "ReactNativeDependencies": [],
+    "React-Core-prebuilt": []
   },
-  "script_phases": [
-    {
-      "name": "[RN]Check rncore",
-      "execution_position": "before_compile",
-      "always_out_of_date": "1",
-      "script": "echo \"Checking whether Codegen has run...\"\nrncorePath=\"$REACT_NATIVE_PATH/ReactCommon/react/renderer/components/rncore\"\n\nif [[ ! -d \"$rncorePath\" ]]; then\n  echo 'error: Codegen did not run properly in your project. Please reinstall cocoapods with `bundle exec pod install`.'\n  exit 1\nfi\n"
-    }
-  ],
   "subspecs": [
     {
       "name": "components",
       "subspecs": [
         {
           "name": "inputaccessory",
-          "source_files": "react/renderer/components/inputaccessory/**/*.{m,mm,cpp,h}",
+          "source_files": "react/renderer/components/inputaccessory/**/*.h",
           "exclude_files": "react/renderer/components/inputaccessory/tests",
           "header_dir": "react/renderer/components/inputaccessory"
         },
         {
           "name": "modal",
-          "source_files": "react/renderer/components/modal/**/*.{m,mm,cpp,h}",
+          "source_files": "react/renderer/components/modal/*.h",
           "exclude_files": "react/renderer/components/modal/tests",
           "header_dir": "react/renderer/components/modal"
         },
         {
-          "name": "rncore",
-          "source_files": "react/renderer/components/rncore/**/*.{m,mm,cpp,h}",
-          "header_dir": "react/renderer/components/rncore"
-        },
-        {
           "name": "safeareaview",
-          "source_files": "react/renderer/components/safeareaview/**/*.{m,mm,cpp,h}",
+          "source_files": "react/renderer/components/safeareaview/**/*.h",
           "exclude_files": "react/renderer/components/safeareaview/tests",
           "header_dir": "react/renderer/components/safeareaview"
         },
         {
           "name": "scrollview",
-          "source_files": "react/renderer/components/scrollview/*.{m,mm,cpp,h}",
+          "source_files": [
+            "react/renderer/components/scrollview/*.h",
+            "react/renderer/components/scrollview/platform/cxx/**/*.h",
+            "react/renderer/components/scrollview/platform/ios/**/*.h"
+          ],
+          "exclude_files": "react/renderer/components/scrollview/tests",
           "header_dir": "react/renderer/components/scrollview"
         },
         {
           "name": "text",
           "source_files": [
-            "react/renderer/components/text/*.{m,mm,cpp,h}",
-            "react/renderer/components/text/platform/cxx/**/*.{m,mm,cpp,h}"
+            "react/renderer/components/text/*.h",
+            "react/renderer/components/text/platform/cxx/**/*.h"
           ],
           "header_dir": "react/renderer/components/text"
         },
         {
           "name": "iostextinput",
           "source_files": [
-            "react/renderer/components/textinput/*.{m,mm,cpp,h}",
-            "react/renderer/components/textinput/platform/ios/**/*.{m,mm,cpp,h}"
+            "react/renderer/components/textinput/*.h",
+            "react/renderer/components/textinput/platform/ios/**/*.h"
           ],
           "header_dir": "react/renderer/components/iostextinput"
         },
         {
+          "name": "switch",
+          "source_files": [
+            "react/renderer/components/switch/iosswitch/**/*.h"
+          ],
+          "exclude_files": "react/renderer/components/switch/iosswitch/**/MacOS*.{m,mm,cpp,h}",
+          "header_dir": "react/renderer/components/switch/"
+        },
+        {
           "name": "textinput",
-          "source_files": "react/renderer/components/textinput/*.{m,mm,cpp,h}",
+          "source_files": "react/renderer/components/textinput/**/*.h",
           "header_dir": "react/renderer/components/textinput"
         },
         {
           "name": "unimplementedview",
-          "source_files": "react/renderer/components/unimplementedview/**/*.{m,mm,cpp,h}",
+          "source_files": "react/renderer/components/unimplementedview/**/*.h",
           "exclude_files": "react/renderer/components/unimplementedview/tests",
           "header_dir": "react/renderer/components/unimplementedview"
+        },
+        {
+          "name": "virtualview",
+          "source_files": "react/renderer/components/virtualview/**/*.h",
+          "exclude_files": "react/renderer/components/virtualview/tests",
+          "header_dir": "react/renderer/components/virtualview"
+        },
+        {
+          "name": "rncore",
+          "source_files": "react/renderer/components/rncore/**/*.h",
+          "header_dir": "react/renderer/components/rncore"
         }
       ]
     },
@@ -139,8 +129,8 @@
         "React-Fabric": []
       },
       "source_files": [
-        "react/renderer/textlayoutmanager/platform/ios/**/*.{m,mm,cpp,h}",
-        "react/renderer/textlayoutmanager/*.{m,mm,cpp,h}"
+        "react/renderer/textlayoutmanager/platform/ios/**/*.h",
+        "react/renderer/textlayoutmanager/*.{h}"
       ],
       "exclude_files": [
         "react/renderer/textlayoutmanager/tests",

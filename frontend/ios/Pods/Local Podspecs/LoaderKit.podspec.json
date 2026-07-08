@@ -1,6 +1,6 @@
 {
   "name": "LoaderKit",
-  "version": "3.0.0",
+  "version": "4.1.0",
   "summary": "🎯 Beautiful native loading indicators for React Native with 30+ animations, TypeScript support, and speed control",
   "homepage": "https://github.com/maitrungduc1410/react-native-loader-kit#readme",
   "license": "MIT",
@@ -10,12 +10,12 @@
   },
   "source": {
     "git": "https://github.com/maitrungduc1410/react-native-loader-kit.git",
-    "tag": "3.0.0"
+    "tag": "4.1.0"
   },
-  "source_files": "ios/**/*.{h,m,mm,cpp}",
+  "source_files": "ios/**/*.{h,m,mm,swift}",
   "private_header_files": "ios/**/*.h",
+  "compiler_flags": "-DRCT_NEW_ARCH_ENABLED=1",
   "dependencies": {
-    "NVActivityIndicatorView-ObjC": [],
     "React-Core": [],
     "React-RCTFabric": [],
     "ReactCodegen": [],
@@ -35,21 +35,14 @@
     "React-jsi": [],
     "React-renderercss": [],
     "hermes-engine": [],
-    "React-hermes": [],
-    "glog": [],
-    "boost": [],
-    "DoubleConversion": [],
-    "fast_float": [],
-    "fmt": [],
-    "RCT-Folly": [],
-    "SocketRocket": [],
-    "RCT-Folly/Fabric": []
+    "ReactNativeDependencies": [],
+    "React-Core-prebuilt": []
   },
-  "compiler_flags": "-DRCT_NEW_ARCH_ENABLED=1",
   "pod_target_xcconfig": {
     "HEADER_SEARCH_PATHS": "\"$(PODS_ROOT)/Headers/Private/Yoga\"",
     "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
-    "OTHER_CPLUSPLUSFLAGS": "$(inherited) -DRCT_NEW_ARCH_ENABLED=1 ",
-    "OTHER_SWIFT_FLAGS": "$(inherited) -DRCT_NEW_ARCH_ENABLED"
+    "OTHER_CPLUSPLUSFLAGS": "$(inherited) -DRCT_NEW_ARCH_ENABLED=1  -ivfsoverlay $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml",
+    "OTHER_SWIFT_FLAGS": "$(inherited) -DRCT_NEW_ARCH_ENABLED -Xcc -ivfsoverlay -Xcc $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml",
+    "OTHER_CFLAGS": "$(inherited) -ivfsoverlay $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml"
   }
 }

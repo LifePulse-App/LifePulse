@@ -1,15 +1,12 @@
 import 'react-native-get-random-values';
 import { Buffer } from 'buffer';
-import { Crypto } from '@peculiar/webcrypto';
 
 // Polyfills
 if (!global.Buffer) global.Buffer = Buffer;
-if (!global.crypto) global.crypto = new Crypto();
-else if (!global.crypto.subtle) global.crypto.subtle = new Crypto().subtle;
 
 import 'react-native-gesture-handler';
-import { AppRegistry } from 'react-native';
-import notifee, { EventType, AndroidImportance } from '@notifee/react-native';
+import { AppRegistry, Platform } from 'react-native';
+import notifee, { EventType, AndroidImportance, AndroidCategory } from '@notifee/react-native';
 
 import { getApp } from '@react-native-firebase/app';
 import { getMessaging, setBackgroundMessageHandler } from '@react-native-firebase/messaging';
@@ -34,7 +31,7 @@ import apiClient from './src/auth/api-client/api_client';
 |--------------------------------------------------------------------------
 */
 
-// Chat channel (existing)
+// Chat channel
 notifee.createChannel({
   id: 'default',
   name: 'Chat Notifications',
@@ -43,7 +40,7 @@ notifee.createChannel({
   vibration: true,
 });
 
-// App notifications channel (new)
+// App notifications channel
 notifee.createChannel({
   id: 'app_notifications',
   name: 'App Notifications',
@@ -52,9 +49,19 @@ notifee.createChannel({
   vibration: true,
 });
 
+// ⚡ V2 FIX: Creating a BRAND NEW channel to force Android to respect the ringtone
+notifee.createChannel({
+  id: 'call_channel_v2',
+  name: 'Incoming Calls',
+  importance: AndroidImportance.HIGH,
+  sound: 'ringtone', 
+  vibration: true,
+  vibrationPattern: [300, 1000, 300, 1000], 
+});
+
 /*
 |--------------------------------------------------------------------------
-| Helpers
+| Helpers 
 |--------------------------------------------------------------------------
 */
 
@@ -134,7 +141,6 @@ function handleNotificationPress(data) {
       } else if (type === 'weekly_recap' || type === 'points_milestone') {
         navigationRef.current?.navigate('Profile');
       } else {
-        // admin_broadcast, welcome_back, general → Home
         navigationRef.current?.navigate('Home');
       }
     } catch (e) {
@@ -143,7 +149,6 @@ function handleNotificationPress(data) {
   }, 300);
 }
 
-// Store pending navigation for when app is killed and opened via notification
 export const notificationNavState = { pending: null };
 
 /*
@@ -158,15 +163,67 @@ const messagingInstance = getMessaging(firebaseApp);
 setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
   const data = remoteMessage?.data || {};
 
+  // ── ⚡ WHATSAPP-STYLE CUSTOM WAKE UP ──
+  if (data.type === 'incoming_call') {
+    const { callId, callerName } = data;
+
+    try {
+      await notifee.displayNotification({
+        id: String(callId),
+        title: 'Incoming Call',
+        body: `${callerName} is calling...`,
+        android: {
+          channelId: 'call_channel_v2', // ⚡ Uses new channel
+          category: AndroidCategory.CALL, 
+          importance: AndroidImportance.HIGH,
+          autoCancel: true,
+          ongoing: false, 
+          loopSound: true, 
+          fullScreenAction: {
+            id: 'default',
+            mainComponent: appName,
+          },
+          pressAction: {
+            id: 'default',
+            mainComponent: appName,
+          },
+          // ⚡ ADDED: Banner Action Buttons
+          actions: [
+            {
+              title: 'Decline',
+              pressAction: { id: 'decline_call' },
+            },
+            {
+              title: 'Answer',
+              pressAction: { id: 'answer_call', mainComponent: appName },
+            },
+          ],
+        },
+        data: { ...data },
+      });
+    } catch (err) {
+      console.log('[Notifee] Full Screen intent failed:', err);
+    }
+    return; 
+  }
+
+  // ⚡ NEW FIX: The Caller Hung Up or Timed Out! Stops the ghost ringing.
+  if (data.type === 'call_ended' || data.type === 'call_missed' || data.type === 'call_cancelled') {
+    if (data.callId) {
+      await notifee.cancelNotification(String(data.callId));
+    }
+    return;
+  }
+
   // ── Chat ──
   if (data.type === 'chat') {
     const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
     if (incomingMessageId) {
       try {
         setSecretKey();
-        const tokens = await UserStorage.getTokens?.();
-        if (tokens?.accessToken) {
-          apiClient.setAuthToken?.(tokens.accessToken);
+        const tokens = await UserStorage.getAccessToken();
+        if (tokens) {
+          apiClient.setAuthToken(tokens);
         }
         await markDelivered([incomingMessageId]);
         console.log('[BGHandler] ✅ Delivered:', incomingMessageId);
@@ -225,13 +282,53 @@ setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
 */
 
 notifee.onBackgroundEvent(async ({ type, detail }) => {
-  if (type === EventType.PRESS && detail?.notification?.data) {
-    const data = detail.notification.data;
+  const { notification, pressAction } = detail;
+  const data = notification?.data;
+  
 
+  // 1. User clicked "Decline" from the banner while app was killed
+  if (type === EventType.ACTION_PRESS && pressAction?.id === 'decline_call') {
+    if (notification?.id) {
+      await notifee.cancelNotification(notification.id);
+    }
+    
+    // ⚡ FIX: Tell backend via REST API since socket is dead
+    if (data?.callId) {
+      try {
+        const tokens = await UserStorage.getAccessToken();
+        apiClient.setAuthToken(tokens);
+        setSecretKey()
+        if (tokens) {
+          // Send request to your backend to reject the call
+          await apiClient.post('/call/reject-offline', { callId: data.callId });
+        }
+      } catch (e) {
+        console.log('[Notifee] Failed to reject call via API', e);
+      }
+    }
+    return;
+  }
+
+  // 2. User clicked "Answer" from the banner
+  if (type === EventType.ACTION_PRESS && pressAction?.id === 'answer_call') {
+    // ⚡ FIX: We save this intent so CallProvider knows they explicitly want to answer!
+    if (notification?.id) {
+      await notifee.cancelNotification(notification.id);
+    }
+
+    if (data) {
+      data.autoAccept = true; 
+      notificationNavState.pending = data; 
+    }
+    return;
+  }
+
+  // Handle standard push routing for chat
+  if (type === EventType.PRESS && data) {
     if (navigationRef.current) {
       handleNotificationPress(data);
     } else {
-      notificationNavState.pending = data; // ✅ mutate property, not assignment
+      notificationNavState.pending = data;
     }
   }
 });

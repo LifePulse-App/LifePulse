@@ -12,7 +12,7 @@ export const loginStyles = () => {
       flex: 1,
     },
     baseBackground: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       backgroundColor: '#020617', // same as Dashboard
     },
     glowTop: {

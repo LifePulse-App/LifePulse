@@ -3,6 +3,7 @@ import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import Mood from "../models/MoodSchema.js";
 import { sendToUser } from '../helpers/broadcastService.js';
 import { TEMPLATES } from '../utils/notificationTemplates.js';
+import { log } from "console";
 
 /**
  * Helpers
@@ -13,8 +14,6 @@ const hasIncomingReq = (user, otherId) => user.incomingFriendRequests?.some(r =>
 
 /**
  * Send a friend request (current user -> target)
- * If target already sent me a request, auto-accept and create friendship.
- * Body/params: targetUserId (in params)
  */
 export const sendFriendRequest = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
@@ -27,12 +26,10 @@ export const sendFriendRequest = catchAsyncErrors(async (req, res) => {
 
   if (isFriend(me, targetUserId)) return res.json({ message: "Already friends", isFriend: true });
 
-  // If they already requested me, auto-accept
   if (hasOutgoingReq(me, targetUserId)) {
     return res.json({ message: "Request already sent", requestSent: true });
   }
   if (hasOutgoingReq(them, currentUserId)) {
-    // they asked me; accept both sides
     them.friendRequests = them.friendRequests.filter(r => String(r.user) !== currentUserId);
     me.friends.push({ user: targetUserId });
     them.friends.push({ user: currentUserId });
@@ -41,21 +38,20 @@ export const sendFriendRequest = catchAsyncErrors(async (req, res) => {
     return res.json({ message: "Request matched; now friends", isFriend: true });
   }
 
-  // otherwise create outgoing request to them
   them.friendRequests.push({ user: currentUserId, requestedAt: new Date() });
   await them.save();
-  await sendToUser(toUserId, {
-  ...TEMPLATES.FRIEND_REQUEST_SENT(req.user.name),
-  extra: {
-    fromUserId: String(req.user._id),
-    fromName: String(req.user.name),
-  },
-});
+  await sendToUser(targetUserId, {
+    ...TEMPLATES.FRIEND_REQUEST_SENT(req.user.name),
+    extra: {
+      fromUserId: String(req.user._id),
+      fromName: String(req.user.name),
+    },
+  });
   return res.json({ message: "Friend request sent", requestSent: true });
 });
 
 /**
- * Accept a friend request (current user accepts requesterId)
+ * Accept a friend request
  */
 export const acceptFriendRequest = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
@@ -74,33 +70,45 @@ export const acceptFriendRequest = catchAsyncErrors(async (req, res) => {
 
   await me.save();
   await them.save();
-  await sendToUser(originalRequesterId, {
-  ...TEMPLATES.FRIEND_REQUEST_ACCEPTED(req.user.name),
-  extra: {
-    fromUserId: String(req.user._id),
-    fromName: String(req.user.name),
-  },
-});
+  await sendToUser(requesterId, {
+    ...TEMPLATES.FRIEND_REQUEST_ACCEPTED(req.user.name),
+    extra: {
+      fromUserId: String(req.user._id),
+      fromName: String(req.user.name),
+    },
+  });
   return res.json({ message: "Request accepted", isFriend: true });
 });
 
 /**
- * Remove/cancel a pending request (current user removes requesterId from their pending list)
- * This works for declining an incoming request (requesterId -> me)
- * or canceling my outgoing request (me -> targetId) by swapping ids on the route.
+ * Remove/cancel a pending friend request
  */
 export const removeFriendRequest = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
-  const { requesterId } = req.params; // requesterId could be the other party
-  const me = await User.findById(currentUserId);
-  if (!me) return res.status(404).json({ message: "User not found" });
+  const { requesterId } = req.params; 
 
-  const initial = me.friendRequests.length;
+  const me = await User.findById(currentUserId);
+  const them = await User.findById(requesterId);
+
+  if (!me || !them) return res.status(404).json({ message: "User not found" });
+
+  let modified = false;
+
+  const initialMeCount = me.friendRequests.length;
   me.friendRequests = me.friendRequests.filter(r => String(r.user) !== requesterId);
-  if (me.friendRequests.length < initial) {
+  if (me.friendRequests.length < initialMeCount) {
     await me.save();
-    return res.json({ message: "Request removed" });
+    modified = true;
   }
+
+  const initialThemCount = them.friendRequests.length;
+  them.friendRequests = them.friendRequests.filter(r => String(r.user) !== currentUserId);
+  if (them.friendRequests.length < initialThemCount) {
+    await them.save();
+    modified = true;
+  }
+
+  if (modified) return res.json({ message: "Request removed successfully" });
   return res.json({ message: "No request found" });
 });
 
@@ -128,31 +136,24 @@ export const unfriend = catchAsyncErrors(async (req, res) => {
   return res.json({ message: changed ? "Unfriended" : "Not friends", isFriend: false });
 });
 
-/**
- * Friend status flags
- */
 export const friendStatus = catchAsyncErrors(async (req, res) => {
-  const { userId } = req.params; // target user
+  const { userId } = req.params; 
   const currentUserId = req.user.id;
   const user = await User.findById(userId).select("friendRequests friends");
   if (!user) return res.status(404).json({ message: "User not found" });
 
   const isFriendFlag = isFriend(user, currentUserId);
   const hasRequestSent = user.friendRequests?.some(r => String(r.user) === currentUserId);
-  // incoming request = they sent to me (so I have it in my friendRequests)
   const me = await User.findById(currentUserId).select("friendRequests");
   const hasIncoming = me?.friendRequests?.some(r => String(r.user) === userId);
 
   res.json({ isFriend: isFriendFlag, requestSent: hasRequestSent, requestIncoming: hasIncoming });
 });
 
-/**
- * List my friends
- */
 export const listFriends = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const me = await User.findById(currentUserId)
-    .populate("friends.user", "name username avatarUrl tick")
+    .populate("friends.user", "name username avatarUrl tick avatarVersion")
     .lean();
   if (!me) return res.status(404).json({ message: "User not found" });
 
@@ -170,9 +171,6 @@ export const listFriends = catchAsyncErrors(async (req, res) => {
   res.json({ friends });
 });
 
-/**
- * Incoming pending requests (to me)
- */
 export const pendingFriendRequests = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const me = await User.findById(currentUserId)
@@ -180,23 +178,20 @@ export const pendingFriendRequests = catchAsyncErrors(async (req, res) => {
     .lean();
   if (!me) return res.status(404).json({ message: "User not found" });
 
-res.json({
-  requests: (me.friendRequests || [])
-    .filter(r => !me.friends.some(f => String(f.user) === String(r.user?._id)))
-    .map(r => ({
-      _id: r.user?._id,
-      name: r.user?.name,
-      username: r.user?.username,
-      avatar: r.user?.avatarUrl,
-      tick: r.user?.tick,
-      requestedAt: r.requestedAt,
-    })),
-});
+  res.json({
+    requests: (me.friendRequests || [])
+      .filter(r => !me.friends.some(f => String(f.user) === String(r.user?._id)))
+      .map(r => ({
+        _id: r.user?._id,
+        name: r.user?.name,
+        username: r.user?.username,
+        avatar: r.user?.avatarUrl,
+        tick: r.user?.tick,
+        requestedAt: r.requestedAt,
+      })),
+  });
 });
 
-/**
- * Search users with friend flags
- */
 export const searchUsers = catchAsyncErrors(async (req, res) => {
   const { q } = req.query;
   const currentUserId = req.user?.id;
@@ -230,9 +225,6 @@ export const searchUsers = catchAsyncErrors(async (req, res) => {
   res.status(200).json({ user: users, filteredUsersCount: users.length });
 });
 
-/**
- * Suggested users (not friends yet)
- */
 export const suggestedFriends = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const limit = parseInt(req.query.limit) || 20;
@@ -267,78 +259,312 @@ export const suggestedFriends = catchAsyncErrors(async (req, res) => {
   res.status(200).json({ suggestions: shuffled });
 });
 
+
+// ==========================================
+// ⚡ RELATIONSHIP SYSTEM
+// ==========================================
+
+const checkAndCleanupGracePeriod = async (userDoc) => {
+  const now = new Date();
+  if (userDoc.partner && userDoc.partnerGracePeriodEnd && userDoc.partnerGracePeriodEnd < now) {
+    const them = await User.findById(userDoc.partner);
+    
+    // Move to history for ME
+    userDoc.relationshipHistory.push({
+      partnerId: them ? them._id : userDoc.partner,
+      partnerName: them ? them.name : "Unknown User",
+      startedAt: userDoc.partnerSince,
+      endedAt: userDoc.partnerGracePeriodEnd, 
+    });
+    userDoc.partner = null;
+    userDoc.partnerSince = null;
+    userDoc.partnerGracePeriodEnd = null;
+    await userDoc.save();
+
+    // Move to history for THEM
+    if (them) {
+      them.relationshipHistory.push({
+        partnerId: userDoc._id,
+        partnerName: userDoc.name,
+        startedAt: them.partnerSince,
+        endedAt: userDoc.partnerGracePeriodEnd,
+      });
+      them.partner = null;
+      them.partnerSince = null;
+      them.partnerGracePeriodEnd = null;
+      await them.save();
+    }
+    return true; 
+  }
+  return false; 
+};
+
 export const previewProfile = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const { userId } = req.params;
 
-  const target = await User.findById(userId)
-    .select("name username avatarUrl avatarThumbnailUrl level currentTitle country city isPublic tick")
-    .lean();
+  let targetDoc = await User.findById(userId)
+    .select("name username avatarUrl avatarVersion avatarThumbnailUrl level currentTitle country city isPublic tick partner partnerSince partnerGracePeriodEnd ")
+    .lean(); // temporarily removed lean if we needed to save, but let's fetch properly
 
-  if (!target) return res.status(404).json({ message: "User not found" });
+  if (!targetDoc) return res.status(404).json({ message: "User not found" });
 
-  const me = await User.findById(currentUserId)
-    .select("friends friendRequests")
-    .lean();
+  // Quick check and cleanup for target doc
+  const targetUserObj = await User.findById(userId);
+  const wasCleanedUp = await checkAndCleanupGracePeriod(targetUserObj);
+  if (wasCleanedUp) {
+    targetDoc = await User.findById(userId)
+       .select("name username avatarUrl avatarVersion avatarThumbnailUrl level currentTitle country city isPublic tick partner partnerSince partnerGracePeriodEnd")
+       .lean();
+  }
 
+  // Fetch ME to check arrays
+  const me = await User.findById(currentUserId).select("friends friendRequests relationshipIncoming relationshipOutgoing partner").lean();
+  
   const isFriendFlag = me ? isFriend(me, userId) : false;
+  const requestSent = await User.exists({ _id: userId, "friendRequests.user": currentUserId });
+  const requestIncoming = me?.friendRequests?.some((r) => String(r.user) === String(userId));
+  const canSeeLocation = targetDoc.isPublic === true || isFriendFlag;
 
-  // I sent request to them (they have my id in their friendRequests)
-  const requestSent = await User.exists({
-    _id: userId,
-    "friendRequests.user": currentUserId,
-  });
-
-  // they sent request to me (I have their id in my friendRequests)
-  const requestIncoming = me?.friendRequests?.some(
-    (r) => String(r.user) === String(userId)
-  );
-
-  // Location visibility policy:
-  // - public accounts share location to everyone
-  // - friends share location to each other
-  const canSeeLocation = target.isPublic === true || isFriendFlag;
-
-  // Latest active (non-expired) mood
   const now = new Date();
-  const moodDoc = await Mood.findOne({
-    user: userId,
-    expiresAt: { $gt: now },
-  })
-    .sort({ createdAt: -1 })
-    .select("mood createdAt expiresAt")
-    .lean();
+  const moodDoc = await Mood.findOne({ user: userId, expiresAt: { $gt: now } })
+    .sort({ createdAt: -1 }).select("mood createdAt expiresAt").lean();
+
+  // ⚡ Check relationship array status
+  const isPartner = targetDoc.partner && String(targetDoc.partner) === currentUserId;
+  const relRequestSent = me?.relationshipOutgoing?.some(r => String(r.user) === userId);
+  const relRequestIncoming = me?.relationshipIncoming?.some(r => String(r.user) === userId);
+
+  // Change this block in previewProfile controller
+let partnerData = null;
+if (targetDoc.partner) { // Removed: && !targetDoc.partnerGracePeriodEnd
+  const partnerUser = await User.findById(targetDoc.partner).select("name").lean();
+  if (partnerUser) {
+    const msInDay = 24 * 60 * 60 * 1000;
+    const diff = now.getTime() - new Date(targetDoc.partnerSince).getTime();
+    
+    partnerData = {
+      _id: partnerUser._id,
+      name: partnerUser.name,
+      days: Math.floor(diff / msInDay),
+      // ⚡ Keep these even if suspended
+      isSuspended: !!targetDoc.partnerGracePeriodEnd,
+      gracePeriodEnd: targetDoc.partnerGracePeriodEnd || null
+    };
+  }
+}
+
+  const isSuspended = !!targetDoc.partnerGracePeriodEnd;
 
   res.json({
     user: {
-      _id: target._id,
-      name: target.name,
-      username: target.username,
-      avatarUrl: target.avatarUrl,
-      avatarThumbnailUrl: target.avatarThumbnailUrl,
-
-      level: target.level,
-      title: target.currentTitle || "",
-
-      // only show if allowed
-      country: canSeeLocation ? target.country || "" : "",
-      city: canSeeLocation ? target.city || "" : "",
-
-      // mood can be treated as public or follow same rule; you decide.
-      // Here: mood is shown to everyone if it exists.
+      _id: targetDoc._id,
+      name: targetDoc.name,
+      username: targetDoc.username,
+      avatarUrl: targetDoc.avatarUrl,
+      avatarThumbnailUrl: targetDoc.avatarThumbnailUrl,
+      level: targetDoc.level,
+      title: targetDoc.currentTitle || "",
+      country: canSeeLocation ? targetDoc.country || "" : "",
+      city: canSeeLocation ? targetDoc.city || "" : "",
       mood: moodDoc?.mood || "",
       moodCreatedAt: moodDoc?.createdAt || null,
       moodExpiresAt: moodDoc?.expiresAt || null,
-      tick: target?.tick,
-
-      // share setting
-      isPublic: !!target.isPublic,
+      tick: targetDoc?.tick,
+      isPublic: !!targetDoc.isPublic,
       canSeeLocation,
+      partner: partnerData, 
     },
     friendship: {
       isFriend: isFriendFlag,
       requestSent: !!requestSent,
       requestIncoming: !!requestIncoming,
     },
+    // ⚡ Pass exact relationship status back to frontend
+    relationship: {
+      isPartner: !!isPartner,
+      requestSent: !!relRequestSent,
+      requestIncoming: !!relRequestIncoming,
+      isSuspended: isSuspended,
+      gracePeriodEnd: targetDoc.partnerGracePeriodEnd || null
+    }
   });
+});
+
+/**
+ * Send a relationship request
+ */
+export const sendRelationshipRequest = catchAsyncErrors(async (req, res) => {
+  const currentUserId = req.user.id;
+  const { targetUserId } = req.params;
+
+  if (currentUserId === targetUserId) return res.status(400).json({ message: "Cannot date yourself" });
+
+  const me = await User.findById(currentUserId);
+  const them = await User.findById(targetUserId);
+
+  if (!them) return res.status(404).json({ message: "User not found" });
+
+  await checkAndCleanupGracePeriod(me);
+  await checkAndCleanupGracePeriod(them);
+
+  // ⚡ Block if EITHER has a partner
+  if (me.partner) return res.status(400).json({ message: "You are already in a relationship." });
+  if (them.partner) return res.status(400).json({ message: "They are already in a relationship." });
+
+  // ⚡ Prevent duplicate requests
+  const alreadySent = me.relationshipOutgoing?.some(r => String(r.user) === targetUserId);
+  if (alreadySent) return res.status(400).json({ message: "Request already sent." });
+
+  const alreadyReceived = me.relationshipIncoming?.some(r => String(r.user) === targetUserId);
+  if (alreadyReceived) return res.status(400).json({ message: "They already sent you a request. Please accept it." });
+
+  // Initialize arrays if missing
+  if (!me.relationshipOutgoing) me.relationshipOutgoing = [];
+  if (!them.relationshipIncoming) them.relationshipIncoming = [];
+
+  // Push to arrays (Unlimited allowed if single)
+  me.relationshipOutgoing.push({ user: targetUserId });
+  them.relationshipIncoming.push({ user: currentUserId });
+
+  await me.save();
+  await them.save();
+
+  return res.json({ message: "Relationship request sent!", requestSent: true });
+});
+
+/**
+ * Accept a relationship request
+ */
+export const acceptRelationshipRequest = catchAsyncErrors(async (req, res) => {
+  console.log(req.params);
+  
+  const currentUserId = req.user.id;
+  const { targetUserId } = req.params; // Requires the ID from the URL
+  
+
+  const me = await User.findById(currentUserId);
+  const them = await User.findById(targetUserId);
+
+  if (!them) return res.status(404).json({ message: "User not found" });
+
+  if (me.partner) return res.status(400).json({ message: "You already have a partner." });
+  if (them.partner) return res.status(400).json({ message: "They already have a partner." });
+
+  const hasIncoming = me.relationshipIncoming?.some(r => String(r.user) === targetUserId);
+  if (!hasIncoming) return res.status(400).json({ message: "No incoming request from this user." });
+
+  const now = new Date();
+
+  // ⚡ Accept, then instantly wipe ALL other pending requests for both users
+  me.relationshipIncoming = [];
+  me.relationshipOutgoing = [];
+  me.partner = them._id;
+  me.partnerSince = now;
+  me.partnerGracePeriodEnd = null;
+
+  them.relationshipIncoming = [];
+  them.relationshipOutgoing = [];
+  them.partner = me._id;
+  them.partnerSince = now;
+  them.partnerGracePeriodEnd = null;
+
+  await me.save();
+  await them.save();
+
+  return res.json({ message: "Relationship started!", success: true });
+});
+
+/**
+ * Cancel or Decline a pending relationship request
+ */
+export const cancelRelationshipRequest = catchAsyncErrors(async (req, res) => {
+  const currentUserId = req.user.id;
+  const { targetUserId } = req.params; // Requires the ID from the URL
+
+  const me = await User.findById(currentUserId);
+  const them = await User.findById(targetUserId);
+
+  if (!them) return res.status(404).json({ message: "User not found" });
+
+  let modified = false;
+
+  // Check if I am cancelling an outgoing request
+  const outIndex = me.relationshipOutgoing?.findIndex(r => String(r.user) === targetUserId);
+  if (outIndex !== -1 && outIndex !== undefined) {
+    me.relationshipOutgoing.splice(outIndex, 1);
+    them.relationshipIncoming = them.relationshipIncoming.filter(r => String(r.user) !== currentUserId);
+    modified = true;
+  }
+
+  // Check if I am declining an incoming request
+  const inIndex = me.relationshipIncoming?.findIndex(r => String(r.user) === targetUserId);
+  if (inIndex !== -1 && inIndex !== undefined) {
+    me.relationshipIncoming.splice(inIndex, 1);
+    them.relationshipOutgoing = them.relationshipOutgoing.filter(r => String(r.user) !== currentUserId);
+    modified = true;
+  }
+
+  if (modified) {
+    await me.save();
+    await them.save();
+    return res.json({ message: "Request cancelled.", success: true });
+  }
+
+  return res.status(400).json({ message: "No request found to cancel." });
+});
+
+/**
+ * Suspend current partner (Starts 24-hour grace period)
+ */
+export const removeRelationship = catchAsyncErrors(async (req, res) => {
+  const currentUserId = req.user.id;
+  const me = await User.findById(currentUserId);
+
+  if (!me.partner) return res.status(400).json({ message: "You are not in a relationship." });
+
+  const them = await User.findById(me.partner);
+  
+  const graceEnd = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  
+  me.partnerGracePeriodEnd = graceEnd;
+  await me.save();
+
+  if (them) {
+    them.partnerGracePeriodEnd = graceEnd;
+    await them.save();
+  }
+
+  return res.json({ 
+    message: "Relationship suspended. You have 24 hours to restore it.", 
+    success: true 
+  });
+});
+
+/**
+ * Restore relationship (Cancels the 24-hour grace period)
+ */
+export const restoreRelationship = catchAsyncErrors(async (req, res) => {
+  const currentUserId = req.user.id;
+  const me = await User.findById(currentUserId);
+
+  if (!me.partner) return res.status(400).json({ message: "No relationship to restore." });
+  if (!me.partnerGracePeriodEnd) return res.status(400).json({ message: "Your relationship is already active." });
+
+  const isExpired = await checkAndCleanupGracePeriod(me);
+  if (isExpired) {
+    return res.status(400).json({ message: "Grace period expired. Relationship lost permanently." });
+  }
+
+  const them = await User.findById(me.partner);
+
+  me.partnerGracePeriodEnd = null;
+  await me.save();
+
+  if (them) {
+    them.partnerGracePeriodEnd = null;
+    await them.save();
+  }
+
+  return res.json({ message: "Relationship successfully restored!", success: true });
 });

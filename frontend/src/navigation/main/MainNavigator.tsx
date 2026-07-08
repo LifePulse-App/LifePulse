@@ -15,7 +15,10 @@ import ArPortalScreen from '../../screens/AR-Model/components/ar_screen';
 const Stack = createNativeStackNavigator();
 
 const MainNavigator = () => (
-  <Stack.Navigator screenOptions={{ headerShown: false }}>
+  <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade',
+    gestureEnabled: true,
+    fullScreenGestureEnabled: true,
+    animationDuration: 20 }}>
     <Stack.Screen name="Dashboard" component={Dashboard} />
     <Stack.Screen name="MoodScreen" component={MoodScreen} />
     <Stack.Screen name="Student" component={StudentList} />

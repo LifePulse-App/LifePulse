@@ -18,6 +18,8 @@ import MainLayout from "../../../shared/components/MainLayout";
 import socialApi from "../services/api_friends";
 import apiClient from "../../../auth/api-client/api_client";
 import AuthContext from "../../../auth/user/UserContext";
+import FastImage from "react-native-fast-image";
+import { getAvatar } from "../../../storage/AvatarManager";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
 const GLASS_BORDER = "rgba(148, 163, 184, 0.35)";
@@ -68,6 +70,7 @@ export default function FriendsListScreen({ navigation }: any) {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [avatarMap, setAvatarMap] = useState({});
 
   const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
@@ -166,6 +169,37 @@ export default function FriendsListScreen({ navigation }: any) {
     }
   }, [offline]); // intentionally only triggers on offline toggle, not on loadFriends change
 
+useEffect(() => {
+  let isMounted = true;
+
+  const preload = async () => {
+    const entries = await Promise.all(
+      friends.map(async (f) => {
+        const raw =
+          f.avatarThumbnailUrl ||
+          f.avatarUrl ||
+          (typeof f.avatar === "string" ? f.avatar : f.avatar?.url) ||
+          "";
+
+        const local = await getAvatar(f._id, raw);
+        return [f._id, local];
+      })
+    );
+
+    if (!isMounted) return;
+
+    const map = Object.fromEntries(entries);
+    setAvatarMap(map);
+  };
+
+  if (friends.length) preload();
+
+  return () => {
+    isMounted = false;
+  };
+}, [friends]);
+
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return friends;
@@ -176,18 +210,22 @@ export default function FriendsListScreen({ navigation }: any) {
     });
   }, [friends, search]);
 
-  const resolveAvatarUri = (item: Friend) => {
-    const raw =
-      item.avatarThumbnailUrl ||
-      item.avatarUrl ||
-      (typeof item.avatar === "string" ? item.avatar : item.avatar?.url) ||
-      "";
-    if (!raw) return "";
-    return raw.startsWith("http") ? raw : newUrl + raw;
-  };
+const resolveAvatarUri = async (item: Friend) => {
+  const raw =
+    item.avatarThumbnailUrl ||
+    item.avatarUrl ||
+    (typeof item.avatar === "string"
+      ? item.avatar
+      : item.avatar?.url) ||
+    "";
+
+  const local = await getAvatar(item._id, raw);
+  return local;
+};
+
 
   const renderFriend = ({ item }: { item: Friend }) => {
-    const avatarUri = resolveAvatarUri(item);
+    const uri = avatarMap[item._id];
 
     return (
       <TouchableOpacity
@@ -202,17 +240,21 @@ export default function FriendsListScreen({ navigation }: any) {
         }
       >
         <View style={styles.left}>
-          <View style={styles.avatarCircle}>
-            {avatarUri ? (
-              <Image
-                source={{ uri: avatarUri }}
-                style={{ width: 40, height: 40, borderRadius: 999 }}
-                resizeMode="cover"
-              />
-            ) : (
-              <Icon name="account" size={20} color="#E5E7EB" />
-            )}
-          </View>
+
+{uri ? (
+  <FastImage
+    source={{
+      uri,
+      priority: FastImage.priority.high,
+      cache: FastImage.cacheControl.immutable,
+    }}
+    style={{ width: 40, height: 40, borderRadius: 999 }}
+  />
+) : (
+  <View style={styles.avatarCircle}>
+    <Icon name="account" size={20} color="#E5E7EB" />
+  </View>
+)}
 
          <View style={{ flex: 1 }}>
   <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -265,9 +307,6 @@ export default function FriendsListScreen({ navigation }: any) {
 
           <View style={{ flex: 1, marginLeft: 10 }}>
             <Text style={styles.title}>Friends</Text>
-            <Text style={[styles.netStatus, offline ? styles.netOffline : styles.netOnline]}>
-              {offline ? "Offline / Cached" : "Online"}
-            </Text>
           </View>
 
           <TouchableOpacity
@@ -329,7 +368,7 @@ export default function FriendsListScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0f172a", padding: 12 },
-  baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: "#020617" },
+  baseBackground: { ...StyleSheet.absoluteFill, backgroundColor: "#020617" },
   glowTop: {
     position: "absolute",
     top: -120,

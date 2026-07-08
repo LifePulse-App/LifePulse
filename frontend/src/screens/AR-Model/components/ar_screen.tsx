@@ -8,7 +8,6 @@ import {
   TextInput,
   FlatList,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Dimensions,
   PermissionsAndroid,
   Linking,
@@ -19,8 +18,10 @@ import AppText from "../../../components/Layout/AppText/AppText";
 
 import Geolocation from "react-native-geolocation-service";
 import CompassHeading from "react-native-compass-heading";
+import { KeyboardAvoidingView, KeyboardStickyView } from "react-native-keyboard-controller";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Camera, useCameraDevice } from "react-native-vision-camera";
+import { Camera, useCameraDevice, useCameraPermission } from "react-native-vision-camera";
 
 import {
   listNearbyArSpots,
@@ -81,6 +82,7 @@ export default function ARCameraView({ navigation }: any) {
   const myUserId = user?.User?.user?.id ? String(user.User.user.id) : null;
 
   const device = useCameraDevice("back");
+  const insets = useSafeAreaInsets();
 
   const [camPerm, setCamPerm] = useState<CamPerm>("not-determined");
   const [camReady, setCamReady] = useState(false);
@@ -157,29 +159,24 @@ export default function ARCameraView({ navigation }: any) {
     }).start();
   }, [composeOpen]);
 
-  const askPermissions = async () => {
-    try {
-      const status = await Camera.getCameraPermissionStatus();
-      if (status === "granted") {
-        setCamPerm("granted");
-      } else {
-        const newStatus = await Camera.requestCameraPermission();
-        setCamPerm(newStatus);
-      }
-
-      if (Platform.OS === "android") {
-        const ok = await requestAndroidLocationPermission();
-        setLocPermOk(ok);
-      } else {
-        const loc = await Geolocation.requestAuthorization("whenInUse");
-        setLocPermOk(loc === "granted");
-      }
-    } catch (e) {
-      console.log("[AR] permission error", e);
-    } finally {
-      setCamReady(true);
+  useEffect(() => {
+  (async () => {
+    if (Platform.OS === "android") {
+      const ok = await requestAndroidLocationPermission();
+      setLocPermOk(ok);
+    } else {
+      setLocPermOk(true); // iOS handled differently (if plist exists)
     }
-  };
+  })();
+}, []);
+
+const { hasPermission, requestPermission } = useCameraPermission();
+
+const askPermissions = async () => {
+  const ok = await requestPermission();
+  setCamPerm(ok ? "granted" : "denied");
+  setCamReady(true)
+};
 
   useEffect(() => {
     askPermissions();
@@ -473,7 +470,7 @@ export default function ARCameraView({ navigation }: any) {
 
   return (
     <View style={styles.root}>
-      <Camera style={StyleSheet.absoluteFillObject} device={device} isActive={!composeOpen} />
+      <Camera style={StyleSheet.absoluteFill} device={device} isActive={!composeOpen} />
 
       {!!toast && (
         <View
@@ -546,8 +543,9 @@ export default function ARCameraView({ navigation }: any) {
             <Icon name="plus" size={22} color="#E5E7EB" />
           </TouchableOpacity>
         </View>
+      </View>
 
-        <View style={styles.spotStack} pointerEvents="box-none">
+       <View style={styles.spotStack} pointerEvents="box-none">
           {visibleSpots.map((s: any) => (
             <TouchableOpacity key={s._id} activeOpacity={0.92} style={styles.spotPill} onPress={() => selectSpotForPreview(s)}>
               <Icon name="comment-quote-outline" size={18} color="#fff" />
@@ -559,7 +557,6 @@ export default function ARCameraView({ navigation }: any) {
             </TouchableOpacity>
           ))}
         </View>
-      </View>
 
       {/* VIEW MODAL - Keep as Modal since it's first level */}
       <Modal transparent visible={viewModalOpen} animationType="fade" onRequestClose={() => setViewModalOpen(false)}>
@@ -650,14 +647,11 @@ export default function ARCameraView({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* COMPOSE OVERLAY - NOT a modal, slides up from bottom */}
+      {/* COMPOSE OVERLAY - UPDATED TO USE KEYBOARD CONTROLLER */}
       {composeOpen && (
-        <View style={styles.composeOverlay}>
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-            style={{ width: '100%' }}
-          >
+        <View style={styles.composeOverlay} pointerEvents="box-none">
+          {/* Note: pointerEvents="box-none" ensures you can click outside if needed */}
+          <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
             <Animated.View style={[styles.composeCard, composeSlideStyle]}>
               <View style={styles.modalHeader}>
                 <AppText style={styles.modalTitle} numberOfLines={1}>
@@ -685,14 +679,14 @@ export default function ARCameraView({ navigation }: any) {
 
               <AppText style={styles.hint}>This message is public for this pinned spot.</AppText>
             </Animated.View>
-          </KeyboardAvoidingView>
+          </KeyboardStickyView>
         </View>
       )}
 
-      {/* CREATE MODAL - Keep as modal (first level) */}
+      {/* CREATE MODAL - UPDATED TO USE KEYBOARD CONTROLLER */}
       <Modal transparent visible={createOpen} animationType="fade" onRequestClose={() => setCreateOpen(false)}>
         <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} keyboardVerticalOffset={Platform.OS === "ios" ? 24 : 0}>
+          <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
                 <AppText style={styles.modalTitle}>Create Chat Spot</AppText>
@@ -705,7 +699,13 @@ export default function ARCameraView({ navigation }: any) {
                 Enter a name, then tap "Pin Here".
               </AppText>
 
-              <TextInput value={spotName} onChangeText={setSpotName} placeholder="Spot name" placeholderTextColor="#94A3B8" style={styles.inputTall} />
+              <TextInput 
+                value={spotName} 
+                onChangeText={setSpotName} 
+                placeholder="Spot name" 
+                placeholderTextColor="#94A3B8" 
+                style={styles.inputTall} 
+              />
 
               <TouchableOpacity style={[styles.primaryBtn, creating && { opacity: 0.7 }]} onPress={createSpotNow} disabled={creating}>
                 {creating ? (
@@ -720,7 +720,7 @@ export default function ARCameraView({ navigation }: any) {
 
               <AppText style={styles.hint}>Range is {NEARBY_RADIUS_M}m.</AppText>
             </View>
-          </KeyboardAvoidingView>
+          </KeyboardStickyView>
         </View>
       </Modal>
 
@@ -787,7 +787,16 @@ const styles = StyleSheet.create({
   },
   loadingPillText: { color: "#E5E7EB", marginLeft: 8, fontWeight: "700", fontSize: 12 },
 
-  spotStack: { position: "absolute", left: 0, right: 0, bottom: 28, alignItems: "center", gap: 10 },
+spotStack: { 
+    position: "absolute", 
+    left: 0, 
+    right: 0, 
+    bottom: Platform.OS === "android" ? 40 : 60, // Pins exactly to the bottom
+    alignItems: "center", 
+    gap: 10, 
+    flexDirection: "column-reverse", // Forces items to stack upwards, not downwards
+    zIndex: 10 
+  },
   spotPill: {
     flexDirection: "row",
     alignItems: "center",

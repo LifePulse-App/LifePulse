@@ -9,13 +9,20 @@ import cron from 'node-cron';
 import os from "os";
 import path from "path";
 import http from "http";
-import { Server } from "socket.io";
 import { startNotificationJobs } from './jobs/scheduledNotifications.js';
+import { getIO, initializeSocket } from "./config/socket.js";
 
 // --- ENV
 const app = express();
-const envFile = `.env.${process.env.NODE_ENV || ''}`;
-dotenv.config({ path: envFile });
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({
+  path: path.join(__dirname, `.env.${process.env.NODE_ENV}`),
+});
+
 
 // --- DB
 mongoose.connect(process.env.MONGO_URI)
@@ -47,9 +54,11 @@ import ProfileRoutes from "./routes/ProfileRoutes.js";
 import LeaderboardRoutes from "./routes/LeaderboardRoutes.js";
 import E2EERoutes from "./routes/e2eeRoutes.js";
 import FriendRoutes from "./routes/FriendsRoutes.js";
+import RelationshipRoutes from "./routes/RelationshipRoutes.js";
 import PushRoutes from "./routes/NotificationRoutes.js";
 import LocationRoutes from "./routes/LocationRoutes.js";
 import ChatRoutes from "./routes/ChatRoutes.js";
+import CallRoutes from "./routes/CallRoutes.js";
 import appVersionRoutes from './routes/AppVersion.js';
 import adminNotifyRoutes from './routes/AdminNotificationRoutes.js';
 import ArPortalRoutes from "./routes/ArPortalRoutes.js";
@@ -57,7 +66,7 @@ import ArPrivatePortalRoutes from "./routes/ArPrivatePortalRoutes.js";
 
 // --- Attach io to req
 app.use((req, res, next) => {
-  req.io = io;
+  req.io = getIO();
   next();
 });
 
@@ -69,12 +78,14 @@ app.use("/api/moods", MoodRoutes);
 app.use("/api/proofs", ProofRoutes);
 app.use("/api/social", SocialRoutes);
 app.use("/api/profile", ProfileRoutes);
+app.use("/api/relationship", RelationshipRoutes);
 app.use("/api/leaderboard", LeaderboardRoutes);
 app.use("/api/e2ee", E2EERoutes);
 app.use("/api/friends", FriendRoutes);
 app.use("/api/push", PushRoutes);
 app.use("/api/location", LocationRoutes);
 app.use("/api/chat", ChatRoutes);
+app.use("/api/call", CallRoutes);
 app.use("/api/ar-portal", ArPortalRoutes);
 app.use("/api/ar-private-portal", ArPrivatePortalRoutes);
 app.use("/api/admin/notify", adminNotifyRoutes);
@@ -88,46 +99,19 @@ app.get('/health', (req, res) => {
 app.use(errorMiddleware);
 
 // --- Server
-const PORT = process.env.NODE_ENV === 'development' ? 40000 : 8080;
+const PORT = Number(process.env.PORT);
+
 const server = http.createServer(app);
 
-// --- SOCKET (ONLY ONE INSTANCE)
-const io = new Server(server, {
-  cors: { origin: "*" },
-});
+(async () => {
 
+  const io = await initializeSocket(server);
 
-// --- SOCKET EVENTS
-io.on("connection", (socket) => {
-  // console.log("⚡ Connected:", socket.id);
-
-  socket.on("join", (userId) => {
-    socket.join(`user:${userId}`);
+  server.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
   });
 
-  socket.on("join-conversation", (conversationId) => {
-    socket.join(`conversation:${conversationId}`);
-  });
-
-  // Typing
-  socket.on("typing", ({ conversationId, userId }) => {
-    socket.to(`conversation:${conversationId}`).emit("typing", { userId });
-  });
-
-  socket.on("stop-typing", ({ conversationId, userId }) => {
-    socket.to(`conversation:${conversationId}`).emit("stop-typing", { userId });
-  });
-
-   socket.join("ar-global-portal"); // all AR users in one room
-
-  socket.on("join-ar-private-portal", (portalId) => {
-    socket.join(`ar-private-portal:${portalId}`);
-  });
-  
-  socket.on("disconnect", () => {
-    //  console.log("❌ Disconnected:", socket.id);
-  });
-});
+})();
 
 // --- CRON
 import { runMonthlyReset } from './helpers/monthlyReset.js';
@@ -148,7 +132,8 @@ process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
 
+
 // --- START
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
+// server.listen(PORT, () => {
+//   console.log(`🚀 Server running on http://localhost:${PORT}`);
+// });

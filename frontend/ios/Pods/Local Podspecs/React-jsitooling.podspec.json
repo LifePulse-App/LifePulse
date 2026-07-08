@@ -1,6 +1,6 @@
 {
   "name": "React-jsitooling",
-  "version": "0.80.0",
+  "version": "0.86.0",
   "summary": "-",
   "homepage": "https://reactnative.dev/",
   "license": "MIT",
@@ -10,43 +10,33 @@
   },
   "source": {
     "git": "https://github.com/facebook/react-native.git",
-    "tag": "v0.80.0"
+    "tag": "v0.86.0"
   },
-  "source_files": "react/runtime/*.{cpp,h}",
+  "source_files": "react/runtime/*.h",
   "header_dir": "react/runtime",
   "pod_target_xcconfig": {
     "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
     "DEFINES_MODULE": "YES",
-    "HEADER_SEARCH_PATHS": [
-      "\"${PODS_CONFIGURATION_BUILD_DIR}/React-jsinspector/jsinspector_modern.framework/Headers\"",
-      "\"${PODS_CONFIGURATION_BUILD_DIR}/React-jsinspectorcdp/jsinspector_moderncdp.framework/Headers\"",
-      "\"${PODS_CONFIGURATION_BUILD_DIR}/React-jsinspectortracing/jsinspector_moderntracing.framework/Headers\"",
-      "$(PODS_ROOT)/glog",
-      "$(PODS_ROOT)/boost",
-      "$(PODS_ROOT)/DoubleConversion",
-      "$(PODS_ROOT)/fast_float/include",
-      "$(PODS_ROOT)/fmt/include",
-      "$(PODS_ROOT)/SocketRocket",
-      "$(PODS_ROOT)/RCT-Folly"
-    ]
+    "HEADER_SEARCH_PATHS": "\"${PODS_ROOT}/React-debug\" \"${PODS_ROOT}/React-runtimeexecutor\" \"${PODS_ROOT}/React-runtimeexecutor/platform/ios\" \"${PODS_ROOT}/React-jsinspector\" \"${PODS_ROOT}/React-jsinspectorcdp\" \"${PODS_ROOT}/React-jsinspectortracing\" \"${PODS_ROOT}/React-utils\" \"${PODS_ROOT}/React-utils/react/utils/platform/ios\"",
+    "OTHER_CFLAGS": "$(inherited) -ivfsoverlay $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml",
+    "OTHER_CPLUSPLUSFLAGS": "$(inherited) -ivfsoverlay $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml",
+    "OTHER_SWIFT_FLAGS": "$(inherited) -Xcc -ivfsoverlay -Xcc $(PODS_ROOT)/React-Core-prebuilt/React-VFS.yaml"
   },
   "dependencies": {
     "React-cxxreact": [
-      "0.80.0"
+      "0.86.0"
     ],
     "React-jsi": [
-      "0.80.0"
+      "0.86.0"
     ],
+    "React-debug": [],
+    "React-runtimeexecutor": [],
     "React-jsinspector": [],
     "React-jsinspectorcdp": [],
     "React-jsinspectortracing": [],
-    "glog": [],
-    "boost": [],
-    "DoubleConversion": [],
-    "fast_float": [],
-    "fmt": [],
-    "RCT-Folly": [],
-    "SocketRocket": [],
-    "RCT-Folly/Fabric": []
+    "React-utils": [],
+    "hermes-engine": [],
+    "ReactNativeDependencies": [],
+    "React-Core-prebuilt": []
   }
 }

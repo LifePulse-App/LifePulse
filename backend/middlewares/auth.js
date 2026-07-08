@@ -3,6 +3,7 @@ import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import User from "../models/UserSchema.js";
 import ErrorHandler from "../utils/errorHandler.js";
 import Jwt from "jsonwebtoken";
+import { verifyUserFromToken } from "../utils/verifyJwt.js";
 
 export const isAuthenticatedUser = catchAsyncErrors(async (req, res, next) => {
   let token;
@@ -16,9 +17,7 @@ export const isAuthenticatedUser = catchAsyncErrors(async (req, res, next) => {
   }
 
   try {
-    const decoded = Jwt.verify(token, process.env.JWT_SECRET);
-
-    req.user = await User.findById(decoded.id);
+    req.user = await verifyUserFromToken(token);
 
     if (!req.user) {
       return next(new ErrorHandler("User not found", 404));

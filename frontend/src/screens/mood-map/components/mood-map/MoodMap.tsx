@@ -3,10 +3,7 @@ import {
   View,
   StyleSheet,
   Platform,
-  StatusBar,
-  Modal,
   TouchableOpacity,
-  Pressable,
   PermissionsAndroid,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -15,7 +12,6 @@ import AppScreen from "../../../../components/Layout/AppScreen/AppScreen";
 import MainLayout from "../../../../shared/components/MainLayout";
 import * as MapLibreGL from "@maplibre/maplibre-react-native";
 import Geolocation from "react-native-geolocation-service";
-import { io } from "socket.io-client";
 import locationApi, { ShareMode } from "../../services/api_location";
 import AuthContext from "../../../../auth/user/UserContext";
 import socialApi from "../../../friends/services/api_friends";
@@ -23,6 +19,8 @@ import MoodService from "../../../moodscreen/services/api_mood";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import NetInfo from "@react-native-community/netinfo";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
+import { getSocket } from "../../../../auth/api-client/socket";
 
 // --- Single source of truth for mood colors ---
 const MOOD_COLORS = {
@@ -56,7 +54,6 @@ const moodMatchArray = [
   "#94a3b8",
 ];
 
-const SOCKET_URL = "http://YOUR_SERVER_IP:5000";
 const DARK_MAP_STYLE = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
 const CACHE_KEYS = {
@@ -72,22 +69,48 @@ const MoodMap = () => {
   const currentUserId = authContext?.User?.user?.id;
   const insets = useSafeAreaInsets();
 
+  // --- TrueSheet refs (replaces @gorhom/bottom-sheet refs) ---
+  const legendSheetRef = useRef<TrueSheet>(null);
+  const settingsSheetRef = useRef<TrueSheet>(null);
+
+  // detents are fractions of screen height (0-1), equivalent to old "25%" / "30%" snapPoints
+  const legendDetents = useMemo(() => [0.88], []);
+  const settingsDetents = useMemo(() => [0.87], []);
+
+  const closeAllSheets = async () => {
+    await Promise.all([
+      legendSheetRef.current?.dismiss(),
+      settingsSheetRef.current?.dismiss(),
+    ]);
+  };
+
+  const openLegend = async () => {
+    await closeAllSheets();
+    await legendSheetRef.current?.present();
+  };
+
+  const closeLegend = () => legendSheetRef.current?.dismiss();
+
+  const openSettings = async () => {
+    await closeAllSheets();
+    await settingsSheetRef.current?.present();
+  };
+  const closeSettings = () => settingsSheetRef.current?.dismiss();
+
   const [offline, setOffline] = useState(false);
 
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
   const [moods, setMoods] = useState<any[]>([]);
   const cameraRef = useRef<typeof MapLibreGL.Camera>(null);
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [shareEnabled, setShareEnabled] = useState(false);
   const [shareMode, setShareMode] = useState<ShareMode>("all");
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [friendLocations, setFriendLocations] = useState<any[]>([]);
-  const [legendOpen, setLegendOpen] = useState(false);
   const [allFriends, setAllFriends] = useState<any[]>([]);
   const [worldMoods, setWorldMoods] = useState<any[]>([]);
 
-  const socket = useMemo(() => io(SOCKET_URL), []);
+const socket = getSocket();
 
   const saveCache = async (key: string, value: any) => {
     try {
@@ -140,16 +163,29 @@ const MoodMap = () => {
     MapLibreGL.setAccessToken("");
   }, []);
 
-  // --- Socket for mood events ---
-  useEffect(() => {
-    socket.on("mood:bulk", (data) => setMoods(data));
-    socket.on("mood:update", (data) => setMoods((prev) => [...prev, data]));
-    return () => socket.disconnect();
-  }, [socket]);
+useEffect(() => {
+  const onBulk = (data: any) => {
+    setMoods(data);
+  };
 
-  useEffect(() => {
-    if (currentUserId) socket.emit("join", currentUserId);
-  }, [socket, currentUserId]);
+  const onUpdate = (data: any) => {
+    setMoods(prev => [...prev, data]);
+  };
+
+  socket?.on("mood:bulk", onBulk);
+  socket?.on("mood:update", onUpdate);
+
+  return () => {
+    socket?.off("mood:bulk", onBulk);
+    socket?.off("mood:update", onUpdate);
+  };
+}, []);
+
+useEffect(() => {
+  if (!currentUserId) return;
+
+  socket?.emit("join", currentUserId);
+}, [currentUserId]);
 
   // --- Only call API for fresh map if online
   useEffect(() => {
@@ -172,7 +208,7 @@ const MoodMap = () => {
     const loadWorldMoods = async () => {
       try {
         const res = await MoodService.getWorldMoods();
-        const wm = res?.data?.data || [];        
+        const wm = res?.data?.data || [];
         if (wm.length > 0) {
           setWorldMoods(wm);
           await saveCache(CACHE_KEYS.worldMoods, wm);
@@ -199,7 +235,7 @@ const MoodMap = () => {
   );
 
   const requestLocationPermission = async () => {
-    if (Platform.OS === 'android') {
+    if (Platform.OS === "android") {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         {
@@ -211,8 +247,8 @@ const MoodMap = () => {
       return granted === PermissionsAndroid.RESULTS.GRANTED;
     } else {
       // iOS
-      const status = await Geolocation.requestAuthorization('whenInUse');
-      return status === 'granted';
+      const status = await Geolocation.requestAuthorization("whenInUse");
+      return status === "granted";
     }
   };
 
@@ -307,17 +343,20 @@ const MoodMap = () => {
   };
 
   const handleLocate = () => {
-    if (myLocation && Platform.OS == "android") {
-      cameraRef.current?.moveTo(myLocation, 10);
-      cameraRef.current?.zoomTo(15, 10);
-    } else if (myLocation && cameraRef.current) {
-      cameraRef.current.setCamera({
-        centerCoordinate: myLocation,
-        zoomLevel: 15,
-        animationMode: "flyTo",
-        animationDuration: 1000,
+    if (!myLocation || !cameraRef.current) return;
+
+    cameraRef.current.setCamera({
+      centerCoordinate: myLocation,
+      zoomLevel: 15,
+      animationMode: "easeTo",
+      animationDuration: 700,
+    });
+
+    setTimeout(() => {
+      cameraRef.current?.setCamera({
+        animationMode: "none",
       });
-    }
+    }, 750);
   };
 
   return (
@@ -326,10 +365,10 @@ const MoodMap = () => {
         <View style={styles.topBar}>
           <AppText style={styles.headerText}>Mood Map</AppText>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <TouchableOpacity style={styles.infoBtn} onPress={() => setLegendOpen(true)}>
+            <TouchableOpacity style={styles.infoBtn} onPress={openLegend}>
               <Icon name="information-outline" size={18} color="#E5E7EB" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.infoBtn} onPress={() => setSettingsOpen(true)}>
+            <TouchableOpacity style={styles.infoBtn} onPress={openSettings}>
               <AppText style={styles.settingsIcon}>⚙</AppText>
             </TouchableOpacity>
           </View>
@@ -374,20 +413,29 @@ const MoodMap = () => {
           </MapLibreGL.ShapeSource>
         </MapLibreGL.MapView>
 
-        <TouchableOpacity
-          style={[
-            styles.locateBtn,
-            { bottom: insets.bottom },
-          ]}
-          onPress={handleLocate}
-        >
-          <AppText style={styles.locateIcon}>➤</AppText>
-        </TouchableOpacity>
+<TouchableOpacity
+  style={[styles.locateBtn, { bottom: Math.max(insets.bottom + 12, 24) }]}
+  onPress={handleLocate}
+  activeOpacity={0.8}
+>
+  <Icon
+    name="crosshairs-gps"
+    size={24}
+    color="#E5E7EB"
+  />
+</TouchableOpacity>
 
-        <Modal transparent visible={legendOpen} animationType="fade">
-          <Pressable style={styles.sheetBackdrop} onPress={() => setLegendOpen(false)} />
-          <View style={styles.legendSheet}>
+        {/* --- Legend sheet (TrueSheet) --- */}
+        <TrueSheet
+          ref={legendSheetRef}
+          detents={legendDetents}
+          cornerRadius={20}
+          backgroundColor="#0F172A"
+          grabber={false}
+        >
+          <View style={{ padding: 20 }}>
             <AppText style={styles.sheetTitle}>Mood Colors</AppText>
+
             {MOOD_LEGEND.map((m) => (
               <View key={m.mood} style={styles.legendRow}>
                 <View style={[styles.legendDot, { backgroundColor: m.color }]} />
@@ -395,20 +443,38 @@ const MoodMap = () => {
               </View>
             ))}
           </View>
-        </Modal>
+        </TrueSheet>
 
-        <Modal transparent visible={settingsOpen} animationType="slide">
-          <Pressable style={styles.sheetBackdrop} onPress={() => setSettingsOpen(false)} />
-          <View style={styles.sheet}>
+        {/* --- Settings sheet (TrueSheet) --- */}
+        <TrueSheet
+          ref={settingsSheetRef}
+          detents={settingsDetents}
+          cornerRadius={20}
+          backgroundColor="#0F172A"
+          grabber={false}
+        >
+          <View style={{ padding: 20 }}>
             <AppText style={styles.sheetTitle}>Share My Location</AppText>
-            <TouchableOpacity style={styles.toggleRow} onPress={() => setShareEnabled((v) => !v)}>
+
+            <TouchableOpacity
+              style={styles.toggleRow}
+              onPress={() => setShareEnabled((v) => !v)}
+            >
               <View style={[styles.checkbox, shareEnabled && styles.checkboxOn]} />
-              <AppText style={styles.sheetText}>{shareEnabled ? "Enabled" : "Disabled"}</AppText>
+              <AppText style={styles.sheetText}>
+                {shareEnabled ? "Enabled" : "Disabled"}
+              </AppText>
             </TouchableOpacity>
+
             <View style={styles.section}>
               <AppText style={styles.sectionTitle}>Share With</AppText>
+
               {(["all", "none", "custom"] as ShareMode[]).map((mode) => (
-                <TouchableOpacity key={mode} style={styles.toggleRow} onPress={() => setShareMode(mode)}>
+                <TouchableOpacity
+                  key={mode}
+                  style={styles.toggleRow}
+                  onPress={() => setShareMode(mode)}
+                >
                   <View style={[styles.radio, shareMode === mode && styles.radioOn]} />
                   <AppText style={styles.sheetText}>
                     {mode === "all" ? "All Friends" : mode === "none" ? "None" : "Custom"}
@@ -416,19 +482,32 @@ const MoodMap = () => {
                 </TouchableOpacity>
               ))}
             </View>
+
             {shareMode === "custom" && (
               <View style={styles.section}>
                 <AppText style={styles.sectionTitle}>Select Friends</AppText>
+
                 {allFriends.map((f: any) => (
-                  <TouchableOpacity key={f._id} style={styles.toggleRow} onPress={() => toggleFriend(f._id)}>
-                    <View style={[styles.checkbox, selectedFriends.includes(f._id) && styles.checkboxOn]} />
-                    <AppText style={styles.sheetText}>{f.name || f.username || "Friend"}</AppText>
+                  <TouchableOpacity
+                    key={f._id}
+                    style={styles.toggleRow}
+                    onPress={() => toggleFriend(f._id)}
+                  >
+                    <View
+                      style={[
+                        styles.checkbox,
+                        selectedFriends.includes(f._id) && styles.checkboxOn,
+                      ]}
+                    />
+                    <AppText style={styles.sheetText}>
+                      {f.name || f.username || "Friend"}
+                    </AppText>
                   </TouchableOpacity>
                 ))}
               </View>
             )}
           </View>
-        </Modal>
+        </TrueSheet>
       </AppScreen>
     </MainLayout>
   );
@@ -450,7 +529,7 @@ const styles = StyleSheet.create({
   },
   headerText: { color: "#E5E7EB", fontWeight: "700", fontSize: 20 },
   mapFull: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   userDot: {
     width: 10,
@@ -490,9 +569,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     zIndex: 20,
-    transform: [{ rotate: "270deg" }]
+    transform: [{ rotate: "270deg" }],
   },
-  locateIcon: { color: "#E5E7EB", fontSize: 18, marginBottom: Platform.OS === "android" ? 5 : 0, },
+  locateIcon: { color: "#E5E7EB", fontSize: 18, marginBottom: Platform.OS === "android" ? 5 : 0 },
   infoBtn: {
     width: 40,
     height: 40,
@@ -505,19 +584,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(15,23,42,0.55)",
   },
   settingsIcon: { color: "#E5E7EB", fontSize: 18 },
-  sheetBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.4)" },
-  sheet: {
-    backgroundColor: "#0F172A",
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  legendSheet: {
-    backgroundColor: "#0F172A",
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
   sheetTitle: { color: "#E5E7EB", fontWeight: "700", fontSize: 18, marginBottom: 12 },
   sheetText: { color: "#E5E7EB", fontSize: 15 },
   section: { marginTop: 14 },

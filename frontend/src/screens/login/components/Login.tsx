@@ -22,6 +22,7 @@ import DeviceInfo from 'react-native-device-info';
 import { BlurView } from '@react-native-community/blur';
 import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
 import { CommonActions } from '@react-navigation/native';
+import { connectSocket } from '../../../auth/api-client/socket';
 
 const Login = ({ navigation }: any) => {
   const styles = loginStyles();
@@ -101,6 +102,7 @@ const Login = ({ navigation }: any) => {
       if (storedUser.accessToken) {
         setAuthHeaders(storedUser.accessToken);
         authContext?.setUser(storedUser);
+        await connectSocket()
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
@@ -180,7 +182,7 @@ const Login = ({ navigation }: any) => {
       if (user.refreshToken) {
         await UserStorage.setRefreshToken(user.refreshToken);
       }
-
+      await connectSocket()
       navigation.dispatch(
         CommonActions.reset({
           index: 0,

@@ -16,7 +16,7 @@ import { AnimatedCircularProgress } from "react-native-circular-progress";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import Icon1 from "react-native-vector-icons/MaterialIcons";
 import NetInfo from "@react-native-community/netinfo";
-
+import Animated, { FadeIn } from 'react-native-reanimated';
 import MainLayout from "../../../../shared/components/MainLayout";
 import AppScreen from "../../../../components/Layout/AppScreen/AppScreen";
 import DashboardService from "../../services/api_dashboard";
@@ -740,7 +740,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   baseBackground: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "#020617",
   },
   glowTop: {

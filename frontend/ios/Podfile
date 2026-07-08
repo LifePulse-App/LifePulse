@@ -13,7 +13,7 @@ ENV['RCT_NEW_ARCH_ENABLED'] = '1'
 
 prepare_react_native_project!
 
-target 'LifePulse' do
+target 'StreakSphere' do
   config = use_native_modules!
 
   # 🔥 NitroModules / TurboModules REQUIRED
@@ -28,6 +28,7 @@ target 'LifePulse' do
   pod 'FirebaseMessaging', :modular_headers => true
   pod 'GoogleDataTransport', :modular_headers => true
   pod 'nanopb', :modular_headers => true
+  pod 'RecaptchaInterop', :modular_headers => true
 
   use_react_native!(
     :path => config[:reactNativePath],

@@ -8,14 +8,15 @@ import {
   Platform,
   PermissionsAndroid,
   AppState,
+  DeviceEventEmitter, // ⚡ Added to dispatch wake up events
 } from 'react-native';
-import { DefaultTheme, MD3DarkTheme, PaperProvider } from 'react-native-paper';
 import Toast, { BaseToast, BaseToastProps } from 'react-native-toast-message';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReactNativeBiometrics from 'react-native-biometrics';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
+import codePush from "@revopush/react-native-code-push";
 import { getApp } from '@react-native-firebase/app';
 import { getMessaging, getToken, onMessage, onTokenRefresh } from '@react-native-firebase/messaging';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
@@ -27,6 +28,7 @@ import UserStorage from './src/auth/user/UserStorage';
 import apiClient, { setSecretKey } from './src/auth/api-client/api_client';
 import { navigationRef, resetToLogin } from './src/navigation/main/RootNavigation';
 import AppUpdateGate from './AppUpdateGate';
+import { enableScreens } from 'react-native-screens';
 
 import {
   loadChatNotificationState,
@@ -37,12 +39,14 @@ import {
 } from './src/screens/chat/services/ChatNotifications';
 
 import { markDelivered, markAllPendingDelivered } from './src/screens/chat/services/api_chat';
-
-import { notificationNavState } from './index'; // not pendingNavigation!
-import { handleNotificationPress } from './handleNotificationPress'; // or use your util in index.js
+import { notificationNavState } from './index'; 
+import { handleNotificationPress } from './handleNotificationPress'; 
 
 import 'react-native-get-random-values';
 import { TextEncoder, TextDecoder } from 'text-encoding';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { PaperProvider } from 'react-native-paper';
+import { connectSocket, disconnectSocket, getSocket } from './src/auth/api-client/socket';
 (global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
 
@@ -56,7 +60,6 @@ notifee.createChannel({
   vibration: true,
 });
 
-// Add alongside your existing CHAT_CHANNEL_ID setup
 const APP_CHANNEL_ID = 'app_notifications';
 
 notifee.createChannel({
@@ -124,9 +127,12 @@ async function displayChatNotificationGroupedBySender(
   });
 }
 
+// ⚡ CLEANED: Only asks for POST_NOTIFICATIONS on launch
 async function requestNotificationPermission() {
-  if (Platform.OS === 'android' && Platform.Version >= 33) {
-    await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+  if (Platform.OS === 'android') {
+    if (Platform.Version >= 33) {
+      await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+    }
   } else if (Platform.OS === 'ios') {
     await notifee.requestPermission();
   }
@@ -148,10 +154,6 @@ async function unregisterPushToken() {
 
 const App = () => {
   const [User, setUser] = useState<user | undefined>();
-
-  const colorScheme = useColorScheme();
-  const isDarkMode = colorScheme === 'dark';
-  const theme = isDarkMode ? MD3DarkTheme : DefaultTheme;
 
   const [isBiometricVerified, setIsBiometricVerified] = useState(false);
   const [isCheckingBiometric, setIsCheckingBiometric] = useState(true);
@@ -185,39 +187,57 @@ const App = () => {
     const sub = AppState.addEventListener('change', async state => {
       if (state === 'active') {
         await runMarkAllPendingDelivered('active');
+        
+        try {
+          const displayed = await notifee.getDisplayedNotifications();
+          const chatNotifs = displayed
+            .filter(n => 
+              n.notification?.data?.type === 'chat' ||
+              n.notification?.data?.type === 'chat_summary'
+            )
+            .map(n => n.id);
+          
+          await Promise.all(chatNotifs.map(id => notifee.cancelNotification(id)));
+        } catch (e) {
+          console.log('Failed to cancel chat notifications:', e);
+        }
       }
     });
     return () => sub.remove();
   }, []);
 
+  // ⚡ FIX: Emits Wake Up for calls, only navigates for chats
   useEffect(() => {
     const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
-      if (
-        type === EventType.PRESS &&
-        detail?.notification?.data?.type === 'chat' &&
-        detail?.notification?.data?.peerUserId
-      ) {
-        navigationRef.current?.navigate('chat', {
-          peerUserId: detail.notification.data.peerUserId,
-          peerName: detail.notification.data.peerName,
-        });
+      if (type === EventType.PRESS && detail?.notification?.data) {
+        const data = detail.notification.data;
+if (data.type === 'chat' && data.peerUserId) {
+          navigationRef.current?.navigate('chat', {
+            peerUserId: data.peerUserId,
+            peerName: data.peerName,
+          });
+        }
       }
     });
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
+  // ⚡ FIX: Boot-up lock screen interceptor
+ useEffect(() => {
     async function checkInitialNotification() {
       const initial = await notifee.getInitialNotification();
-      if (
-        initial?.notification?.data?.type === 'chat' &&
-        initial?.notification?.data?.peerUserId
-      ) {
+      if (initial?.notification?.data) {
+        const data = initial.notification.data;
+
         setTimeout(() => {
-          navigationRef.current?.navigate('chat', {
-            peerUserId: initial.notification.data.peerUserId,
-            peerName: initial.notification.data.peerName,
-          });
+          // ⚡ FIX: Removed incoming_call logic entirely. 
+          // Only handle chats here. CallProvider handles calls automatically!
+          if (data.type === 'chat' && data.peerUserId) {
+            navigationRef.current?.navigate('chat', {
+              peerUserId: data.peerUserId,
+              peerName: data.peerName,
+            });
+          }
         }, 600);
       }
     }
@@ -225,36 +245,13 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-  if (Platform.OS === 'android') {
-    SystemNavigationBar.navigationHide();
-    SystemNavigationBar.stickyImmersive();
-  }
-}, []);
-
-// In the AppState listener useEffect, update it:
-useEffect(() => {
-  const sub = AppState.addEventListener('change', async state => {
-    if (state === 'active') {
-      await runMarkAllPendingDelivered('active');
-      
-      // ← ADD: Cancel all chat notifications when app opens
-      try {
-        const displayed = await notifee.getDisplayedNotifications();
-        const chatNotifs = displayed
-          .filter(n => 
-            n.notification?.data?.type === 'chat' ||
-            n.notification?.data?.type === 'chat_summary'
-          )
-          .map(n => n.id);
-        
-        await Promise.all(chatNotifs.map(id => notifee.cancelNotification(id)));
-      } catch (e) {
-        console.log('Failed to cancel chat notifications:', e);
-      }
+    if (Platform.OS === 'android') {
+      SystemNavigationBar.navigationHide();
+      SystemNavigationBar.stickyImmersive();
     }
-  });
-  return () => sub.remove();
-}, []);
+  }, []);
+
+  enableScreens(true);
 
   useEffect(() => {
     if (!secretKeySetRef.current) {
@@ -279,7 +276,17 @@ useEffect(() => {
           const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
           if (incomingMessageId) {
             try {
-              await markDelivered([incomingMessageId]);
+              const socket = getSocket();
+              
+              if (socket?.connected && data.conversationId) {
+                socket.emit("mark-delivered", {
+                  messageIds: [incomingMessageId],
+                  myUserId: User?.id || User?._id,
+                  conversationId: data.conversationId
+                });
+              } else {
+                await markDelivered([incomingMessageId]);
+              }
             } catch (e) {
               console.log('markDelivered (foreground) failed', e);
             }
@@ -311,7 +318,7 @@ useEffect(() => {
 
   useEffect(() => {
     if (!User) return;
-    if (Platform.OS !== 'android' && Platform.OS !== 'ios') return;
+    if (Platform.OS !== 'android') return;
 
     let unsubscribeTokenRefresh: undefined | (() => void);
 
@@ -344,13 +351,21 @@ useEffect(() => {
   }, [User]);
 
   useEffect(() => {
-  if (notificationNavState.pending) {
-    setTimeout(() => {
-      handleNotificationPress(notificationNavState.pending);
-      notificationNavState.pending = null; // ✅ allowed!
-    }, 600);
-  }
-}, [isBiometricVerified]);
+    if (notificationNavState.pending) {
+      setTimeout(() => {
+        handleNotificationPress(notificationNavState.pending);
+        notificationNavState.pending = null; 
+      }, 600);
+    }
+  }, [isBiometricVerified]);
+
+  useEffect(() => {
+    if (User) {
+      connectSocket().catch(e => console.log('Socket boot error:', e));
+    } else {
+      disconnectSocket();
+    }
+  }, [User]);
 
   useEffect(() => {
     const checkBiometric = async () => {
@@ -414,7 +429,7 @@ useEffect(() => {
 
   if (isCheckingBiometric) {
     return (
-      <PaperProvider theme={theme} settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
+      <PaperProvider settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#020617' }}>
           <ActivityIndicator size="large" color="#A855F7" />
         </View>
@@ -423,21 +438,29 @@ useEffect(() => {
   }
 
   return (
+    <KeyboardProvider>
      <GestureHandlerRootView style={{ flex: 1 }}>
-    <PaperProvider theme={theme} settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
+    <PaperProvider settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
       <AuthContext.Provider value={{ User, setUser }}>
         <AppUpdateGate>
           {isBiometricVerified ? (
-            <NavigationContainer theme={NavigationTheme} ref={navigationRef}>
+            <NavigationContainer ref={navigationRef}>
               <AuthNavigator />
             </NavigationContainer>
           ) : null}
-          <Toast config={toastConfig} position="top" topOffset={5} />
+          <Toast config={toastConfig} position="top" topOffset={30} />
         </AppUpdateGate>
       </AuthContext.Provider>
     </PaperProvider>
     </GestureHandlerRootView>
+    </KeyboardProvider>
   );
 };
 
-export default App;
+const codePushOptions = { 
+  checkFrequency: codePush.CheckFrequency.ON_APP_RESUME,
+  installMode: codePush.InstallMode.ON_NEXT_RESTART,
+  mandatoryInstallMode: codePush.InstallMode.ON_NEXT_RESTART,
+};
+
+export default codePush(codePushOptions)(App);

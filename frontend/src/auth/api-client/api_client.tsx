@@ -2,6 +2,7 @@ import { create } from 'apisauce';
 import { HTTP_Headers } from '../../shared/config/enum';
 import UserStorage from '../user/UserStorage';
 import { resetToLogin } from '../../navigation/main/RootNavigation';
+import { updateSocketToken } from './socket';
 
 let isRefreshing = false;
 let failedQueue: any[] = [];
@@ -16,7 +17,7 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 const apiClient = create({
-  baseURL: 'http://192.168.18.143:40000/api',
+  baseURL: 'https://api-dev.streaksphere.app/api',
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -141,6 +142,7 @@ apiClient.axiosInstance.interceptors.response.use(
 
         if (newAccessToken) {
           await UserStorage.setAccessToken(newAccessToken);
+          updateSocketToken(newAccessToken);
           console.log('[AUTH] Saved new access token to storage');
         }
         if (newRefreshToken) {

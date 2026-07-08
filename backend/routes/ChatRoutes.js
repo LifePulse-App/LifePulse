@@ -13,6 +13,7 @@ import {
   reactToMessage,
   removeReaction,
   deleteForEveryone,
+  markListened,
 } from "../controllers/ChatController.js";
 
 const router = express.Router();
@@ -29,6 +30,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const okMime =
       file.mimetype.startsWith("image/") ||
+      file.mimetype.startsWith("audio/") ||
       file.mimetype.startsWith("video/") ||
       file.mimetype === "application/pdf" ||
       file.mimetype === "application/msword" ||
@@ -52,6 +54,7 @@ router.get("/messages/thread/:conversationId", isAuthenticatedUser, getThread);
 router.patch("/messages/delivered", isAuthenticatedUser, markDelivered);
 router.patch("/messages/seen", isAuthenticatedUser, markSeen);
 router.post("/messages/mark-delivered-all", isAuthenticatedUser, markDeliveredAll);
+router.post("/messages/listened", isAuthenticatedUser, markListened);
 
 // single file (existing compatibility)
 router.post("/messages/upload", isAuthenticatedUser, upload.single("file"), uploadChatMedia);

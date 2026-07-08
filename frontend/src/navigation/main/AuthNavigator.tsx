@@ -1,7 +1,8 @@
 import React, { useContext, useEffect, useState, useRef } from 'react';
 import { View, ActivityIndicator, Text, Animated, Dimensions } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-
+import { Platform } from 'react-native';
+import NativeTabs from './NativeTabs';
 import Login from '../../screens/login/components/Login';
 import DrawerNavigator from '../../screens/drawer/DrawerNavigator';
 import Register from '../../screens/login/components/Register';
@@ -198,16 +199,53 @@ const SplashScreen = () => {
   );
 };
 
+  // 1. THE HEADLESS NAVIGATION LISTENER
+// This renders nothing, but watches the CallContext to trigger screen changes automatically.
+const CallNavigationListener = () => {
+  const navigation = useNavigation<any>();
+  const callContext = useContext(CallContext);
+
+  useEffect(() => {
+    if (!callContext?.currentSession) return;
+
+    const { status, isIncoming } = callContext.currentSession;
+
+    if (status === 'initiating') {
+      navigation.navigate('OutgoingCallScreen');
+    } else if (status === 'ringing' && isIncoming) {
+      navigation.navigate('IncomingCallScreen');
+    } else if (status === 'connected') {
+      navigation.navigate('VoiceCallScreen');
+    }
+  }, [callContext?.currentSession?.status]);
+
+  return null;
+};
+
 import SavedAccountsStorage from "../../auth/user/SavedAccountsStorage";
 import FriendsListScreen from '../../screens/friends/components/FriendsList';
 import ProfilePreviewScreen from '../../screens/profile/components/ProfilePreview';
 import HabitDetailScreen from '../../screens/dashboard/components/dashboard/HabitDetailScreen';
 import ArPortalScreen from '../../screens/AR-Model/components/ar_screen';
 import ARCameraView from '../../screens/AR-Model/components/ar_screen';
+import ProfileScreen from '../../screens/profile/components/Profile';
+import AppTabs from './AppTabs';
+import { CallContext } from '../../screens/call/context/CallContext';
+import { useNavigation } from '@react-navigation/native';
+import { CallProvider } from '../../screens/call/context/CallProvider';
+import { OutgoingCallScreen } from '../../screens/call/components/OutgoingCallScreen';
+import { IncomingCallScreen } from '../../screens/call/components/IncomingCallScreen';
+import { VoiceCallScreen } from '../../screens/call/components/VoiceCallScreen';
+import { CallComingScreen } from '../../screens/call/components/CallComingScreen';
 
   const AuthNavigator = () => {
-    const [initialRoute, setInitialRoute] = useState<'Login' | 'Drawer' | 'SavedAccounts' | null>(null);
+    const [initialRoute, setInitialRoute] = useState<'Login' | 'AppTabs' | 'Drawer' | 'SavedAccounts' | null>(null);
     const authContext = useContext(AuthContext);
+const isIOS26Plus =
+  Platform.OS === 'ios' &&
+  parseInt(Platform.Version, 10) >= 26;
+
+  
 
     useEffect(() => {
       const bootstrap = async () => {
@@ -221,12 +259,20 @@ import ARCameraView from '../../screens/AR-Model/components/ar_screen';
             const accessToken =
               (await UserStorage.getAccessToken()) || storedUser.accessToken;
     
-            if (accessToken) {
+            if (accessToken && isIOS26Plus) {
+              await setAuthHeaders(accessToken);
+              authContext?.setUser?.(storedUser);
+              setInitialRoute("AppTabs");
+              return;
+            }
+
+            if (accessToken && !isIOS26Plus) {
               await setAuthHeaders(accessToken);
               authContext?.setUser?.(storedUser);
               setInitialRoute("Drawer");
               return;
             }
+
           }
     
           // 2) If no session, show SavedAccounts if any
@@ -255,35 +301,95 @@ import ARCameraView from '../../screens/AR-Model/components/ar_screen';
     return <SplashScreen />;
   }
 
-  return (
-    <Stack.Navigator
-      screenOptions={{ headerShown: false }}
-      initialRouteName={initialRoute}
-    >
-      <Stack.Screen name="Login" component={Login} />
-      <Stack.Screen name="SavedAccounts" component={SavedAccountsScreen} />
-      <Stack.Screen name="TwoFA" component={TwoFAScreen} />
-      <Stack.Screen name="VerifyOtp" component={VerifyOtp} />
-      <Stack.Screen name="ForgotPass" component={ForgotPass} />
-      <Stack.Screen name="ResetPassVerifyOtp" component={ResetPassVerifyOTP} />
-      <Stack.Screen name="SetPass" component={SetPassVerifiedOTP} />
-      <Stack.Screen name="Register" component={Register} />
-      <Stack.Screen name="Drawer" component={DrawerNavigator} />
-      <Stack.Screen name="ProofCamera" component={ProofVisionCameraScreen} />
-      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-      <Stack.Screen name="Enable2FA" component={Enable2FAScreen} />
-      <Stack.Screen name="Devices" component={DevicesScreen} />
-      <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
-<Stack.Screen name="ReportProblem" component={ReportProblemScreen} />
-<Stack.Screen name="LegalPolicy" component={LegalPolicyScreen} />
-<Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
-<Stack.Screen name="AvatarCreator" component={AvatarCreatorScreen} />
-<Stack.Screen name="chat" component={ChatScreen} />
-    <Stack.Screen name="ArPortal" component={ARCameraView} options={{headerShown: false}}/>
-    <Stack.Screen name="ProfilePreview" component={ProfilePreviewScreen} options={{headerShown: false}}/>
-  <Stack.Screen name="HabitDetail" component={HabitDetailScreen} options={{ headerShown: false }} />
-    </Stack.Navigator>
-  );
+return (
+  <CallProvider>
+      {/* 2. Drop the listener inside the Provider so it can access context */}
+      
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+          fullScreenGestureEnabled: true,
+          animationDuration: 200,
+        }}
+        initialRouteName={initialRoute}
+      >
+        
+        <Stack.Screen name="Login" component={Login} />
+        <Stack.Screen name="SavedAccounts" component={SavedAccountsScreen} />
+        <Stack.Screen name="TwoFA" component={TwoFAScreen} />
+        <Stack.Screen name="VerifyOtp" component={VerifyOtp} />
+        <Stack.Screen name="ForgotPass" component={ForgotPass} />
+        <Stack.Screen name="ResetPassVerifyOtp" component={ResetPassVerifyOTP} />
+        <Stack.Screen name="SetPass" component={SetPassVerifiedOTP} />
+        <Stack.Screen name="Register" component={Register} />
+        <Stack.Screen name="MoodScreen" component={MoodScreen} />
+        <Stack.Screen name="Drawer" component={DrawerNavigator} />
+<Stack.Screen name="AppTabs" component={AppTabs} />
+        <Stack.Screen name="ProofCamera" component={ProofVisionCameraScreen} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+        <Stack.Screen name="Enable2FA" component={Enable2FAScreen} />
+        <Stack.Screen name="Devices" component={DevicesScreen} />
+        <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+        <Stack.Screen name="ReportProblem" component={ReportProblemScreen} />
+        <Stack.Screen name="LegalPolicy" component={LegalPolicyScreen} />
+
+        <Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
+        <Stack.Screen name="AvatarCreator" component={AvatarCreatorScreen} />
+
+        <Stack.Screen
+          name="chat"
+          component={ChatScreen}
+          options={{ unmountOnBlur: false, freezeOnBlur: true }}
+        />
+
+        <Stack.Screen
+          name="NewChat"
+          component={NewChatScreen}
+          options={{ unmountOnBlur: false, freezeOnBlur: true }}
+        />
+
+        <Stack.Screen name="ArPortal" component={ARCameraView} />
+
+        <Stack.Screen
+          name="ProfilePreview"
+          component={ProfilePreviewScreen}
+          options={{ unmountOnBlur: false, freezeOnBlur: true }}
+        />
+
+        <Stack.Screen name="HabitDetail" component={HabitDetailScreen} />
+
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{ unmountOnBlur: false, freezeOnBlur: true }}
+        />
+
+        <Stack.Screen
+          name="Friends"
+          component={Friends}
+          options={{ unmountOnBlur: false, freezeOnBlur: true }}
+        />
+
+        <Stack.Screen
+          name="FriendsManage"
+          component={FriendsListScreen}
+          options={{ unmountOnBlur: false, freezeOnBlur: true }}
+        />
+       <Stack.Screen 
+  name="IncomingCallScreen" 
+  component={CallComingScreen} 
+  options={{ 
+    headerShown: false, 
+    // This animation makes it slide up from the bottom like a native call
+    presentation: 'fullScreenModal',
+    animation: 'slide_from_bottom' 
+  }} 
+/>
+      </Stack.Navigator>
+      </CallProvider>
+);
 };
 
 export default AuthNavigator;

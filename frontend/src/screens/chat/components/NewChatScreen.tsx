@@ -135,11 +135,9 @@ export default function NewChatScreen({ navigation }: any) {
           <View style={styles.topBar}>
             <View>
               <Text style={styles.title}>New Chat</Text>
-              <Text style={[styles.netStatus, offline ? styles.netOffline : styles.netOnline]}>
-                {offline ? "Connecting..." : "Online"}
-              </Text>
+             
             </View>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate("Chat")}>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
               <Icon name="close" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
@@ -210,7 +208,7 @@ export default function NewChatScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0f172a", padding: 12 },
-  baseBackground: { ...StyleSheet.absoluteFillObject, backgroundColor: "#020617" },
+  baseBackground: { ...StyleSheet.absoluteFill, backgroundColor: "#020617" },
   glowTop: {
     position: "absolute",
     top: -120,

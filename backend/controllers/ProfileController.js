@@ -39,8 +39,25 @@ const buildAvatarThumbnailUrl = (modelUrl) => {
 // Get profile
 export const getProfile = catchAsyncErrors(async (req, res, next) => {
   const user = await User.findById(req.user._id)
-    .select("-password -resetPasswordCode -resetPasswordCodeExpire -verificationCode -verificationCodeExpire");
+    // ⚡ 1. Explicitly hide ALL sensitive tokens and OTPs
+    .select(
+      "-password -resetPasswordCode -resetPasswordCodeExpire -verificationCode -verificationCodeExpire -refreshTokens -twoFactor.secret -deleteAccountOtp -deleteAccountOtpExpire -emailChangeOtp -emailChangeOtpExpire -pendingEmail"
+    )
+    .populate("partner", "name username avatarUrl avatarThumbnailUrl")
+    // ⚡ 2. Use Object Syntax for nested arrays to guarantee it populates correctly
+    .populate({
+      path: "relationshipIncoming.user",
+      select: "name username avatarUrl avatarThumbnailUrl"
+    })
+    .populate({
+      path: "relationshipOutgoing.user",
+      select: "name username avatarUrl avatarThumbnailUrl"
+    })
+    // ⚡ 3. Force pure JSON output so nested arrays don't get stripped by Mongoose
+    .lean(); 
+
   if (!user) return next(new ErrorHandler("User not found", 404));
+  
   res.status(200).json({ success: true, user });
 });
 
@@ -463,17 +480,23 @@ export const uploadAvatar = catchAsyncErrors(async (req, res, next) => {
   
   const avatarUrl = `/avatars/${req.file.filename}`;
   // Optionally delete previous avatar here (recommended for cleanup!)
-  await User.findByIdAndUpdate(
-    req.user._id,
-    { avatarUrl },
-    { new: true }
-  );
+  const user = await User.findByIdAndUpdate(
+  req.user._id,
+  {
+    avatarUrl,
+    $inc: { avatarVersion: 1 }, // 🔥 force refresh
+  },
+  { new: true }
+);
+
+res.json(user);
+  
   res.json({ success: true, url: avatarUrl });
 });
 
 // 4. Controller: Get current avatar of a user (by auth)
 export const getMyAvatar = catchAsyncErrors(async (req, res, next) => {
-  const user = await User.findById(req.user._id).select("avatarUrl");
+  const user = await User.findById(req.user._id).select("avatarUrl avatarVersion");
   if (!user) return next(new ErrorHandler("User not found", 404));
   res.json({ success: true, avatarUrl: user.avatarUrl });
 });
@@ -481,7 +504,7 @@ export const getMyAvatar = catchAsyncErrors(async (req, res, next) => {
 // controllers/avatarController.js
 export const getUserProfile = catchAsyncErrors(async (req, res, next) => {
   const { userId } = req.params;
-  const user = await User.findById(userId).select("name username avatarUrl");
+  const user = await User.findById(userId).select("name username avatarUrl avatarVersion");
   if (!user) return next(new ErrorHandler("User not found", 404));
   res.json({ success: true, user });
 });
