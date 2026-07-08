@@ -73,6 +73,7 @@ const [unreadChats, setUnreadChats] = useState(getUnreadChatCount());
         component={ARCameraView}
         options={{
           tabBarLabel: 'AR Portal',
+          tabBarStyle: { display: 'none' },
           tabBarIcon: Platform.select({
             ios: {
               type: 'sfSymbol',

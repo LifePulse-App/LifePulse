@@ -99,6 +99,11 @@
 			<key>isShown</key>
 			<false/>
 		</dict>
+		<key>JitsiWebRTC.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
 		<key>LiquidGlass.xcscheme</key>
 		<dict>
 			<key>isShown</key>
@@ -115,6 +120,11 @@
 			<false/>
 		</dict>
 		<key>NitroModules.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
+		<key>NitroSound.xcscheme</key>
 		<dict>
 			<key>isShown</key>
 			<false/>
@@ -240,6 +250,11 @@
 			<false/>
 		</dict>
 		<key>RNScreens.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
+		<key>RNSound.xcscheme</key>
 		<dict>
 			<key>isShown</key>
 			<false/>
@@ -609,6 +624,16 @@
 			<key>isShown</key>
 			<false/>
 		</dict>
+		<key>ReactNativeIncallManager.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
+		<key>ReactNativeVideo.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
 		<key>RecaptchaInterop.xcscheme</key>
 		<dict>
 			<key>isShown</key>
@@ -679,6 +704,11 @@
 			<key>isShown</key>
 			<false/>
 		</dict>
+		<key>react-native-create-thumbnail.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
 		<key>react-native-document-picker.xcscheme</key>
 		<dict>
 			<key>isShown</key>
@@ -724,7 +754,7 @@
 			<key>isShown</key>
 			<false/>
 		</dict>
-		<key>react-native-video.xcscheme</key>
+		<key>react-native-webrtc.xcscheme</key>
 		<dict>
 			<key>isShown</key>
 			<false/>

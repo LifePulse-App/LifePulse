@@ -2973,8 +2973,8 @@ const handleReact = useCallback(async (emoji: string) => {
       )}
 
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1,marginBottom: Platform.OS === "ios" ? 20 : 0  }}
+        behavior={Platform.OS === "ios" ? "" : "height"}
       >
         <View style={styles.container}>
           <View style={styles.topBar}>

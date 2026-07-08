@@ -16,7 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReactNativeBiometrics from 'react-native-biometrics';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
-
+import codePush from "@revopush/react-native-code-push";
 import { getApp } from '@react-native-firebase/app';
 import { getMessaging, getToken, onMessage, onTokenRefresh } from '@react-native-firebase/messaging';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
@@ -318,7 +318,7 @@ if (data.type === 'chat' && data.peerUserId) {
 
   useEffect(() => {
     if (!User) return;
-    if (Platform.OS !== 'android' && Platform.OS !== 'ios') return;
+    if (Platform.OS !== 'android') return;
 
     let unsubscribeTokenRefresh: undefined | (() => void);
 
@@ -448,7 +448,7 @@ if (data.type === 'chat' && data.peerUserId) {
               <AuthNavigator />
             </NavigationContainer>
           ) : null}
-          <Toast config={toastConfig} position="top" topOffset={5} />
+          <Toast config={toastConfig} position="top" topOffset={30} />
         </AppUpdateGate>
       </AuthContext.Provider>
     </PaperProvider>
@@ -457,4 +457,10 @@ if (data.type === 'chat' && data.peerUserId) {
   );
 };
 
-export default App;
+const codePushOptions = { 
+  checkFrequency: codePush.CheckFrequency.ON_APP_RESUME,
+  installMode: codePush.InstallMode.ON_NEXT_RESTART,
+  mandatoryInstallMode: codePush.InstallMode.ON_NEXT_RESTART,
+};
+
+export default codePush(codePushOptions)(App);
