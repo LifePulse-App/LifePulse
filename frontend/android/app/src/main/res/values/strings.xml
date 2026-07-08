@@ -1,4 +1,6 @@
 <resources>
   <string name="app_name">StreakSphere</string>
-  <string name="expo_runtime_version">1.0.0</string>
+  <string name="expo_runtime_version">5.0.0</string>
+  <string name="CodePushServerUrl">https://api-updates.streaksphere.app/</string>
+<string name="CodePushDeploymentKey">CDkYbUAwbSzACHjkM5Of4yzigIIN4ksvOXqog</string>
 </resources>
