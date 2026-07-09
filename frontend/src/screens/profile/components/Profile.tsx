@@ -972,7 +972,7 @@ const renderRelReqSheet = () => {
                   {actionLoading ? <ActivityIndicator size="small" color="#f87171" /> : (
                     <>
                       <Icon name="heart-broken" size={18} color="#f87171" />
-                      <Text style={styles.btnTextDanger}>Suspend (Start 24h Timer)</Text>
+                      <Text style={styles.btnTextDanger}>Break-up (Start 24h Timer)</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -985,7 +985,7 @@ const renderRelReqSheet = () => {
                   {actionLoading ? <ActivityIndicator size="small" color="#34d399" /> : (
                     <>
                       <Icon name="heart-pulse" size={18} color="#34d399" />
-                      <Text style={styles.btnTextSuccess}>Restore Relationship</Text>
+                      <Text style={styles.btnTextSuccess}>Patch-up Relationship</Text>
                     </>
                   )}
                 </TouchableOpacity>
