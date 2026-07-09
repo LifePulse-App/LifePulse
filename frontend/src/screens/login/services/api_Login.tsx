@@ -4,7 +4,7 @@ import { DashboardResponse } from '../../dashboard/models/dashboard/DashboardRes
 import { UserLoginResponse } from '../../user/models/UserLoginResponse';
 
 // Login API
-const getLogin = async (identifier: string, password: string, deviceId: string, deviceName: string, deviceModel: string, deviceBrand: string) => {
+const getLogin = async (identifier: string, password: string, deviceId: string, deviceName: string, deviceModel: string, deviceBrand: string, deviceTimezone: string) => {
   try {
     return await client.post<object>('/auth/login', {
       identifier,
@@ -12,7 +12,8 @@ const getLogin = async (identifier: string, password: string, deviceId: string, 
       deviceId,
       deviceName,
       deviceModel,
-      deviceBrand
+      deviceBrand,
+      deviceTimezone
     });
   } catch (error: any) {
     if (!error.response) {

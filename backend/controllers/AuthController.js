@@ -11,6 +11,7 @@ import QRCode from "qrcode";
 import { decryptTOTPSecret, encryptTOTPSecret } from "../utils/crypto2fa.js";
 import { lookupIpLocation } from "../utils/geoip.js";
 import {sendLoginAlertEmail} from "../helpers/emails.js";
+import { log } from "console";
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -225,7 +226,7 @@ export const resendVerificationOtp = catchAsyncErrors(async (req, res, next) => 
 // Login
 export const login = catchAsyncErrors(async (req, res, next) => {
   try {
-    const { identifier, password, deviceId, deviceName, deviceModel, deviceBrand } = req.body;
+    const { identifier, password, deviceId, deviceName, deviceModel, deviceBrand, deviceTimezone } = req.body;
 
     if (!identifier || !password) {
       return next(new ErrorHandler("Credentials Missing", 400));
@@ -239,6 +240,14 @@ export const login = catchAsyncErrors(async (req, res, next) => {
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return next(new ErrorHandler("Invalid credentials", 401));
+
+    console.log(deviceTimezone);
+    
+
+    if (deviceTimezone && user.timezone !== deviceTimezone) {
+      user.timezone = deviceTimezone;
+      await user.save({ validateBeforeSave: false });
+    }
 
     // If user has 2FA enabled → do not issue full tokens yet, and DO NOT fully register device here.
     if (user.twoFactor?.enabled && user.twoFactor.secret) {
@@ -279,10 +288,10 @@ const location = await lookupIpLocation(ip);
 const now = new Date();
 
 const localDateTime = new Intl.DateTimeFormat('en-US', {
-  timeZone: user.timezone || 'UTC',
-  dateStyle: 'medium',
-  timeStyle: 'medium',
-}).format(now);
+      timeZone: deviceTimezone || user.timezone || 'UTC', 
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+    }).format(now);
 
 await sendLoginAlertEmail({
   to: user.email,

@@ -141,6 +141,8 @@ const Login = ({ navigation }: any) => {
       const deviceName = await DeviceInfo.getDeviceName();
       const deviceModel = DeviceInfo.getModel();
       const deviceBrand = DeviceInfo.getBrand();
+      const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      
       const response = await api_Login.getLogin(
         values.username,
         values.password,
@@ -148,6 +150,7 @@ const Login = ({ navigation }: any) => {
         deviceName,
         deviceModel,
         deviceBrand,
+        deviceTimezone
       );
 
       if (!response.ok) {

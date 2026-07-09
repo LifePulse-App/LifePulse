@@ -100,6 +100,7 @@ const baseLayout = ({ title, preview, bodyHtml }) => `
 
     /* Logo section */
     .logo-section {
+      margin-left: 8px;
       padding: 32px 32px 0;
       display: flex;
       align-items: center;
