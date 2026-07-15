@@ -6,7 +6,7 @@ import Call from "../models/Call.js";
 import admin from "firebase-admin"; 
 import PushToken from "../models/PushToken.js";
 // Make sure to import your Redis clients from wherever you initialized them
-import { getRedisClients } from "../config/socket.js"; 
+import { getRedisClients } from "../config/redis.js"; 
 
 const CALL_TIMEOUT = 30000;
 const localTimeouts = new Map(); // Timeouts remain local to the initiating worker
