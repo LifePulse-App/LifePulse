@@ -239,10 +239,7 @@ export const login = catchAsyncErrors(async (req, res, next) => {
     if (!user) return next(new ErrorHandler("Invalid credentials", 401));
 
     const isMatch = await user.comparePassword(password);
-    if (!isMatch) return next(new ErrorHandler("Invalid credentials", 401));
-
-    console.log(deviceTimezone);
-    
+    if (!isMatch) return next(new ErrorHandler("Invalid credentials", 401))
 
     if (deviceTimezone && user.timezone !== deviceTimezone) {
       user.timezone = deviceTimezone;

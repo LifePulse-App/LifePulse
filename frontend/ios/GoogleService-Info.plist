@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>org.reactjs.native.example.LifePulse</string>
+	<string>org.reactjs.native.example.StreakSphere</string>
 	<key>PROJECT_ID</key>
 	<string>crucial-mender-474816-u9</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:460940026449:ios:93e4272e225b91f1214e70</string>
+	<string>1:460940026449:ios:85fa9b6ea5d4ae74214e70</string>
 </dict>
 </plist>

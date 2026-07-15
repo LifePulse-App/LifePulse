@@ -27,8 +27,13 @@ dotenv.config({
 // --- DB
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
-    console.log('✅ DB Connected');
-    startNotificationJobs(); // ← add this line
+    console.log(`✅ DB Connected [Worker: ${process.env.NODE_APP_INSTANCE || 'Single'}]`);
+    
+    // ⚡ FIX: Prevent duplicate notifications across 12 PM2 instances
+    if (process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE) {
+      console.log('⏰ Starting Notification Jobs on Worker 0');
+      startNotificationJobs();
+    }
   })
   .catch(err => console.error("DB Error:", err));
 
@@ -92,7 +97,7 @@ app.use("/api/admin/notify", adminNotifyRoutes);
 
 // --- Health
 app.get('/health', (req, res) => {
-  res.send("Backend running 🚀");
+  res.send(`Backend running 🚀 [Worker: ${process.env.NODE_APP_INSTANCE || 'Single'}]`);
 });
 
 // --- Error
@@ -104,24 +109,27 @@ const PORT = Number(process.env.PORT);
 const server = http.createServer(app);
 
 (async () => {
-
   const io = await initializeSocket(server);
 
   server.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
   });
-
 })();
 
 // --- CRON
 import { runMonthlyReset } from './helpers/monthlyReset.js';
-cron.schedule('0 0 0 1 * *', async () => {
-  try {
-    await runMonthlyReset();
-  } catch (err) {
-    console.error("Cron error:", err);
-  }
-}, { timezone: 'UTC' });
+
+// ⚡ FIX: Prevent duplicate database resets across 12 PM2 instances
+if (process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE) {
+  cron.schedule('0 0 0 1 * *', async () => {
+    try {
+      console.log('🧹 Running monthly reset on Worker 0');
+      await runMonthlyReset();
+    } catch (err) {
+      console.error("Cron error:", err);
+    }
+  }, { timezone: 'UTC' });
+}
 
 // --- Errors
 process.on('unhandledRejection', (err) => {
@@ -131,9 +139,3 @@ process.on('unhandledRejection', (err) => {
 process.on('uncaughtException', (err) => {
   console.error('Uncaught Exception:', err);
 });
-
-
-// --- START
-// server.listen(PORT, () => {
-//   console.log(`🚀 Server running on http://localhost:${PORT}`);
-// });
