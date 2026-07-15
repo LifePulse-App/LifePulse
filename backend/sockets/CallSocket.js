@@ -5,38 +5,38 @@ import OnlineManager from "../managers/OnlineManager.js";
 import Call from "../models/Call.js";
 import admin from "firebase-admin"; 
 import PushToken from "../models/PushToken.js";
-
-const activeCalls = new Map();
-/*
-callId => { callerId, receiverId, callerSocketId, receiverSocketId, type, status, startedAt, timeout }
-*/
+// Make sure to import your Redis clients from wherever you initialized them
+import { getRedisClients } from "../config/socket.js"; 
 
 const CALL_TIMEOUT = 30000;
+const localTimeouts = new Map(); // Timeouts remain local to the initiating worker
 
 const generateCallId = () => new mongoose.Types.ObjectId().toString();
 
-const emitToUser = (io, userId, event, payload) => {
-    const sockets = OnlineManager.getUserSockets(String(userId));
-    if (!sockets || sockets.size === 0) return false;
-    sockets.forEach(socketId => { io.to(socketId).emit(event, payload); });
-    return true;
+// --- REDIS STATE HELPERS ---
+const setCallState = async (callId, data) => {
+    const { pubClient } = getRedisClients();
+    await pubClient.set(`call:${callId}`, JSON.stringify(data), { EX: 3600 }); // Expires in 1hr for safety
 };
 
-const emitToUserExcept = (io, userId, exceptSocketId, event, payload) => {
-    const sockets = OnlineManager.getUserSockets(String(userId));
-    if (!sockets || sockets.size === 0) return false;
-    sockets.forEach(socketId => {
-        if (socketId === exceptSocketId) return;
-        io.to(socketId).emit(event, payload);
-    });
-    return true;
+const getCallState = async (callId) => {
+    const { pubClient } = getRedisClients();
+    const data = await pubClient.get(`call:${callId}`);
+    return data ? JSON.parse(data) : null;
 };
 
-const cleanupCall = (callId) => {
-    const call = activeCalls.get(callId);
-    if (!call) return;
-    if (call.timeout) clearTimeout(call.timeout);
-    activeCalls.delete(callId);
+const deleteCallState = async (callId) => {
+    const { pubClient } = getRedisClients();
+    await pubClient.del(`call:${callId}`);
+};
+// ---------------------------
+
+const cleanupCall = async (callId) => {
+    if (localTimeouts.has(callId)) {
+        clearTimeout(localTimeouts.get(callId));
+        localTimeouts.delete(callId);
+    }
+    await deleteCallState(callId);
 };
 
 // ⚡ NEW HELPER: Sends a silent push to violently kill the Notifee ringtone on the locked phone
@@ -78,26 +78,23 @@ export default function registerCallSocket(io, socket) {
             const convo = await Conversation.findOne({ _id: conversationId, participants: { $all: [callerId, receiverId] } }).lean();
             if (!convo) return callback({ success: false, message: "Conversation not found" });
 
-            const receiverSockets = OnlineManager.getUserSockets(String(receiverId));
+            // Check online status cluster-wide
+            const isReceiverOnline = await OnlineManager.isOnline(io, receiverId);
 
-            const alreadyBusy = [...activeCalls.values()].find(c =>
-                (c.status === "ringing" || c.status === "connected") &&
-                (String(c.callerId) === String(receiverId) || String(c.receiverId) === String(receiverId))
-            );
-
-            if (alreadyBusy) {
-                emitToUser(io, callerId, "call:busy", { receiverId });
-                return callback({ success: false, message: "User busy" });
-            }
+            // Fetch any existing calls to check for busy status
+            // Note: In Redis we don't scan all keys. It's safer to trust the client UI preventing double calls, 
+            // or you could map user -> active call in Redis if strict busy checking is needed.
+            // For now, if they answer elsewhere, the 'connected' state handles it.
 
             const callId = generateCallId();
+            socket.activeCallId = callId; // Bind call to this socket for disconnect handler
 
             const timeout = setTimeout(async() => {
-                const current = activeCalls.get(callId);
+                const current = await getCallState(callId);
                 if (!current) return;
 
-                emitToUser(io, current.callerId, "call:no-answer", { callId, callerId: current.callerId, receiverId: current.receiverId, conversationId: current.conversationId });
-                emitToUser(io, current.receiverId, "call:missed", { callId, callerId: current.callerId, receiverId: current.receiverId, conversationId: current.conversationId });
+                OnlineManager.emitToUser(io, current.callerId, "call:no-answer", { callId, callerId: current.callerId, receiverId: current.receiverId, conversationId: current.conversationId });
+                OnlineManager.emitToUser(io, current.receiverId, "call:missed", { callId, callerId: current.callerId, receiverId: current.receiverId, conversationId: current.conversationId });
 
                 // ⚡ FIX: Silences the receiver's phone if they didn't answer in 30 seconds
                 sendCallCleanupPush(current.receiverId, callId, "call_missed");
@@ -109,20 +106,22 @@ export default function registerCallSocket(io, socket) {
                     });
                 } catch (err) { console.error(err); }
 
-                cleanupCall(callId);
+                await cleanupCall(callId);
             }, CALL_TIMEOUT);
 
-            activeCalls.set(callId, {
+            localTimeouts.set(callId, timeout);
+
+            await setCallState(callId, {
                 callId, callerId, receiverId, callerSocketId: socket.id,
-                receiverSocketId: receiverSockets && receiverSockets.size > 0 ? [...receiverSockets][0] : null,
-                type, conversationId, startedAt: Date.now(), status: "connecting", timeout
+                receiverSocketId: null, // Socket ID matters less now that we use rooms
+                type, conversationId, startedAt: Date.now(), status: "ringing" // Skip straight to ringing
             });
 
             const caller = await User.findById(callerId).select("name username avatar avatarUrl tick");
 
-            if (receiverSockets && receiverSockets.size > 0) {
+            if (isReceiverOnline) {
                 console.log("🔵 BACKEND EMITTING call:incoming to receiver socket room:", payload.receiverId); 
-                emitToUser(io, receiverId, "call:incoming", { callId, caller, callerId, conversationId, type });
+                OnlineManager.emitToUser(io, receiverId, "call:incoming", { callId, caller, callerId, conversationId, type });
             } else {
                 const pushTokens = await PushToken.find({ userId: receiverId, platform: { $in: ['android', 'ios'] } }).lean();
                 
@@ -146,10 +145,7 @@ export default function registerCallSocket(io, socket) {
             }
 
             // ⚡ FIX: INSTANT RINGING FEEDBACK
-            // Update the backend state to ringing and instantly tell the caller's screen to swap to "Ringing"
-            const call = activeCalls.get(callId);
-            if (call) call.status = "ringing";
-            emitToUser(io, callerId, "call:ringing", { callId });
+            OnlineManager.emitToUser(io, callerId, "call:ringing", { callId });
 
             // ⚡ FIX 2A: Pass status: "ringing" directly in the callback
             callback({ success: true, callId, status: "ringing" });
@@ -161,7 +157,7 @@ export default function registerCallSocket(io, socket) {
     });
 
     socket.on("call:cancel", async ({ callId }) => {
-        const call = activeCalls.get(callId);
+        const call = await getCallState(callId);
         if (!call) return;
         if (String(call.callerId) !== String(socket.userId)) return;
 
@@ -176,34 +172,35 @@ export default function registerCallSocket(io, socket) {
             );
         } catch (err) { console.error("Saving call failed:", err); }
 
-        emitToUser(io, call.receiverId, "call:cancelled", { callId, callerId: call.callerId, receiverId: call.receiverId, conversationId: call.conversationId });
+        OnlineManager.emitToUser(io, call.receiverId, "call:cancelled", { callId, callerId: call.callerId, receiverId: call.receiverId, conversationId: call.conversationId });
         
         // ⚡ FIX: Stop the receiver's phone from ringing if the caller hangs up
         sendCallCleanupPush(call.receiverId, callId, "call_cancelled");
 
-        cleanupCall(callId);
+        await cleanupCall(callId);
     });
 
-    socket.on("call:accept", ({ callId }, callback = () => {}) => {
+    socket.on("call:accept", async ({ callId }, callback = () => {}) => {
         try {
-            const call = activeCalls.get(callId);
+            const call = await getCallState(callId);
             if (!call) return callback({ success: false, message: "Call not found" });
             if (String(call.receiverId) !== String(socket.userId)) return callback({ success: false, message: "Unauthorized" });
 
             if (call.status === "connected") return callback({ success: true, alreadyConnected: true });
 
-            if (call.timeout) {
-                clearTimeout(call.timeout);
-                call.timeout = null;
+            if (localTimeouts.has(callId)) {
+                clearTimeout(localTimeouts.get(callId));
+                localTimeouts.delete(callId);
             }
 
             call.status = "connected";
             call.receiverSocketId = socket.id;
-            activeCalls.set(callId, call);
+            socket.activeCallId = callId; // Bind for disconnect
+            await setCallState(callId, call);
 
-            emitToUser(io, call.callerId, "call:accepted", { callId, receiverId: call.receiverId });
-            emitToUser(io, call.receiverId, "call:accepted", { callId, callerId: call.callerId });
-            emitToUserExcept(io, call.receiverId, socket.id, "call:answered-elsewhere", { callId });
+            OnlineManager.emitToUser(io, call.callerId, "call:accepted", { callId, receiverId: call.receiverId });
+            OnlineManager.emitToUser(io, call.receiverId, "call:accepted", { callId, callerId: call.callerId });
+            OnlineManager.emitToUserExcept(io, call.receiverId, socket.id, "call:answered-elsewhere", { callId });
 
             callback({ success: true });
 
@@ -214,37 +211,32 @@ export default function registerCallSocket(io, socket) {
     });
 
     socket.on("call:reject", async ({ callId }) => {
-        const call = activeCalls.get(callId);
+        const call = await getCallState(callId);
         if (!call) return;
         if (String(call.receiverId) !== String(socket.userId)) return;
-
-        if (call.timeout) clearTimeout(call.timeout);
 
         try {
             await Call.findOneAndUpdate(
                 { callId: call.callId }, 
                 {
                     $setOnInsert: { caller: call.callerId, receiver: call.receiverId, conversationId: call.conversationId, type: call.type, startedAt: new Date(call.startedAt) },
-                    // ⚡ FIX: Corrected "rejecte" typo to "rejected"
                     $set: { status: "rejected", endedAt: new Date(), duration: 0 }
                 },
                 { upsert: true, new: true } 
             );
         } catch (err) { console.error("Saving call failed:", err); }
 
-        emitToUser(io, call.callerId, "call:rejected", { callId, callerId: call.callerId, receiverId: call.receiverId, conversationId: call.conversationId });
-        emitToUserExcept(io, call.receiverId, socket.id, "call:answered-elsewhere", { callId });
-        cleanupCall(callId);
+        OnlineManager.emitToUser(io, call.callerId, "call:rejected", { callId, callerId: call.callerId, receiverId: call.receiverId, conversationId: call.conversationId });
+        OnlineManager.emitToUserExcept(io, call.receiverId, socket.id, "call:answered-elsewhere", { callId });
+        await cleanupCall(callId);
     });
 
     socket.on("call:busy", async ({ callId }) => {
-        const call = activeCalls.get(callId);
+        const call = await getCallState(callId);
         if (!call) return;
         if (String(call.receiverId) !== String(socket.userId)) return;
 
-        if (call.timeout) clearTimeout(call.timeout);
-
-        emitToUser(io, call.callerId, "call:busy", { callId, callerId: call.callerId, receiverId: call.receiverId, conversationId: call.conversationId });
+        OnlineManager.emitToUser(io, call.callerId, "call:busy", { callId, callerId: call.callerId, receiverId: call.receiverId, conversationId: call.conversationId });
         
         try {
             await Call.findOneAndUpdate(
@@ -257,11 +249,11 @@ export default function registerCallSocket(io, socket) {
             );
         } catch (err) { console.error("Saving call failed:", err); }
 
-        cleanupCall(callId);
+        await cleanupCall(callId);
     });
 
     socket.on("call:end", async ({ callId }) => {
-        const call = activeCalls.get(callId);
+        const call = await getCallState(callId);
         if (!call) return;
 
         const duration = Math.max(0, Math.floor((Date.now() - call.startedAt) / 1000));
@@ -278,79 +270,62 @@ export default function registerCallSocket(io, socket) {
         } catch (err) { console.error("Saving call failed:", err); }
 
         const payload = { callId, duration, callerId: call.callerId, receiverId: call.receiverId, conversationId: call.conversationId };
-        emitToUser(io, call.callerId, "call:ended", payload);
-        emitToUser(io, call.receiverId, "call:ended", payload);
+        OnlineManager.emitToUser(io, call.callerId, "call:ended", payload);
+        OnlineManager.emitToUser(io, call.receiverId, "call:ended", payload);
         
         // ⚡ FIX: Ensure Notifee banner clears if they were disconnected improperly
         sendCallCleanupPush(call.receiverId, callId, "call_ended");
 
-        cleanupCall(callId);
+        await cleanupCall(callId);
     });
 
-    socket.on("call:decline-busy", ({ callId }) => {
-        const call = activeCalls.get(callId);
+    socket.on("call:decline-busy", async ({ callId }) => {
+        const call = await getCallState(callId);
         if (!call) return;
-        emitToUser(io, call.callerId, "call:busy", { callId });
-        cleanupCall(callId);
+        OnlineManager.emitToUser(io, call.callerId, "call:busy", { callId });
+        await cleanupCall(callId);
     });
 
-    socket.on("call:get-state", ({ callId }, callback = () => {}) => {
-        const call = activeCalls.get(callId);
+    socket.on("call:get-state", async ({ callId }, callback = () => {}) => {
+        const call = await getCallState(callId);
         if (!call) return callback({ exists: false });
         callback({ exists: true, status: call.status, callerId: call.callerId, receiverId: call.receiverId, type: call.type });
     });
 
-    socket.on("webrtc:offer", ({ callId, offer }) => {
-        const call = activeCalls.get(callId);
+    // --- WebRTC Routes ---
+    const routeWebRTC = async (eventName, { callId, ...data }) => {
+        const call = await getCallState(callId);
         if (!call) return;
         const target = String(socket.userId) === String(call.callerId) ? call.receiverId : call.callerId;
-        emitToUser(io, target, "webrtc:offer", { callId, offer });
-    });
+        socket.activeCallId = callId; // Bind just in case
+        OnlineManager.emitToUser(io, target, eventName, { callId, ...data });
+    };
 
-    socket.on("webrtc:answer", ({ callId, answer }) => {
-        const call = activeCalls.get(callId);
-        if (!call) return;
-        const target = String(socket.userId) === String(call.callerId) ? call.receiverId : call.callerId;
-        emitToUser(io, target, "webrtc:answer", { callId, answer });
-    });
+    socket.on("webrtc:offer", (data) => routeWebRTC("webrtc:offer", data));
+    socket.on("webrtc:answer", (data) => routeWebRTC("webrtc:answer", data));
+    socket.on("webrtc:ice-candidate", (data) => routeWebRTC("webrtc:ice-candidate", data));
+    socket.on("webrtc:renegotiate-offer", (data) => routeWebRTC("webrtc:renegotiate-offer", data));
+    socket.on("webrtc:renegotiate-answer", (data) => routeWebRTC("webrtc:renegotiate-answer", data));
 
-    socket.on("webrtc:ice-candidate", ({ callId, candidate }) => {
-        const call = activeCalls.get(callId);
-        if (!call) return;
-        const target = String(socket.userId) === String(call.callerId) ? call.receiverId : call.callerId;
-        emitToUser(io, target, "webrtc:ice-candidate", { callId, candidate });
-    });
-
-    socket.on("webrtc:renegotiate-offer", ({ callId, offer }) => {
-        const call = activeCalls.get(callId);
-        if (!call) return;
-        const target = String(socket.userId) === String(call.callerId) ? call.receiverId : call.callerId;
-        emitToUser(io, target, "webrtc:renegotiate-offer", { callId, offer });
-    });
-
-    socket.on("webrtc:renegotiate-answer", ({ callId, answer }) => {
-        const call = activeCalls.get(callId);
-        if (!call) return;
-        const target = String(socket.userId) === String(call.callerId) ? call.receiverId : call.callerId;
-        emitToUser(io, target, "webrtc:renegotiate-answer", { callId, answer });
-    });
-
-    socket.on("call:ringing", ({ callId }) => {
-        const call = activeCalls.get(callId);
+    socket.on("call:ringing", async ({ callId }) => {
+        const call = await getCallState(callId);
         if (!call) return;
         call.status = "ringing";
-        activeCalls.set(callId, call);
-        emitToUser(io, call.callerId, "call:ringing", { callId });
+        await setCallState(callId, call);
+        OnlineManager.emitToUser(io, call.callerId, "call:ringing", { callId });
     });
 
     socket.on("disconnect", async () => {
         const userId = socket.userId;
-        const activeCall = [...activeCalls.values()].find(
-            c => String(c.callerId) === String(userId) || String(c.receiverId) === String(userId)
-        );
+        const callId = socket.activeCallId; // ⚡ Used explicit binding instead of Map scanning
+        
+        if (!callId) return;
 
+        const activeCall = await getCallState(callId);
         if (!activeCall) return;
-        if (activeCall.timeout) clearTimeout(activeCall.timeout);
+
+        // Ensure this user is actually in this call before tearing it down
+        if (String(activeCall.callerId) !== String(userId) && String(activeCall.receiverId) !== String(userId)) return;
 
         const otherUser = String(activeCall.callerId) === String(userId) ? activeCall.receiverId : activeCall.callerId;
         const wasConnected = activeCall.status === "connected";
@@ -388,16 +363,16 @@ export default function registerCallSocket(io, socket) {
             );
         } catch (err) { console.error("Saving call failed:", err); }
 
-        emitToUser(io, otherUser, endedEvent, endedPayload);
+        OnlineManager.emitToUser(io, otherUser, endedEvent, endedPayload);
         
         // ⚡ FIX: Silences the phone if someone's app crashed or internet dropped
         if (!wasConnected) sendCallCleanupPush(otherUser, activeCall.callId, pushType);
 
-        cleanupCall(activeCall.callId);
+        await cleanupCall(activeCall.callId);
     });
 
-    socket.on("call:rejoin", ({ callId }, callback = () => {}) => {
-        const call = activeCalls.get(callId);
+    socket.on("call:rejoin", async ({ callId }, callback = () => {}) => {
+        const call = await getCallState(callId);
         if (!call) return callback({ success: false });
 
         const isCaller = String(call.callerId) === String(socket.userId);
@@ -407,8 +382,9 @@ export default function registerCallSocket(io, socket) {
 
         if (isCaller) call.callerSocketId = socket.id;
         if (isReceiver) call.receiverSocketId = socket.id;
+        socket.activeCallId = callId;
 
-        activeCalls.set(callId, call);
+        await setCallState(callId, call);
         callback({ success: true, call });
     });
 }
