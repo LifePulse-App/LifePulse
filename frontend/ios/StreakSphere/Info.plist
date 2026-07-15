@@ -42,6 +42,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to capture activity proofs.</string>
+	<key>NSMotionUsageDescription</key>
+<string>This app requires access to your motion data for activity tracking.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs your location to show mood-map</string>
 	<key>NSMicrophoneUsageDescription</key>
