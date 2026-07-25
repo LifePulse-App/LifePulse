@@ -172,7 +172,7 @@ const LegalPolicyScreen = () => {
             If you have questions about these Terms, your privacy, or how your
             data is handled, you can contact us at:
             {'\n\n'}
-            infostreaksphere@gmail.com
+            contact@streaksphere.app
             {'\n\n'}
             Please include &quot;Legal Request&quot; or &quot;Privacy Request&quot; in
             the subject line so we can route your message appropriately.

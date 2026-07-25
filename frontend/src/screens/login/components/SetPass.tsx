@@ -146,17 +146,6 @@ const SetPassVerifiedOTP = ({ navigation, route }: any) => {
       return;
     }
 
-    const passwordRegex =
-  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
-
-if (!passwordRegex.test(newPassword)) {
-  setLoading(false);
-  showError(
-    'Password must be at least 8 characters long and include 1 lowercase letter, 1 uppercase letter, 1 number, and 1 special character.'
-  );
-  return;
-}
-
     if (newPassword !== newPasswordMatch) {
         setLoading(false);
         showError('Password does not match!');
@@ -258,8 +247,7 @@ if (!passwordRegex.test(newPassword)) {
               )}
 
               <Text style={styles.termsText} numberOfLines={2}>
-                Didn’t receive the code? Check your spam folder or wait a few
-                moments.
+                Remember this now...
               </Text>
             </View>
           </View>

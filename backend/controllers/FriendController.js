@@ -18,28 +18,44 @@ const hasIncomingReq = (user, otherId) => user.incomingFriendRequests?.some(r =>
 export const sendFriendRequest = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const { targetUserId } = req.params;
-  if (currentUserId === targetUserId) return res.status(400).json({ message: "Cannot friend yourself" });
+  
+  if (currentUserId === targetUserId) {
+    return res.status(400).json({ message: "Cannot friend yourself" });
+  }
 
   const me = await User.findById(currentUserId);
   const them = await User.findById(targetUserId);
   if (!them) return res.status(404).json({ message: "User not found" });
 
-  if (isFriend(me, targetUserId)) return res.json({ message: "Already friends", isFriend: true });
-
-  if (hasOutgoingReq(me, targetUserId)) {
-    return res.json({ message: "Request already sent", requestSent: true });
+  // 1. Check if you are already friends
+  if (isFriend(me, targetUserId)) {
+    return res.json({ message: "Already friends", isFriend: true });
   }
-  if (hasOutgoingReq(them, currentUserId)) {
-    them.friendRequests = them.friendRequests.filter(r => String(r.user) !== currentUserId);
+
+  // 2. Check if THEY already sent ME a request (My Add acts as an Accept)
+  const theySentMeReq = me.friendRequests?.some(r => String(r.user) === targetUserId);
+  if (theySentMeReq) {
+    me.friendRequests = me.friendRequests.filter(r => String(r.user) !== targetUserId);
+    me.markModified('friendRequests'); // Force mongoose to save array change
+    
     me.friends.push({ user: targetUserId });
     them.friends.push({ user: currentUserId });
+    
     await me.save();
     await them.save();
-    return res.json({ message: "Request matched; now friends", isFriend: true });
+    return res.json({ message: "Request accepted; you are now friends!", isFriend: true });
   }
 
+  // 3. Check if I already sent THEM a request (Prevents duplicate click auto-adding)
+  const iSentThemReq = them.friendRequests?.some(r => String(r.user) === currentUserId);
+  if (iSentThemReq) {
+    return res.json({ message: "Request already sent", requestSent: true });
+  }
+
+  // 4. Safely send the request
   them.friendRequests.push({ user: currentUserId, requestedAt: new Date() });
   await them.save();
+  
   await sendToUser(targetUserId, {
     ...TEMPLATES.FRIEND_REQUEST_SENT(req.user.name),
     extra: {
@@ -47,6 +63,7 @@ export const sendFriendRequest = catchAsyncErrors(async (req, res) => {
       fromName: String(req.user.name),
     },
   });
+  
   return res.json({ message: "Friend request sent", requestSent: true });
 });
 
@@ -54,7 +71,7 @@ export const sendFriendRequest = catchAsyncErrors(async (req, res) => {
  * Accept a friend request
  */
 export const acceptFriendRequest = catchAsyncErrors(async (req, res) => {
-  const currentUserId = req.user.id;
+const currentUserId = req.user.id;
   const { requesterId } = req.params;
 
   const me = await User.findById(currentUserId);
@@ -64,7 +81,10 @@ export const acceptFriendRequest = catchAsyncErrors(async (req, res) => {
   const hadRequest = hasOutgoingReq(me, requesterId);
   if (!hadRequest) return res.json({ message: "No request found" });
 
+  // ⚡ FIX: Filter the array and explicitly mark it as modified
   me.friendRequests = me.friendRequests.filter(r => String(r.user) !== requesterId);
+  me.markModified('friendRequests'); 
+  
   if (!isFriend(me, requesterId)) me.friends.push({ user: requesterId });
   if (!isFriend(them, currentUserId)) them.friends.push({ user: currentUserId });
 

@@ -172,6 +172,8 @@ resetPasswordVerified: {
 },
 deleteAccountOtp: String,
 deleteAccountOtpExpire: Date,
+passwordChangeOtp: String,
+  passwordChangeOtpExpire: Date,
     refreshTokens: [
       {
         token: { type: String, required: true },

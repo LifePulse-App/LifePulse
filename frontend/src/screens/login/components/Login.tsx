@@ -285,9 +285,9 @@ const Login = ({ navigation }: any) => {
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
-                textColor="black"
-                placeholderTextColor="grey"
-                cursorColor='black'
+                textColor="#fff"              // White text
+                placeholderTextColor="#94a3b8" // Slate gray placeholder
+                cursorColor="#fff"
               />
 
               <TextInput
@@ -295,7 +295,7 @@ const Login = ({ navigation }: any) => {
                 placeholder="Password"
                 value={password}
                 onChangeText={setPassword}
-                secureTextEntry={!showPassword}   // keep visible when showPassword is true
+                secureTextEntry={!showPassword}
                 autoCorrect={false}
                 autoCapitalize="none"
                 textContentType="password"
@@ -304,12 +304,13 @@ const Login = ({ navigation }: any) => {
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
-                textColor="black"
-                placeholderTextColor="grey"
-                cursorColor='black'
+                textColor="#fff"              // White text
+                placeholderTextColor="#94a3b8" // Slate gray placeholder
+                cursorColor="#fff"
                 right={
                   <TextInput.Icon
                     icon={showPassword ? 'eye-off' : 'eye'}
+                    color="#cbd5e1" // Added icon color
                     onPress={() => setShowPassword((prev) => !prev)}
                   />
                 }
@@ -335,12 +336,12 @@ const Login = ({ navigation }: any) => {
               )}
 
               <View style={{ marginTop: 4, alignItems: 'center' }}>
-                <Text style={{ color: 'black', fontSize: 13 }}>
+                <Text style={{ color: '#cbd5e1', fontSize: 13 }}>
                   Want to reset password?{' '}
                   <Text
                     style={{
                       fontWeight: '700',
-                      color: '#F9FAFB',
+                      color: '#fff', // Purple accent to match the glow
                     }}
                     onPress={() => navigation.navigate('ForgotPass')}
                   >
@@ -350,12 +351,12 @@ const Login = ({ navigation }: any) => {
               </View>
 
               <View style={{ marginTop: 5, alignItems: 'center' }}>
-                <Text style={{ color: 'black', fontSize: 13 }}>
+                <Text style={{ color: '#c7cbcf', fontSize: 13 }}>
                   Don’t have an account?{' '}
                   <Text
                     style={{
                       fontWeight: '700',
-                      color: '#F9FAFB',
+                      color: '#fff', // Purple accent
                     }}
                     onPress={() => navigation.navigate('Register')}
                   >

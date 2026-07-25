@@ -96,9 +96,38 @@ const SavedAccountsScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleRemove = async (id: string) => {
-    await SavedAccountsStorage.remove(id);
-    await load();
+// ⚡ UPDATED: Accept the full account object
+  const handleRemove = async (acc: SavedAccount) => {
+    try {
+      setLoadingId(acc.id); // Show loading state on the remove button
+      const deviceId = await DeviceInfo.getUniqueId();
+
+      // 1. Silently login to get a fresh, valid access token
+      const res = await api_Login.getLogin(
+        acc.username,
+        acc.password,
+        deviceId
+      );
+
+      // 2. If successful, use the token to tell the backend to forget this device
+      if (res.ok && res.data?.accessToken) {
+        // Temporarily set the auth header for this specific request
+        setAuthHeaders(res.data.accessToken);
+        
+        // Ensure you have a logoutDevice method in your api_Login service!
+        await api_Login.logoutDevice(deviceId); 
+        
+        // Clear the header right after
+        setAuthHeaders(null);
+      }
+    } catch (error) {
+      console.log("Failed to remove device from backend:", error);
+    } finally {
+      // 3. ALWAYS remove from local storage, even if the backend request fails
+      await SavedAccountsStorage.remove(acc.id);
+      await load();
+      setLoadingId(null);
+    }
   };
 
   return (
@@ -135,9 +164,13 @@ const SavedAccountsScreen = ({ navigation }: any) => {
 
                   <TouchableOpacity
                     style={localStyles.removeBtn}
-                    onPress={() => handleRemove(acc.id)}
+                    // ⚡ UPDATED: Pass 'acc' instead of 'acc.id'
+                    onPress={() => handleRemove(acc)}
+                    disabled={loadingId === acc.id}
                   >
-                    <Text style={localStyles.removeText}>Remove</Text>
+                    <Text style={localStyles.removeText}>
+                      {loadingId === acc.id ? "Remove" : "Remove"}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>

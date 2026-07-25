@@ -2,7 +2,7 @@ import User from "../models/UserSchema.js";
 
 import catchAsyncErrors from "../utils/catchAsyncErrors.js";
 import ErrorHandler from "../utils/errorHandler.js";
-import { sendPasswordResetEmail, sendWelcomeEmail } from "../helpers/emails.js"
+import { sendOtpVerificationEmail, sendPasswordResetEmail, sendWelcomeEmail } from "../helpers/emails.js"
 
 // Helper to send access + refresh tokens
 const sendTokens = async (res, user, deviceId) => {

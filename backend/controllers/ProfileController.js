@@ -94,18 +94,42 @@ export const editProfile = catchAsyncErrors(async (req, res, next) => {
 
 // Request password change OTP
 export const requestPasswordChangeOtp = catchAsyncErrors(async (req, res, next) => {
-  const user = await User.findById(req.user._id);
+  const { oldPassword } = req.body;
+
+  if (!oldPassword) {
+    return next(new ErrorHandler("Please provide your current password to request an OTP", 400));
+  }
+
+  // 1. Fetch user WITH the password field included
+  const user = await User.findById(req.user._id).select("+password");
   if (!user) return next(new ErrorHandler("User not found", 404));
 
-  // Generate OTP
+  // 2. Verify the current password BEFORE doing anything else
+  const isMatch = await user.comparePassword(oldPassword);
+  if (!isMatch) {
+    return next(new ErrorHandler("Current password is incorrect", 400));
+  }
+
+  // 3. Generate OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const hashed = crypto.createHash("sha256").update(otp).digest("hex");
 
   user.passwordChangeOtp = hashed;
-  user.passwordChangeOtpExpire = Date.now() + 2 * 60 * 1000; // 15 minutes
+  user.passwordChangeOtpExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
 
-  await sendVerificationEmail(user.email, otp, user.username);
-  await user.save();
+  // 4. Save to database FIRST
+  await user.save({ validateBeforeSave: false });
+
+  // 5. Send email
+  try {
+    await sendVerificationEmail(user.email, otp, user.username || user.name);
+  } catch (err) {
+    // Revert if email fails
+    user.passwordChangeOtp = undefined;
+    user.passwordChangeOtpExpire = undefined;
+    await user.save({ validateBeforeSave: false });
+    return next(new ErrorHandler("Failed to send OTP email", 500));
+  }
 
   res.status(200).json({
     success: true,
@@ -115,29 +139,49 @@ export const requestPasswordChangeOtp = catchAsyncErrors(async (req, res, next) 
 
 // Change password WITH OTP verification
 export const changePasswordWithOtp = catchAsyncErrors(async (req, res, next) => {
-  const { oldPassword, newPassword, otp } = req.body;
-  const user = await User.findById(req.user._id).select("+password");
-  if (!user) return next(new ErrorHandler("User not found", 404));
+  let { oldPassword, newPassword, otp } = req.body;
+  
   if (!otp) return next(new ErrorHandler("OTP required", 400));
-  if (!user.passwordChangeOtp || !user.passwordChangeOtpExpire) {
-    return next(new ErrorHandler("No valid OTP found. Request a new OTP.", 400));
-  }
-  if (user.passwordChangeOtpExpire < Date.now()) {
-    user.passwordChangeOtp = undefined;
-    user.passwordChangeOtpExpire = undefined;
-    await user.save();
-    return next(new ErrorHandler("OTP expired. Request again.", 400));
-  }
+  
+  // 🚨 FIX: Force string and trim hidden spaces
+  otp = String(otp).trim();
+
+  // We need the password field to check the old password
+  const user = await User.findById(req.user._id).select("+password");
+    if (!user) return next(new ErrorHandler("User not found", 404));
+
+  // Verify old password first
   const isMatch = await user.comparePassword(oldPassword);
   if (!isMatch) return next(new ErrorHandler("Old password incorrect", 400));
+
+  // 🚨 FIX: Safely parse Mongoose Date to prevent comparison bugs
+  if (
+    !user.passwordChangeOtp || 
+    !user.passwordChangeOtpExpire ||
+    new Date(user.passwordChangeOtpExpire).getTime() < Date.now()
+  ) {
+    // Clean up expired OTP
+    user.passwordChangeOtp = undefined;
+    user.passwordChangeOtpExpire = undefined;
+    await user.save({ validateBeforeSave: false });
+    return next(new ErrorHandler("OTP invalid or expired. Request again.", 400));
+  }
+
+  // Hash incoming clean OTP and verify
   const hashed = crypto.createHash("sha256").update(otp).digest("hex");
   if (hashed !== user.passwordChangeOtp) {
     return next(new ErrorHandler("Incorrect OTP", 400));
   }
+
+  // Success: Update password and clear OTP
   user.password = newPassword;
   user.passwordChangeOtp = undefined;
   user.passwordChangeOtpExpire = undefined;
-  await user.save();
+  
+  // We DO NOT use validateBeforeSave: false here because we want Mongoose 
+  // to run your minimum 8 character password regex validation.
+  await user.save(); 
+
   res.status(200).json({ success: true, message: "Password changed successfully" });
 });
 
