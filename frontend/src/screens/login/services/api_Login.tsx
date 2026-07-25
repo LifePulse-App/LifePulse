@@ -131,12 +131,21 @@ const googleLogin = async (idToken: string, deviceId: string) => {
 };
 
 // 2FA verify-login API
-const verify2faLogin = async (twoFaToken: string, code?: string, backupCode?: string) => {
+const verify2faLogin = async (twoFaToken: string, code?: string, backupCode?: string, deviceId: string,
+        deviceName: string,
+        deviceModel: string,
+        deviceBrand: string,
+        deviceTimezone: string) => {
   try {
     return await client.post<object>('/auth/2fa/verify-login', {
       twoFaToken,
       code,
       backupCode,
+      deviceId,
+        deviceName,
+        deviceModel,
+        deviceBrand,
+        deviceTimezone
     });
   } catch (error: any) {
     if (!error.response) {

@@ -139,7 +139,7 @@ if (!passwordRegex.test(password)) {
     const user = await User.create({ name, email, password, username, phone, isVerified: false });
 
     // Generate OTP
-    const otp = user.generateVerificationCode();
+    const otp = user.generateVerificationCode()
 
     // Send OTP
     await sendVerificationEmail(email, otp, user.name || user.username || user.email);
@@ -246,8 +246,11 @@ export const login = catchAsyncErrors(async (req, res, next) => {
       await user.save({ validateBeforeSave: false });
     }
 
-    // If user has 2FA enabled → do not issue full tokens yet, and DO NOT fully register device here.
-    if (user.twoFactor?.enabled && user.twoFactor.secret) {
+// ⚡ FIX: Check if this specific device is already recognized/trusted
+    const isRecognizedDevice = user.deviceInfo?.some(d => d.deviceId === deviceId);
+
+    // ⚡ FIX: Only require 2FA if it's enabled AND the device is NOT recognized
+    if (user.twoFactor?.enabled && user.twoFactor.secret && !isRecognizedDevice) {
       const twoFaToken = Jwt.sign(
         { id: user._id, stage: "2fa", deviceId },
         process.env.JWT_SECRET,
@@ -666,7 +669,11 @@ export const enable2FAConfirm = catchAsyncErrors(async (req, res, next) => {
 
 export const verify2FALogin = catchAsyncErrors(async (req, res, next) => {
   try {
-    const { twoFaToken, code, backupCode } = req.body;
+    const { twoFaToken, code, backupCode, deviceId,
+        deviceName,
+        deviceModel,
+        deviceBrand,
+        deviceTimezone } = req.body;
 
     if (!twoFaToken) {
       return next(new ErrorHandler("Missing 2FA token", 400));

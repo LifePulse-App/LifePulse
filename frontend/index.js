@@ -5,7 +5,7 @@ import { Buffer } from 'buffer';
 if (!global.Buffer) global.Buffer = Buffer;
 
 import 'react-native-gesture-handler';
-import { AppRegistry, Platform } from 'react-native';
+import { AppRegistry, Platform, DeviceEventEmitter } from 'react-native';
 import notifee, { EventType, AndroidImportance, AndroidCategory } from '@notifee/react-native';
 
 import { getApp } from '@react-native-firebase/app';

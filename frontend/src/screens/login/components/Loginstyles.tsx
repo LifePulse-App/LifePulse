@@ -108,7 +108,7 @@ export const loginStyles = () => {
     appName: {
       fontSize: 30,
       fontWeight: '700',
-      color: '#A8FFF8',
+      color: 'white',
     },
 
     // Glass card near bottom
@@ -119,37 +119,38 @@ export const loginStyles = () => {
       paddingBottom: 16,
     },
     glassBlur: {
-      ...StyleSheet.absoluteFillObject,
+      ...StyleSheet.absoluteFill,
       borderRadius: 24,
     },
+// --- SLEEK DARK CARD (Redeem Store Style) ---
     glassContent: {
       width: '100%',
-      borderRadius: 24,
+      borderRadius: 16, // Sharper corners like the modal
       paddingHorizontal: 20,
       paddingTop: 24,
       paddingBottom: 28,
-      backgroundColor: 'rgba(255,255,255,0.25)',
-      borderWidth: 0.7,
-      borderColor: 'rgba(255,255,255,1)',
+      backgroundColor: 'rgba(17, 24, 39, 0.9)', // Dark background
+      borderWidth: 1,
+      borderColor: 'rgba(148, 163, 184, 0.4)', // Subtle gray border
       overflow: 'hidden',
       shadowColor: '#000',
-      shadowOpacity: 0.25,
+      shadowOpacity: 0.3,
       shadowRadius: 20,
       shadowOffset: { width: 0, height: 10 },
     },
 
     mainTitle: {
       fontSize: 20,
-      fontWeight: '700',
-      color: '#000',
+      fontWeight: '800',
+      color: '#fff', // White text
       textAlign: 'center',
       marginBottom: 5,
     },
     mainSubtitle: {
       fontSize: 13,
-      color: '#000',
+      color: '#cbd5e1', // Light grayish-blue
       textAlign: 'center',
-      marginBottom: 10,
+      marginBottom: 16, // Added a bit more space
     },
 
     input: {
@@ -158,7 +159,7 @@ export const loginStyles = () => {
       borderTopLeftRadius: 12,
       borderTopRightRadius: 12,
       borderRadius: 12,
-      backgroundColor: 'rgba(255,255,255,1)',
+      backgroundColor: 'rgba(31, 41, 55, 0.8)', // Dark input background
       paddingHorizontal: 12,
       marginBottom: 10,
     },
@@ -168,7 +169,7 @@ export const loginStyles = () => {
       borderTopLeftRadius: 12,
       borderTopRightRadius: 12,
       borderRadius: 12,
-      backgroundColor: 'rgba(255,255,255,1)',
+      backgroundColor: 'rgba(31, 41, 55, 0.8)', // Dark input background
       paddingHorizontal: 12,
       marginBottom: 14,
     },
@@ -176,17 +177,27 @@ export const loginStyles = () => {
     primaryButton: {
       width: '100%',
       height: 52,
-      borderRadius: 12,
-      backgroundColor: '#000000',
+      borderRadius: 10,
+      backgroundColor: 'rgba(99, 102, 241, 0.25)', // Indigo tinted background
+      borderColor: 'rgba(99, 102, 241, 0.6)',      // Indigo border
+      borderWidth: 1,
       justifyContent: 'center',
       alignItems: 'center',
       marginTop: 4,
       marginBottom: 10,
     },
     primaryButtonText: {
-      color: '#FFFFFF',
+      color: '#fff',
       fontSize: 14,
-      fontWeight: '600',
+      fontWeight: '700',
+    },
+
+    termsText: {
+      fontSize: 10,
+      color: '#94a3b8',
+      textAlign: 'center',
+      lineHeight: 17,
+      marginTop: 10,
     },
 
     secondaryButton: {
@@ -254,14 +265,6 @@ export const loginStyles = () => {
       fontSize: 16,
       fontWeight: '500',
       color: '#111827',
-    },
-
-    termsText: {
-      fontSize: 10,
-      color: '#000',
-      textAlign: 'center',
-      lineHeight: 17,
-      marginTop: 10,
     },
   });
 };

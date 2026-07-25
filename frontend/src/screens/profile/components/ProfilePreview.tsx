@@ -937,7 +937,7 @@ const styles = StyleSheet.create({
     width: 36, height: 36, borderRadius: 12,
     alignItems: "center", justifyContent: "center", marginBottom: 12,
   },
-  detailTitle: { color: "#f1f5f9", fontSize: 16, fontWeight: "700", marginBottom: 4 },
+  detailTitle: { color: "#f1f5f9", fontSize: 16, fontWeight: "700", marginBottom: 4, marginLeft: 4 },
   detailSub: { color: "#64748b", fontSize: 13, fontWeight: "500" },
 
   friendBanner: {

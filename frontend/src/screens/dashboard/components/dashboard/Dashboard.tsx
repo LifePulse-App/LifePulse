@@ -346,7 +346,7 @@ useEffect(() => {
                   </Text>
                   <Text style={styles.errorText}>
                     {offline
-                      ? "You’re not connected to internet. Your will be synced with server when you’re back online."
+                      ? "You’re not connected to internet."
                       : error}
                   </Text>
                 </View>

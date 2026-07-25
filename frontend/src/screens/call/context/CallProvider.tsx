@@ -49,12 +49,26 @@ const playOutgoingTone = () => {
     return tone;
 };
 
+// ⚡ CUSTOM INCOMING RINGTONE SOUND
+const playIncomingTone = () => {
+  const tone = new Sound('ringtone.mp3', Sound.MAIN_BUNDLE, error => {
+    if (!error) {
+      tone.setNumberOfLoops(-1); // loop infinitely until stopped
+      tone.play();
+    }
+  });
+  return tone;
+};
+
 export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentSession, setCurrentSession] = useState<CallSession | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  
+  // ⚡ REFS FOR TONES
   const outgoingToneRef = useRef<Sound | null>(null);
+  const incomingToneRef = useRef<Sound | null>(null);
 
   const [callDuration, setCallDuration] = useState(0);
 
@@ -75,6 +89,22 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const activeCallIdRef = useRef<string | null>(null);
   const hasHandledOfferRef = useRef(false);
+
+  // ⚡ HELPER TO PROPERLY STOP BOTH TONES
+  const stopAllTones = () => {
+    if (outgoingToneRef.current) {
+      outgoingToneRef.current.stop(() => {
+        outgoingToneRef.current?.release();
+        outgoingToneRef.current = null;
+      });
+    }
+    if (incomingToneRef.current) {
+      incomingToneRef.current.stop(() => {
+        incomingToneRef.current?.release();
+        incomingToneRef.current = null;
+      });
+    }
+  };
 
   useEffect(() => {
     // ⚡ LISTEN FOR HARDWARE CHANGES (Bluetooth/Headphones plugged in)
@@ -124,17 +154,14 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const handleNoAnswer = (payload: any) => {
         setCurrentSession((prev) => prev ? { ...prev, status: 'no-answer' } : null);
         
-        outgoingToneRef.current?.stop(() => {
-          outgoingToneRef.current?.release();
-          outgoingToneRef.current = null;
-        });
-                  playEndTone();
-         setTimeout(() => {
+        stopAllTones();
+        playEndTone();
+        setTimeout(() => {
           cleanupCallSession();
         }, 5000);
       }; 
 
-const handleIncomingCall = (payload: any) => {
+      const handleIncomingCall = (payload: any) => {
         activeCallIdRef.current = payload.callId;
         hasHandledOfferRef.current = false;
         
@@ -154,7 +181,10 @@ const handleIncomingCall = (payload: any) => {
           status: 'ringing',
           isIncoming: true,
         });
-        InCallManager.startRingtone('ringtone', [1000, 500, 1000, 500], 'default', 30);
+        
+        stopAllTones();
+        incomingToneRef.current = playIncomingTone();
+        
         activeSocket.emit("call:ringing", { callId: payload.callId });
       };
 
@@ -167,11 +197,8 @@ const handleIncomingCall = (payload: any) => {
       const handleCallAccepted = async (payload: any) => {
         InCallManager.stopRingback();
         InCallManager.stopRingtone();
-
-        outgoingToneRef.current?.stop(() => {
-    outgoingToneRef.current?.release();
-    outgoingToneRef.current = null;
-});
+        
+        stopAllTones();
         
         InCallManager.start({ media: 'audio', auto: true, ringback: '' });
         
@@ -290,7 +317,8 @@ const handleIncomingCall = (payload: any) => {
         });
 
         // Start playing the ringing sound
-        InCallManager.startRingtone('ringtone', [1000, 500, 1000, 500], 'default', 30);
+        stopAllTones();
+        incomingToneRef.current = playIncomingTone();
 
         // If they explicitly tapped "Answer" on the banner, auto-accept!
         if (callData.autoAccept) {
@@ -321,10 +349,7 @@ const handleIncomingCall = (payload: any) => {
             if (data.type === 'call_rejected') {
                 setCurrentSession(prev => prev ? { ...prev, status: 'rejected' } : null);
                 
-                outgoingToneRef.current?.stop(() => {
-                    outgoingToneRef.current?.release();
-                    outgoingToneRef.current = null;
-                });
+                stopAllTones();
                 
                 playEndTone(); // Play the hangup beep
                 
@@ -349,7 +374,8 @@ const handleIncomingCall = (payload: any) => {
     const hasPermission = await PermissionService.checkAndRequestAudioPermission();
     if (!hasPermission) return;
 
-outgoingToneRef.current = playOutgoingTone();
+    stopAllTones();
+    outgoingToneRef.current = playOutgoingTone();
     setIsMinimized(false);
 
     InCallManager.start({ media: 'audio', auto: true, ringback: '' });
@@ -372,12 +398,8 @@ outgoingToneRef.current = playOutgoingTone();
         // ⚡ HANDLE BUSY STATE
         setCurrentSession((prev) => prev ? { ...prev, status: 'busy' } : null);
 
-        outgoingToneRef.current?.stop(() => {
-    outgoingToneRef.current?.release();
-    outgoingToneRef.current = null;
-});
-
-          playEndTone();
+        stopAllTones();
+        playEndTone();
        
         // Wait 2.5 seconds so the user can read "User Busy", then hang up automatically
         setTimeout(() => {
@@ -453,10 +475,9 @@ const toggleMinimize = () => {
     InCallManager.stopRingback();
     webRTCService.cleanup();
     activeCallIdRef.current = null;
-    outgoingToneRef.current?.stop(() => {
-    outgoingToneRef.current?.release();
-    outgoingToneRef.current = null;
-});
+    
+    stopAllTones();
+    
     setCurrentSession(null);
     setRemoteStream(null);
     setIsMuted(false);

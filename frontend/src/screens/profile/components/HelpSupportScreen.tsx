@@ -46,6 +46,7 @@ const HelpSupportScreen = () => {
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
           <Text style={styles.title}>Need some help?</Text>
           <Text style={styles.subtitle}>
@@ -53,6 +54,64 @@ const HelpSupportScreen = () => {
             If you can&apos;t find your answer here, you can always report a problem
             from the Profile → Help & Support section.
           </Text>
+
+          <Question
+            q="How do streaks work in StreakSphere?"
+            a={
+              'Streaks are a way to keep track of your consistent activity over time. ' +
+              'Each day you complete your required activity, your streak increases by 1.\n\n' +
+              'If you miss a day, your streak will reset back to 0, unless the app introduces ' +
+              'a specific feature (like a "streak freeze" or "streak protection") that prevents it.\n\n' +
+              'You can usually see your current streak on your profile or on the main dashboard.'
+            }
+          />
+
+          <Question
+            q="How does the XP and Leveling system work?"
+            a={
+              'You earn XP by maintaining streaks, logging your mood, and completing daily habits.\n\n' +
+              '• Lifetime XP increases your overall Account Level permanently.\n' +
+              '• Monthly XP resets at the beginning of every month and dictates your rank on the Monthly Leaderboards.'
+            }
+          />
+
+          <Question
+            q="How does the Relationship / Partner system work?"
+            a={
+              'You can pair up with a friend or significant other to track your progress together! To start, visit their profile and send a relationship request.\n\n' +
+              'Once partnered, you will share a "Days Together" counter. If either of you decides to break up, the app triggers a 24-hour grace period timer. During this time, you can patch things up and restore the relationship without losing your combined partner streak.'
+            }
+          />
+
+          <Question
+            q="What are Reward balances?"
+            a={
+              'As you gain XP and hold long streaks, you earn a reward balance currency. This balance can be saved up and used to redeem special perks, avatar items, or premium app features in the store.'
+            }
+          />
+
+          <Question
+            q="Can I customize my avatar?"
+            a={
+              'Absolutely! StreakSphere supports customized avatars and fully 3D Ready Player Me models.\n\n' +
+              'Go to your Profile and tap the pencil icon next to your picture. You can design your avatar’s look, which will show up across leaderboards and friend lists.'
+            }
+          />
+
+          <Question
+            q="How do I log my daily mood?"
+            a={
+              'Tracking your emotions helps you see how your habits affect your mental health. Tap "Share your mood" from the dashboard, pick the feeling that best matches your current state, and we will save it to your personal history.'
+            }
+          />
+
+          <Question
+            q="Why can't I change my Country or City?"
+            a={
+              'To keep regional leaderboards fair and prevent cheating, changing your location (City/Country) locks it for 30 days.\n\n' +
+              'If you recently updated it, you will need to wait for the countdown to expire. You can always hide your location from others by toggling "Show my location" off in the Edit Profile menu.'
+            }
+          />
 
           <Question
             q="How do I enable two-factor authentication (2FA)?"
@@ -74,17 +133,6 @@ const HelpSupportScreen = () => {
               '3. Check your email for a verification code.\n' +
               '4. Enter the code in the app, then set a new password.\n\n' +
               'For security reasons, the code is time-limited and can only be used once.'
-            }
-          />
-
-          <Question
-            q="How do streaks work in StreakSphere?"
-            a={
-              'Streaks are a way to keep track of your consistent activity over time. ' +
-              'Each day you complete your required activity, your streak increases by 1.\n\n' +
-              'If you miss a day, your streak will reset back to 0, unless the app introduces ' +
-              'a specific feature (like a "streak freeze" or "streak protection") that prevents it.\n\n' +
-              'You can usually see your current streak on your profile or on the main dashboard.'
             }
           />
 

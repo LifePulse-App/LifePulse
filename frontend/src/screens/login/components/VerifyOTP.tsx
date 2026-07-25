@@ -6,8 +6,10 @@ import {
   Keyboard,
   TouchableOpacity,
   Animated,
+  StyleSheet,
+  TextInput as RNTextInput, // ⚡ ADDED: Native text input for the hidden overlay
 } from 'react-native';
-import { TextInput, Text } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 import AuthContext from '../../../auth/user/UserContext';
 import { UserLoginResponse } from '../../user/models/UserLoginResponse';
 import { setAuthHeaders, setSecretKey } from '../../../auth/api-client/api_client';
@@ -18,6 +20,8 @@ import { loginStyles } from './Loginstyles';
 import DeviceInfo from 'react-native-device-info';
 import { BlurView } from '@react-native-community/blur';
 import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
+
+const OTP_LENGTH = 6;
 
 const VerifyOtp = ({ navigation, route }: any) => {
   const styles = loginStyles();
@@ -32,6 +36,9 @@ const VerifyOtp = ({ navigation, route }: any) => {
   // toast-like message for success / info
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
+
+  // ⚡ ADDED: Ref for the hidden input to force focus
+  const inputRef = useRef<RNTextInput>(null);
 
   const showError = (message: string) => {
     setErrorMessage(message);
@@ -139,9 +146,9 @@ const VerifyOtp = ({ navigation, route }: any) => {
     Keyboard.dismiss();
     setLoading(true);
 
-    if (!otp) {
+    if (!otp || otp.length < OTP_LENGTH) {
       setLoading(false);
-      showError('Please enter the OTP sent to your email.');
+      showError('Please enter the full 6-digit code.');
       return;
     }
 
@@ -155,10 +162,6 @@ const VerifyOtp = ({ navigation, route }: any) => {
         showError(response.data?.message || 'OTP verification failed');
         return;
       }
-
-      // const user = response.data as UserLoginResponse;
-      // setAuthHeaders(user.accessToken);
-      // authContext?.setUser(user);
 
       navigation.navigate('Login');
     } catch (e) {
@@ -177,8 +180,6 @@ const VerifyOtp = ({ navigation, route }: any) => {
 
     try {
       setSecretKey();
-
-      // Adjust this to your actual resend endpoint
       const response = await api_Login.resendOtp(email);
 
       if (!response.ok) {
@@ -186,7 +187,7 @@ const VerifyOtp = ({ navigation, route }: any) => {
         return;
       }
 
-      // Show a simple toast-like message
+      setOtp(''); // Clear OTP on resend
       showToast('Verification code sent to your email.');
     } catch (e) {
       showError('Unexpected error while resending OTP');
@@ -205,7 +206,6 @@ const VerifyOtp = ({ navigation, route }: any) => {
         style={styles.kbWrapper}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-
           <View style={styles.appNameWrapper}>
             <Text style={styles.appName}>StreakSphere</Text>
           </View>
@@ -217,21 +217,52 @@ const VerifyOtp = ({ navigation, route }: any) => {
                 Enter the 6-digit code we emailed you to: {email}
               </Text>
 
-              <TextInput
-                label="OTP"
-                placeholder="OTP"
-                value={otp}
-                onChangeText={setOtp}
-                style={styles.input}
-                mode="flat"
-                underlineColor="transparent"
-                activeUnderlineColor="transparent"
-                keyboardType="number-pad"
-                maxLength={6}
-                textColor="#111827"
-                placeholderTextColor="grey"
-                cursorColor='black'
-              />
+              {/* ⚡ ADDED: Visual 6-Block OTP Input */}
+              <View style={otpStyles.otpContainer}>
+                <RNTextInput
+                  ref={inputRef}
+                  value={otp}
+                  onChangeText={(text) => {
+                    // Only allow numbers
+                    const numericValue = text.replace(/[^0-9]/g, '');
+                    setOtp(numericValue);
+                    if (numericValue.length === OTP_LENGTH) {
+                      Keyboard.dismiss();
+                    }
+                  }}
+                  maxLength={OTP_LENGTH}
+                  keyboardType="number-pad"
+                  textContentType="oneTimeCode" // iOS Autofill
+                  autoComplete="sms-otp"        // Android Autofill
+                  autoFocus={true}
+                  caretHidden={true}
+                  style={otpStyles.hiddenInput}
+                />
+                
+                <View style={otpStyles.cellsWrapper} pointerEvents="none">
+                  {Array(OTP_LENGTH)
+                    .fill(0)
+                    .map((_, index) => {
+                      const digit = otp[index] || '';
+                      // Highlight the cell that is currently waiting for input
+                      const isCurrentCell = index === otp.length;
+
+                      return (
+                        <View
+                          key={index}
+                          style={[
+                            otpStyles.cell,
+                            isCurrentCell && otpStyles.cellFocused,
+                            digit ? otpStyles.cellFilled : null
+                          ]}
+                        >
+                          <Text style={otpStyles.cellText}>{digit}</Text>
+                        </View>
+                      );
+                    })}
+                </View>
+              </View>
+              {/* ⚡ END OF OTP BLOCKS */}
 
               {loading ? (
                 <View style={styles.loadingOverlay}>
@@ -255,7 +286,7 @@ const VerifyOtp = ({ navigation, route }: any) => {
               {/* NEW: Resend OTP button */}
               <TouchableOpacity
                 onPress={handleResendOtp}
-                style={styles.secondaryButton} // you can add this style in Loginstyles
+                style={styles.secondaryButton}
               >
                 <AppText style={styles.secondaryButtonText}>
                   Resend verification code
@@ -271,14 +302,12 @@ const VerifyOtp = ({ navigation, route }: any) => {
         </KeyboardAvoidingView>
       </View>
 
-      {/* Error modal (already present) */}
       <GlassyErrorModal
         visible={errorVisible}
         message={errorMessage}
         onClose={hideError}
       />
 
-      {/* Toast-style info modal (reuse same component; you can style it differently if it supports it) */}
       <GlassyErrorModal
         visible={toastVisible}
         message={toastMessage}
@@ -287,5 +316,58 @@ const VerifyOtp = ({ navigation, route }: any) => {
     </>
   );
 };
+
+// ⚡ ADDED: Local styles specifically for the OTP layout
+const otpStyles = StyleSheet.create({
+  otpContainer: {
+    width: '100%',
+    height: 60,
+    marginVertical: 20,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  hiddenInput: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0,
+    zIndex: 999, // Ensures tapping anywhere on the blocks pulls up the keyboard
+  },
+  cellsWrapper: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    height: '100%',
+  },
+  cell: {
+    width: 48,
+    height: 58,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cellFocused: {
+    borderColor: '#6366f1', // StreakSphere primary indigo
+    borderWidth: 2,
+    backgroundColor: '#ffffff',
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  cellFilled: {
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1',
+  },
+  cellText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+});
 
 export default VerifyOtp;

@@ -24,9 +24,9 @@ const editProfile = async (profileData: object) => {
 };
 
 // Request Password Change OTP
-const requestPasswordChangeOtp = async () => {
+const requestPasswordChangeOtp = async (oldPassword: string) => {
   try {
-    return await client.post<object>('/profile/change-password-otp');
+    return await client.post<object>('/profile/change-password-otp', {oldPassword});
   } catch (error: any) {
     if (!error.response) throw new Error('Server is offline, try again later.');
     throw error;

@@ -1,10 +1,12 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useRef } from 'react';
 import {
   View,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
   TouchableOpacity,
+  TextInput as RNTextInput, // ⚡ ADDED: Native text input for the hidden overlay
+  StyleSheet,
 } from 'react-native';
 import { TextInput, Text } from 'react-native-paper';
 import { useRoute, useNavigation, CommonActions } from '@react-navigation/native';
@@ -17,6 +19,7 @@ import LoaderKitView from 'react-native-loader-kit';
 import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
 import { loginStyles } from './Loginstyles';
 import api_Login from '../services/api_Login';
+import DeviceInfo from 'react-native-device-info';
 
 type RouteParams = {
   twoFaToken: string;
@@ -25,6 +28,8 @@ type RouteParams = {
 };
 
 type Mode = 'totp' | 'backup';
+
+const OTP_LENGTH = 6;
 
 const TwoFAScreen = () => {
   const styles = loginStyles();
@@ -42,6 +47,9 @@ const TwoFAScreen = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorVisible, setErrorVisible] = useState(false);
 
+  // ⚡ ADDED: Ref for the hidden input
+  const inputRef = useRef<RNTextInput>(null);
+
   const showError = (message: string) => {
     setErrorMessage(message);
     setErrorVisible(true);
@@ -56,12 +64,12 @@ const TwoFAScreen = () => {
     Keyboard.dismiss();
 
     const selectedCode = mode === 'totp' ? code : backupCode;
-    if (!selectedCode) {
-      showError(
-        mode === 'totp'
-          ? 'Please enter your 6-digit code.'
-          : 'Please enter your backup code.',
-      );
+    
+    if (mode === 'totp' && (!selectedCode || selectedCode.length < OTP_LENGTH)) {
+      showError('Please enter the full 6-digit code.');
+      return;
+    } else if (mode === 'backup' && !selectedCode) {
+      showError('Please enter your backup code.');
       return;
     }
 
@@ -69,10 +77,21 @@ const TwoFAScreen = () => {
     try {
       setSecretKey();
 
+      const deviceId = await DeviceInfo.getUniqueId();
+      const deviceName = await DeviceInfo.getDeviceName();
+      const deviceModel = DeviceInfo.getModel();
+      const deviceBrand = DeviceInfo.getBrand();
+      const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
       const response = await api_Login.verify2faLogin(
         twoFaToken,
         mode === 'totp' ? selectedCode : undefined,
         mode === 'backup' ? selectedCode : undefined,
+        deviceId,
+        deviceName,
+        deviceModel,
+        deviceBrand,
+        deviceTimezone
       );
 
       if (!response.ok) {
@@ -133,7 +152,7 @@ const TwoFAScreen = () => {
           borderTopLeftRadius: 999,
           borderBottomLeftRadius: 999,
           borderWidth: 1,
-          borderColor: mode === 'totp' ? '#111827' : 'rgba(148,163,184,1)',
+          borderColor: mode === 'totp' ? 'rgba(148,163,184,1)' : 'rgba(148,163,184,1)',
           backgroundColor:
             mode === 'totp' ? '#111827' : 'rgba(148,163,184,0.15)',
         }}
@@ -157,7 +176,7 @@ const TwoFAScreen = () => {
           borderBottomRightRadius: 999,
           borderWidth: 1,
           borderLeftWidth: 0,
-          borderColor: mode === 'backup' ? '#111827' : 'rgba(148,163,184,1)',
+          borderColor: mode === 'backup' ? 'rgba(148,163,184,1)' : 'rgba(148,163,184,1)',
           backgroundColor:
             mode === 'backup' ? '#111827' : 'rgba(148,163,184,0.15)',
         }}
@@ -200,28 +219,55 @@ const TwoFAScreen = () => {
               {renderModeToggle()}
 
               {mode === 'totp' ? (
-                <>
-                  <TextInput
-                    label="6-digit 2FA code"
-                    placeholder="6-digit 2FA code"
+                // ⚡ ADDED: Visual 6-Block OTP Input for 2FA
+                <View style={otpStyles.otpContainer}>
+                  <RNTextInput
+                    ref={inputRef}
                     value={code}
-                    onChangeText={setCode}
-                    style={styles.input}
-                    mode="flat"
-                    underlineColor="transparent"
-                    activeUnderlineColor="transparent"
-                    keyboardType="numeric"
-                    maxLength={6}
-                    textColor="black"
-                    placeholderTextColor="grey"
-                    cursorColor='black'
+                    onChangeText={(text) => {
+                      // Only allow numbers
+                      const numericValue = text.replace(/[^0-9]/g, '');
+                      setCode(numericValue);
+                      if (numericValue.length === OTP_LENGTH) {
+                        Keyboard.dismiss();
+                      }
+                    }}
+                    maxLength={OTP_LENGTH}
+                    keyboardType="number-pad"
+                    textContentType="oneTimeCode" // iOS Autofill
+                    autoComplete="sms-otp"        // Android Autofill
+                    autoFocus={true}
+                    caretHidden={true}
+                    style={otpStyles.hiddenInput}
                   />
-                </>
+                  
+                  <View style={otpStyles.cellsWrapper} pointerEvents="none">
+                    {Array(OTP_LENGTH)
+                      .fill(0)
+                      .map((_, index) => {
+                        const digit = code[index] || '';
+                        // Highlight the cell that is currently waiting for input
+                        const isCurrentCell = index === code.length;
+
+                        return (
+                          <View
+                            key={index}
+                            style={[
+                              otpStyles.cell,
+                              isCurrentCell && otpStyles.cellFocused,
+                              digit ? otpStyles.cellFilled : null
+                            ]}
+                          >
+                            <Text style={otpStyles.cellText}>{digit}</Text>
+                          </View>
+                        );
+                      })}
+                  </View>
+                </View>
               ) : (
                 <>
                   <TextInput
                     label="Backup Code"
-                    placeholder="Backup Code"
                     value={backupCode}
                     onChangeText={setBackupCode}
                     style={styles.passwordInput}
@@ -255,11 +301,11 @@ const TwoFAScreen = () => {
 
               <View style={{ marginTop: 8, alignItems: 'center' }}>
                 {mode === 'totp' ? (
-                  <Text style={{ color: 'black', fontSize: 12 }}>
+                  <Text style={{ color: '#cbd5e1', fontSize: 12 }}>
                     Lost access to your authenticator app? Switch to backup code above.
                   </Text>
                 ) : (
-                  <Text style={{ color: 'black', fontSize: 12 }}>
+                  <Text style={{ color: '#cbd5e1', fontSize: 12 }}>
                     Backup codes are one-time use. Keep them in a safe place.
                   </Text>
                 )}
@@ -277,5 +323,58 @@ const TwoFAScreen = () => {
     </>
   );
 };
+
+// ⚡ ADDED: Local styles for the 6-block input UI
+const otpStyles = StyleSheet.create({
+  otpContainer: {
+    width: '100%',
+    height: 60,
+    marginVertical: 16,
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  hiddenInput: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0,
+    zIndex: 999, // Ensures tapping anywhere on the blocks pulls up the keyboard
+  },
+  cellsWrapper: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    height: '100%',
+  },
+  cell: {
+    width: 48,
+    height: 58,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cellFocused: {
+    borderColor: '#6366f1', // StreakSphere primary indigo
+    borderWidth: 2,
+    backgroundColor: '#ffffff',
+    shadowColor: '#6366f1',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  cellFilled: {
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1',
+  },
+  cellText: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+});
 
 export default TwoFAScreen;

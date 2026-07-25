@@ -244,12 +244,12 @@ if (data.type === 'chat' && data.peerUserId) {
     checkInitialNotification();
   }, []);
 
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      SystemNavigationBar.navigationHide();
-      SystemNavigationBar.stickyImmersive();
-    }
-  }, []);
+  // useEffect(() => {
+  //   if (Platform.OS === 'android') {
+  //     SystemNavigationBar.navigationHide();
+  //     SystemNavigationBar.stickyImmersive();
+  //   }
+  // }, []);
 
   enableScreens(true);
 
