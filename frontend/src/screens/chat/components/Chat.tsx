@@ -1,21 +1,32 @@
-import React, { useEffect, useState, useCallback, useContext } from "react";
-import { View, FlatList, TouchableOpacity, StyleSheet, TextInput, Image, ActivityIndicator } from "react-native";
+import React, { useEffect, useState, useCallback, useContext, useRef } from "react";
+import { 
+  View, 
+  FlatList, 
+  TouchableOpacity, 
+  StyleSheet, 
+  TextInput, 
+  ActivityIndicator,
+  Modal,
+  Animated
+} from "react-native";
 import { Text } from "@rneui/themed";
 import { useFocusEffect } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import NetInfo from "@react-native-community/netinfo";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Swipeable } from "react-native-gesture-handler";
+import FastImage from "react-native-fast-image";
 
 import { listConversationPreviews as listConversationPreviewsApi, fetchFriends } from "../services/api_chat";
-
 import MainLayout from "../../../shared/components/MainLayout";
 import AuthContext from "../../../auth/user/UserContext";
+import { CallContext } from "../../call/context/CallContext"; 
 import { getUnread, subscribeUnreadChanges, subscribeConversationChanges } from "../services/ChatNotifications";
 import apiClient from "../../../auth/api-client/api_client";
-import FastImage from "react-native-fast-image";
 import { getAvatar } from "../../../storage/AvatarManager";
 
 const CACHE_KEY = "chat_list_cache";
+const HIDDEN_CHATS_KEY = "hidden_chats_cache";
 
 const formatLastTime = (iso?: string) => {
   if (!iso) return "";
@@ -58,21 +69,13 @@ const Avatar = ({ userId, url, avatarVersion }) => {
 
   useEffect(() => {
     let mounted = true;
-
     const load = async () => {
-      const img = await getAvatar(
-        userId,
-        url,
-        avatarVersion
-      );
-
+      const img = await getAvatar(userId, url, avatarVersion);
       if (mounted) {
         setLocalUri(img);
       }
     };
-
     load();
-
     return () => {
       mounted = false;
     };
@@ -87,21 +90,140 @@ const Avatar = ({ userId, url, avatarVersion }) => {
   );
 };
 
+// --- Sub-component for Swipeable Row ---
+const ChatRowItem = ({ item, navigation, onHideRequest, onCallRequest }) => {
+  const swipeRef = useRef(null);
+
+  // Swipe Left Action (Hide) -> Dragging Left (dragX is negative)
+  const renderRightActions = (progress, dragX) => {
+    const scale = dragX.interpolate({
+      inputRange: [-80, 0],
+      outputRange: [1, 0.6],
+      extrapolate: 'clamp',
+    });
+    const opacity = dragX.interpolate({
+      inputRange: [-80, -40, 0],
+      outputRange: [1, 0.5, 0],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <View style={styles.rightActionContainer}>
+        <Animated.View style={{ opacity, transform: [{ scale }], width: 88, alignItems: 'center' }}>
+          <Icon name="eye-off-outline" size={28} color="#fff" />
+          <Text style={styles.actionText}>Hide</Text>
+        </Animated.View>
+      </View>
+    );
+  };
+
+  // Swipe Right Action (Call) -> Dragging Right (dragX is positive)
+  const renderLeftActions = (progress, dragX) => {
+    const scale = dragX.interpolate({
+      inputRange: [0, 80],
+      outputRange: [0.6, 1],
+      extrapolate: 'clamp',
+    });
+    const opacity = dragX.interpolate({
+      inputRange: [0, 40, 80],
+      outputRange: [0, 0.5, 1],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <View style={styles.leftActionContainer}>
+        <Animated.View style={{ opacity, transform: [{ scale }], width: 88, alignItems: 'center' }}>
+          <Icon name="phone-outline" size={28} color="#fff" />
+          <Text style={styles.actionText}>Call</Text>
+        </Animated.View>
+      </View>
+    );
+  };
+
+  return (
+    <Swipeable 
+      ref={swipeRef} 
+      renderRightActions={renderRightActions} 
+      renderLeftActions={renderLeftActions}
+      leftThreshold={75} // The exact distance needed to trigger the call automatically
+      rightThreshold={75} // The exact distance needed to trigger hide automatically
+      onSwipeableLeftWillOpen={() => {
+        swipeRef.current?.close(); 
+        onCallRequest(item);       
+      }}
+      onSwipeableRightWillOpen={() => {
+        swipeRef.current?.close(); 
+        onHideRequest(item);       
+      }}
+    >
+      <TouchableOpacity
+        style={styles.row}
+        activeOpacity={1} // Keep at 1 to prevent flashing the background color on tap
+        onPress={() =>
+          navigation.navigate("chat", {
+            conversationId: item.conversationId,
+            peerUserId: item.peerUserId,
+            peerName: item.peerName,
+            peerMood: item.mood,
+            peerAvatarUrl: item.peerAvatarUrl,
+          })
+        }
+      >
+        <Avatar
+          userId={item.peerUserId}
+          url={item.peerAvatarUrl}
+          avatarVersion={item.avatarUpdatedAt}
+        />
+        <View style={styles.rowContent}>
+          <View style={styles.rowTop}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <Text style={styles.peer} numberOfLines={1}>
+                {item.peerName}
+                {item.tick === "verified" && (
+                  <Icon name="check-decagram" size={16} color="#3b82f6" style={{ marginLeft: 6, marginTop: 2 }} />
+                )}
+                {item.tick === "golden" && (
+                  <Icon name="check-decagram" size={16} color="#fbbf24" style={{ marginLeft: 6, marginTop: 2 }} />
+                )}
+              </Text>
+            </View>
+            <Text style={styles.time}>{formatLastTime(item.lastAt)}</Text>
+          </View>
+          <View style={styles.rowTop}>
+            <Text style={styles.snippet} numberOfLines={1}>
+              {item.lastText || "No messages yet"}
+            </Text>
+            {item.unread > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText} numberOfLines={1}>
+                  {item.unread > 99 ? "99+" : item.unread}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    </Swipeable>
+  );
+};
+
 export default function ChatListScreen({ navigation }: any) {
-  // State for context reload
   const [myUserId, setMyUserId] = useState("");
   const [userLoaded, setUserLoaded] = useState(false);
-
   const [search, setSearch] = useState("");
   const [rows, setRows] = useState<any[]>([]);
+  const [hiddenChats, setHiddenChats] = useState<{ [key: string]: string }>({});
+  
   const [offline, setOffline] = useState(false);
   const [version, setVersion] = useState(0);
   const [loadingCache, setLoadingCache] = useState(true);
   const [loadingApi, setLoadingApi] = useState(false);
 
-  const user = useContext(AuthContext);
+  const [deleteCandidate, setDeleteCandidate] = useState<any>(null);
 
-  // Track user id from context more robustly
+  const user = useContext(AuthContext);
+  const callContext = useContext(CallContext); 
+
   useEffect(() => {
     let resolvedId = "";
     if (user?.User?.user?.id) resolvedId = String(user?.User?.user?.id);
@@ -110,20 +232,31 @@ export default function ChatListScreen({ navigation }: any) {
     setUserLoaded(!!resolvedId);
   }, [user]);
 
-  // Load cache immediately when userId is set
+  const loadHiddenChatsState = async (userId: string) => {
+    try {
+      const raw = await AsyncStorage.getItem(`${HIDDEN_CHATS_KEY}:${userId}`);
+      if (raw) setHiddenChats(JSON.parse(raw));
+    } catch (e) {
+      console.log('Error loading hidden chats', e);
+    }
+  };
+
   useEffect(() => {
     if (!myUserId) {
       setLoadingCache(false);
       return;
     }
     setLoadingCache(true);
-    loadCache(myUserId).then((cached) => {
-      setRows(cached || []); // always set cached value (even empty)
+    
+    Promise.all([
+      loadCache(myUserId),
+      loadHiddenChatsState(myUserId)
+    ]).then(([cached]) => {
+      setRows(cached || []); 
       setLoadingCache(false);
     });
   }, [myUserId]);
 
-  // Online API fetch: only if userId available and not offline
   const loadOnline = useCallback(async () => {
     if (!myUserId || offline) return;
     setLoadingApi(true);
@@ -134,29 +267,18 @@ export default function ChatListScreen({ navigation }: any) {
         fetchFriends(),
       ]);
 
-      // Defensive: if either fails, throw
-      if (!convRes?.conversations || !Array.isArray(convRes.conversations)) {
-        throw new Error("Failed to load conversations");
-      }
-      if (!friendsRes?.data?.friends || !Array.isArray(friendsRes.data.friends)) {
-        throw new Error("Failed to load friends");
-      }
+      if (!convRes?.conversations || !Array.isArray(convRes.conversations)) throw new Error("Failed to load conversations");
+      if (!friendsRes?.data?.friends || !Array.isArray(friendsRes.data.friends)) throw new Error("Failed to load friends");
 
       const friends = friendsRes?.data?.friends || [];
-      const friendMap = new Map<
-        string,
-        { name: string; avatarUrl: string; avatarThumb: string; avatarPublicUrl: string; tick: string; avatarVersion: Date;}
-      >();
+      const friendMap = new Map();
 
       for (const f of friends) {
-        const id = String(f._id);
-        friendMap.set(id, {
+        friendMap.set(String(f._id), {
           name: String(f.name || f.username || "Friend"),
           avatarUrl: String(f.avatar || ""),
-          avatarThumb: String(f.avatarThumbnailUrl || ""),
-          avatarPublicUrl: String(f.avatar?.url || ""),
           avatarVersion: f.avatarVersion,
-           tick: f.tick || "none",
+          tick: f.tick || "none",
         });
       }
 
@@ -165,14 +287,12 @@ export default function ChatListScreen({ navigation }: any) {
         const peerId = String(c.peerUserId);
         const friend = friendMap.get(peerId);
 
-        const resolvedAvatar = friend?.avatarUrl || "";
-
         return {
           conversationId: String(c.conversationId),
           peerUserId: peerId,
           peerName: c.peerName || friend?.name || "Friend",
-          peerAvatarUrl: String(resolvedAvatar || ""),
-           avatarVersion: friend?.avatarVersion,
+          peerAvatarUrl: String(friend?.avatarUrl || ""),
+          avatarVersion: friend?.avatarVersion,
           mood: c.mood || "",
           lastText: c.lastText || "",
           lastAt: c.lastAt || "",
@@ -181,84 +301,91 @@ export default function ChatListScreen({ navigation }: any) {
         };
       });
 
-      mapped.sort(
-        (a: any, b: any) =>
-          new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime()
-      );
+      mapped.sort((a: any, b: any) => new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime());
 
-      // Only setRows and saveCache if mapped has results.
       if (mapped.length > 0) {
         setRows(mapped);
         await saveCache(myUserId, mapped);
-      } else {
-        // If API returns empty but cache exists, don't overwrite cache!
-        console.log('API returned empty list — cache not overwritten.');
       }
       setLoadingApi(false);
-
     } catch (e) {
       setLoadingApi(false);
-      console.log("load list error — using cache", e);
-      // DO NOT overwrite cache or setRows([])
     }
   }, [myUserId, offline]);
 
-  // Always track network status
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
       setOffline(!state.isConnected || state.isInternetReachable === false);
-      console.log('Network status changed:', state.isConnected, state.isInternetReachable);
     });
     return () => unsub();
   }, []);
 
-  // API fetch triggers on version change
   useEffect(() => {
     if (myUserId && !offline) loadOnline();
   }, [loadOnline, version, myUserId, offline]);
 
-  // Navigation focus: reload cache and try API fetch
-  useEffect(() => {
-    const unsub = navigation.addListener("focus", () => {
-      if (!myUserId) return;
-      loadCache(myUserId).then((cached) => {
-        setRows(cached || []); // always restore cache on focus
-        setLoadingCache(false);
-      });
-      loadOnline();
-      console.log('Navigation focus event triggered.');
-    });
-    return unsub;
-  }, [navigation, loadOnline, myUserId]);
-
-  // Every time screen gets focus (react navigation)
   useFocusEffect(
     useCallback(() => {
       if (!myUserId) return;
-      loadCache(myUserId).then((cached) => {
+      Promise.all([
+        loadCache(myUserId),
+        loadHiddenChatsState(myUserId)
+      ]).then(([cached]) => {
         setRows(cached || []);
         setLoadingCache(false);
-        console.log('Screen focus: Cache restored');
       });
-    }, [myUserId])
+      loadOnline();
+    }, [myUserId, loadOnline])
   );
 
-  // Subscribe changes: force refresh
   useEffect(() => {
     const a = subscribeConversationChanges(() => setVersion((v) => v + 1));
     const b = subscribeUnreadChanges(() => setVersion((v) => v + 1));
-    return () => {
-      a();
-      b();
-    };
+    return () => { a(); b(); };
   }, []);
 
-  // Filter for search
-  const filtered = rows.filter((r) =>
-    String(r.peerName || "").toLowerCase().includes(search.toLowerCase())
-  );
+  const visibleFilteredRows = rows.filter((r) => {
+    const matchesSearch = String(r.peerName || "").toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
 
-  // Loading UI
+    const hiddenTimestamp = hiddenChats[r.conversationId];
+    if (hiddenTimestamp) {
+      const isNewMessage = new Date(r.lastAt || 0).getTime() > new Date(hiddenTimestamp).getTime();
+      if (!isNewMessage) return false; 
+    }
+    return true;
+  });
+
+  const handleConfirmHide = async () => {
+    if (!deleteCandidate) return;
+    const hideTime = deleteCandidate.lastAt || new Date().toISOString();
+    const updatedHidden = { ...hiddenChats, [deleteCandidate.conversationId]: hideTime };
+    
+    setHiddenChats(updatedHidden);
+    await AsyncStorage.setItem(`${HIDDEN_CHATS_KEY}:${myUserId}`, JSON.stringify(updatedHidden));
+    setDeleteCandidate(null);
+  };
+
+  const handleCancelHide = () => setDeleteCandidate(null);
+
+  const handleCallRequest = (item: any) => {
+    if (offline) {
+      alert("You are offline. Connect to the internet to call.");
+      return;
+    }
+    
+    if (callContext) {
+      callContext.startCall(
+        {
+          id: String(item.peerUserId),
+          name: item.peerName || "Friend",
+          avatar: newUrl + String(item.peerAvatarUrl || ""),
+        }, 
+        item.conversationId
+      );
+    }
+  };
+
   if (!userLoaded || loadingCache) {
     return (
       <MainLayout>
@@ -301,85 +428,62 @@ export default function ChatListScreen({ navigation }: any) {
             />
           </View>
 
-          {(loadingApi && !filtered.length) ? (
+          {(loadingApi && !visibleFilteredRows.length) ? (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
               <ActivityIndicator color="#6366f1" size="large" />
               <Text style={{ color: "#fff", marginTop: 12 }}>Fetching latest chats...</Text>
             </View>
           ) :
           <FlatList
-            data={filtered}
+            data={visibleFilteredRows}
             keyExtractor={(item) => `${item.conversationId}:${item.peerUserId}`}
             keyboardShouldPersistTaps="handled"
-         renderItem={({ item }) => (
-  <TouchableOpacity
-    style={styles.row}
-    onPress={() =>
-      navigation.navigate("chat", {
-        conversationId: item.conversationId,
-        peerUserId: item.peerUserId,
-        peerName: item.peerName,
-        peerMood: item.mood,
-        peerAvatarUrl: item.peerAvatarUrl,
-      })
-    }
-  >
- <Avatar
-  userId={item.peerUserId}
-  url={item.peerAvatarUrl}
-  avatarVersion={item.avatarUpdatedAt}
-/>
-    <View style={styles.rowContent}>
-      <View style={styles.rowTop}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <Text style={styles.peer} numberOfLines={1}>
-            {item.peerName}
-          
-          {item.tick === "verified" && (
-            <Icon
-              name="check-decagram"
-              size={16}
-              color="#3b82f6"
-              style={{ marginLeft: 6, marginTop: 2 }}
-            />
-          )}
-          {item.tick === "golden" && (
-            <Icon
-              name="check-decagram"
-              size={16}
-              color="#fbbf24"
-              style={{ marginLeft: 6, marginTop: 2 }}
-            />
-          )}
-          </Text>
-        </View>
-        <Text style={styles.time}>{formatLastTime(item.lastAt)}</Text>
-      </View>
-
-      <View style={styles.rowTop}>
-        <Text style={styles.snippet} numberOfLines={1}>
-          {item.lastText || "No messages yet"}
-        </Text>
-        {item.unread > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText} numberOfLines={1}>
-              {item.unread > 99 ? "99+" : item.unread}
-            </Text>
-          </View>
-        )}
-      </View>
-    </View>
-  </TouchableOpacity>
-)}
+            renderItem={({ item }) => (
+              <ChatRowItem 
+                item={item} 
+                navigation={navigation} 
+                onHideRequest={setDeleteCandidate} 
+                onCallRequest={handleCallRequest}
+              />
+            )}
             ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
           />}
         </View>
+
+        <Modal
+          visible={!!deleteCandidate}
+          transparent
+          animationType="fade"
+          onRequestClose={handleCancelHide}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.glassCard}>
+              <View style={styles.glassIconWrapper}>
+                <Icon name="eye-off-outline" size={32} color="#a855f7" />
+              </View>
+              <Text style={styles.modalTitle}>Hide Chat?</Text>
+              <Text style={styles.modalSubtitle}>
+                {deleteCandidate?.peerName} will be hidden from your list until a new message is sent or received.
+              </Text>
+              
+              <View style={styles.modalActions}>
+                <TouchableOpacity style={styles.modalBtnCancel} onPress={handleCancelHide}>
+                  <Text style={styles.modalBtnCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.modalBtnConfirm} onPress={handleConfirmHide}>
+                  <Text style={styles.modalBtnConfirmText}>Hide</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
       </View>
     </MainLayout>
   );
 }
 
-// Styles (same as yours)
+// Styles
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0f172a", padding: 12 },
   baseBackground: { ...StyleSheet.absoluteFill, backgroundColor: "#020617" },
@@ -403,13 +507,38 @@ const styles = StyleSheet.create({
   },
 
   row: {
-    backgroundColor: "rgba(255,255,255,0.05)",
+    // Exact solid hex approximation of rgba(255,255,255,0.05) over #0f172a
+    // This stops the full-width backgrounds beneath from bleeding through.
+    backgroundColor: "#0f172a", 
     borderRadius: 12,
     padding: 12,
     flexDirection: "row",
     alignItems: "center",
   },
   rowContent: { flex: 1, marginLeft: 10 },
+
+  // --- Full Width Expanding Backgrounds ---
+  leftActionContainer: {
+    width: "100%", // Fills the row
+    backgroundColor: "#22c55e",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    borderRadius: 12,
+  },
+  rightActionContainer: {
+    width: "100%", // Fills the row
+    backgroundColor: "#ef4444",
+    justifyContent: "center",
+    alignItems: "flex-end",
+    borderRadius: 12,
+  },
+
+  actionText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "bold",
+    marginTop: 4,
+  },
 
   avatar: {
     width: 50,
@@ -445,9 +574,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: { color: "#fff", fontSize: 20, fontWeight: "800" },
-  netStatus: { fontSize: 12, marginTop: 2 },
-  netOnline: { color: "#22c55e" },
-  netOffline: { color: "#f97316" },
   iconBtn: {
     width: 36,
     height: 36,
@@ -468,7 +594,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, color: "#fff", paddingVertical: 8, marginLeft: 6 },
 
-  peer: { color: "#fff", fontSize: 16, fontWeight: "700", flex: 1, marginRight: 8  },
+  peer: { color: "#fff", fontSize: 16, fontWeight: "700", flex: 1, marginRight: 8 },
   snippet: { color: "#94a3b8", marginTop: 4, flex: 1, marginRight: 8 },
   badge: {
     marginLeft: 8,
@@ -486,5 +612,90 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
     includeFontPadding: false,
+  },
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  glassCard: {
+    width: "100%",
+    maxWidth: 320,
+    backgroundColor: "rgba(30, 41, 59, 0.75)",
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.15)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  glassIconWrapper: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(168, 85, 247, 0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(168, 85, 247, 0.3)",
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "800",
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    color: "#94a3b8",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: "row",
+    width: "100%",
+    justifyContent: "space-between",
+  },
+  modalBtnCancel: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    marginRight: 8,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  modalBtnCancelText: {
+    color: "#cbd5e1",
+    fontWeight: "700",
+    fontSize: 15,
+  },
+  modalBtnConfirm: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#ef4444",
+    marginLeft: 8,
+    alignItems: "center",
+    shadowColor: "#ef4444",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  modalBtnConfirmText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
   },
 });

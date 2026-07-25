@@ -44,9 +44,7 @@ const normalizeMessageBody = (body) => {
         size: Number(media.size || 0),
         name: String(media.name || ""),
         thumbnailUrl: String(media.thumbnailUrl || ""),
-        // FIX: was `media.duration` (frontend never sends that key) -> now reads `durationMs`
         durationMs: Number(media.durationMs || 0),
-        // FIX: peaks were dropped before saving; now passed through
         peaks: Array.isArray(media.peaks) ? media.peaks.map(Number) : [],
       }
     : null;
@@ -99,7 +97,6 @@ const saveOneFile = async (file, durationMs, peaks) => {
     size: Number(file.size || 0),
     name: String(file.originalname || fileName),
     thumbnailUrl: "",
-    // FIX: was always 0 (`duration: 0` hardcoded) -> now uses uploaded durationMs/peaks
     durationMs: Number(durationMs || 0),
     peaks: Array.isArray(peaks) ? peaks.map(Number) : [],
     messageType: detectMessageTypeFromMime(String(file.mimetype || "")),
@@ -126,7 +123,6 @@ export const uploadChatMedia = async (req, res) => {
       }
     }
 
-    // FIX: durationMs/peaks were sent by frontend (form fields) but never read on this route
     const durationMs = Number(req.body?.durationMs || 0);
     let peaks = [];
     if (req.body?.peaks) {
@@ -308,14 +304,12 @@ export const getThread = async (req, res) => {
     const q = { conversationId: convoObj, deletedForEveryone: { $ne: true } };
     if (beforeRaw) q.createdAt = { $lt: new Date(String(beforeRaw)) };
 
-    // ⚡ CRITICAL FIX: Sort by -1 to get the NEWEST messages, then limit
     const messages = await ChatMessage.find(q)
       .populate("replyTo", "text messageType media senderId")
       .sort({ createdAt: -1 }) 
       .limit(limit)
       .lean();
       
-    // ⚡ Reverse the array so the frontend receives them oldest-to-newest
     res.json({ messages: messages.reverse() });
   } catch (err) {
     console.error("[chat] getThread error", err);
@@ -334,12 +328,13 @@ export const markDelivered = async (req, res) => {
 
     const ids = messageIds.map((id) => toObjectId(id)).filter(Boolean);
 
+    // ⚡ FIX 1: Fetch clientMessageId so the frontend knows exactly which local message to double-tick
     const msgs = await ChatMessage.find({
       _id: { $in: ids },
       receiverId: me,
       deliveredAt: null,
     })
-      .select("_id senderId receiverId conversationId")
+      .select("_id senderId receiverId conversationId clientMessageId") 
       .lean();
 
     if (!msgs.length) {
@@ -364,11 +359,20 @@ export const markDelivered = async (req, res) => {
       await sendDeliveredNotification(senderId, me, deliveredMsgIds);
     }
 
+    // ⚡ FIX 2: Emit the payload with exact matching IDs to both the convo room AND the sender's direct room
     for (const msg of msgs) {
-      req.io.to(`conversation:${msg.conversationId}`).emit("msg-delivered", {
+      const payload = {
         msgId: String(msg._id),
+        clientMessageId: msg.clientMessageId || null,
         userId: String(me),
-      });
+        conversationId: String(msg.conversationId)
+      };
+
+      // Emit to conversation
+      req.io.to(`conversation:${msg.conversationId}`).emit("msg-delivered", payload);
+      
+      // GUARANTEE emit directly to sender
+      req.io.to(String(msg.senderId)).emit("msg-delivered", payload);
     }
 
     res.json({ success: true, count: msgIdsToUpdate.length });
@@ -413,10 +417,15 @@ export const markSeen = async (req, res) => {
       await sendSeenNotification(peerObj, me);
     }
 
-    req.io.to(`conversation:${conversationId}`).emit("msg-seen", {
+    // ⚡ FIX: Emit to both convo room AND sender directly
+    const payload = {
       msgId: lastSeenMessageId,
       userId: String(me),
-    });
+      conversationId: String(conversationId)
+    };
+
+    req.io.to(`conversation:${conversationId}`).emit("msg-seen", payload);
+    req.io.to(String(peerObj)).emit("msg-seen", payload);
 
     res.json({ success: true, count: changed });
   } catch (err) {
@@ -456,7 +465,6 @@ export const listConversationPreviews = async (req, res) => {
         if (last.messageType === "image") lastText = "📷 Photo";
         else if (last.messageType === "video") lastText = "🎥 Video";
         else if (last.messageType === "document") lastText = "📎 Document";
-        // FIX: voice/audio fell through to `last.text` (empty string) -> preview was blank.
         else if (last.messageType === "voice" || last.messageType === "audio") lastText = "🎤 Voice message";
         else lastText = last.text || "";
       }
@@ -487,7 +495,7 @@ export const markDeliveredAll = async (req, res) => {
       receiverId: me,
       deliveredAt: null,
     })
-      .select("_id senderId conversationId")
+      .select("_id senderId conversationId clientMessageId") // ⚡ FIX 1: Add clientMessageId
       .lean();
 
     if (!pending.length) return res.json({ success: true, count: 0 });
@@ -499,11 +507,17 @@ export const markDeliveredAll = async (req, res) => {
       { $set: { deliveredAt: new Date() } }
     );
 
+    // ⚡ FIX 2: Emit to both convo room AND direct sender room
     for (const msg of pending) {
-      req.io.to(`conversation:${msg.conversationId}`).emit("msg-delivered", {
+      const payload = {
         msgId: String(msg._id),
+        clientMessageId: msg.clientMessageId || null,
         userId: String(me),
-      });
+        conversationId: String(msg.conversationId)
+      };
+
+      req.io.to(`conversation:${msg.conversationId}`).emit("msg-delivered", payload);
+      req.io.to(String(msg.senderId)).emit("msg-delivered", payload);
     }
 
     const bySender = new Map();

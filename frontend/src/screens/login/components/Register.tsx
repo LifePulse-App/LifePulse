@@ -295,10 +295,10 @@ const Register = ({ navigation }: any) => {
               )}
 
 <View style={{ marginTop: 2, alignItems: 'center' }}>
-  <Text style={{ color: '#000' }}>
+  <Text style={{ color: '#cbd5e1' }}>
     Already have an account?{' '}
     <Text
-      style={{ fontWeight: '700', textDecorationLine: 'underline', color: '#fff' }}
+      style={{ fontWeight: '700', color: '#fff' }}
       onPress={() => navigation.navigate('Login')}
     >
       Login

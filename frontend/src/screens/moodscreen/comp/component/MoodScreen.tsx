@@ -6,6 +6,7 @@ import {
   StyleSheet,
   StatusBar,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
@@ -100,19 +101,14 @@ const MoodScreen = ({ navigation, route }) => {
     setErrorMessage(null);
   };
 
-  const handleSelectMood = (moodId) => {
+const handleSelectAndSaveMood = async (moodId) => {
+    if (submitting) return; 
+    
     setSelectedMoodId(moodId);
-  };
-
-  const handleSubmit = async () => {
-    if (!selectedMoodId) {
-      showError("Please pick how you feel right now.");
-      return;
-    }
+    setSubmitting(true);
 
     try {
-      setSubmitting(true);
-      const res = await MoodService.logMood(selectedMoodId);
+      const res = await MoodService.logMood(moodId);
 
       if (!res.data?.success) {
         showError(res.data?.message || "Failed to save mood");
@@ -120,8 +116,18 @@ const MoodScreen = ({ navigation, route }) => {
         return;
       }
 
-      // On success go back – dashboard will refetch and show latest mood
-      navigation.goBack?.();
+      // 1. Give the UI thread 150ms to breathe before navigating so the slide animation plays smoothly
+      setTimeout(() => {
+        navigation.goBack?.();
+        
+        // 2. Reset the submitting state AFTER the sliding animation has finished (approx 500ms)
+        // so the screen doesn't freeze if reopened later.
+        setTimeout(() => {
+          setSubmitting(false);
+        }, 500);
+        
+      }, 150);
+
     } catch (err) {
       console.log("Mood save error:", err);
       const msg =
@@ -129,9 +135,10 @@ const MoodScreen = ({ navigation, route }) => {
         err?.message ||
         "Failed to save mood";
       showError(msg);
-    } finally {
       setSubmitting(false);
-    }
+    } 
+    // Notice: The `finally` block is removed because we are handling 
+    // the state reset manually inside the timeouts above.
   };
 
   return (
@@ -156,6 +163,7 @@ const MoodScreen = ({ navigation, route }) => {
                 activeOpacity={0.8}
                 style={styles.iconGlass}
                 onPress={() => navigation.goBack?.()}
+                disabled={submitting}
               >
                 <Icon name="arrow-left" size={22} color="#E5E7EB" />
               </TouchableOpacity>
@@ -197,14 +205,19 @@ const MoodScreen = ({ navigation, route }) => {
                             styles.moodItem,
                             isSelected && styles.moodItemSelected,
                           ]}
-                          onPress={() => handleSelectMood(mood.id)}
+                          onPress={() => handleSelectAndSaveMood(mood.id)}
+                          disabled={submitting}
                         >
                           <View style={styles.moodIconWrap}>
-                            <Icon
-                              name={mood.icon}
-                              size={24}
-                              color={isSelected ? "#F9FAFB" : "#C4B5FD"}
-                            />
+                            {submitting && isSelected ? (
+                              <ActivityIndicator size="small" color="#F9FAFB" />
+                            ) : (
+                              <Icon
+                                name={mood.icon}
+                                size={24}
+                                color={isSelected ? "#F9FAFB" : "#C4B5FD"}
+                              />
+                            )}
                           </View>
                           <Text
                             style={[
@@ -212,7 +225,7 @@ const MoodScreen = ({ navigation, route }) => {
                               isSelected && styles.moodLabelSelected,
                             ]}
                           >
-                            {mood.label}
+                            {submitting && isSelected ? "Saving..." : mood.label}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -221,30 +234,8 @@ const MoodScreen = ({ navigation, route }) => {
                 </View>
               ))}
 
-              {/* Spacer so last card isn't hidden behind floating button */}
-              <View style={{ height: 80 }} />
+              <View style={{ height: 20 }} />
             </ScrollView>
-
-            {/* Floating Save button */}
-            <TouchableOpacity
-              activeOpacity={0.9}
-              style={[
-                styles.glassButton,
-                (!selectedMoodId || submitting) && { opacity: 0.7 },
-              ]}
-              onPress={submitting ? undefined : handleSubmit}
-            >
-              <View style={styles.glassButtonInner}>
-                <Icon
-                  name={submitting ? "loading" : "check-circle-outline"}
-                  size={22}
-                  color="#F9FAFB"
-                />
-                <Text style={styles.glassButtonText}>
-                  {submitting ? "Saving..." : "Save mood"}
-                </Text>
-              </View>
-            </TouchableOpacity>
           </View>
         </AppScreen>
       </MainLayout>
@@ -312,11 +303,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 0,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 20,
-    elevation: 6,
   },
   topTitle: {
     color: "#E5E7EB",
@@ -341,11 +327,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: GLASS_BORDER,
     marginBottom: 18,
-    shadowColor: "#000",
-    shadowOpacity: 0.35,
-    shadowOffset: { width: 0, height: 14 },
-    shadowRadius: 24,
-    elevation: 8,
   },
   cardHeaderRow: {
     flexDirection: "row",
@@ -382,14 +363,11 @@ const styles = StyleSheet.create({
   moodItemSelected: {
     backgroundColor: "rgba(59, 130, 246, 0.95)",
     borderColor: "rgba(191, 219, 254, 0.9)",
-    shadowColor: "#60A5FA",
-    shadowOpacity: 0.5,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 20,
-    elevation: 8,
   },
   moodIconWrap: {
     marginBottom: 6,
+    height: 24, 
+    justifyContent: "center",
   },
   moodLabel: {
     fontSize: 11,
@@ -399,34 +377,6 @@ const styles = StyleSheet.create({
   moodLabelSelected: {
     color: "#F9FAFB",
     fontWeight: "700",
-  },
-  glassButton: {
-    position: "absolute",
-    left: 20,
-    right: 20,
-    bottom: Platform.OS === "android" ? 24 : 34,
-    borderRadius: 999,
-    overflow: "hidden",
-    backgroundColor: "rgba(30, 64, 175, 0.85)",
-    borderWidth: 1,
-    borderColor: "rgba(191, 219, 254, 0.7)",
-    shadowColor: "#60A5FA",
-    shadowOpacity: 0.6,
-    shadowOffset: { width: 0, height: 12 },
-    shadowRadius: 24,
-    elevation: 10,
-  },
-  glassButtonInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 14,
-  },
-  glassButtonText: {
-    color: "#F9FAFB",
-    fontWeight: "700",
-    fontSize: 15,
-    marginLeft: 8,
   },
 });
 

@@ -241,9 +241,6 @@ import { CallComingScreen } from '../../screens/call/components/CallComingScreen
   const AuthNavigator = () => {
     const [initialRoute, setInitialRoute] = useState<'Login' | 'AppTabs' | 'Drawer' | 'SavedAccounts' | null>(null);
     const authContext = useContext(AuthContext);
-const isIOS26Plus =
-  Platform.OS === 'ios' &&
-  parseInt(Platform.Version, 10) >= 26;
 
   
 
@@ -258,6 +255,10 @@ const isIOS26Plus =
             const storedUser: UserLoginResponse = JSON.parse(creds.username);
             const accessToken =
               (await UserStorage.getAccessToken()) || storedUser.accessToken;
+
+              const isIOS26Plus =
+  Platform.OS === 'ios' &&
+  parseInt(Platform.Version, 10) >= 26;
     
             if (accessToken && isIOS26Plus) {
               await setAuthHeaders(accessToken);

@@ -21,7 +21,6 @@ import AuthContext from "../../../auth/user/UserContext";
 import { UserProfile, FollowRequest } from "../models/FriendModel";
 import apiClient from "../../../auth/api-client/api_client";
 
-// ⚡ IMPORT AVATAR MANAGER
 import { getAvatar } from "../../../storage/AvatarManager";
 
 const GLASS_BG = "rgba(15, 23, 42, 0.65)";
@@ -78,7 +77,8 @@ const GlassConfirmModal = ({
 
 const Friends = ({ navigation }: any) => {
   const authContext = useContext(AuthContext);
-  const currentUserId = authContext?.User?.user?.id;
+  // ⚡ FIX 1: Safely extract ID (checks both _id and id) to prevent Cache overlap when switching accounts
+  const currentUserId = authContext?.User?.user?._id || authContext?.User?.user?.id;
 
   const [search, setSearch] = useState("");
   const [suggestions, setSuggestions] = useState<UserProfile[]>([]);
@@ -88,15 +88,9 @@ const Friends = ({ navigation }: any) => {
   const [loadingActions, setLoadingActions] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [showRemoveModal, setShowRemoveModal] = useState<{ user: UserProfile | null } | null>(null);
-  
-  // ⚡ ADDED: Avatar Map to hold local file URIs
   const [avatarMap, setAvatarMap] = useState<Record<string, string | null>>({});
 
   const isSearching = search.trim().length > 0;
-
-  const baseUrl = apiClient.getBaseURL();
-  const newUrl = baseUrl.replace(/\/api\/?$/, "");
-
   const offlineRef = useRef(false);
   const [offline, setOffline] = useState(false);
 
@@ -166,53 +160,8 @@ const Friends = ({ navigation }: any) => {
     })();
   }, [cacheKeys]);
 
-  const fetchSuggestions = useCallback(async () => {
-    if (offlineRef.current) return;
-
-    try {
-      const res = await socialApi.getSuggestedUsers(5);
-      const data = (res?.data?.suggestions ?? []).filter((u: any) => u?._id);
-
-      if (!data || data.length === 0) return;
-
-      setSuggestions(data);
-      await saveCache(cacheKeys.suggestions, data);
-    } catch (e) {
-      console.log("[FRIENDS] fetchSuggestions error:", e);
-    }
-  }, [cacheKeys]);
-
-  const fetchSearch = useCallback(async () => {
-    const key = cacheKeys.search(search);
-
-    const cached = await loadCache<UserProfile[]>(key);
-    if (cached) setAllUsers(cached);
-
-    if (offlineRef.current) {
-      if (!cached) setAllUsers([]);
-      return;
-    }
-
-    try {
-      const res = await socialApi.searchUsers(`q=${encodeURIComponent(search)}`);
-      const data = (res?.data?.user ?? []).filter((u: any) => u?._id);
-
-      if (!data || data.length === 0) {
-        if (!cached) setAllUsers([]);
-        return;
-      }
-
-      setAllUsers(data);
-      await saveCache(key, data);
-    } catch (e) {
-      console.log("[FRIENDS] fetchSearch error:", e);
-      if (!cached) setAllUsers([]);
-    }
-  }, [search, cacheKeys]); 
-
   const fetchRequests = useCallback(async () => {
     if (offlineRef.current) return;
-
     try {
       const res = await socialApi.getPendingFriendRequests();
       const cleaned = (res?.data?.requests ?? [])
@@ -236,14 +185,45 @@ const Friends = ({ navigation }: any) => {
         })
         .filter((r: any) => r?.user?._id);
 
-      if (cleaned.length > 0) {
-        setFriendRequests(cleaned);
-        await saveCache(cacheKeys.friendRequests, cleaned);
-      }
+      setFriendRequests(cleaned);
+      await saveCache(cacheKeys.friendRequests, cleaned);
     } catch (e) {
       console.log("[FRIENDS] fetchRequests error:", e);
     }
   }, [cacheKeys]);
+
+  const fetchSuggestions = useCallback(async () => {
+    if (offlineRef.current) return;
+    try {
+      const res = await socialApi.getSuggestedUsers(5);
+      const data = (res?.data?.suggestions ?? []).filter((u: any) => u?._id);
+      setSuggestions(data);
+      await saveCache(cacheKeys.suggestions, data);
+    } catch (e) {
+      console.log("[FRIENDS] fetchSuggestions error:", e);
+    }
+  }, [cacheKeys]);
+
+  const fetchSearch = useCallback(async () => {
+    const key = cacheKeys.search(search);
+    const cached = await loadCache<UserProfile[]>(key);
+    if (cached) setAllUsers(cached);
+
+    if (offlineRef.current) {
+      if (!cached) setAllUsers([]);
+      return;
+    }
+
+    try {
+      const res = await socialApi.searchUsers(`q=${encodeURIComponent(search)}`);
+      const data = (res?.data?.user ?? []).filter((u: any) => u?._id);
+      setAllUsers(data);
+      await saveCache(key, data);
+    } catch (e) {
+      console.log("[FRIENDS] fetchSearch error:", e);
+      if (!cached) setAllUsers([]);
+    }
+  }, [search, cacheKeys]);
 
   useEffect(() => {
     fetchSuggestions();
@@ -258,21 +238,16 @@ const Friends = ({ navigation }: any) => {
     }
   }, [search, isSearching, fetchSearch]);
 
-  // ⚡ ADDED: Preload Avatars Logic
   useEffect(() => {
     let isMounted = true;
-
     const preloadAvatars = async () => {
-      // Combine all currently visible users
       const combined = [
         ...suggestions,
         ...allUsers,
         ...friendRequests.map((r) => r.user),
       ].filter((u) => u && u._id);
 
-      // Deduplicate by ID
       const uniqueUsers = Array.from(new Map(combined.map((item) => [item._id, item])).values());
-
       const entries = await Promise.all(
         uniqueUsers.map(async (u: any) => {
           const raw =
@@ -280,25 +255,18 @@ const Friends = ({ navigation }: any) => {
             u.avatarUrl ||
             (typeof u.avatar === "string" ? u.avatar : u.avatar?.url) ||
             "";
-
           const local = await getAvatar(u._id, raw);
           return [u._id, local];
         })
       );
-
       if (!isMounted) return;
-
-      const map = Object.fromEntries(entries);
-      setAvatarMap(map);
+      setAvatarMap(Object.fromEntries(entries));
     };
 
     if (suggestions.length || allUsers.length || friendRequests.length) {
       preloadAvatars();
     }
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [suggestions, allUsers, friendRequests]);
 
   const searchResults = useMemo(() => (isSearching ? allUsers : []), [allUsers, isSearching]);
@@ -377,7 +345,6 @@ const Friends = ({ navigation }: any) => {
     const user = isRequest ? (item as FollowRequest).user : (item as UserProfile);
     if (!user || !user._id) return null;
 
-    // ⚡ ADDED: Fetch the resolved local URI from our map
     const uri = avatarMap[user._id];
 
     return (
@@ -388,13 +355,8 @@ const Friends = ({ navigation }: any) => {
           onPress={() => openProfilePreview(user)}
         >
           <View style={styles.avatar}>
-            {/* ⚡ UPDATED: Uses standard Image tag and the local URI */}
             {uri ? (
-              <Image
-                source={{ uri }}
-                style={{ width: 40, height: 40, borderRadius: 999 }}
-                resizeMode="cover"
-              />
+              <Image source={{ uri }} style={{ width: 40, height: 40, borderRadius: 999 }} resizeMode="cover" />
             ) : (
               <Icon name="account" size={20} color="#E5E7EB" />
             )}
@@ -424,10 +386,7 @@ const Friends = ({ navigation }: any) => {
               activeOpacity={0.7}
               style={[
                 styles.addBtn,
-                {
-                  backgroundColor: loadingActions === user._id ? "#d1d5db" : "#22C55E",
-                  marginRight: 6,
-                },
+                { backgroundColor: loadingActions === user._id ? "#d1d5db" : "#22C55E", marginRight: 6 },
               ]}
               onPress={() => handleAcceptRequest(item as FollowRequest)}
               disabled={loadingActions === user._id}
@@ -442,9 +401,7 @@ const Friends = ({ navigation }: any) => {
               activeOpacity={0.7}
               style={[
                 styles.addBtn,
-                {
-                  backgroundColor: loadingActions === user._id ? "#d1d5db" : "#EF4444",
-                },
+                { backgroundColor: loadingActions === user._id ? "#d1d5db" : "#EF4444" },
               ]}
               onPress={() => handleRejectRequest(item as FollowRequest)}
               disabled={loadingActions === user._id}
@@ -459,15 +416,23 @@ const Friends = ({ navigation }: any) => {
           <TouchableOpacity
             style={[styles.addBtn, { backgroundColor: "#6366f1" }]}
             activeOpacity={0.85}
-            onPress={() =>
-              setNotification({
-                type: "success",
-                message: `Open chat with ${user.name || user.username}`,
-              })
-            }
+            onPress={() => setNotification({ type: "success", message: `Open chat with ${user.name || user.username}` })}
           >
             <Icon name="chat" size={18} color="#F9FAFB" />
             <Text style={styles.addBtnText}>Chat</Text>
+          </TouchableOpacity>
+        ) : user.requestIncoming ? (
+          // ⚡ FIX 2: SWAPPED PRIORITY. Incoming requests MUST be evaluated BEFORE Sent requests.
+          <TouchableOpacity
+            style={[styles.addBtn, { backgroundColor: "#22C55E" }]}
+            activeOpacity={0.85}
+            onPress={() => handleAcceptRequest({ user: user as any, requestedAt: new Date().toISOString() } as FollowRequest)}
+            disabled={loadingActions === user._id}
+          >
+            <Icon name="account-arrow-left" size={18} color="#F9FAFB" />
+            <Text style={styles.addBtnText}>
+              {loadingActions === user._id ? "..." : "Accept"}
+            </Text>
           </TouchableOpacity>
         ) : user.requestSent ? (
           <TouchableOpacity
@@ -479,23 +444,6 @@ const Friends = ({ navigation }: any) => {
             <Icon name="check" size={18} color="#F9FAFB" />
             <Text style={styles.addBtnText}>
               {loadingActions === user._id ? "..." : "Added"}
-            </Text>
-          </TouchableOpacity>
-        ) : user.requestIncoming ? (
-          <TouchableOpacity
-            style={[styles.addBtn, { backgroundColor: "#22C55E" }]}
-            activeOpacity={0.85}
-            onPress={() =>
-              handleAcceptRequest({
-                user: user as any,
-                requestedAt: new Date().toISOString(),
-              } as FollowRequest)
-            }
-            disabled={loadingActions === user._id}
-          >
-            <Icon name="account-arrow-left" size={18} color="#F9FAFB" />
-            <Text style={styles.addBtnText}>
-              {loadingActions === user._id ? "..." : "Accept"}
             </Text>
           </TouchableOpacity>
         ) : (
@@ -514,8 +462,8 @@ const Friends = ({ navigation }: any) => {
       </View>
     );
   };
+  
   const listData = isSearching ? searchResults : suggestions;
-
   const handleRemoveModalCancel = () => setShowRemoveModal(null);
   const handleRemoveModalRemove = async () => {
     if (showRemoveModal?.user) {
@@ -528,11 +476,7 @@ const Friends = ({ navigation }: any) => {
       <AppScreen style={styles.root}>
         <GlassConfirmModal
           visible={!!showRemoveModal?.user}
-          message={
-            showRemoveModal?.user
-              ? `Remove friend request to ${showRemoveModal.user.name || showRemoveModal.user.username}?`
-              : ""
-          }
+          message={showRemoveModal?.user ? `Remove friend request to ${showRemoveModal.user.name || showRemoveModal.user.username}?` : ""}
           onCancel={handleRemoveModalCancel}
           onRemove={handleRemoveModalRemove}
         />
@@ -585,9 +529,7 @@ const Friends = ({ navigation }: any) => {
 
                 <FlatList
                   data={requestListToShow}
-                  keyExtractor={(item) =>
-                    (item as any)?.user?._id || (item as any)?._id || Math.random().toString()
-                  }
+                  keyExtractor={(item) => (item as any)?.user?._id || (item as any)?._id || Math.random().toString()}
                   renderItem={renderUserItem}
                   scrollEnabled={false}
                   ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
@@ -644,202 +586,43 @@ const Friends = ({ navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  notificationCard: {
-    position: "absolute",
-    top: 24,
-    left: 20,
-    right: 20,
-    zIndex: 999,
-    backgroundColor: "rgba(55,209,90,0.87)",
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: "rgba(148,163,184,0.4)",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowOffset: { height: 8, width: 0 },
-  },
-  notificationText: {
-    color: "#F9FAFB",
-    fontSize: 15,
-    fontWeight: "600",
-    marginLeft: 10,
-    flex: 1,
-  },
-  modalOverlay: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(15,23,42,0.43)",
-    zIndex: 9999,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  badgeBubbleSection: {
-    backgroundColor: "#EF4444",
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 4,
-    marginLeft: 10,
-    marginTop: 2,
-    alignSelf: "flex-start",
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  modalCard: {
-    backgroundColor: GLASS_BG,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: GLASS_BORDER,
-    padding: 24,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.14,
-    shadowOffset: { height: 12, width: 0 },
-    width: "82%",
-  },
-  modalMessage: {
-    color: "#F9FAFB",
-    fontSize: 16,
-    fontWeight: "600",
-    textAlign: "center",
-    marginBottom: 3,
-  },
-  modalBtn: {
-    paddingHorizontal: 22,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  modalBtnText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 14,
-  },
+  notificationCard: { position: "absolute", top: 24, left: 20, right: 20, zIndex: 999, backgroundColor: "rgba(55,209,90,0.87)", borderRadius: 18, borderWidth: 1, borderColor: "rgba(148,163,184,0.4)", paddingHorizontal: 16, paddingVertical: 12, flexDirection: "row", alignItems: "center", shadowColor: "#000", shadowOpacity: 0.12, shadowOffset: { height: 8, width: 0 } },
+  notificationText: { color: "#F9FAFB", fontSize: 15, fontWeight: "600", marginLeft: 10, flex: 1 },
+  modalOverlay: { position: "absolute", left: 0, top: 0, right: 0, bottom: 0, backgroundColor: "rgba(15,23,42,0.43)", zIndex: 9999, justifyContent: "center", alignItems: "center" },
+  badgeBubbleSection: { backgroundColor: "#EF4444", borderRadius: 10, minWidth: 18, height: 18, justifyContent: "center", alignItems: "center", paddingHorizontal: 4, marginLeft: 10, marginTop: 2, alignSelf: "flex-start" },
+  badgeText: { color: "#fff", fontSize: 12, fontWeight: "600", textAlign: "center" },
+  modalCard: { backgroundColor: GLASS_BG, borderRadius: 22, borderWidth: 1, borderColor: GLASS_BORDER, padding: 24, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.14, shadowOffset: { height: 12, width: 0 }, width: "82%" },
+  modalMessage: { color: "#F9FAFB", fontSize: 16, fontWeight: "600", textAlign: "center", marginBottom: 3 },
+  modalBtn: { paddingHorizontal: 22, paddingVertical: 8, borderRadius: 999 },
+  modalBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
   root: { flex: 1 },
   baseBackground: { ...StyleSheet.absoluteFill, backgroundColor: "#020617" },
-  glowTop: {
-    position: "absolute",
-    top: -120,
-    left: -40,
-    width: 260,
-    height: 260,
-    borderRadius: 260,
-    backgroundColor: "rgba(59, 130, 246, 0.35)",
-  },
-  glowBottom: {
-    position: "absolute",
-    bottom: -140,
-    right: -40,
-    width: 260,
-    height: 260,
-    borderRadius: 260,
-    backgroundColor: "rgba(168, 85, 247, 0.35)",
-  },
+  glowTop: { position: "absolute", top: -120, left: -40, width: 260, height: 260, borderRadius: 260, backgroundColor: "rgba(59, 130, 246, 0.35)" },
+  glowBottom: { position: "absolute", bottom: -140, right: -40, width: 260, height: 260, borderRadius: 260, backgroundColor: "rgba(168, 85, 247, 0.35)" },
   overlay: { flex: 1, paddingTop: Platform.OS === "android" ? "3%" : "5%", paddingHorizontal: 20 },
   scrollContent: { paddingTop: 8 },
   topBar: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
-  iconGlass: {
-    width: 40,
-    height: 40,
-    borderRadius: 16,
-    backgroundColor: ICON_GLASS_BG,
-    borderWidth: 1,
-    borderColor: "rgba(148, 163, 184, 0.4)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 10 },
-    shadowRadius: 20,
-    elevation: 6,
-  },
+  iconGlass: { width: 40, height: 40, borderRadius: 16, backgroundColor: ICON_GLASS_BG, borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.4)", justifyContent: "center", alignItems: "center", marginRight: 10, shadowColor: "#000", shadowOpacity: 0.25, shadowOffset: { width: 0, height: 10 }, shadowRadius: 20, elevation: 6 },
   topTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "700", color: "#F9FAFB" },
   topRightSpacer: { width: 40, height: 40 },
-  searchCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: GLASS_BG,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: GLASS_BORDER,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    marginBottom: 18,
-  },
+  searchCard: { flexDirection: "row", alignItems: "center", backgroundColor: GLASS_BG, borderRadius: 999, borderWidth: 1, borderColor: GLASS_BORDER, paddingHorizontal: 14, paddingVertical: 8, marginBottom: 18 },
   searchInput: { flex: 1, color: "#E5E7EB", fontSize: 12 },
   sectionHeader: { marginBottom: 10 },
   sectionTitle: { fontSize: 16, fontWeight: "700", color: "#F9FAFB" },
   sectionHint: { fontSize: 12, color: "#9CA3AF", marginTop: 2 },
-  userListCard: {
-    backgroundColor: GLASS_BG,
-    borderRadius: 20,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: GLASS_BORDER,
-    shadowColor: "#000",
-    shadowOpacity: 0.35,
-    shadowOffset: { width: 0, height: 14 },
-    shadowRadius: 24,
-    elevation: 8,
-    marginBottom: 15,
-  },
+  userListCard: { backgroundColor: GLASS_BG, borderRadius: 20, padding: 12, borderWidth: 1, borderColor: GLASS_BORDER, shadowColor: "#000", shadowOpacity: 0.35, shadowOffset: { width: 0, height: 14 }, shadowRadius: 24, elevation: 8, marginBottom: 15 },
   listSeparator: { height: 1, backgroundColor: "rgba(31, 41, 55, 0.9)", marginVertical: 8 },
   userCard: { flexDirection: "row", alignItems: "center" },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 999,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-    backgroundColor: "rgba(99, 102, 241, 0.25)",
-    borderWidth: 1,
-    borderColor: "rgba(191, 219, 254, 0.35)",
-    overflow: "hidden",
-  },
+  avatar: { width: 40, height: 40, borderRadius: 999, justifyContent: "center", alignItems: "center", marginRight: 10, backgroundColor: "rgba(99, 102, 241, 0.25)", borderWidth: 1, borderColor: "rgba(191, 219, 254, 0.35)", overflow: "hidden" },
   userInfo: { flex: 1 },
   userName: { fontSize: 14, fontWeight: "600", color: "#E5E7EB" },
   userUsername: { fontSize: 12, color: "#9CA3AF" },
-  addBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: "rgba(30, 64, 175, 0.9)",
-    borderWidth: 1,
-    borderColor: "rgba(191, 219, 254, 0.7)",
-  },
+  addBtn: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: "rgba(30, 64, 175, 0.9)", borderWidth: 1, borderColor: "rgba(191, 219, 254, 0.7)" },
   addBtnText: { color: "#F9FAFB", fontSize: 12, fontWeight: "600", marginLeft: 4 },
-  emptyStateCard: {
-    backgroundColor: GLASS_BG,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: GLASS_BORDER,
-    alignItems: "center",
-  },
+  emptyStateCard: { backgroundColor: GLASS_BG, borderRadius: 20, padding: 20, borderWidth: 1, borderColor: GLASS_BORDER, alignItems: "center" },
   emptyTitle: { marginTop: 10, fontSize: 15, fontWeight: "600", color: "#E5E7EB" },
   emptyText: { marginTop: 4, fontSize: 12, color: "#9CA3AF", textAlign: "center" },
-  userClickable: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    marginRight: 10,
-  },
+  userClickable: { flexDirection: "row", alignItems: "center", flex: 1, marginRight: 10 },
 });
 
 export default Friends;

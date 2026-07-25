@@ -159,7 +159,16 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
   const requestOtp = async () => {
     setLoading(true);
     try {
-      await profileApi.requestPasswordChangeOtp();
+      const response = await profileApi.requestPasswordChangeOtp(oldPassword);
+      if (!response.data?.success) {
+        setResultCard({
+          visible: true,
+          type: "error",
+          message: response.data?.message || "Error changing password."
+        });
+        onClose();
+        return;
+      }
       setLoading(false);
       setStep(2);
     } catch (err) {
@@ -282,14 +291,13 @@ function ChangeNumberModal({ user, onClose, setResultCard }: any) {
 }
 
 // --- Linked Account Modal ---
-function LinkedAccountModal({ onClose, onChange }: any) {
+function LinkedAccountModal({ onClose, onChange, setResultCard }: any) {
   const [email, setEmail] = useState("");
   const [stage, setStage] = useState(1);
   const [newEmail, setNewEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState({ visible: false, type: "success", message: "" });
 
   useEffect(() => {
     (async () => {
@@ -307,15 +315,23 @@ function LinkedAccountModal({ onClose, onChange }: any) {
     try {
       const response = await profileApi.requestEmailChange(currentPassword, newEmail);
       if (!(response.data as any)?.success) {
-        setResult({ visible: true, type: "error", message: (response as any)?.data?.message || "Error changing email." });
-        onClose();
+        setResultCard({ 
+          visible: true, 
+          type: "error", 
+          message: (response as any)?.data?.message || "Error changing email." 
+        });
+        onClose(); // 🚨 Closes sheet, leaves error card on screen
         return;
       }
       setLoading(false);
       setStage(2);
     } catch (err: any) {
-      setLoading(false);
-      setResult({ visible: true, type: "error", message: err?.response?.data?.message || "Failed to send OTP." });
+      setResultCard({ 
+        visible: true, 
+        type: "error", 
+        message: err?.response?.data?.message || "Failed to send OTP." 
+      });
+      onClose(); // 🚨 Closes sheet, leaves error card on screen
     }
   };
 
@@ -324,8 +340,12 @@ function LinkedAccountModal({ onClose, onChange }: any) {
     try {
       const response = await profileApi.verifyEmailChange(otp);
       if (!(response.data as any)?.success) {
-        setResult({ visible: true, type: "error", message: (response.data as any)?.message || "Error changing email." });
-        onClose();
+        setResultCard({ 
+          visible: true, 
+          type: "error", 
+          message: (response.data as any)?.message || "Error changing email." 
+        });
+        onClose(); // 🚨 Closes sheet, leaves error card on screen
         return;
       }
       setEmail(newEmail);
@@ -334,11 +354,16 @@ function LinkedAccountModal({ onClose, onChange }: any) {
       setCurrentPassword("");
       setOtp("");
       setLoading(false);
-      setResult({ visible: true, type: "success", message: "Email successfully updated!" });
+      setResultCard({ visible: true, type: "success", message: "Email successfully updated!" });
       onChange?.();
+      onClose(); // Close the sheet on success
     } catch (err: any) {
-      setLoading(false);
-      setResult({ visible: true, type: "error", message: err?.response?.data?.message || "Failed to update email." });
+      setResultCard({ 
+        visible: true, 
+        type: "error", 
+        message: err?.response?.data?.message || "Failed to update email." 
+      });
+      onClose(); // 🚨 Closes sheet, leaves error card on screen
     }
   };
 
@@ -399,22 +424,6 @@ function LinkedAccountModal({ onClose, onChange }: any) {
       <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
         <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Close</Text>
       </TouchableOpacity>
-      {result.visible && (
-        <View style={styles.resultSoftCard}>
-          <Text style={{
-            padding: 16,
-            color: result.type === "success" ? "#22c55e" : "#ef4444",
-            fontWeight: "bold",
-            textAlign: "center"
-          }}>{result.message}</Text>
-          <TouchableOpacity
-            style={styles.resultSoftOkBtn}
-            onPress={() => setResult({ ...result, visible: false })}
-          >
-            <Text style={{ color: "#fff", fontWeight: "bold" }}>OK</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 }
@@ -753,10 +762,11 @@ const formatTimeRemaining = (endDate: string) => {
             />
           )}
 
-          {activeModal === "LinkedAccount" && (
+         {activeModal === "LinkedAccount" && (
             <LinkedAccountModal
               onClose={closeSheet}
               onChange={fetchProfileOnline}
+              setResultCard={setResultCard} // 🚨 MAKE SURE THIS LINE IS ADDED!
             />
           )}
         </View>

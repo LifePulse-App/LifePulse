@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import ChatMessage from "../models/ChatMessage.js";
-import OnlineManager from "../managers/OnlineManager.js"; // ⚡ Import this!
+import OnlineManager from "../managers/OnlineManager.js"; 
 
 const toObjectId = (v) => {
   try {
@@ -8,16 +8,6 @@ const toObjectId = (v) => {
   } catch {
     return null;
   }
-};
-
-// ⚡ Helper to target users regardless of what screen they are on
-const emitToUser = (io, userId, event, payload) => {
-  const sockets = OnlineManager.getUserSockets(String(userId));
-  if (!sockets || sockets.size === 0) return false;
-  sockets.forEach(socketId => {
-    io.to(socketId).emit(event, payload);
-  });
-  return true;
 };
 
 export default function registerChatSocket(io, socket) {
@@ -32,7 +22,7 @@ export default function registerChatSocket(io, socket) {
       const meObj = toObjectId(myUserId);
       const ids = messageIds.map(toObjectId).filter(Boolean);
 
-      // ⚡ Fetch messages FIRST to know who the sender is
+      // Fetch messages FIRST to know who the sender is
       const pendingMsgs = await ChatMessage.find({ _id: { $in: ids }, receiverId: meObj, deliveredAt: null }).lean();
       if (!pendingMsgs.length) return;
 
@@ -41,10 +31,11 @@ export default function registerChatSocket(io, socket) {
         { $set: { deliveredAt: new Date() } }
       );
 
-      // ⚡ Group by sender and notify them DIRECTLY via OnlineManager
+      // Group by sender and notify them DIRECTLY via OnlineManager
       const bySender = new Set(pendingMsgs.map(m => String(m.senderId)));
       bySender.forEach(senderId => {
-        emitToUser(io, senderId, "msg-delivered", {
+        // ⚡ FIX: Use OnlineManager's built-in emitToUser
+        OnlineManager.emitToUser(io, senderId, "msg-delivered", {
           messageIds: pendingMsgs.map(m => String(m._id)), // Send array of IDs
           userId: String(myUserId),
           conversationId
@@ -73,8 +64,8 @@ export default function registerChatSocket(io, socket) {
       );
 
       if (upd.modifiedCount > 0 || upd.nModified > 0) {
-        // ⚡ Notify the sender directly that their messages were seen
-        emitToUser(io, String(peerObj), "msg-seen", {
+        // ⚡ FIX: Use OnlineManager's built-in emitToUser
+        OnlineManager.emitToUser(io, String(peerObj), "msg-seen", {
           msgId: lastSeenMessageId,
           userId: String(myUserId),
           conversationId: String(conversationId)

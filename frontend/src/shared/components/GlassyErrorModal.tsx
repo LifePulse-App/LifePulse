@@ -25,7 +25,7 @@ const GlassyErrorModal: React.FC<GlassyErrorModalProps> = ({
       <View style={styles.overlay}>
         <View style={styles.cardWrapper}>
           <View style={styles.cardContent}>
-            <Text style={styles.title}>Something went wrong</Text>
+            <Text style={styles.title}>Attention Required</Text>
             <Text style={styles.message}>{message}</Text>
 
             <TouchableOpacity style={styles.button} onPress={onClose}>
