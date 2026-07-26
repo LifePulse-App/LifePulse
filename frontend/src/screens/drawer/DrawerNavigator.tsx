@@ -43,6 +43,9 @@ const DrawerNavigator = () => (
     <Drawer.Screen name="User" component={UserNavigator} options={{headerShown: false}} />
     <Drawer.Screen name="Chat" component={ChatScreen} options={{headerShown: false}} />
     <Drawer.Screen name="MoodScreen" component={MoodScreen}  options={{headerShown: false}}/>
+    <Drawer.Screen name="Friends" component={Friends}  options={{headerShown: false}}/>
+    <Drawer.Screen name="FriendsManage" component={FriendsListScreen}  options={{headerShown: false}}/>
+    <Drawer.Screen name="Profile" component={ProfileScreen}  options={{headerShown: false}}/>
   </Drawer.Navigator>
 );
 

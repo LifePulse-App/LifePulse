@@ -570,6 +570,11 @@ export const resetPasswordSetNew = catchAsyncErrors(async (req, res, next) => {
       message: "Password reset successfully",
     });
   } catch (err) {
+    if (err.name === "ValidationError") {
+      // Extract the validation messages (in case there are multiple)
+      const message = Object.values(err.errors).map(val => val.message).join(', ');
+      return next(new ErrorHandler(message, 400));
+    }
     console.error(err);
     return next(new ErrorHandler("Server error", 500));
   }

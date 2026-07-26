@@ -448,7 +448,6 @@ if (data.type === 'chat' && data.peerUserId) {
               <AuthNavigator />
             </NavigationContainer>
           ) : null}
-          <Toast config={toastConfig} position="top" topOffset={30} />
         </AppUpdateGate>
       </AuthContext.Provider>
     </PaperProvider>

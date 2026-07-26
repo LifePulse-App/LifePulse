@@ -93,6 +93,11 @@ export default function registerCallSocket(io, socket) {
                 const current = await getCallState(callId);
                 if (!current) return;
 
+                if (current.status !== "ringing") {
+                    if (localTimeouts.has(callId)) localTimeouts.delete(callId);
+                    return; 
+                }
+
                 OnlineManager.emitToUser(io, current.callerId, "call:no-answer", { callId, callerId: current.callerId, receiverId: current.receiverId, conversationId: current.conversationId });
                 OnlineManager.emitToUser(io, current.receiverId, "call:missed", { callId, callerId: current.callerId, receiverId: current.receiverId, conversationId: current.conversationId });
 

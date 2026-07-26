@@ -260,6 +260,12 @@ useEffect(() => {
       if (!ok) return;
       watchId = Geolocation.watchPosition(
         async (pos) => {
+          if (pos.mocked) {
+            console.warn("User is using a Fake GPS app. Ignoring location update.");
+            // Optional: You could show a toast message here telling them 
+            // that MoodMap requires real locations to work.
+            return; // Exit early, do not update state or backend
+          }
           const coords: [number, number] = [pos.coords.longitude, pos.coords.latitude];
           setMyLocation(coords);
           await saveCache(CACHE_KEYS.myLocation, coords);

@@ -2965,13 +2965,6 @@ const handleReact = useCallback(async (emoji: string) => {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
-      {!!glassError && (
-        <View style={styles.errorCard}>
-          <Icon name="alert-circle-outline" size={18} color="#FEE2E2" />
-          <Text style={styles.errorText}>{glassError}</Text>
-        </View>
-      )}
-
       <KeyboardAvoidingView
         style={{ flex: 1,marginBottom: Platform.OS === "ios" ? 20 : 0  }}
         behavior={Platform.OS === "ios" ? "" : "height"}
