@@ -289,9 +289,17 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setBusyAction(true);
       setErrorMsg(null);
       if (friendship.requestIncoming) {
-        await (socialApi as any).acceptFriendRequest(userId);
+        const response = await (socialApi as any).acceptFriendRequest(userId);
+        if (!response.ok) {
+        // response.data contains your backend's JSON { message: "..." }
+        throw new Error(response.data?.message);
+      }
       } else if (!friendship.requestSent) {
-        await (socialApi as any).sendFriendRequest(userId);
+        const response = await (socialApi as any).sendFriendRequest(userId);
+        if (!response.ok) {
+        // response.data contains your backend's JSON { message: "..." }
+        throw new Error(response.data?.message);
+      }
       }
       await load();
     } catch (e: any) {
@@ -306,7 +314,11 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     try {
       setBusyAction(true);
       setErrorMsg(null);
-      await (socialApi as any).unfriend(userId);
+      const response = await (socialApi as any).unfriend(userId);
+      if (!response.ok) {
+        // response.data contains your backend's JSON { message: "..." }
+        throw new Error(response.data?.message);
+      }
       setUnfriendModalVisible(false);
       await load();
     } catch (e: any) {
@@ -322,7 +334,11 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setBusyAction(true);
       setErrorMsg(null);
       setFriendship((prev) => prev ? { ...prev, requestSent: false } : null);
-      await (socialApi as any).removeFriendRequest(userId);
+      const response = await (socialApi as any).removeFriendRequest(userId);
+      if (!response.ok) {
+        // response.data contains your backend's JSON { message: "..." }
+        throw new Error(response.data?.message);
+      }
       await load();
     } catch (e: any) {
       setErrorMsg(e?.response?.data?.message || "Cancel failed.");
@@ -338,11 +354,15 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setBusyAction(true); 
       setErrorMsg(null);
       setRelationship((prev) => prev ? { ...prev, requestSent: true } : { isPartner: false, requestIncoming: false, requestSent: true });
-      await apiClient.post(`/relationship/request/${userId}`); 
+      const response = await apiClient.post(`/relationship/request/${userId}`); 
+      if (!response.ok) {
+        // response.data contains your backend's JSON { message: "..." }
+        throw new Error(response.data?.message || "You are already in a relationship.");
+      }
       await load(); 
     } catch(e: any) {
       setRelationship((prev) => prev ? { ...prev, requestSent: false } : null);
-      setErrorMsg(e?.response?.data?.message || "Could not send relationship request.");
+      setErrorMsg(e?.response?.data?.message || "You are already in a relationship.");
     } finally { setBusyAction(false); }
   };
   
@@ -350,7 +370,11 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     try { 
       setBusyAction(true); 
       setErrorMsg(null);
-      await apiClient.post(`/relationship/accept/${userId}`); 
+      const response = await apiClient.post(`/relationship/accept/${userId}`); 
+       if (!response.ok) {
+        // response.data contains your backend's JSON { message: "..." }
+        throw new Error(response.data?.message || "You are already in a relationship.");
+      }
       await load(); 
     } catch(e: any) {
       setErrorMsg(e?.response?.data?.message || "Could not accept request.");
@@ -362,7 +386,11 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setBusyAction(true); 
       setErrorMsg(null);
       setRelationship((prev) => prev ? { ...prev, requestSent: false, requestIncoming: false } : null);
-      await apiClient.post(`/relationship/cancel/${userId}`); 
+      const response = await apiClient.post(`/relationship/cancel/${userId}`); 
+       if (!response.ok) {
+        // response.data contains your backend's JSON { message: "..." }
+        throw new Error(response.data?.message || "You are already in a relationship.");
+      }
       await load(); 
     } catch(e: any) {
       setErrorMsg(e?.response?.data?.message || "Could not cancel request.");
@@ -373,7 +401,11 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     try { 
       setBusyAction(true); 
       setErrorMsg(null);
-      await apiClient.post(`/relationship/remove`); 
+      const response = await apiClient.post(`/relationship/remove`);
+       if (!response.ok) {
+        // response.data contains your backend's JSON { message: "..." }
+        throw new Error(response.data?.message || "You are already in a relationship.");
+      }
       await load(); 
     } catch(e: any) {
       setErrorMsg(e?.response?.data?.message || "Could not suspend relationship.");
@@ -384,12 +416,19 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     try { 
       setBusyAction(true); 
       setErrorMsg(null);
-      await apiClient.post(`/relationship/restore`); 
+      const response = await apiClient.post(`/relationship/restore`); 
+       if (!response.ok) {
+        // response.data contains your backend's JSON { message: "..." }
+        throw new Error(response.data?.message || "You are already in a relationship.");
+      }
       await load(); 
     } catch(e: any) {
       setErrorMsg(e?.response?.data?.message || "Could not restore relationship.");
     } finally { setBusyAction(false); }
   };
+
+  console.log(errorMsg);
+  
 
   const handlePartnerClick = () => {
     if (user?.partner?._id) {
@@ -529,6 +568,25 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                 ) : null}
               </View>
             </View>
+
+            {/* ⚡ Error Message Row */}
+            {errorMsg && (
+              <View style={styles.errorRow}>
+                <Icon name="alert-circle-outline" size={16} color="#fca5a5" />
+                <Text style={styles.errorText}>{errorMsg}</Text>
+                <TouchableOpacity onPress={() => setErrorMsg(null)} style={styles.retryBtn}>
+                  <Icon name="close" size={16} color="#fca5a5" />
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* Offline */}
+            {offline && (
+              <View style={styles.offlineBanner}>
+                <Icon name="wifi-off" size={13} color="#475569" />
+                <Text style={styles.offlineText}>Offline — showing cached data</Text>
+              </View>
+            )}
 
             {/* ── Modern Inline Stats ── */}
             <View style={styles.statsContainer}>
@@ -699,24 +757,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
 
             </View>
 
-            {/* ⚡ Error Message Row */}
-            {errorMsg && (
-              <View style={styles.errorRow}>
-                <Icon name="alert-circle-outline" size={16} color="#fca5a5" />
-                <Text style={styles.errorText}>{errorMsg}</Text>
-                <TouchableOpacity onPress={() => setErrorMsg(null)} style={styles.retryBtn}>
-                  <Icon name="close" size={16} color="#fca5a5" />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {/* Offline */}
-            {offline && (
-              <View style={styles.offlineBanner}>
-                <Icon name="wifi-off" size={13} color="#475569" />
-                <Text style={styles.offlineText}>Offline — showing cached data</Text>
-              </View>
-            )}
           </View>
         )}
       </ScrollView>
@@ -935,9 +975,9 @@ const styles = StyleSheet.create({
   locationCard: { flexDirection: "row", alignItems: "center", marginBottom: 24 },
   detailIconWrap: {
     width: 36, height: 36, borderRadius: 12,
-    alignItems: "center", justifyContent: "center", marginBottom: 12,
+    alignItems: "center", justifyContent: "center", marginBottom: 12, marginRight: 4
   },
-  detailTitle: { color: "#f1f5f9", fontSize: 16, fontWeight: "700", marginBottom: 4, marginLeft: 4 },
+  detailTitle: { color: "#f1f5f9", fontSize: 16, fontWeight: "700", marginBottom: 4, marginLeft: 0 },
   detailSub: { color: "#64748b", fontSize: 13, fontWeight: "500" },
 
   friendBanner: {

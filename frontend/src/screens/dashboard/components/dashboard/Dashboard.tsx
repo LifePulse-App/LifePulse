@@ -334,7 +334,7 @@ useEffect(() => {
 
             <Text style={styles.mainTitle}>Your Mood Journey</Text>
             <Text style={styles.subtitle}>
-              Share your mood, grow your habits, and level up daily.
+              Share your mood, level up daily.
             </Text>
              {/* Offline / error banner */}
              {(offline || error) && (

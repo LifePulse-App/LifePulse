@@ -194,7 +194,7 @@ const ForgotPass = ({ navigation, route }: any) => {
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
-                textColor="#111827"
+                textColor="#ffffff"
                 placeholderTextColor="grey"
                 cursorColor='black'
               />
