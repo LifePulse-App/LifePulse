@@ -1,0 +1,11 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.streaksphere",
+      "sha256_cert_fingerprints":
+        ["99:E6:3B:C1:08:F6:61:1E:D3:FE:B6:F5:52:CA:BA:A8:AC:7D:ED:F0:F4:C7:2B:63:E2:7E:FB:0A:84:28:C9:7C"]
+    }
+  }
+]
