@@ -36,11 +36,11 @@ import { KeyboardProvider } from "react-native-keyboard-controller"
 const Stack = createNativeStackNavigator();
 const { width, height } = Dimensions.get('window');
 
-// Simple splash screen with dashboard-like background
 const SplashScreen = () => {
+  const styles = loginStyles();
+
   const anim1 = useRef(new Animated.Value(0)).current;
   const anim2 = useRef(new Animated.Value(0)).current;
-  const anim3 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const makeLoop = (animatedValue: Animated.Value, delay: number) =>
@@ -62,139 +62,57 @@ const SplashScreen = () => {
 
     makeLoop(anim1, 0).start();
     makeLoop(anim2, 1500).start();
-    makeLoop(anim3, 3000).start();
-  }, [anim1, anim2, anim3]);
+  }, [anim1, anim2]);
 
-  const blob1Style = {
+  // Interpolated transforms matching the precise motion of glowTop and glowBottom
+  const glowTopStyle = {
     transform: [
       {
         translateX: anim1.interpolate({
           inputRange: [0, 1],
-          outputRange: [-40, 40],
+          outputRange: [-30, 30],
         }),
       },
       {
         translateY: anim1.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, 30],
+          outputRange: [0, 25],
         }),
       },
     ],
   };
 
-  const blob2Style = {
+  const glowBottomStyle = {
     transform: [
       {
         translateX: anim2.interpolate({
           inputRange: [0, 1],
-          outputRange: [30, -30],
+          outputRange: [25, -25],
         }),
       },
       {
         translateY: anim2.interpolate({
           inputRange: [0, 1],
-          outputRange: [10, -20],
-        }),
-      },
-    ],
-  };
-
-  const blob3Style = {
-    transform: [
-      {
-        translateX: anim3.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-20, 20],
-        }),
-      },
-      {
-        translateY: anim3.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-30, 10],
+          outputRange: [10, -15],
         }),
       },
     ],
   };
 
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: '#020617',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Glowy background blobs similar to dashboard/login */}
-      <Animated.View
-        style={[
-          {
-            position: 'absolute',
-            width: width * 1.6,
-            height: width * 1.6,
-            borderRadius: width * 0.8,
-            backgroundColor: 'rgba(59, 130, 246, 0.35)',
-            top: -width * 0.6,
-            left: -width * 0.3,
-          },
-          blob1Style,
-        ]}
-      />
-      <Animated.View
-        style={[
-          {
-            position: 'absolute',
-            width: width * 1.4,
-            height: width * 1.4,
-            borderRadius: width * 0.7,
-            backgroundColor: 'rgba(168, 85, 247, 0.35)',
-            bottom: -width * 0.5,
-            right: -width * 0.4,
-          },
-          blob2Style,
-        ]}
-      />
-      <Animated.View
-        style={[
-          {
-            position: 'absolute',
-            width: width * 1.2,
-            height: width * 1.2,
-            borderRadius: width * 0.6,
-            backgroundColor: 'rgba(37, 99, 235, 0.25)',
-            top: height * 0.3,
-            right: -width * 0.5,
-          },
-          blob3Style,
-        ]}
-      />
+    <View style={styles.root}>
+      <View style={styles.baseBackground} />
 
-      {/* Centered logo + app name */}
-      <View style={{ alignItems: 'center' }}>
-        {/* Replace with your logo Image if you have one */}
-        {/* <Image source={require('path/to/logo.png')} style={{ width: 80, height: 80, marginBottom: 16 }} /> */}
-        <Text
-          style={{
-            fontSize: 30,
-            fontWeight: '800',
-            color: '#F9FAFB',
-            letterSpacing: 0.8,
-            marginBottom: 8,
-          }}
-        >
-          StreakSphere
-        </Text>
-        <Text
-          style={{
-            fontSize: 14,
-            color: '#9CA3AF',
-            marginBottom: 20,
-          }}
-        >
-          Loading your experience...
-        </Text>
-      </View>
+      {/* Top Glow matching Login screen style */}
+      <Animated.View style={[styles.glowTop, glowTopStyle]} />
+
+      {/* Bottom Glow matching Login screen style */}
+      <Animated.View style={[styles.glowBottom, glowBottomStyle]} />
+
+      {/* Centered Loading Indicator */}
+      {/* <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+        <ActivityIndicator size="large" color="#A855F7" />
+      </View> */}
     </View>
   );
 };
@@ -237,6 +155,7 @@ import { OutgoingCallScreen } from '../../screens/call/components/OutgoingCallSc
 import { IncomingCallScreen } from '../../screens/call/components/IncomingCallScreen';
 import { VoiceCallScreen } from '../../screens/call/components/VoiceCallScreen';
 import { CallComingScreen } from '../../screens/call/components/CallComingScreen';
+import { loginStyles } from '../../screens/login/components/Loginstyles';
 
   const AuthNavigator = () => {
     const [initialRoute, setInitialRoute] = useState<'Login' | 'AppTabs' | 'Drawer' | 'SavedAccounts' | null>(null);
@@ -335,6 +254,7 @@ return (
         <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
         <Stack.Screen name="ReportProblem" component={ReportProblemScreen} />
         <Stack.Screen name="LegalPolicy" component={LegalPolicyScreen} />
+
 
         <Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
         <Stack.Screen name="AvatarCreator" component={AvatarCreatorScreen} />

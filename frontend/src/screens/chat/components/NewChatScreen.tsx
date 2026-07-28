@@ -23,6 +23,7 @@ type Friend = {
   avatar?: { url?: string } | string;
   avatarUrl?: string;
   avatarThumbnailUrl?: string;
+  tick?: string; // Added tick to satisfy TS for the verified/golden checks
 };
 
 const FRIENDS_CACHE_KEY = "chat:newChatFriends:v1";
@@ -125,7 +126,7 @@ export default function NewChatScreen({ navigation }: any) {
   };
 
   return (
-    <MainLayout>
+    <MainLayout hideNavBar={true}>
       <View style={styles.root}>
         <View style={styles.baseBackground} />
         <View style={styles.glowTop} />
@@ -153,12 +154,14 @@ export default function NewChatScreen({ navigation }: any) {
             />
           </View>
 
-          {loading ? (
+          {/* Changed condition here: Only show spinner if loading AND there is no cached data */}
+          {loading && friends.length === 0 ? (
             <ActivityIndicator color="#fff" style={{ marginTop: 12 }} />
           ) : (
             <FlatList
               data={filtered}
               keyExtractor={(item) => item._id}
+              showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={styles.row}
@@ -173,23 +176,23 @@ export default function NewChatScreen({ navigation }: any) {
                   {renderAvatar(item)}
 
                <View style={styles.rowTextWrap}>
-  <View style={{ flexDirection: "row", alignItems: "center" }}>
-    <Text style={styles.name} numberOfLines={1}>
-      {item.name}
-    </Text>
-    {item.tick === "verified" && (
-      <Icon name="check-decagram" size={16} color="#3b82f6" style={{ marginLeft: 6, marginTop: 2 }} />
-    )}
-    {item.tick === "golden" && (
-      <Icon name="check-decagram" size={16} color="#fbbf24" style={{ marginLeft: 6, marginTop: 2 }} />
-    )}
-  </View>
-  {item.username ? (
-    <Text style={styles.sub} numberOfLines={1}>
-      @{item.username}
-    </Text>
-  ) : null}
-</View>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={styles.name} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    {item.tick === "verified" && (
+                      <Icon name="check-decagram" size={16} color="#3b82f6" style={{ marginLeft: 6, marginTop: 2 }} />
+                    )}
+                    {item.tick === "golden" && (
+                      <Icon name="check-decagram" size={16} color="#fbbf24" style={{ marginLeft: 6, marginTop: 2 }} />
+                    )}
+                  </View>
+                  {item.username ? (
+                    <Text style={styles.sub} numberOfLines={1}>
+                      @{item.username}
+                    </Text>
+                  ) : null}
+                </View>
                 </TouchableOpacity>
               )}
               ItemSeparatorComponent={() => <View style={{ height: 8 }} />}

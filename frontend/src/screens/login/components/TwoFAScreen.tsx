@@ -267,18 +267,18 @@ const TwoFAScreen = () => {
               ) : (
                 <>
                   <TextInput
-                    label="Backup Code"
+                    
                     value={backupCode}
                     onChangeText={setBackupCode}
                     style={styles.passwordInput}
                     mode="flat"
                     underlineColor="transparent"
                     activeUnderlineColor="transparent"
-                    textColor="black"
-                    placeholder="XXXX-XXXX-XX"
+                    textColor="white"
+                    placeholder="Back-up Code"
                     autoCapitalize="characters"
                     placeholderTextColor="grey"
-                    cursorColor='black'
+                    cursorColor='white'
                   />
                 </>
               )}

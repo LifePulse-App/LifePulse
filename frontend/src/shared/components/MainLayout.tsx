@@ -4,7 +4,13 @@ import { View, StyleSheet, Platform } from 'react-native';
 import LowNavBAr from './LowNavBar'; 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const MainLayout = ({ children }: { children: React.ReactNode }) => {
+// Add interface for props
+interface MainLayoutProps {
+  children: React.ReactNode;
+  hideNavBar?: boolean;
+}
+
+const MainLayout = ({ children, hideNavBar = false }: MainLayoutProps) => {
   // Checks if the device is iOS 26 or newer
   const isIOS26Plus =
     Platform.OS === 'ios' &&
@@ -17,8 +23,8 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
         {children}
       </View>
       
-      {/* Render navigation bar only if the device is NOT iOS 26+ */}
-      {!isIOS26Plus && <LowNavBAr />}
+      {/* Render navigation bar only if NOT iOS 26+ AND hideNavBar is false */}
+      {!isIOS26Plus && !hideNavBar && <LowNavBAr />}
     </SafeAreaView>
   );
 };

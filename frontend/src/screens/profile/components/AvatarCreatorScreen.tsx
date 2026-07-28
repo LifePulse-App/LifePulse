@@ -5,14 +5,16 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  TextInput,
 } from 'react-native';
 import { Text } from '@rneui/themed';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import { launchImageLibrary } from 'react-native-image-picker';
-import profileApi from '../services/api_profile'; // Your API
+import ImagePicker from 'react-native-image-crop-picker'; // Switched to crop-picker
+import profileApi from '../services/api_profile'; 
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../../auth/api-client/api_client';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const PROFILE_CACHE_KEY = 'sbjkshiuhuw';
 
 // Glassy Result Card Component
 const GlassyResultCard = ({ visible, type = "success", message, onClose }: any) => {
@@ -39,8 +41,7 @@ const resultStyles = StyleSheet.create({
   okBtn: { backgroundColor: "#6366f1", borderRadius: 14, paddingVertical: 9, paddingHorizontal: 34, marginTop: 2 },
 });
 
-// Set your backend base (for local avatars, adjust as needed)
-const baseUrl = apiClient.getBaseURL(); // Example: "http://localhost:40000/api"
+const baseUrl = apiClient.getBaseURL(); 
 const BASE_SERVER_URL = baseUrl.replace(/\/api\/?$/, "");
 
 export default function ProfilePicUploaderScreen() {
@@ -49,30 +50,49 @@ export default function ProfilePicUploaderScreen() {
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
 
-  // Glassy message state!
   const [resultCard, setResultCard] = useState({ visible: false, type: "success", message: "" });
 
-  // Load current avatar from backend on mount
   useEffect(() => {
     const load = async () => {
+      // 1. Load instantly from cache
+      try {
+        const raw = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.avatarUrl || parsed?.avatarThumbnailUrl) {
+            setAvatarUrl(parsed.avatarUrl || parsed.avatarThumbnailUrl);
+          }
+        }
+      } catch (e) {}
+
+      // 2. Fetch fresh from backend
       try {
         const res = await profileApi.getAvatarUrl();
-        setAvatarUrl(res?.data?.avatarUrl ?? null);
-      } catch (e) {
-        setAvatarUrl(null);
-      }
+        if (res?.data?.avatarUrl) {
+          setAvatarUrl(res.data.avatarUrl);
+        }
+      } catch (e) {}
     };
     load();
   }, []);
 
   const pickPhoto = async () => {
-    const res = await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
-    if (res.didCancel) return;
-    if (res.errorCode) {
-      setResultCard({ visible: true, type: "error", message: res.errorMessage || 'Failed to pick image' });
-      return;
+    try {
+      const image = await ImagePicker.openPicker({
+        width: 400,
+        height: 400,
+        cropping: true,
+        cropperCircleOverlay: true, // Shows circular crop UI for avatars
+        mediaType: 'photo',
+      });
+      if (image?.path) {
+        setPhotoUri(image.path);
+      }
+    } catch (error: any) {
+      if (error.code !== 'E_PICKER_CANCELLED') {
+        setResultCard({ visible: true, type: "error", message: 'Failed to pick image' });
+      }
     }
-    if (res.assets?.[0]?.uri) setPhotoUri(res.assets[0].uri);
   };
 
   const uploadPhoto = async () => {
@@ -93,7 +113,7 @@ export default function ProfilePicUploaderScreen() {
         setResultCard({ visible: false, type: "success", message: "" });
         navigation.goBack();
       }, 1400);
-    } catch (e) {
+    } catch (e: any) {
       setResultCard({ visible: true, type: "error", message: e?.message || 'Error uploading photo. Try again later.' });
     }
     setUploading(false);
@@ -105,28 +125,29 @@ export default function ProfilePicUploaderScreen() {
       setPhotoUri(null);
       setAvatarUrl(null);
       setResultCard({ visible: true, type: "success", message: "Profile picture removed!" });
-    } catch (e) {
+    } catch (e: any) {
       setResultCard({ visible: true, type: "error", message: e?.message || 'Failed to remove profile photo.' });
     }
   };
 
-  // Compose image url for local uploads (if needed)
-  const avatarDisplayUrl =
-    photoUri ||
-    (avatarUrl
-      ? BASE_SERVER_URL + avatarUrl
-      : null);
+  // Safely compose image URL (handles HTTP prefixes vs local paths)
+  let avatarDisplayUrl = photoUri;
+  if (!avatarDisplayUrl && avatarUrl) {
+    avatarDisplayUrl = avatarUrl.startsWith("http") 
+      ? avatarUrl 
+      : BASE_SERVER_URL + avatarUrl;
+  }
 
   return (
     <View style={styles.root}>
       <View style={styles.topBar}>
-        <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass}
-          onPress={() => navigation.goBack()}>
+        <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass} onPress={() => navigation.goBack()}>
           <Icon name="arrow-left" size={24} color="#E5E7EB" />
         </TouchableOpacity>
-        <Text style={styles.pageTitle}>Upload Profile Pic</Text>
+        <Text style={styles.pageTitle}>Profile Picture</Text>
         <View style={styles.rightSpacer} />
       </View>
+
       <TouchableOpacity style={styles.avatarWrap} onPress={pickPhoto} activeOpacity={0.95}>
         {avatarDisplayUrl ? (
           <Image
@@ -135,23 +156,39 @@ export default function ProfilePicUploaderScreen() {
             resizeMode="cover"
           />
         ) : (
-          <Icon name="account-circle-outline" size={120} color="#6366f1" />
+          <View style={styles.avatarFallback}>
+            <Icon name="account" size={80} color="#94a3b8" />
+          </View>
         )}
       </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.saveBtn, { opacity: photoUri ? 1 : 0.5 }]}
-        onPress={uploadPhoto}
-        disabled={!photoUri || uploading}
-      >
-        {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnTxt}>Upload</Text>}
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.cancelBtn} onPress={() => navigation.goBack()}>
-        <Text style={styles.cancelBtnTxt}>Cancel</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.deleteBtn} onPress={deleteAvatar}>
-        <Text style={styles.deleteBtnTxt}>Remove Profile Picture</Text>
-      </TouchableOpacity>
-      <Text style={styles.hint}>Tap the avatar above to choose a new photo.</Text>
+
+      <Text style={styles.hint}>Tap the avatar above to pick a photo.</Text>
+
+      {/* Dynamic Button Logic */}
+      {photoUri ? (
+        <TouchableOpacity
+          style={styles.saveBtn}
+          onPress={uploadPhoto}
+          disabled={uploading}
+        >
+          {uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnTxt}>Save New Picture</Text>}
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={styles.saveBtn}
+          onPress={pickPhoto}
+        >
+          <Text style={styles.saveBtnTxt}>{avatarUrl ? 'Change Picture' : 'Upload Picture'}</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Only show delete button if they have an active avatar and aren't in the middle of uploading a new one */}
+      {avatarUrl && !photoUri && (
+        <TouchableOpacity style={styles.deleteBtn} onPress={deleteAvatar}>
+          <Text style={styles.deleteBtnTxt}>Remove Profile Picture</Text>
+        </TouchableOpacity>
+      )}
+
       <GlassyResultCard
         visible={resultCard.visible}
         type={resultCard.type}
@@ -163,55 +200,64 @@ export default function ProfilePicUploaderScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000', alignItems: 'center', paddingTop: 56 },
-  header: { fontSize: 19, color: '#fff', fontWeight: 'bold', marginBottom: 36 },
+  root: { flex: 1, backgroundColor: '#020617', alignItems: 'center', paddingTop: 56 },
   avatarWrap: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: '#F3F4F6',
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: '#1e293b',
     overflow: 'hidden',
     borderWidth: 2,
     borderColor: '#6366f1',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 10,
   },
-  avatar: { width: 140, height: 140, borderRadius: 70 },
+  avatar: { width: 150, height: 150, borderRadius: 75 },
+  avatarFallback: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    backgroundColor: '#1e293b',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   saveBtn: {
     backgroundColor: '#6366f1',
     paddingHorizontal: 40,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderRadius: 18,
-    marginTop: 22,
+    marginTop: 24,
     marginBottom: 6,
+    width: '70%',
+    alignItems: 'center'
   },
   saveBtnTxt: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  cancelBtn: { paddingHorizontal: 32, paddingVertical: 11, marginTop: 6 },
-  cancelBtnTxt: { color: '#6b7280', fontWeight: 'bold', fontSize: 15 },
   deleteBtn: {
     marginTop: 10,
     paddingHorizontal: 32,
-    paddingVertical: 11,
-    backgroundColor: '#EF4444',
+    paddingVertical: 14,
+    backgroundColor: 'rgba(239,68,68,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(248,113,113,0.3)',
     borderRadius: 18,
+    width: '70%',
+    alignItems: 'center'
   },
   deleteBtnTxt: {
-    color: '#fff',
+    color: '#f87171',
     fontWeight: 'bold',
     fontSize: 15,
-    textAlign: 'center',
   },
   pageTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "700", color: "#F9FAFB" },
   rightSpacer: { width: 40, height: 40 },
-  hint: { color: '#a1a1aa', marginTop: 12, fontSize: 13 },
-  topBar: { flexDirection: "row", alignItems: "center", marginTop: 3, marginBottom: 30 },
+  hint: { color: '#64748b', marginTop: 8, fontSize: 13 },
+  topBar: { flexDirection: "row", alignItems: "center", marginTop: 3, marginBottom: 40 },
   iconGlass: {
     width: 40, height: 40, borderRadius: 16,
     backgroundColor: "rgba(15, 23, 42, 0.0)",
     borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.4)",
     justifyContent: "center", alignItems: "center", marginRight: 0,
-    shadowColor: "#000", shadowOpacity: 0.15, shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 10, elevation: 4, marginLeft: 12, marginTop: 5
+    marginLeft: 12, marginTop: 5
   },
 });

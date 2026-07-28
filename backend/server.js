@@ -124,6 +124,7 @@ if (process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE) {
   cron.schedule('0 0 0 1 * *', async () => {
     try {
       console.log('🧹 Running monthly reset on Worker 0');
+      await startNotificationJobs()
       await runMonthlyReset();
     } catch (err) {
       console.error("Cron error:", err);

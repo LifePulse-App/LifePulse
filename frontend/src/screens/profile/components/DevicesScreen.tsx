@@ -3,8 +3,8 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  KeyboardAvoidingView,
   Platform,
+  StyleSheet,
 } from 'react-native';
 import { Text } from '@rneui/themed';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -12,9 +12,7 @@ import DeviceInfo from 'react-native-device-info';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { loginStyles } from '../../login/components/Loginstyles';
 import api_Login from '../../login/services/api_Login';
-import AppText from '../../../components/Layout/AppText/AppText';
 import LoaderKitView from 'react-native-loader-kit';
 import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
 import NetInfo from '@react-native-community/netinfo';
@@ -35,7 +33,6 @@ type DeviceInfoItem = {
 const DEVICES_CACHE_KEY = "devicescreen:authorizedDevices:v1";
 
 const DevicesScreen = () => {
-  const styles = loginStyles();
   const navigation = useNavigation<any>();
 
   const [devices, setDevices] = useState<DeviceInfoItem[]>([]);
@@ -49,8 +46,6 @@ const DevicesScreen = () => {
   const [targetDeviceId, setTargetDeviceId] = useState<string | null>(null);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
-  // FIX 1: Use a ref for offline status so loadDevices always reads the latest
-  // value synchronously — avoids stale closure on first render.
   const offlineRef = useRef(false);
   const [offline, setOffline] = useState(false);
 
@@ -63,8 +58,6 @@ const DevicesScreen = () => {
     setErrorMessage(null);
   };
 
-  // FIX 2: Set up NetInfo listener AND fetch initial network state immediately
-  // on mount so offlineRef is populated before loadDevices runs.
   useEffect(() => {
     NetInfo.fetch().then((state) => {
       const isOffline = !state.isConnected || state.isInternetReachable === false;
@@ -81,41 +74,44 @@ const DevicesScreen = () => {
   }, []);
 
   const loadDevices = useCallback(async () => {
-    // FIX 3: Always load cache first, unconditionally — before any online/offline checks.
-    // This guarantees cached data is shown immediately regardless of network state.
     let hasCachedData = false;
+    
+    // Fetch the current device ID immediately
+    const id = await DeviceInfo.getUniqueId();
+    setCurrentDeviceId(id);
+
+    // Helper to always push current device to top, and sort rest by last login
+    const sortDevices = (list: DeviceInfoItem[]) => {
+      return [...list].sort((a, b) => {
+        if (a.deviceId === id) return -1;
+        if (b.deviceId === id) return 1;
+        const timeA = new Date(a.lastLogin || 0).getTime();
+        const timeB = new Date(b.lastLogin || 0).getTime();
+        return timeB - timeA; // Newest first
+      });
+    };
+
     try {
       const raw = await AsyncStorage.getItem(DEVICES_CACHE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        // FIX 4: Check key existence rather than truthiness — an empty array is valid cache.
         if (parsed && "devices" in parsed) {
-          setDevices(parsed.devices);
+          setDevices(sortDevices(parsed.devices));
           hasCachedData = true;
-          setLoading(false); // Show cached data immediately, don't wait for API.
+          setLoading(false);
         }
       }
     } catch {}
 
-    // FIX 5: Read offlineRef.current synchronously instead of offline state
-    // to avoid stale closure where offline is still false on first render.
     if (offlineRef.current) {
-      if (!hasCachedData) {
-        setLoading(false);
-      }
-      // Cache already set above if available — nothing more to do offline.
+      if (!hasCachedData) setLoading(false);
       return;
     }
 
-    // Online path: fetch live data.
     setLoading(true);
     try {
-      const id = await DeviceInfo.getUniqueId();
-      setCurrentDeviceId(id);
-
       const res = await api_Login.getDevices();
       if (!res.ok) {
-        // FIX 6: On API error, keep cache already set above — don't clear devices state.
         if (!hasCachedData) {
           showError((res as any).data?.message || 'Failed to load devices');
         }
@@ -126,41 +122,37 @@ const DevicesScreen = () => {
       const data: any = res.data;
       const list: DeviceInfoItem[] = data.devices || [];
 
-      // FIX 7: Guard against undefined/empty API response — don't overwrite good cache.
       if (!data.devices) {
-        console.log("[Devices] API returned no devices data — keeping cache.");
         if (!hasCachedData) setLoading(false);
         setLoading(false);
         return;
       }
 
-      setDevices(list);
+      const sortedList = sortDevices(list);
+      setDevices(sortedList);
+      
       await AsyncStorage.setItem(
         DEVICES_CACHE_KEY,
-        JSON.stringify({ ts: Date.now(), devices: list })
+        JSON.stringify({ ts: Date.now(), devices: sortedList })
       );
     } catch (e: any) {
-      // FIX 8: On error, keep the cache already set above — don't clear devices state.
-      console.log("[Devices] loadDevices error — keeping cache:", e?.message);
       if (!hasCachedData) {
         showError('Unable to fetch devices. Please try again.');
       }
     } finally {
       setLoading(false);
     }
-  }, []); // FIX 9: No `offline` dependency — uses ref instead.
+  }, []);
 
-  // FIX 10: Single clean mount effect — no dependency on offline state.
   useEffect(() => {
     loadDevices();
   }, [loadDevices]);
 
-  // FIX 11: Re-fetch when coming back online so live data replaces cached data.
   useEffect(() => {
     if (!offline) {
       loadDevices();
     }
-  }, [offline]); // intentionally only triggers on offline toggle
+  }, [offline]);
 
   const formatDateTime = (value?: string | Date) => {
     if (!value) return 'Unknown';
@@ -181,25 +173,16 @@ const DevicesScreen = () => {
   };
 
   const renderHeader = () => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 18, marginTop: 30 }}>
+    <View style={styles.header}>
       <TouchableOpacity
         activeOpacity={0.8}
-        style={{
-          width: 40, height: 40, borderRadius: 16,
-          backgroundColor: 'rgba(15,23,42,0.0)',
-          borderWidth: 1, borderColor: 'rgba(148,163,184,0.4)',
-          justifyContent: 'center', alignItems: 'center', marginLeft: 4,
-        }}
+        style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
         <Icon name="arrow-left" size={24} color="#E5E7EB" />
       </TouchableOpacity>
-      <Text style={{
-        flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700',
-        color: '#F9FAFB', marginRight: 40,
-      }}>
-        Authorized Devices
-      </Text>
+      <Text style={styles.headerTitle}>Authorized Devices</Text>
+      <View style={{ width: 40 }} />
     </View>
   );
 
@@ -227,21 +210,31 @@ const DevicesScreen = () => {
     }
   };
 
+  // Skeleton Loading State
   if (loading) {
     return (
-      <View style={[styles.root, { justifyContent: 'center', alignItems: 'center' }]}>
-        <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
-        <LoaderKitView
-          style={{ width: 40, height: 40 }}
-          name={'BallSpinFadeLoader'}
-          animationSpeedMultiplier={1.0}
-          color={'#FFFFFF'}
-        />
-        <AppText style={{ marginTop: 12, color: '#FFFFFF' }}>
-          Loading devices...
-        </AppText>
+      <View style={styles.root}>
+        {renderHeader()}
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <View style={styles.headerTextWrap}>
+            <View style={[styles.skeletonLine, { width: '60%', height: 20, marginBottom: 8 }]} />
+            <View style={[styles.skeletonLine, { width: '80%', height: 14 }]} />
+          </View>
+          
+          {[1, 2, 3].map((item) => (
+            <View key={item} style={styles.deviceCard}>
+              <View style={styles.deviceRow}>
+                <View style={styles.skeletonIcon} />
+                <View style={styles.deviceInfoWrap}>
+                  <View style={[styles.skeletonLine, { width: '50%', height: 16, marginBottom: 8 }]} />
+                  <View style={[styles.skeletonLine, { width: '70%', height: 12, marginBottom: 6 }]} />
+                  <View style={[styles.skeletonLine, { width: '60%', height: 12, marginBottom: 6 }]} />
+                  <View style={[styles.skeletonLine, { width: '40%', height: 12 }]} />
+                </View>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
       </View>
     );
   }
@@ -249,167 +242,116 @@ const DevicesScreen = () => {
   return (
     <>
       <View style={styles.root}>
-        <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
+        {renderHeader()}
 
-        <KeyboardAvoidingView
-          style={styles.kbWrapper}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          {renderHeader()}
-
-          <View style={styles.glassWrapper}>
-            <View style={styles.glassContent}>
-              <View style={{ marginBottom: 10 }}>
-                <Text style={{ color: '#020617', fontSize: 18, fontWeight: '700', marginBottom: 4 }}>
-                  Your active sessions
-                </Text>
-                <Text style={{ color: 'white', fontSize: 13 }}>
-                  These devices are currently logged into your account.
-                </Text>
-              </View>
-
-              {devices.length === 0 ? (
-                <Text style={{ color: '#000', textAlign: 'center', marginTop: 18 }}>
-                  No devices found.
-                </Text>
-              ) : (
-                <ScrollView
-                  style={{ maxHeight: 420, marginTop: 10 }}
-                  contentContainerStyle={{ paddingVertical: 4 }}
-                >
-                  {devices.map((d, idx) => {
-                    const isCurrent = d.deviceId === currentDeviceId;
-                    const locText = formatLocation(d);
-
-                    return (
-                      <View
-                        key={d.deviceId || idx}
-                        style={{
-                          marginBottom: 10,
-                          paddingVertical: 10,
-                          paddingHorizontal: 12,
-                          borderRadius: 16,
-                          backgroundColor: isCurrent
-                            ? 'rgba(191,219,254,0.8)'
-                            : 'rgba(248,250,252,0.9)',
-                          borderWidth: 1,
-                          borderColor: isCurrent
-                            ? 'rgba(37,99,235,0.9)'
-                            : 'rgba(148,163,184,0.6)',
-                          shadowColor: '#000',
-                          shadowOpacity: 0.08,
-                          shadowRadius: 8,
-                          shadowOffset: { width: 0, height: 4 },
-                          elevation: 2,
-                        }}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                          <Icon
-                            name={isCurrent ? 'cellphone' : 'tablet-cellphone'}
-                            size={26}
-                            color={isCurrent ? '#1D4ED8' : '#64748B'}
-                          />
-                          <View style={{ marginLeft: 10, flex: 1 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-                              <Text style={{ color: '#020617', fontWeight: '700', fontSize: 15, flexShrink: 1 }}>
-                                {d.deviceName || 'Unknown device'}
-                              </Text>
-                              {isCurrent && (
-                                <View style={{
-                                  marginLeft: 6, paddingHorizontal: 8, paddingVertical: 2,
-                                  borderRadius: 999, backgroundColor: '#1D4ED8',
-                                }}>
-                                  <Text style={{ color: '#F9FAFB', fontSize: 10, fontWeight: '700' }}>
-                                    THIS DEVICE
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
-                            <Text style={{ color: '#4B5563', fontSize: 13, marginBottom: 2 }}>
-                              {d.deviceBrand || ''} {d.deviceModel || ''}
-                            </Text>
-                            <Text style={{ color: '#6B7280', fontSize: 12 }}>
-                              Last login: {formatDateTime(d.lastLogin)}
-                            </Text>
-                            <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 2 }}>
-                              Location: {locText}
-                            </Text>
-                          </View>
-                        </View>
-
-                        {!isCurrent && (
-                          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 }}>
-                            <TouchableOpacity
-                              onPress={() => openLogoutConfirm(d.deviceId)}
-                              style={{
-                                paddingVertical: 6, paddingHorizontal: 12,
-                                borderRadius: 999, borderWidth: 1, borderColor: '#EF4444',
-                                backgroundColor: 'rgba(248,113,113,0.08)',
-                                flexDirection: 'row', alignItems: 'center',
-                              }}
-                            >
-                              <Icon name="logout-variant" size={14} color="#EF4444" style={{ marginRight: 4 }} />
-                              <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>
-                                Logout this device
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-              )}
-            </View>
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.mainTitle}>Your active sessions</Text>
+            <Text style={styles.mainSubtitle}>
+              These devices are currently logged into your account.
+            </Text>
           </View>
-        </KeyboardAvoidingView>
+
+          {devices.length === 0 ? (
+            <Text style={styles.emptyText}>No devices found.</Text>
+          ) : (
+            <View style={{ paddingBottom: 40 }}>
+              {devices.map((d, idx) => {
+                const isCurrent = d.deviceId === currentDeviceId;
+                const locText = formatLocation(d);
+
+                return (
+                  <View
+                    key={d.deviceId || idx}
+                    style={[
+                      styles.deviceCard,
+                      isCurrent && styles.currentDeviceCard
+                    ]}
+                  >
+                    <View style={styles.deviceRow}>
+                      <View style={[styles.iconWrap, isCurrent && styles.currentIconWrap]}>
+                        <Icon
+                          name={isCurrent ? 'cellphone' : 'tablet-cellphone'}
+                          size={24}
+                          color={isCurrent ? '#818CF8' : '#94A3B8'}
+                        />
+                      </View>
+                      
+                      <View style={styles.deviceInfoWrap}>
+                        <View style={styles.deviceTitleRow}>
+                          <Text style={styles.deviceName} numberOfLines={1}>
+                            {d.deviceName || 'Unknown device'}
+                          </Text>
+                          {isCurrent && (
+                            <View style={styles.badge}>
+                              <Text style={styles.badgeText}>THIS DEVICE</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.deviceSub}>
+                          {d.deviceBrand || ''} {d.deviceModel || ''}
+                        </Text>
+                        <Text style={styles.deviceDetail}>
+                          Last login: {formatDateTime(d.lastLogin)}
+                        </Text>
+                        <Text style={styles.deviceDetail}>
+                          Location: {locText}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {!isCurrent && (
+                      <View style={styles.actionRow}>
+                        <TouchableOpacity
+                          onPress={() => openLogoutConfirm(d.deviceId)}
+                          style={styles.logoutBtn}
+                        >
+                          <Icon name="logout-variant" size={14} color="#F87171" style={{ marginRight: 6 }} />
+                          <Text style={styles.logoutBtnText}>Logout device</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
       </View>
 
+      {/* Modern Dark Confirmation Modal */}
       {confirmVisible && (
-        <View style={{
-          position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
-          backgroundColor: 'rgba(15,23,42,0.6)', justifyContent: 'center', alignItems: 'center',
-        }}>
-          <View style={{
-            width: 290, borderRadius: 20,
-            backgroundColor: 'rgba(15,23,42,0.97)',
-            borderWidth: 1, borderColor: 'rgba(148,163,184,0.6)', padding: 22,
-          }}>
-            <Text style={{ color: '#F9FAFB', fontSize: 16, fontWeight: '700', marginBottom: 8, textAlign: 'center' }}>
-              Logout this device?
-            </Text>
-            <Text style={{ color: '#E5E7EB', fontSize: 13, marginBottom: 18, textAlign: 'center' }}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Logout this device?</Text>
+            <Text style={styles.modalText}>
               This will sign out that device from your account. It will need to log in again to regain access.
             </Text>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+            
+            <View style={styles.modalBtnRow}>
               <TouchableOpacity
                 onPress={() => { setConfirmVisible(false); setTargetDeviceId(null); }}
-                style={{
-                  flex: 1, marginRight: 6, paddingVertical: 9, borderRadius: 12,
-                  backgroundColor: 'rgba(148,163,184,0.28)', alignItems: 'center',
-                }}
+                style={styles.modalCancelBtn}
               >
-                <Text style={{ color: '#E5E7EB', fontWeight: '600' }}>Cancel</Text>
+                <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
+              
               <TouchableOpacity
                 onPress={performLogoutDevice}
                 disabled={logoutLoading}
-                style={{
-                  flex: 1, marginLeft: 6, paddingVertical: 9, borderRadius: 12,
-                  backgroundColor: '#EF4444', alignItems: 'center',
-                }}
+                style={styles.modalConfirmBtn}
               >
                 {logoutLoading ? (
                   <LoaderKitView
                     style={{ width: 20, height: 20 }}
                     name={'BallSpinFadeLoader'}
-                    animationSpeedMultiplier={1.0}
                     color={'#FFFFFF'}
                   />
                 ) : (
-                  <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Logout</Text>
+                  <Text style={styles.modalConfirmText}>Logout</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -425,5 +367,233 @@ const DevicesScreen = () => {
     </>
   );
 };
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#020617', // Flat, deep dark background
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginTop: Platform.OS === 'ios' ? 60 : 50,
+    marginBottom: 10,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#F9FAFB',
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  headerTextWrap: {
+    marginBottom: 20,
+    marginTop: 10,
+  },
+  mainTitle: {
+    color: '#F9FAFB',
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  mainSubtitle: {
+    color: '#94A3B8',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  emptyText: {
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 40,
+    fontSize: 15,
+  },
+  
+  // Device Card Styles
+  deviceCard: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+  currentDeviceCard: {
+    backgroundColor: 'rgba(99, 102, 241, 0.08)',
+    borderColor: 'rgba(99, 102, 241, 0.3)',
+  },
+  deviceRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  iconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  currentIconWrap: {
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+  },
+  deviceInfoWrap: {
+    flex: 1,
+    marginLeft: 14,
+  },
+  deviceTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  deviceName: {
+    color: '#F9FAFB',
+    fontWeight: '700',
+    fontSize: 16,
+    flexShrink: 1,
+  },
+  badge: {
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: '#6366f1',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+  },
+  deviceSub: {
+    color: '#CBD5E1',
+    fontSize: 14,
+    marginBottom: 6,
+    fontWeight: '500',
+  },
+  deviceDetail: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  logoutBtnText: {
+    color: '#F87171',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+
+  // Skeleton Styles
+  skeletonIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  skeletonLine: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 6,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(2, 6, 23, 0.8)', // Darker overlay
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  modalContent: {
+    width: '85%',
+    maxWidth: 320,
+    borderRadius: 20,
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    padding: 24,
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 10 },
+  },
+  modalTitle: {
+    color: '#F9FAFB',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  modalText: {
+    color: '#94A3B8',
+    fontSize: 14,
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  modalBtnRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalCancelBtn: {
+    flex: 1,
+    marginRight: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#E2E8F0',
+    fontWeight: '600',
+    fontSize: 15,
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    marginLeft: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+});
 
 export default DevicesScreen;

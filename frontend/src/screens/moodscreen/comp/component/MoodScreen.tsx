@@ -143,7 +143,7 @@ const handleSelectAndSaveMood = async (moodId) => {
 
   return (
     <>
-      <MainLayout>
+      <MainLayout hideNavBar={true}>
         <AppScreen style={styles.root}>
           {/* Background */}
           <View style={styles.baseBackground} />
@@ -178,7 +178,7 @@ const handleSelectAndSaveMood = async (moodId) => {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}
             >
-              <Text style={styles.mainTitle}>How are you feeling today?</Text>
+              <Text style={styles.mainTitle}>How are you feeling?</Text>
               <Text style={styles.subtitle}>
                 Tap one mood that best matches your current state.
               </Text>
@@ -225,7 +225,7 @@ const handleSelectAndSaveMood = async (moodId) => {
                               isSelected && styles.moodLabelSelected,
                             ]}
                           >
-                            {submitting && isSelected ? "Saving..." : mood.label}
+                            {submitting && isSelected ? "Updating..." : mood.label}
                           </Text>
                         </TouchableOpacity>
                       );

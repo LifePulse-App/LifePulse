@@ -7,6 +7,7 @@ import {
   Keyboard,
   Linking,
   StyleSheet,
+  ScrollView,
 } from 'react-native';
 import { Text } from '@rneui/themed';
 import { TextInput } from 'react-native-paper';
@@ -116,7 +117,7 @@ const ReportProblemScreen = () => {
         style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
-        <Icon name="arrow-left" size={24} color="#111827" />
+        <Icon name="arrow-left" size={24} color="#E5E7EB" />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>Report a Problem</Text>
       <View style={styles.headerRightSpacer} />
@@ -127,72 +128,82 @@ const ReportProblemScreen = () => {
     <>
       <View style={styles.root}>
         <KeyboardAvoidingView
-          style={styles.kbWrapper}
+          style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
         >
-          {renderHeader()}
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {renderHeader()}
 
-          <View style={styles.body}>
-            <Text style={styles.title}>Tell us what went wrong</Text>
-            <Text style={styles.subtitle}>
-              We take reliability and user experience seriously. Please share as
-              many details as you can so we can investigate and fix the issue.
-            </Text>
+            <View style={styles.body}>
+              <Text style={styles.title}>Tell us what went wrong</Text>
+              <Text style={styles.subtitle}>
+                We take reliability and user experience seriously. Please share as
+                many details as you can so we can investigate and fix the issue.
+              </Text>
 
-            <TextInput
-              label="Subject (optional)"
-              value={subject}
-              onChangeText={setSubject}
-              style={styles.input}
-              mode="flat"
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
-              textColor="black"
-              placeholderTextColor="#9CA3AF"
-            />
+              <Text style={styles.inputLabel}>Subject (optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                mode="flat"
+                underlineColor="transparent"
+                activeUnderlineColor="transparent"
+                textColor="#FFFFFF"
+                placeholder="Brief summary of the issue"
+                placeholderTextColor="#64748B"
+                value={subject}
+                onChangeText={setSubject}
+              />
 
-            <TextInput
-              label="Describe the issue"
-              value={description}
-              onChangeText={setDescription}
-              style={[styles.input, styles.descriptionInput]}
-              mode="flat"
-              underlineColor="transparent"
-              activeUnderlineColor="transparent"
-              textColor="black"
-              placeholder="What happened? Steps to reproduce, expected vs actual behavior, any screenshots."
-              placeholderTextColor="#9CA3AF"
-              multiline
-            />
+              <Text style={styles.inputLabel}>Describe the issue</Text>
+              <TextInput
+                style={[styles.textInput, styles.descriptionInput]}
+                mode="flat"
+                underlineColor="transparent"
+                activeUnderlineColor="transparent"
+                textColor="#FFFFFF"
+                placeholder="What happened? Steps to reproduce, expected vs actual behavior"
+                placeholderTextColor="#64748B"
+                value={description}
+                onChangeText={setDescription}
+                multiline
+              />
 
-            <TouchableOpacity
-              onPress={handleSend}
-              style={[styles.primaryButton, sending && { opacity: 0.75 }]}
-              disabled={sending}
-            >
-              {sending ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <LoaderKitView
-                    style={{ width: 20, height: 20 }}
-                    name={'BallSpinFadeLoader'}
-                    animationSpeedMultiplier={1.0}
-                    color={'#FFFFFF'}
-                  />
-                  <AppText style={[styles.primaryButtonText, { marginLeft: 8 }]}>
-                    Opening mail...
-                  </AppText>
-                </View>
-              ) : (
-                <AppText style={styles.primaryButtonText}>Send via Email</AppText>
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSend}
+                style={[styles.primaryButton, sending && { opacity: 0.75 }]}
+                disabled={sending}
+              >
+                {sending ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <LoaderKitView
+                      style={{ width: 24, height: 24 }}
+                      name={'BallSpinFadeLoader'}
+                      color={'#FFFFFF'}
+                    />
+                    <Text style={[styles.primaryButtonText, { marginLeft: 10 }]}>
+                      Opening mail...
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.primaryButtonText}>Send via Email</Text>
+                )}
+              </TouchableOpacity>
 
-            <Text style={styles.footerText}>
-              We will include basic device information (such as device model and
-              OS version) to help us reproduce and debug the issue. No
-              passwords, tokens, or other sensitive data are sent.
-            </Text>
-          </View>
+              <Text style={styles.footerText}>
+                We will include basic device information (such as device model and
+                OS version) to help us reproduce and debug the issue. No
+                passwords, tokens, or other sensitive data are sent.
+              </Text>
+            </View>
+            
+            {/* Added spacer to ensure scroll space exists above keyboard */}
+            <View style={{ height: 60 }} />
+          </ScrollView>
         </KeyboardAvoidingView>
       </View>
 
@@ -208,25 +219,27 @@ const ReportProblemScreen = () => {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#020617', // Flat, deep dark background
   },
-  kbWrapper: {
-    flex: 1,
+  scrollContent: {
+    flexGrow: 1,
     paddingTop: Platform.OS === 'android' ? 32 : 48,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
+    marginTop: 20
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -235,7 +248,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: '#F9FAFB',
   },
   headerRightSpacer: {
     width: 40,
@@ -245,42 +258,58 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 6,
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 13,
-    color: '#4B5563',
-    marginBottom: 16,
+    fontSize: 14,
+    color: '#94A3B8',
+    marginBottom: 24,
+    lineHeight: 22,
   },
-  input: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    marginBottom: 14,
+  inputLabel: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  textInput: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    marginBottom: 20,
   },
   descriptionInput: {
-    minHeight: 120,
+    minHeight: 140,
     textAlignVertical: 'top',
   },
   primaryButton: {
-    backgroundColor: '#6366F1',
-    borderRadius: 999,
-    paddingVertical: 12,
+    backgroundColor: '#6366f1',
+    borderRadius: 14,
+    paddingVertical: 16,
     alignItems: 'center',
-    marginTop: 6,
+    justifyContent: 'center',
+    marginTop: 10,
   },
   primaryButtonText: {
     color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '700',
-    fontSize: 15,
   },
   footerText: {
-    marginTop: 10,
+    marginTop: 24,
     fontSize: 12,
-    color: '#6B7280',
+    color: '#64748B',
     lineHeight: 18,
+    textAlign: 'center',
+    paddingHorizontal: 10,
   },
 });
 

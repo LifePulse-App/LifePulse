@@ -386,16 +386,28 @@ export default function ChatListScreen({ navigation }: any) {
     }
   };
 
-  if (!userLoaded || loadingCache) {
-    return (
-      <MainLayout>
-        <View style={styles.root}>
-          <ActivityIndicator color="#6366f1" size="large" style={{ marginTop: 80 }} />
-          <Text style={{ color: "#fff", textAlign: "center", marginTop: 18 }}>Loading your cached chats...</Text>
-        </View>
-      </MainLayout>
-    );
-  }
+  // if (!userLoaded || loadingCache) {
+  //   return (
+  //     <MainLayout>
+  //       <View style={styles.root}>
+  //        <FlatList
+  //           data={visibleFilteredRows}
+  //           keyExtractor={(item) => `${item.conversationId}:${item.peerUserId}`}
+  //           keyboardShouldPersistTaps="handled"
+  //           renderItem={({ item }) => (
+  //             <ChatRowItem 
+  //               item={item} 
+  //               navigation={navigation} 
+  //               onHideRequest={setDeleteCandidate} 
+  //               onCallRequest={handleCallRequest}
+  //             />
+  //           )}
+  //           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+  //         />
+  //       </View>
+  //     </MainLayout>
+  //   );
+  // }
 
   return (
     <MainLayout>
@@ -429,15 +441,27 @@ export default function ChatListScreen({ navigation }: any) {
           </View>
 
           {(loadingApi && !visibleFilteredRows.length) ? (
-            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-              <ActivityIndicator color="#6366f1" size="large" />
-              <Text style={{ color: "#fff", marginTop: 12 }}>Fetching latest chats...</Text>
-            </View>
+            <FlatList
+            data={visibleFilteredRows}
+            keyExtractor={(item) => `${item.conversationId}:${item.peerUserId}`}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <ChatRowItem 
+                item={item} 
+                navigation={navigation} 
+                onHideRequest={setDeleteCandidate} 
+                onCallRequest={handleCallRequest}
+              />
+            )}
+            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          />
           ) :
           <FlatList
             data={visibleFilteredRows}
             keyExtractor={(item) => `${item.conversationId}:${item.peerUserId}`}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
               <ChatRowItem 
                 item={item} 

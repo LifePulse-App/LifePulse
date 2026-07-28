@@ -250,7 +250,7 @@ useEffect(() => {
   const interval = setInterval(() => {
     fetchDashboardInBackground();
     fetchTodayHabitsInBackground();
-  }, 10000); // refresh every 10 seconds
+  }, 20000); // refresh every 10 seconds
 
   return () => clearInterval(interval);
 }, [      fetchDashboardInBackground, fetchTodayHabitsInBackground]);
@@ -332,9 +332,9 @@ useEffect(() => {
               </View>
             </View>
 
-            <Text style={styles.mainTitle}>Your Mood Journey</Text>
+            <Text style={styles.mainTitle}>Your Journey</Text>
             <Text style={styles.subtitle}>
-              Share your mood, level up daily.
+              Share your mood & activities, level up daily.
             </Text>
              {/* Offline / error banner */}
              {(offline || error) && (
@@ -439,7 +439,7 @@ useEffect(() => {
               </View>
               <View style={[styles.smallCard, { marginRight: 0 }]}>
                 <Icon name="clock-outline" size={22} color="#60A5FA" />
-                <Text style={styles.smallCardTitle}>Habits Completed</Text>
+                <Text style={styles.smallCardTitle}>Activities Completed</Text>
                 <Text style={styles.smallCardValue}>
                   {secondaryCards?.habitCompletionRate ?? 0}
                 </Text>

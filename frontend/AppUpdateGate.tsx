@@ -96,19 +96,19 @@ export default function AppUpdateGate({ children }: any) {
     } catch {}
   };
 
-  // Loading
-  if (checking) {
-    return (
-      <View style={styles.root}>
-        <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color="#A855F7" />
-        </View>
-      </View>
-    );
-  }
+  // // Loading
+  // if (checking) {
+  //   return (
+  //     <View style={styles.root}>
+  //       <View style={styles.baseBackground} />
+  //       <View style={styles.glowTop} />
+  //       <View style={styles.glowBottom} />
+  //       <View style={styles.loaderWrap}>
+  //         <ActivityIndicator size="large" color="#A855F7" />
+  //       </View>
+  //     </View>
+  //   );
+  // }
 
   // Force update - gate app entirely
   if (force) {
