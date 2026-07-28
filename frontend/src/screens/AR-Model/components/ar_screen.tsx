@@ -105,8 +105,7 @@ export default function ARCameraView({ navigation }: any) {
   const [creating, setCreating] = useState(false);
 
   const [viewModalOpen, setViewModalOpen] = useState(false);
-  // REMOVED: const [composeOpen, setComposeOpen] = useState(false);
-  const [composeOpen, setComposeOpen] = useState(false); // Keep but use as overlay instead
+  const [composeOpen, setComposeOpen] = useState(false);
 
   const [lockToSpot, setLockToSpot] = useState(false);
 
@@ -116,7 +115,6 @@ export default function ARCameraView({ navigation }: any) {
   const toastTimerRef = useRef<any>(null);
   const pollRef = useRef<any>(null);
 
-  // Animation for compose overlay
   const composeAnim = useRef(new Animated.Value(0)).current;
 
   const showToast = (text: string, kind: "ok" | "err" = "ok") => {
@@ -143,13 +141,11 @@ export default function ARCameraView({ navigation }: any) {
   const closeSpotModalsOnly = () => {
     setViewModalOpen(false);
     setConfirm(null);
-    // Don't close compose here - handled separately
   };
 
   const reactionCount = (reactions: any[] | undefined, emoji: string) =>
     (reactions || []).filter((r: any) => r.emoji === emoji).length;
 
-  // Animate compose overlay
   useEffect(() => {
     Animated.spring(composeAnim, {
       toValue: composeOpen ? 1 : 0,
@@ -159,27 +155,41 @@ export default function ARCameraView({ navigation }: any) {
     }).start();
   }, [composeOpen]);
 
+  const { hasPermission, requestPermission } = useCameraPermission();
+
+  const askPermissions = async () => {
+    const ok = await requestPermission();
+    setCamPerm(ok ? "granted" : "denied");
+    setCamReady(true);
+  };
+
+  // Fixed Initialization Sequence
   useEffect(() => {
-  (async () => {
-    if (Platform.OS === "android") {
-      const ok = await requestAndroidLocationPermission();
-      setLocPermOk(ok);
-    } else {
-      setLocPermOk(true); // iOS handled differently (if plist exists)
-    }
-  })();
-}, []);
+    let isMounted = true;
 
-const { hasPermission, requestPermission } = useCameraPermission();
+    const initPermissions = async () => {
+      let locOk = true;
+      if (Platform.OS === "android") {
+        locOk = await requestAndroidLocationPermission();
+      }
 
-const askPermissions = async () => {
-  const ok = await requestPermission();
-  setCamPerm(ok ? "granted" : "denied");
-  setCamReady(true)
-};
+      if (isMounted) {
+        setLocPermOk(locOk);
+      }
 
-  useEffect(() => {
-    askPermissions();
+      const camOk = await requestPermission();
+
+      if (isMounted) {
+        setCamPerm(camOk ? "granted" : "denied");
+        setCamReady(true);
+      }
+    };
+
+    initPermissions();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -403,12 +413,11 @@ const askPermissions = async () => {
 
   const roundTo5 = (n: number) => Math.round(n / 5) * 5;
 
-  // Compose overlay animation styles
   const composeSlideStyle = {
     transform: [{
       translateY: composeAnim.interpolate({
         inputRange: [0, 1],
-        outputRange: [H, 0], // Slide up from bottom
+        outputRange: [H, 0],
       })
     }]
   };
@@ -492,9 +501,6 @@ const askPermissions = async () => {
             <Icon name="comment-quote-outline" size={18} color="#E5E7EB" />
             <AppText style={styles.previewTitle} numberOfLines={1}>
               {selectedSpot.name}
-              {/* {typeof (selectedSpot as any).distanceMeters === "number"
-                ? ` • ${roundTo5((selectedSpot as any).distanceMeters)}m`
-                : ""} */}
             </AppText>
 
             <TouchableOpacity onPress={closeSpot} style={styles.previewClose}>
@@ -551,14 +557,12 @@ const askPermissions = async () => {
               <Icon name="comment-quote-outline" size={18} color="#fff" />
               <AppText style={styles.spotText} numberOfLines={1}>
                 {s.name}
-                {/* {typeof s.distanceMeters === "number" ? ` • ${roundTo5(s.distanceMeters)}m` : ""} */}
               </AppText>
               <Icon name="chevron-up" size={18} color="#E5E7EB" />
             </TouchableOpacity>
           ))}
         </View>
 
-      {/* VIEW MODAL - Keep as Modal since it's first level */}
       <Modal transparent visible={viewModalOpen} animationType="fade" onRequestClose={() => setViewModalOpen(false)}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
@@ -585,12 +589,11 @@ const askPermissions = async () => {
                 </TouchableOpacity>
               )}
 
-              {/* PENCIL BUTTON - Opens compose overlay instead of modal */}
               <TouchableOpacity 
                 style={styles.modalClose} 
                 onPress={() => {
-                  setViewModalOpen(false);  // Close view modal first
-                  setTimeout(() => setComposeOpen(true), 100); // Small delay then open compose
+                  setViewModalOpen(false);  
+                  setTimeout(() => setComposeOpen(true), 100); 
                 }}
               >
                 <Icon name="pencil-outline" size={20} color="#fff" />
@@ -647,10 +650,8 @@ const askPermissions = async () => {
         </View>
       </Modal>
 
-      {/* COMPOSE OVERLAY - UPDATED TO USE KEYBOARD CONTROLLER */}
       {composeOpen && (
         <View style={styles.composeOverlay} pointerEvents="box-none">
-          {/* Note: pointerEvents="box-none" ensures you can click outside if needed */}
           <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
             <Animated.View style={[styles.composeCard, composeSlideStyle]}>
               <View style={styles.modalHeader}>
@@ -683,7 +684,6 @@ const askPermissions = async () => {
         </View>
       )}
 
-      {/* CREATE MODAL - UPDATED TO USE KEYBOARD CONTROLLER */}
       <Modal transparent visible={createOpen} animationType="fade" onRequestClose={() => setCreateOpen(false)}>
         <View style={styles.modalOverlay}>
           <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
@@ -724,7 +724,6 @@ const askPermissions = async () => {
         </View>
       </Modal>
 
-      {/* CONFIRM MODAL - Keep as modal */}
       {!!confirm && (
         <View style={styles.confirmOverlay} pointerEvents="auto">
           <View style={styles.confirmCard}>
@@ -791,10 +790,10 @@ spotStack: {
     position: "absolute", 
     left: 0, 
     right: 0, 
-    bottom: Platform.OS === "android" ? 40 : 60, // Pins exactly to the bottom
+    bottom: Platform.OS === "android" ? 40 : 60, 
     alignItems: "center", 
     gap: 10, 
-    flexDirection: "column-reverse", // Forces items to stack upwards, not downwards
+    flexDirection: "column-reverse", 
     zIndex: 10 
   },
   spotPill: {
@@ -920,7 +919,6 @@ spotStack: {
     marginRight: 8,
   },
 
-  // NEW: Compose overlay styles
   composeOverlay: {
     position: 'absolute',
     left: 0,
@@ -938,7 +936,7 @@ spotStack: {
     borderWidth: 1,
     borderColor: "rgba(148, 163, 184, 0.35)",
     padding: 14,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 14, // Extra padding for iOS home indicator
+    paddingBottom: Platform.OS === 'ios' ? 34 : 14,
   },
 
   lockPill: {
@@ -986,7 +984,7 @@ spotStack: {
     borderWidth: 1,
     borderColor: "rgba(148,163,184,0.25)",
   },
-  reactionText: { color: "#E5E7EB", fontWeight: "900", FontSize: 12 },
+  reactionText: { color: "#E5E7EB", fontWeight: "900", fontSize: 12 },
 
   inputTall: {
     minHeight: 48,

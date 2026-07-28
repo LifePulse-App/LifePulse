@@ -26,8 +26,8 @@ import MainLayout from "../../../../shared/components/MainLayout";
 import apiClient from "../../../../auth/api-client/api_client";
 
 const scopes: Array<{ key: "world" | "country" | "city" | "friends"; label: string }> = [
-  { key: "world", label: "World Rank" },
-  { key: "country", label: "Country Rank" },
+  { key: "world", label: "World" },
+  { key: "country", label: "Country" },
   { key: "city", label: "City" },
   { key: "friends", label: "Friends" },
 ];
@@ -577,6 +577,7 @@ const LeaderboardScreen = ({ navigation }: any) => {
                     <FlatList
                       data={countryOptions}
                       keyExtractor={(item) => item.value}
+                      showsVerticalScrollIndicator={false}
                       renderItem={({ item }) => (
                         <TouchableOpacity
                           style={[
@@ -603,6 +604,7 @@ const LeaderboardScreen = ({ navigation }: any) => {
                       <FlatList
                         data={cityOptions}
                         keyExtractor={(item, idx) => item.value + idx}
+                        showsVerticalScrollIndicator={false}
                         renderItem={({ item }) => (
                           <TouchableOpacity
                             style={[
@@ -676,6 +678,7 @@ const LeaderboardScreen = ({ navigation }: any) => {
             <FlatList
               data={data?.leaderboard || []}
               keyExtractor={(item) => String(item.userId || item._id || item.rank)}
+              showsVerticalScrollIndicator={false}
               renderItem={renderRow}
               ItemSeparatorComponent={renderSeparator}
               contentContainerStyle={{ paddingBottom: 24 }}

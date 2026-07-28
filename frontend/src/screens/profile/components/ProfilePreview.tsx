@@ -498,10 +498,8 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                 {avatarUri ? (
                   <Image source={{ uri: avatarUri }} style={styles.avatar} resizeMode="cover" />
                 ) : (
-                  <LinearGradient colors={["#6366f1", "#8b5cf6"]} style={styles.avatarFallback}>
-                    <Text style={styles.avatarInitial}>
-                      {(user?.name || "?")[0].toUpperCase()}
-                    </Text>
+                  <LinearGradient colors={["#334155", "#1e293b"]} style={styles.avatarFallback}>
+                    <Icon name="account" size={48} color="#94a3b8" />
                   </LinearGradient>
                 )}
               </TouchableOpacity>

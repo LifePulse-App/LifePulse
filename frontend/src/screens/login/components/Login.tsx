@@ -275,7 +275,7 @@ const Login = ({ navigation }: any) => {
               </Text>
 
               <TextInput
-                label="Username or Email"
+                
                 placeholder="Username or Email"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -291,7 +291,7 @@ const Login = ({ navigation }: any) => {
               />
 
               <TextInput
-                label="Password"
+                
                 placeholder="Password"
                 value={password}
                 onChangeText={setPassword}

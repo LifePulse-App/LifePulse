@@ -197,7 +197,7 @@ const SetPassVerifiedOTP = ({ navigation, route }: any) => {
             <View style={styles.glassContent}>
               <Text style={styles.mainTitle}>Reset Password</Text>
               <TextInput
-                label="Password"
+               
                 placeholder="Password"
                 value={newPassword}
                 onChangeText={setNewPassword}
@@ -206,14 +206,14 @@ const SetPassVerifiedOTP = ({ navigation, route }: any) => {
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
-                textColor="#111827"
+                textColor="#fff"
 
                 placeholderTextColor="grey"
-                cursorColor='black'
+                cursorColor='white'
               />
 
               <TextInput
-                label="Confirm Password"
+                
                 placeholder="Confirm Password"
                 value={newPasswordMatch}
                 onChangeText={setNewPasswordMatch}
@@ -222,9 +222,9 @@ const SetPassVerifiedOTP = ({ navigation, route }: any) => {
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
-                textColor="#111827"
+                textColor="#fff"
                 placeholderTextColor="grey"
-                cursorColor='black'
+                cursorColor='white'
               />
 
               {loading ? (

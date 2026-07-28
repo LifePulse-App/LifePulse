@@ -1,21 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
+  ScrollView,
+  TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
   Image,
-  TouchableOpacity,
   Keyboard,
+  StyleSheet,
+  TextInput,
 } from 'react-native';
 import { Text } from '@rneui/themed';
-import { TextInput } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
+import Clipboard from '@react-native-clipboard/clipboard'; // Make sure this package is installed, or use your project's clipboard solution
+import { Linking } from 'react-native';
 
-import { loginStyles } from '../../login/components/Loginstyles';
 import api_Login from '../../login/services/api_Login';
-import AppText from '../../../components/Layout/AppText/AppText';
 import LoaderKitView from 'react-native-loader-kit';
 import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,29 +25,28 @@ import NetInfo from '@react-native-community/netinfo';
 const TWO_FA_CACHE_KEY = 'settings:2fa:setup:v1';
 
 const Enable2FAScreen = () => {
-  const styles = loginStyles();
   const navigation = useNavigation<any>();
 
   const [initialLoading, setInitialLoading] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [isAlreadyEnabled, setIsAlreadyEnabled] = useState(false);
 
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [manualKey, setManualKey] = useState<string | null>(null);
+  const [otpauthUrl, setOtpauthUrl] = useState<string | null>(null);
   const [code, setCode] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorVisible, setErrorVisible] = useState(false);
 
-  const [disableMode, setDisableMode] = useState(false);
   const [disablePassword, setDisablePassword] = useState('');
   const [disableCode, setDisableCode] = useState('');
   const [disableBackupCode, setDisableBackupCode] = useState('');
   const [disableLoading, setDisableLoading] = useState(false);
 
-  // FIX 1: Use a ref for offline status so load2FASetup always reads the latest
-  // value synchronously — avoids stale closure on first render.
   const offlineRef = useRef(false);
   const [offline, setOffline] = useState(false);
 
@@ -59,8 +59,6 @@ const Enable2FAScreen = () => {
     setErrorMessage(null);
   };
 
-  // FIX 2: Set up NetInfo listener AND fetch initial network state immediately
-  // on mount so offlineRef is populated before load2FASetup runs.
   useEffect(() => {
     NetInfo.fetch().then((state) => {
       const isOffline = !state.isConnected || state.isInternetReachable === false;
@@ -77,8 +75,6 @@ const Enable2FAScreen = () => {
   }, []);
 
   const load2FASetup = useCallback(async () => {
-    // FIX 3: Always load cache first, unconditionally — before any online/offline checks.
-    // This guarantees cached QR/key is shown immediately regardless of network state.
     let hasCachedData = false;
     try {
       const raw = await AsyncStorage.getItem(TWO_FA_CACHE_KEY);
@@ -89,26 +85,30 @@ const Enable2FAScreen = () => {
           hasCachedData = true;
         }
         if (parsed?.manualKey) setManualKey(parsed.manualKey);
-        if (hasCachedData) setInitialLoading(false); // Show cached data instantly.
+        if (parsed?.otpauthUrl) setOtpauthUrl(parsed.otpauthUrl);
+        if (hasCachedData) setInitialLoading(false);
       }
     } catch {}
 
-    // FIX 4: Read offlineRef.current synchronously instead of offline state
-    // to avoid stale closure where offline is still false on first render.
     if (offlineRef.current) {
       if (!hasCachedData) setInitialLoading(false);
-      // Cache already set above if available — nothing more to do offline.
       return;
     }
 
-    // Online path: fetch live 2FA setup data.
     setInitialLoading(true);
     try {
       const res = await api_Login.init2fa();
+      
       if (!res.ok) {
-        // FIX 5: On API error, keep cache already set above — don't clear state.
+        const msg = (res as any).data?.message || '';
+        if (msg.toLowerCase().includes('already enabled') || msg.toLowerCase().includes('already set up')) {
+          setIsAlreadyEnabled(true);
+          setInitialLoading(false);
+          return;
+        }
+
         if (!hasCachedData) {
-          showError((res as any).data?.message || 'Failed to start 2FA setup');
+          showError(msg || 'Failed to start 2FA setup');
         }
         setInitialLoading(false);
         return;
@@ -116,46 +116,71 @@ const Enable2FAScreen = () => {
 
       const data: any = res.data;
 
-      // FIX 6: Guard against undefined API response — don't overwrite good cache.
+      if (data?.alreadyEnabled) {
+        setIsAlreadyEnabled(true);
+        setInitialLoading(false);
+        return;
+      }
+
       if (!data?.qrImageDataUrl && !data?.manualKey) {
-        console.log('[2FA] API returned no setup data — keeping cache.');
         setInitialLoading(false);
         return;
       }
 
       if (data.qrImageDataUrl) setQrImage(data.qrImageDataUrl);
       if (data.manualKey) setManualKey(data.manualKey);
+      if (data.otpauthUrl) setOtpauthUrl(data.otpauthUrl);
 
       await AsyncStorage.setItem(
         TWO_FA_CACHE_KEY,
         JSON.stringify({
           qrImage: data.qrImageDataUrl,
           manualKey: data.manualKey,
+          otpauthUrl: data.otpauthUrl,
           ts: Date.now(),
         })
       );
     } catch (e: any) {
-      // FIX 7: On error, keep the cache already set above — don't clear state.
-      console.log('[2FA] load2FASetup error — keeping cache:', e?.message);
       if (!hasCachedData) {
         showError('Unable to initialize 2FA. Please try again.');
       }
     } finally {
       setInitialLoading(false);
     }
-  }, []); // FIX 8: No `offline` dependency — uses ref instead.
+  }, []);
 
-  // FIX 9: Single clean mount effect.
   useEffect(() => {
     load2FASetup();
   }, [load2FASetup]);
 
-  // FIX 10: Re-fetch when coming back online so live QR replaces cached one.
   useEffect(() => {
     if (!offline) {
       load2FASetup();
     }
-  }, [offline]); // intentionally only triggers on offline toggle
+  }, [offline]);
+
+  const handleCopyKey = () => {
+    if (manualKey) {
+      Clipboard.setString(manualKey);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleOpenAuthenticator = async () => {
+    if (otpauthUrl) {
+      try {
+        const supported = await Linking.canOpenURL(otpauthUrl);
+        if (supported) {
+          await Linking.openURL(otpauthUrl);
+        } else {
+          showError('No authenticator app found to open this link directly.');
+        }
+      } catch (err) {
+        showError('Failed to open authenticator app.');
+      }
+    }
+  };
 
   const handleConfirm = async () => {
     Keyboard.dismiss();
@@ -173,7 +198,6 @@ const Enable2FAScreen = () => {
       const data: any = res.data;
       if (data.backupCodes && Array.isArray(data.backupCodes)) {
         setBackupCodes(data.backupCodes);
-        // Clear setup cache now that 2FA is enabled.
         await AsyncStorage.removeItem(TWO_FA_CACHE_KEY);
       }
     } catch {
@@ -220,279 +244,463 @@ const Enable2FAScreen = () => {
   };
 
   const renderHeader = () => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, marginTop: 30 }}>
+    <View style={styles.header}>
       <TouchableOpacity
         activeOpacity={0.8}
-        style={{
-          width: 40, height: 40, borderRadius: 16,
-          backgroundColor: 'rgba(15,23,42,0.0)',
-          borderWidth: 1, borderColor: 'rgba(148,163,184,0.4)',
-          justifyContent: 'center', alignItems: 'center', marginLeft: 4,
-        }}
+        style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
         <Icon name="arrow-left" size={24} color="#E5E7EB" />
       </TouchableOpacity>
-      <Text style={{
-        flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700',
-        color: '#F9FAFB', marginRight: 40,
-      }}>
-        Two-factor Auth
-      </Text>
+      <Text style={styles.headerTitle}>Two-factor Auth</Text>
+      <View style={{ width: 40 }} />
     </View>
   );
 
-  const renderDisableSection = () => (
-    <>
+  const renderDisableForm = () => (
+    <View style={styles.formContainer}>
+      <Text style={styles.instructionText}>
+        To disable 2FA, confirm with your password and a 2FA code or backup code.
+      </Text>
+
+      <Text style={styles.inputLabel}>Current Password</Text>
+      <TextInput
+        style={styles.textInput}
+        placeholder="Enter password"
+        placeholderTextColor="#64748B"
+        value={disablePassword}
+        onChangeText={setDisablePassword}
+        secureTextEntry
+      />
+
+      <Text style={styles.inputLabel}>6-digit 2FA code (optional)</Text>
+      <TextInput
+        style={styles.textInput}
+        placeholder="000000"
+        placeholderTextColor="#64748B"
+        value={disableCode}
+        onChangeText={setDisableCode}
+        keyboardType="numeric"
+        maxLength={6}
+      />
+
+      <Text style={styles.inputLabel}>Backup code (optional)</Text>
+      <TextInput
+        style={styles.textInput}
+        placeholder="XXXX-XXXX-XX"
+        placeholderTextColor="#64748B"
+        value={disableBackupCode}
+        onChangeText={setDisableBackupCode}
+        autoCapitalize="characters"
+      />
+
       <TouchableOpacity
-        onPress={() => setDisableMode(!disableMode)}
-        style={[styles.secondaryButton, { marginTop: 16 }]}
+        onPress={handleDisable2FA}
+        style={styles.dangerButton}
+        disabled={disableLoading}
       >
-        <AppText style={styles.secondaryButtonText}>
-          {disableMode ? 'Cancel disable 2FA' : 'Disable 2FA'}
-        </AppText>
+        {disableLoading ? (
+          <LoaderKitView
+            style={{ width: 24, height: 24 }}
+            name={'BallSpinFadeLoader'}
+            color={'#FFFFFF'}
+          />
+        ) : (
+          <Text style={styles.buttonText}>Confirm Disable 2FA</Text>
+        )}
       </TouchableOpacity>
-
-      {disableMode && (
-        <View style={{ marginTop: 10 }}>
-          <Text style={{ color: '#000', fontSize: 13, marginBottom: 6 }}>
-            To disable 2FA, confirm with your password and a 2FA code or backup code.
-          </Text>
-
-          <TextInput
-            label="Current Password"
-            value={disablePassword}
-            onChangeText={setDisablePassword}
-            style={styles.passwordInput}
-            mode="flat"
-            underlineColor="transparent"
-            activeUnderlineColor="transparent"
-            secureTextEntry
-            textColor="black"
-            cursorColor='black'
-          />
-
-          <TextInput
-            label="6-digit 2FA code (optional)"
-            value={disableCode}
-            onChangeText={setDisableCode}
-            style={styles.passwordInput}
-            mode="flat"
-            underlineColor="transparent"
-            activeUnderlineColor="transparent"
-            keyboardType="numeric"
-            maxLength={6}
-            textColor="black"
-            cursorColor='black'
-          />
-
-          <TextInput
-            label="Backup code (optional)"
-            value={disableBackupCode}
-            onChangeText={setDisableBackupCode}
-            style={styles.passwordInput}
-            mode="flat"
-            underlineColor="transparent"
-            activeUnderlineColor="transparent"
-            textColor="black"
-            placeholder="XXXX-XXXX-XX"
-            autoCapitalize="characters"
-            cursorColor='black'
-          />
-
-          <TouchableOpacity
-            onPress={handleDisable2FA}
-            style={[styles.primaryButton, { backgroundColor: '#ef4444', marginTop: 8 }]}
-            disabled={disableLoading}
-          >
-            {disableLoading ? (
-              <LoaderKitView
-                style={{ width: 24, height: 24 }}
-                name={'BallSpinFadeLoader'}
-                animationSpeedMultiplier={1.0}
-                color={'#FFFFFF'}
-              />
-            ) : (
-              <AppText style={styles.primaryButtonText}>Confirm Disable 2FA</AppText>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
-    </>
+    </View>
   );
 
+  // 1. LOADING STATE
   if (initialLoading && !qrImage && !manualKey) {
     return (
       <View style={styles.root}>
-        <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
-        <LoaderKitView
-          style={{ width: 40, height: 40, marginTop: 80 }}
-          name={'BallSpinFadeLoader'}
-          animationSpeedMultiplier={1.0}
-          color={'#FFFFFF'}
-        />
-        <AppText style={{ marginTop: 18, color: '#FFFFFF', fontSize: 16 }}>
-          Preparing 2FA setup...
-        </AppText>
+        {renderHeader()}
+        <View style={styles.centerContent}>
+          <LoaderKitView
+            style={{ width: 45, height: 45 }}
+            name={'BallSpinFadeLoader'}
+            color={'#6366f1'}
+          />
+          <Text style={styles.loadingText}>Preparing 2FA...</Text>
+        </View>
       </View>
     );
   }
 
-  if (backupCodes) {
+  // 2. ALREADY ENABLED STATE
+  if (isAlreadyEnabled) {
     return (
-      <>
-        <View style={styles.root}>
-          <View style={styles.baseBackground} />
-          <View style={styles.glowTop} />
-          <View style={styles.glowBottom} />
-
-          <KeyboardAvoidingView
-            style={styles.kbWrapper}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <View style={styles.root}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
             {renderHeader()}
-
-            <View style={styles.glassWrapper}>
-              <View style={styles.glassContent}>
-                <Text style={styles.mainTitle}>2FA Enabled</Text>
-                <Text style={styles.mainSubtitle}>
-                  Save these backup codes somewhere safe. Each code can be used
-                  once if you lose access to your authenticator app.
-                </Text>
-
-                <ScrollView
-                  style={{ maxHeight: 300, marginVertical: 10 }}
-                  contentContainerStyle={{ paddingVertical: 4 }}
-                >
-                  {backupCodes.map((bc, idx) => (
-                    <View
-                      key={idx}
-                      style={{
-                        paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8,
-                        backgroundColor: 'rgba(255,255,255,0.9)', marginBottom: 6,
-                      }}
-                    >
-                      <Text style={{ color: '#000', fontSize: 15 }}>{bc}</Text>
-                    </View>
-                  ))}
-                </ScrollView>
-
-                <Text style={{ color: '#000', fontSize: 12, textAlign: 'center', marginBottom: 10 }}>
-                  You will not be able to see these codes again. Store them in a secure place.
-                </Text>
-
-                <TouchableOpacity onPress={handleDone} style={styles.primaryButton}>
-                  <AppText style={styles.primaryButtonText}>Done</AppText>
-                </TouchableOpacity>
-
-                {renderDisableSection()}
+            <View style={styles.card}>
+              <View style={styles.iconContainer}>
+                <Icon name="shield-check" size={56} color="#22C55E" />
               </View>
+              <Text style={styles.mainTitle}>2FA is Enabled</Text>
+              <Text style={styles.mainSubtitle}>
+                Your account is currently protected with Two-Factor Authentication.
+              </Text>
+              {renderDisableForm()}
             </View>
-          </KeyboardAvoidingView>
-        </View>
-
-        <GlassyErrorModal
-          visible={errorVisible}
-          message={errorMessage || ''}
-          onClose={hideError}
-        />
-      </>
+            <View style={{ height: 100 }} />
+          </ScrollView>
+        </KeyboardAvoidingView>
+        <GlassyErrorModal visible={errorVisible} message={errorMessage || ''} onClose={hideError} />
+      </View>
     );
   }
 
-  return (
-    <>
+  // 3. SUCCESS / BACKUP CODES STATE
+  if (backupCodes) {
+    return (
       <View style={styles.root}>
-        <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {renderHeader()}
+          <View style={styles.card}>
+            <Text style={styles.mainTitle}>2FA Enabled</Text>
+            <Text style={styles.mainSubtitle}>
+              Save these backup codes somewhere safe. Each code can be used
+              once if you lose access to your authenticator app.
+            </Text>
 
-        <KeyboardAvoidingView
-          style={styles.kbWrapper}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            <View style={styles.backupCodesWrapper}>
+              {backupCodes.map((bc, idx) => (
+                <View key={idx} style={styles.backupCodePill}>
+                  <Text style={styles.backupCodeText}>{bc}</Text>
+                </View>
+              ))}
+            </View>
+
+            <Text style={styles.warningText}>
+              You will not be able to see these codes again. Store them securely.
+            </Text>
+
+            <TouchableOpacity onPress={handleDone} style={styles.primaryButton}>
+              <Text style={styles.buttonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+        <GlassyErrorModal visible={errorVisible} message={errorMessage || ''} onClose={hideError} />
+      </View>
+    );
+  }
+
+  // 4. SETUP STATE (Enable Form)
+  return (
+    <View style={styles.root}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
           {renderHeader()}
 
-          <View style={styles.glassWrapper}>
-            <View style={styles.glassContent}>
-              <Text style={styles.mainTitle}>Enable Two-Factor Auth</Text>
-              <Text style={styles.mainSubtitle}>
-                Scan the QR code below with Google Authenticator, iOS Passwords,
-                or another authenticator app.
-              </Text>
+          <View style={styles.card}>
+            <Text style={styles.mainTitle}>Enable Two-Factor</Text>
+            <Text style={styles.mainSubtitle}>
+              Scan the QR code below or open it directly in your authenticator app.
+            </Text>
 
-              {qrImage && (
-                <View style={{ alignItems: 'center', marginVertical: 12 }}>
-                  <Image
-                    source={{ uri: qrImage }}
-                    style={{ width: 200, height: 200, borderRadius: 12, backgroundColor: '#fff' }}
-                    resizeMode="contain"
-                  />
+            {qrImage && (
+              <View style={styles.qrContainer}>
+                <Image
+                  source={{ uri: qrImage }}
+                  style={styles.qrImage}
+                  resizeMode="contain"
+                />
+              </View>
+            )}
+
+            {/* ⚡ Direct Link to Authenticator App Button */}
+            {otpauthUrl && (
+              <TouchableOpacity
+                onPress={handleOpenAuthenticator}
+                style={styles.actionLinkButton}
+              >
+                <Icon name="shield-key-outline" size={20} color="#818CF8" style={{ marginRight: 8 }} />
+                <Text style={styles.actionLinkText}>Open in Authenticator App</Text>
+              </TouchableOpacity>
+            )}
+
+            {manualKey && (
+              <View style={styles.manualKeyBox}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 6 }}>
+                  <Text style={styles.manualKeyLabel}>Or copy key manually:</Text>
+                  <TouchableOpacity onPress={handleCopyKey} style={styles.copyBtn}>
+                    <Icon name={copied ? "check" : "content-copy"} size={16} color={copied ? "#34D399" : "#E2E8F0"} />
+                    <Text style={[styles.copyBtnText, copied && { color: "#34D399" }]}>
+                      {copied ? "Copied!" : "Copy"}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-              )}
+                <Text selectable style={styles.manualKeyText}>{manualKey}</Text>
+              </View>
+            )}
 
-              {manualKey && (
-                <View style={{
-                  marginBottom: 12, padding: 10, borderRadius: 8,
-                  backgroundColor: 'rgba(255,255,255,0.9)',
-                }}>
-                  <Text style={{ color: '#000', fontWeight: '600', marginBottom: 4 }}>
-                    Or enter this key manually:
-                  </Text>
-                  <Text selectable style={{ color: '#000', fontSize: 14 }}>
-                    {manualKey}
-                  </Text>
-                </View>
-              )}
-
-              <Text style={{ color: '#000', fontSize: 13, marginBottom: 6 }}>
-                After adding your account to the authenticator app, enter the 6-digit code it shows:
-              </Text>
-
+            <View style={styles.formContainer}>
+              <Text style={styles.inputLabel}>Enter 6-digit code</Text>
               <TextInput
-                label="6-digit code"
+                style={styles.textInput}
+                placeholder="000000"
+                placeholderTextColor="#64748B"
                 value={code}
                 onChangeText={setCode}
-                style={styles.passwordInput}
-                mode="flat"
-                underlineColor="transparent"
-                activeUnderlineColor="transparent"
                 keyboardType="numeric"
                 maxLength={6}
-                textColor="black"
               />
 
-              {loading ? (
-                <View style={styles.loadingOverlay}>
+              <TouchableOpacity 
+                onPress={handleConfirm} 
+                style={styles.primaryButton}
+                disabled={loading}
+              >
+                {loading ? (
                   <LoaderKitView
                     style={{ width: 24, height: 24 }}
                     name={'BallSpinFadeLoader'}
-                    animationSpeedMultiplier={1.0}
                     color={'#FFFFFF'}
                   />
-                  <AppText style={styles.loadingText}>Verifying...</AppText>
-                </View>
-              ) : (
-                <TouchableOpacity onPress={handleConfirm} style={styles.primaryButton}>
-                  <AppText style={styles.primaryButtonText}>Confirm & Enable</AppText>
-                </TouchableOpacity>
-              )}
-
-              {renderDisableSection()}
+                ) : (
+                  <Text style={styles.buttonText}>Confirm & Enable</Text>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
-        </KeyboardAvoidingView>
-      </View>
+          
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <GlassyErrorModal
         visible={errorVisible}
         message={errorMessage || ''}
         onClose={hideError}
       />
-    </>
+    </View>
   );
 };
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: '#020617', 
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingTop: Platform.OS === 'android' ? '3%' : '5%',
+    paddingBottom: 20, 
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginTop: 40,
+    marginBottom: 20,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#F9FAFB',
+  },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 100,
+  },
+  loadingText: {
+    marginTop: 20,
+    color: '#94A3B8',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  card: {
+    paddingHorizontal: 24,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  mainTitle: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  mainSubtitle: {
+    fontSize: 15,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  qrContainer: {
+    alignSelf: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    borderRadius: 16,
+    marginBottom: 14,
+  },
+  qrImage: {
+    width: 180,
+    height: 180,
+  },
+  actionLinkButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.3)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  actionLinkText: {
+    color: '#818CF8',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  manualKeyBox: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  manualKeyLabel: {
+    color: '#94A3B8',
+    fontSize: 13,
+  },
+  copyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  copyBtnText: {
+    color: '#E2E8F0',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  manualKeyText: {
+    color: '#F9FAFB',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+  },
+  formContainer: {
+    marginTop: 10,
+  },
+  instructionText: {
+    color: '#94A3B8',
+    fontSize: 14,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  inputLabel: {
+    color: '#E2E8F0',
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  textInput: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    marginBottom: 20,
+    color: '#FFFFFF',
+  },
+  primaryButton: {
+    backgroundColor: '#6366f1',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  dangerButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  backupCodesWrapper: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 20,
+  },
+  backupCodePill: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  backupCodeText: {
+    color: '#E2E8F0',
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  warningText: {
+    color: '#F87171',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 10,
+  },
+});
 
 export default Enable2FAScreen;

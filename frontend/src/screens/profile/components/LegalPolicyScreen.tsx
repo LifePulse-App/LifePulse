@@ -21,7 +21,7 @@ const LegalPolicyScreen = () => {
         style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
-        <Icon name="arrow-left" size={24} color="#111827" />
+        <Icon name="arrow-left" size={24} color="#E5E7EB" />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>Legal & Policy</Text>
       <View style={styles.headerRightSpacer} />
@@ -52,133 +52,111 @@ const LegalPolicyScreen = () => {
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          <Section title="1. Introduction">
-            These Terms of Service and Privacy Policy (&quot;Terms&quot;)
-            govern your use of the StreakSphere mobile application and related
-            services (collectively, the &quot;Service&quot;). By creating an
-            account or using the Service, you agree to be bound by these Terms.
-            If you do not agree, you must not use the Service.
+          <Text style={styles.lastUpdated}>Last Updated: July 2026</Text>
+
+          <Section title="Introduction">
+            Welcome to StreakSphere. These Terms of Service and Privacy Policy ("Terms") govern your use of the StreakSphere mobile application, website, and related services (collectively, the "Service"). By creating an account or using the Service, you agree to be bound by these Terms.
           </Section>
 
-          <Section title="2. Eligibility & Account">
-            To use StreakSphere, you must be at least 13 years of age (or older
-            if required by local law). You are responsible for:
-            {'\n\n'}
-            • Providing accurate registration information (e.g., email,
-            username).{'\n'}
-            • Maintaining the confidentiality of your login credentials.{'\n'}
-            • All activity that occurs under your account.{'\n\n'}
-            You should notify us immediately if you suspect any unauthorized
-            access to your account.
+          <View style={styles.divider} />
+          <Text style={styles.partTitle}>PART 1: PRIVACY POLICY</Text>
+
+          <Section title="1. Information We Collect">
+            To provide and secure the Service, we collect the following information:{'\n\n'}
+            • Information you provide: Email address, username, profile picture, bio, and content you post.{'\n'}
+            • App Usage Data: How you interact with the app, including streak tracking, challenges, social interactions, and crash reports.{'\n'}
+            • Device & Log Data: Device model, operating system version, unique device identifiers, IP address, and login timestamps.{'\n'}
+            • Security Data: 2FA status, backup codes, and a list of authorized devices to prevent unauthorized access.{'\n'}
+            • Device Permissions: With your consent, we may access your camera, photo library, or push notifications to enable specific app features.
           </Section>
 
-          <Section title="3. Acceptable Use">
-            You agree not to misuse the Service. This includes, but is not
-            limited to:{'\n\n'}
-            • Posting or sharing content that is unlawful, harmful, abusive,
-            harassing, defamatory, or discriminatory.{'\n'}
-            • Attempting to gain unauthorized access to other users&apos;
-            accounts or our systems.{'\n'}
-            • Reverse engineering, decompiling, or otherwise attempting to
-            extract the source code of the app.{'\n'}
-            • Using automated scripts, bots, or scrapers in a way that overloads
-            or interferes with the Service.{'\n\n'}
-            We reserve the right to remove content or suspend accounts that
-            violate these rules.
+          <Section title="2. How We Use Your Information">
+            We use your data strictly to operate and improve StreakSphere:{'\n\n'}
+            • To maintain your account, streaks, and data synchronization across devices.{'\n'}
+            • To enable social features, such as sharing progress or participating in challenges.{'\n'}
+            • To secure your account, detect fraud, and alert you of suspicious logins.{'\n'}
+            • To send administrative emails (e.g., password resets) and push notifications.{'\n'}
+            • To analyze app performance and fix technical bugs.
           </Section>
 
-          <Section title="4. Content & Ownership">
-            You retain ownership of the content you create and share on
-            StreakSphere. By posting content, you grant us a non‑exclusive,
-            worldwide, royalty‑free license to store, display, and process that
-            content solely for operating and improving the Service.
-            {'\n\n'}
-            We do not sell your content. We may remove or restrict content that
-            violates these Terms or applicable law.
+          <Section title="3. Third-Party Services">
+            We do not sell your personal data. However, we use trusted third-party service providers to help operate the Service (e.g., cloud hosting like MongoDB/AWS/GCP, analytics, and email delivery). These third parties are contractually obligated to protect your data and may only process it based on our instructions.
           </Section>
 
-          <Section title="5. Data We Collect">
-            To provide and secure the Service, we may collect the following
-            types of information:{'\n\n'}
-            • Account information: email, username, profile details.{'\n'}
-            • Usage information: how you use features such as streak tracking,
-            challenges, or social interactions.{'\n'}
-            • Device information: device model, brand, operating system
-            version, unique device ID, and approximate location based on IP to
-            detect suspicious login activity.{'\n'}
-            • Security data: login timestamps, 2FA status, and authorized
-            devices to keep your account safe.
+          <Section title="4. User Rights & Data Deletion">
+            Depending on your location, you have the right to access, update, or delete your personal data.{'\n\n'}
+            Account Deletion:{'\n'}
+            You may permanently delete your account and associated data at any time via the in-app settings (Settings {'>'} Account {'>'} Delete Account). If you no longer have the app installed, you can email us at contact@streaksphere.app with the subject "Account Deletion Request".{'\n\n'}
+            Upon deletion:{'\n'}
+            • Your profile, streaks, and personal data are removed from our active databases.{'\n'}
+            • Active sessions and authentication tokens are immediately revoked.{'\n'}
+            • Some anonymized analytical data may be retained securely for legal or operational purposes.
           </Section>
 
-          <Section title="6. How We Use Your Data">
-            We use your information to:{'\n\n'}
-            • Operate and maintain your account and streak data.{'\n'}
-            • Provide core app features such as reminders, notifications,
-            streaks, and social interactions (if enabled).{'\n'}
-            • Help secure your account with tools such as two‑factor
-            authentication and device management.{'\n'}
-            • Analyze anonymized usage patterns to improve app performance and
-            user experience.{'\n\n'}
-            We do not sell your personal data. We may share limited information
-            with trusted service providers (e.g., email delivery, analytics)
-            strictly to operate the Service.
+          <Section title="5. Children's Privacy">
+            StreakSphere is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If we discover that a user is under 13, we will delete their account and data immediately.
           </Section>
 
-          <Section title="7. Two-Factor Authentication & Devices">
-            StreakSphere supports two‑factor authentication (2FA) to give your
-            account extra protection. When 2FA is enabled, you may be asked for
-            a 6‑digit code or backup code after entering your password.
-            {'\n\n'}
-            We also track authorized devices for your account. For each device,
-            we may store the device ID, model, brand, last login time, and
-            approximate IP‑based location. This information is used only to:{'\n\n'}
-            • Display a list of devices where you are currently logged in.{'\n'}
-            • Allow you to manually log out specific devices.{'\n'}
-            • Help detect unusual or suspicious login behavior.
+          <View style={styles.divider} />
+          <Text style={styles.partTitle}>PART 2: TERMS OF SERVICE</Text>
+
+          <Section title="6. Acceptable Use & Conduct">
+            You agree not to misuse the Service. You are strictly prohibited from:{'\n\n'}
+            • Attempting to hack, reverse-engineer, or disrupt the app’s infrastructure.{'\n'}
+            • Using automated bots, scrapers, or scripts to manipulate streaks or accounts.{'\n'}
+            • Impersonating others or providing false registration information.
           </Section>
 
-          <Section title="8. Data Retention & Deletion">
-            We retain your account data for as long as your account is active.
-            You may delete your account from within the app. When you do, we
-            will:{'\n\n'}
-            • Remove or anonymize your personal information within a reasonable
-            timeframe, except where retention is required by law.{'\n'}
-            • Delete active sessions and revoke tokens associated with your
-            account.{'\n\n'}
-            Some aggregated or anonymized data (for analytics and security) may
-            be retained, but it cannot be used to identify you.
+          <Section title="7. User-Generated Content & Moderation">
+            StreakSphere allows users to post content and interact. We have a zero-tolerance policy for objectionable content. You agree NOT to post content that is:{'\n\n'}
+            • Unlawful, harassing, abusive, threatening, or defamatory.{'\n'}
+            • Hate speech, discriminatory, or inciting violence.{'\n'}
+            • Sexually explicit or pornographic.{'\n\n'}
+            Moderation: We reserve the right to review, flag, and remove any content that violates these Terms. Users can report inappropriate content or block other users directly within the app. Violators will face immediate account suspension or termination.
           </Section>
 
-          <Section title="9. Security">
-            We implement industry‑standard security measures, including
-            encryption in transit and secure password storage. However, no
-            system is 100% secure. You are encouraged to:{'\n\n'}
-            • Use a strong, unique password for your account.{'\n'}
-            • Enable two‑factor authentication when available.{'\n'}
-            • Review your authorized devices regularly and log out devices you
-            do not recognize.
+          <Section title="8. Intellectual Property">
+            You retain ownership of the content you create. By posting content, you grant StreakSphere a non-exclusive, worldwide, royalty-free license to use, display, and distribute your content solely for the purpose of operating the Service.{'\n\n'}
+            The StreakSphere app, its logo, code, and design are the intellectual property of StreakSphere and may not be copied or reproduced without permission.
           </Section>
 
-          <Section title="10. Changes to These Terms">
-            We may update these Terms from time to time to reflect changes in
-            our app, legal requirements, or best practices. When we make
-            significant changes, we will notify you through the app or by
-            email. Continued use of the Service after such updates means you
-            accept the new Terms.
+          <Section title="9. Disclaimers & Limitation of Liability">
+            "AS IS" Basis: StreakSphere is provided on an "AS IS" and "AS AVAILABLE" basis. We make no warranties that the app will be error-free, completely secure, or operate without interruptions.{'\n\n'}
+            Limitation of Liability: To the maximum extent permitted by law, StreakSphere and its developers shall not be liable for any indirect, incidental, special, or consequential damages resulting from your use of, or inability to use, the Service, including data loss or unauthorized access to your account.
           </Section>
 
-          <Section title="11. Contact Us">
-            If you have questions about these Terms, your privacy, or how your
-            data is handled, you can contact us at:
-            {'\n\n'}
-            contact@streaksphere.app
-            {'\n\n'}
-            Please include &quot;Legal Request&quot; or &quot;Privacy Request&quot; in
-            the subject line so we can route your message appropriately.
+          <View style={styles.divider} />
+          <Text style={styles.partTitle}>PART 3: CHILD SAFETY STANDARDS</Text>
+
+          <Section title="10. Zero Tolerance Policy">
+            StreakSphere is committed to maintaining a safe environment for all users. We have a strict, zero-tolerance policy against Child Sexual Abuse Material (CSAM) and the exploitation of minors.{'\n\n'}
+            Any content that depicts, encourages, promotes, or relates to the sexual exploitation or abuse of children is strictly prohibited. This includes, but is not limited to, sharing CSAM, grooming behaviors, and the sexualization of minors.
           </Section>
 
-          <View style={{ height: 24 }} />
+          <Section title="11. Enforcement & Reporting Mechanisms">
+            If we discover any user violating these standards, we will take immediate action, which includes:{'\n\n'}
+            • Permanent termination of the user's StreakSphere account.{'\n'}
+            • Preservation of associated data for law enforcement.{'\n'}
+            • Reporting the incident and user details to relevant national and international authorities, including the National Center for Missing & Exploited Children (NCMEC) and local law enforcement.{'\n\n'}
+            We empower our community to help keep StreakSphere safe. Users can report inappropriate content or suspicious behavior directly within the app using the "Report" button on profiles, posts, and messages.
+          </Section>
+
+          <View style={styles.divider} />
+
+          <Section title="12. Changes to These Terms">
+            We may update this document periodically. If we make significant changes, we will notify you via the app or email. Your continued use of the Service after changes are published constitutes your acceptance of the updated Terms.
+          </Section>
+
+          <Section title="13. Contact Us">
+            If you have questions regarding these terms, data privacy, or require support, please contact us at:{'\n\n'}
+            • General & Privacy Inquiries: contact@streaksphere.app{'\n'}
+            • Child Safety Concerns: aligee512@gmail.com{'\n\n'}
+            Please include "Privacy Inquiry" or "Legal" in the subject line for faster routing.
+          </Section>
+
+          <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -188,25 +166,26 @@ const LegalPolicyScreen = () => {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#020617', // Flat, deep dark background
   },
   kbWrapper: {
     flex: 1,
     paddingTop: Platform.OS === 'android' ? 32 : 48,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 20,
+    marginTop: 20
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -215,7 +194,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: '#F9FAFB',
   },
   headerRightSpacer: {
     width: 40,
@@ -223,24 +202,41 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
-    marginTop: 4,
   },
   scrollContent: {
     paddingBottom: 24,
   },
+  lastUpdated: {
+    color: '#64748B',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    marginVertical: 24,
+  },
+  partTitle: {
+    color: '#6366f1', // Indigo accent color to match 2FA screen styling
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 16,
+  },
   section: {
-    marginBottom: 18,
+    marginBottom: 24,
   },
   sectionTitle: {
-    color: '#111827',
-    fontSize: 16,
+    color: '#F9FAFB',
+    fontSize: 17,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   sectionText: {
-    color: '#374151',
-    fontSize: 13,
-    lineHeight: 20,
+    color: '#94A3B8',
+    fontSize: 14,
+    lineHeight: 22,
   },
 });
 

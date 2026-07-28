@@ -2,9 +2,7 @@ import RNFS from "react-native-fs";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import apiClient from "../auth/api-client/api_client";
 
-const BASE_DIR =
-  RNFS.DocumentDirectoryPath + "/streaksphere/avatar";
-
+const BASE_DIR = RNFS.DocumentDirectoryPath + "/streaksphere/avatar";
 const baseUrl = apiClient.getBaseURL();
 const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
@@ -19,30 +17,30 @@ export const getLocalAvatarPath = (userId) => {
   return `${BASE_DIR}/${userId}.jpg`;
 };
 
-// download + store avatar
-export const cacheAvatar = async (
-  userId,
-  url,
-  avatarVersion
-) => {
+const getVersionKey = (userId) => `avatar_version_${userId}`;
+
+// download + store avatar     
+export const cacheAvatar = async (userId, url, avatarVersion) => {
   try {
     await ensureDir();
-
     if (!url) return null;
 
     const localPath = getLocalAvatarPath(userId);
 
+    // FIX: Safely handle both absolute (Google/HTTP) and relative (/api/...) paths
+    const fullUrl = url.startsWith("http") 
+      ? url 
+      : (url.startsWith('/') ? newUrl + url : `${newUrl}/${url}`);
+
     const downloadResult = await RNFS.downloadFile({
-      fromUrl: newUrl + url,
+      fromUrl: fullUrl,
       toFile: localPath,
+      connectionTimeout: 30000, 
+      readTimeout: 30000,       
     }).promise;
 
     if (downloadResult.statusCode === 200) {
-      await AsyncStorage.setItem(
-        getVersionKey(userId),
-        String(avatarVersion || 1)
-      );
-
+      await AsyncStorage.setItem(getVersionKey(userId), String(avatarVersion || 1));
       return "file://" + localPath;
     }
 
@@ -54,22 +52,14 @@ export const cacheAvatar = async (
 };
 
 // get avatar (local first)
-export const getAvatar = async (
-  userId,
-  url,
-  avatarVersion = 1
-) => {
+export const getAvatar = async (userId, url, avatarVersion = 1) => {
   try {
+    if (!url) return null;
     const localPath = getLocalAvatarPath(userId);
-
     const exists = await RNFS.exists(localPath);
+    const savedVersion = await AsyncStorage.getItem(getVersionKey(userId));
 
-    const savedVersion = await AsyncStorage.getItem(
-      getVersionKey(userId)
-    );
-
-    const versionChanged =
-      String(savedVersion) !== String(avatarVersion);
+    const versionChanged = String(savedVersion) !== String(avatarVersion);
 
     if (exists && !versionChanged) {
       return "file://" + localPath;
@@ -79,11 +69,7 @@ export const getAvatar = async (
       await RNFS.unlink(localPath);
     }
 
-    return await cacheAvatar(
-      userId,
-      url,
-      avatarVersion
-    );
+    return await cacheAvatar(userId, url, avatarVersion);
   } catch (err) {
     console.log(err);
     return null;
@@ -98,6 +84,3 @@ export const clearAvatarCache = async () => {
     await RNFS.mkdir(BASE_DIR);
   }
 };
-
-const getVersionKey = (userId) =>
-  `avatar_version_${userId}`;

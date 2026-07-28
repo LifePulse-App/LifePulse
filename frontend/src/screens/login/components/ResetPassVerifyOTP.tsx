@@ -190,7 +190,7 @@ const ResetPassVerifyOTP = ({ navigation, route }: any) => {
               </Text>
 
               <TextInput
-                label="OTP"
+               
                 placeholder="OTP"
                 value={otp}
                 onChangeText={setOtp}
@@ -200,8 +200,9 @@ const ResetPassVerifyOTP = ({ navigation, route }: any) => {
                 activeUnderlineColor="transparent"
                 keyboardType="number-pad"
                 maxLength={6}
-                textColor="#111827"
+                textColor="#fff"
                 placeholderTextColor="#9CA3AF"
+                cursorColor='white'
               />
 
               {loading ? (
