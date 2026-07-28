@@ -18,9 +18,12 @@ const SavedAccountsScreen = ({ navigation }: any) => {
   const authContext = useContext(AuthContext);
 
   const [accounts, setAccounts] = useState<SavedAccount[]>([]);
+  
+  // ⚡ Separate state for target account and action type ("login" vs "remove")
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [actionType, setActionType] = useState<"login" | "remove" | null>(null);
 
-  // ✅ keep only unique usernames (case-insensitive)
+  // Keep only unique usernames (case-insensitive)
   const getUniqueByUsername = (list: SavedAccount[]) => {
     const seen = new Set<string>();
     const unique: SavedAccount[] = [];
@@ -51,6 +54,7 @@ const SavedAccountsScreen = ({ navigation }: any) => {
   const handleLogin = async (acc: SavedAccount) => {
     try {
       setLoadingId(acc.id);
+      setActionType("login");
       setSecretKey();
 
       const deviceId = await DeviceInfo.getUniqueId();
@@ -83,7 +87,7 @@ const SavedAccountsScreen = ({ navigation }: any) => {
       if (user.accessToken) await UserStorage.setAccessToken(user.accessToken);
       if (user.refreshToken) await UserStorage.setRefreshToken(user.refreshToken);
 
-      await connectSocket()
+      await connectSocket();
 
       navigation.dispatch(
         CommonActions.reset({
@@ -93,40 +97,34 @@ const SavedAccountsScreen = ({ navigation }: any) => {
       );
     } finally {
       setLoadingId(null);
+      setActionType(null);
     }
   };
 
-// ⚡ UPDATED: Accept the full account object
   const handleRemove = async (acc: SavedAccount) => {
     try {
-      setLoadingId(acc.id); // Show loading state on the remove button
+      setLoadingId(acc.id); 
+      setActionType("remove"); // ⚡ Explicitly flag as removal
       const deviceId = await DeviceInfo.getUniqueId();
 
-      // 1. Silently login to get a fresh, valid access token
       const res = await api_Login.getLogin(
         acc.username,
         acc.password,
         deviceId
       );
 
-      // 2. If successful, use the token to tell the backend to forget this device
       if (res.ok && res.data?.accessToken) {
-        // Temporarily set the auth header for this specific request
         setAuthHeaders(res.data.accessToken);
-        
-        // Ensure you have a logoutDevice method in your api_Login service!
         await api_Login.logoutDevice(deviceId); 
-        
-        // Clear the header right after
         setAuthHeaders(null);
       }
     } catch (error) {
       console.log("Failed to remove device from backend:", error);
     } finally {
-      // 3. ALWAYS remove from local storage, even if the backend request fails
       await SavedAccountsStorage.remove(acc.id);
       await load();
       setLoadingId(null);
+      setActionType(null);
     }
   };
 
@@ -144,37 +142,40 @@ const SavedAccountsScreen = ({ navigation }: any) => {
 
         <View style={localStyles.card}>
           <ScrollView showsVerticalScrollIndicator={false}>
-            {accounts.map((acc) => (
-              <View key={acc.id} style={localStyles.accountRow}>
-                <View style={localStyles.userInfo}>
-                  <Text style={localStyles.username}>{acc?.user?.user?.name}</Text>
-                  <Text style={localStyles.smallText}>Tap login to continue</Text>
-                </View>
+            {accounts.map((acc) => {
+              const isThisLoading = loadingId === acc.id;
 
-                <View style={localStyles.rowActions}>
-                  <TouchableOpacity
-                    style={localStyles.loginBtn}
-                    onPress={() => handleLogin(acc)}
-                    disabled={loadingId === acc.id}
-                  >
-                    <Text style={localStyles.loginText}>
-                      {loadingId === acc.id ? "Loading..." : "Login"}
-                    </Text>
-                  </TouchableOpacity>
+              return (
+                <View key={acc.id} style={localStyles.accountRow}>
+                  <View style={localStyles.userInfo}>
+                    <Text style={localStyles.username}>{acc?.user?.user?.name || acc.username}</Text>
+                    <Text style={localStyles.smallText}>Tap login to continue</Text>
+                  </View>
 
-                  <TouchableOpacity
-                    style={localStyles.removeBtn}
-                    // ⚡ UPDATED: Pass 'acc' instead of 'acc.id'
-                    onPress={() => handleRemove(acc)}
-                    disabled={loadingId === acc.id}
-                  >
-                    <Text style={localStyles.removeText}>
-                      {loadingId === acc.id ? "Remove" : "Remove"}
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={localStyles.rowActions}>
+                    <TouchableOpacity
+                      style={localStyles.loginBtn}
+                      onPress={() => handleLogin(acc)}
+                      disabled={isThisLoading}
+                    >
+                      <Text style={localStyles.loginText}>
+                        {isThisLoading && actionType === "login" ? "Loading..." : "Login"}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={localStyles.removeBtn}
+                      onPress={() => handleRemove(acc)}
+                      disabled={isThisLoading}
+                    >
+                      <Text style={localStyles.removeText}>
+                        {isThisLoading && actionType === "remove" ? "Removing..." : "Remove"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </ScrollView>
 
           <TouchableOpacity
@@ -200,7 +201,7 @@ const savedStyles = () =>
     appName: {
       fontSize: 30,
       fontWeight: "800",
-      color: "#A8FFF8",
+      color: "#f9f9f9",
     },
     subTitle: {
       color: "#9CA3AF",

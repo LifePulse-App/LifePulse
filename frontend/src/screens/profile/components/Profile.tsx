@@ -18,7 +18,7 @@ import FastImage from 'react-native-fast-image';
 import { getAvatar } from "../../../storage/AvatarManager";
 import { disconnectSocket } from "../../../auth/api-client/socket";
 
-const PROFILE_CACHE_KEY = 'sbjkshiuhuw'
+const PROFILE_CACHE_KEY = 'sbjkshiuhuw';
 
 const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }: any) => {
   if (!visible) return null;
@@ -320,7 +320,7 @@ function LinkedAccountModal({ onClose, onChange, setResultCard }: any) {
           type: "error", 
           message: (response as any)?.data?.message || "Error changing email." 
         });
-        onClose(); // 🚨 Closes sheet, leaves error card on screen
+        onClose(); 
         return;
       }
       setLoading(false);
@@ -331,7 +331,7 @@ function LinkedAccountModal({ onClose, onChange, setResultCard }: any) {
         type: "error", 
         message: err?.response?.data?.message || "Failed to send OTP." 
       });
-      onClose(); // 🚨 Closes sheet, leaves error card on screen
+      onClose(); 
     }
   };
 
@@ -345,7 +345,7 @@ function LinkedAccountModal({ onClose, onChange, setResultCard }: any) {
           type: "error", 
           message: (response.data as any)?.message || "Error changing email." 
         });
-        onClose(); // 🚨 Closes sheet, leaves error card on screen
+        onClose(); 
         return;
       }
       setEmail(newEmail);
@@ -356,14 +356,14 @@ function LinkedAccountModal({ onClose, onChange, setResultCard }: any) {
       setLoading(false);
       setResultCard({ visible: true, type: "success", message: "Email successfully updated!" });
       onChange?.();
-      onClose(); // Close the sheet on success
+      onClose(); 
     } catch (err: any) {
       setResultCard({ 
         visible: true, 
         type: "error", 
         message: err?.response?.data?.message || "Failed to update email." 
       });
-      onClose(); // 🚨 Closes sheet, leaves error card on screen
+      onClose(); 
     }
   };
 
@@ -435,6 +435,7 @@ const settingSections = [
       { icon: "account-edit", label: "Edit Profile", route: "EditProfile" },
       { icon: "key", label: "Change Password", route: "ChangePassword" },
       { icon: "link", label: "Manage Linked Account", route: "LinkedAccount" },
+      { icon: "crown-outline", label: "StreakSphere+", route: "Plus", disabled: true },
     ],
   },
   {
@@ -466,9 +467,10 @@ export default function ProfileScreen({ navigation }: any) {
   const userId = user?.id;
   
   const [profile, setProfile] = useState<any>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
-  const [avatarVersion, setAvatarVersion] = useState(null);
+
+  // Store the actual file:// path returned by AvatarManager
+  const [localAvatarUri, setLocalAvatarUri] = useState<string | null>(null);
 
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -491,17 +493,17 @@ export default function ProfileScreen({ navigation }: any) {
   const openRelReqSheet = () => relReqSheetRef.current?.present();
   const closeRelReqSheet = () => relReqSheetRef.current?.dismiss();
 
-const formatTimeRemaining = (endDate: string) => {
-  const diff = new Date(endDate).getTime() - Date.now();
-  if (diff <= 0) return "Expired";
-  
-  const totalSeconds = Math.floor(diff / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  
-  return `${hours}h ${minutes}m ${seconds}s`;
-};
+  const formatTimeRemaining = (endDate: string) => {
+    const diff = new Date(endDate).getTime() - Date.now();
+    if (diff <= 0) return "Expired";
+    
+    const totalSeconds = Math.floor(diff / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    
+    return `${hours}h ${minutes}m ${seconds}s`;
+  };
 
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
   const [deleteOtpStep, setDeleteOtpStep] = useState(0);
@@ -514,7 +516,6 @@ const formatTimeRemaining = (endDate: string) => {
 
   const offlineRef = useRef(false);
   const [offline, setOffline] = useState(false);
-  const hasMountedRef = useRef(false);
 
   const openLogoutSheet = async () => {
     await logoutSheetRef.current?.present();
@@ -549,58 +550,62 @@ const formatTimeRemaining = (endDate: string) => {
       ]);
       
       const fetchedUser = (profileRes as any)?.data?.user;
-      
-
       if (!fetchedUser) return;
 
-      const { avatarThumbnailUrl } = (avatarRes as any)?.data || {};
-      const merged = { ...fetchedUser, avatarThumbnailUrl };
+      const { avatarThumbnailUrl, avatarUrl: fetchedAvatarUrl } = (avatarRes as any)?.data || {};
+      
+      // Merge all retrieved properties together
+      const merged = { ...fetchedUser, avatarThumbnailUrl, avatarUrl: fetchedAvatarUrl };
+      
       setProfile(merged);
-      setAvatarVersion(fetchedUser.avatarVersion);
       await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
+      
     } catch (e: any) {
       console.log("[Profile] fetchProfileOnline error — keeping cache:", e?.message);
     }
   }, []); 
 
+  // Initialize Cache First, then fetch Online
   useEffect(() => {
+    let isMounted = true;
     (async () => {
       try {
         const raw = await AsyncStorage.getItem(PROFILE_CACHE_KEY);
-        if (raw) {
-          const cached = JSON.parse(raw);
-          if (cached) setProfile(cached);
+        if (raw && isMounted) {
+          setProfile(JSON.parse(raw));
         }
       } catch {}
-      await fetchProfileOnline();
+      
+      fetchProfileOnline();
     })();
+    return () => { isMounted = false; };
   }, [fetchProfileOnline]);
 
   useFocusEffect(
     useCallback(() => {
-      if (!hasMountedRef.current) {
-        hasMountedRef.current = true;
-        return;
-      }
       fetchProfileOnline();
     }, [fetchProfileOnline])
   );
 
+  // 🔥 Let AvatarManager handle the image caching seamlessly
   useEffect(() => {
-    if (!offline) fetchProfileOnline();
-  }, [offline]); 
-
-  useEffect(() => {
-    const loadAvatar = async () => {
+    const loadAvatarFromManager = async () => {
       if (!profile?._id) return;
-      const finalAvatar = await getAvatar(
-        profile._id,
-        profile?.avatarUrl || profile?.avatarThumbnailUrl
-      );
-      setAvatarUrl(finalAvatar);
+      
+      const rawUrl = profile?.avatarUrl || profile?.avatarThumbnailUrl;
+      
+      // If the backend has no avatar for this user, safely clear the local state
+      if (!rawUrl || rawUrl.trim() === '' || rawUrl === 'null' || rawUrl === 'undefined') {
+        setLocalAvatarUri(null);
+        return;
+      }
+
+      // Download/Fetch local path via your AvatarManager
+      const localPath = await getAvatar(profile._id, rawUrl, profile.avatarVersion);
+      setLocalAvatarUri(localPath); 
     };
-    loadAvatar();
-  }, [profile?._id, avatarVersion]);
+    loadAvatarFromManager();
+  }, [profile?._id, profile?.avatarUrl, profile?.avatarThumbnailUrl, profile?.avatarVersion]);
 
   const confirmLogout = async () => {
     const userData = authContext?.User;
@@ -723,8 +728,10 @@ const formatTimeRemaining = (endDate: string) => {
   const isSuspended = !!profile?.partnerGracePeriodEnd;
 
   const incomingReqs = Array.isArray(profile?.relationshipIncoming) ? profile.relationshipIncoming : [];
-  
   const hasIncoming = incomingReqs.length > 0;
+
+  // 🔥 Apply Cache Buster strictly via Version so FastImage never flashes white randomly
+  const finalAvatarUri = localAvatarUri ? `${localAvatarUri}?v=${profile?.avatarVersion || 1}` : null;
 
   const renderActionModal = () => {
     return (
@@ -766,7 +773,7 @@ const formatTimeRemaining = (endDate: string) => {
             <LinkedAccountModal
               onClose={closeSheet}
               onChange={fetchProfileOnline}
-              setResultCard={setResultCard} // 🚨 MAKE SURE THIS LINE IS ADDED!
+              setResultCard={setResultCard} 
             />
           )}
         </View>
@@ -810,7 +817,6 @@ const formatTimeRemaining = (endDate: string) => {
     );
   };
 
-  // ⚡ Incoming Requests Sheet 
 const renderRelReqSheet = () => {
     return (
       <TrueSheet
@@ -830,14 +836,12 @@ const renderRelReqSheet = () => {
               No pending requests.
             </Text>
           ) : (
-            // ⚡ REMOVED SCROLLVIEW. Using a View with flex: 1
             <View style={{ flex: 1 }}>
 {incomingReqs.map((req: any, index: number) => {
   const reqUser = req.user || req; 
   
   return (
     <View key={reqUser?._id || index} style={styles.reqCard}>
-      {/* Container for Avatar and Name */}
       <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
         {reqUser.avatarUrl ? (
           <Image 
@@ -850,7 +854,6 @@ const renderRelReqSheet = () => {
           </View>
         )}
         
-        {/* TEXT CONTAINER - This is what was missing in your render */}
         <View style={styles.textContainer}>
           <Text style={{ color: "#F9FAFB", fontSize: 16, fontWeight: "bold" }}>
             {reqUser.name || "Unknown"}
@@ -861,7 +864,6 @@ const renderRelReqSheet = () => {
         </View>
       </View>
       
-      {/* Buttons Container */}
       <View style={{ flexDirection: "row", gap: 8 }}>
         <TouchableOpacity 
           style={styles.reqBtnAccept} 
@@ -890,7 +892,7 @@ const renderRelReqSheet = () => {
   };
 
   return (
-    <MainLayout>
+    <MainLayout hideNavBar={true}>
       <View style={styles.topBar}>
         <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass} onPress={() => navigation.goBack()}>
           <Icon name="arrow-left" size={24} color="#E5E7EB" />
@@ -905,20 +907,19 @@ const renderRelReqSheet = () => {
         <View style={styles.mainCard}>
           <View style={styles.avatarWrap}>
             <View style={styles.avatarCircle}>
-              {avatarUrl ? (
+              {finalAvatarUri ? (
                 <View style={styles.avatarMask}>
                  <FastImage
                     style={styles.avatarImageZoomed}
                     source={{
-                      uri: avatarUrl.startsWith("http") ? newUrl + avatarUrl : avatarUrl,
+                      uri: finalAvatarUri,
                       priority: FastImage.priority.high,
-                      cache: FastImage.cacheControl.immutable,
                     }}
                     resizeMode={FastImage.resizeMode.cover}
                   />
                 </View>
               ) : (
-                <Icon name="account-circle-outline" size={70} color="#6366f1" />
+                <Icon name="account" size={70} color="#94a3b8" />
               )}
               <TouchableOpacity style={styles.editBtn} onPress={() => navigation.navigate('AvatarCreator')}>
                 <Icon name="pencil" size={17} color="#fff" />

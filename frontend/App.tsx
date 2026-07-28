@@ -427,15 +427,15 @@ if (data.type === 'chat' && data.peerUserId) {
     ),
   };
 
-  if (isCheckingBiometric) {
-    return (
-      <PaperProvider settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#020617' }}>
-          <ActivityIndicator size="large" color="#A855F7" />
-        </View>
-      </PaperProvider>
-    );
-  }
+  // if (isCheckingBiometric) {
+  //   return (
+  //     <PaperProvider settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
+  //       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#020617' }}>
+  //         <ActivityIndicator size="large" color="#A855F7" />
+  //       </View>
+  //     </PaperProvider>
+  //   );
+  // }
 
   return (
     <KeyboardProvider>

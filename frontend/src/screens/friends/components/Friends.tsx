@@ -472,7 +472,7 @@ const Friends = ({ navigation }: any) => {
   };
 
   return (
-    <MainLayout>
+    <MainLayout hideNavBar={true}>
       <AppScreen style={styles.root}>
         <GlassConfirmModal
           visible={!!showRemoveModal?.user}
@@ -532,6 +532,7 @@ const Friends = ({ navigation }: any) => {
                   keyExtractor={(item) => (item as any)?.user?._id || (item as any)?._id || Math.random().toString()}
                   renderItem={renderUserItem}
                   scrollEnabled={false}
+                  showsVerticalScrollIndicator={false}
                   ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
                   ListFooterComponent={() =>
                     friendRequests.length > 3 && (
@@ -571,6 +572,7 @@ const Friends = ({ navigation }: any) => {
                   data={listData}
                   keyExtractor={(item) => item._id}
                   renderItem={renderUserItem}
+                  showsVerticalScrollIndicator={false}
                   scrollEnabled={false}
                   ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
                 />

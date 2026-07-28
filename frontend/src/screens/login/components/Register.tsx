@@ -193,7 +193,7 @@ const Register = ({ navigation }: any) => {
               </Text>
 
               <TextInput
-                label="Name"
+                
                 placeholder="Name"
                 value={name}
                 onChangeText={setName}
@@ -201,13 +201,13 @@ const Register = ({ navigation }: any) => {
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
-                textColor="#111827"
+                textColor="#fff"
                 placeholderTextColor="grey"
-                cursorColor='black'
+                cursorColor='grey'
               />
 
               <TextInput
-                label="Username"
+                
                 placeholder="Username"
                 value={username}
                 onChangeText={setUsername}
@@ -215,13 +215,13 @@ const Register = ({ navigation }: any) => {
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
-                textColor="#111827"
+                textColor="#fff"
                 placeholderTextColor="grey"
-                cursorColor='black'
+                cursorColor='grey'
               />
 
               <TextInput
-                label="Email"
+                
                 placeholder="Email"
                 value={identifier}
                 onChangeText={setIdentifier}
@@ -229,13 +229,12 @@ const Register = ({ navigation }: any) => {
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
-                textColor="#111827"
+                textColor="#fff"
                 placeholderTextColor="grey"
-                cursorColor='black'
+                cursorColor='grey'
               />
 
              <TextInput
-                label="Password"
                 placeholder="Password"
                 value={password}
                 onChangeText={setPassword}
@@ -244,9 +243,9 @@ const Register = ({ navigation }: any) => {
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
-                textColor="#111827"
+                textColor="#fff"
                 placeholderTextColor="grey"
-                cursorColor='black'
+                cursorColor='white'
                 right={
                   <TextInput.Icon
                     icon={showPassword ? 'eye-off' : 'eye'}
@@ -256,7 +255,6 @@ const Register = ({ navigation }: any) => {
               />
 
               <TextInput
-                label="Confirm Password"
                 placeholder="Confirm Password"
                 value={confirmpassword}
                 onChangeText={setConfirmPassword}
@@ -265,9 +263,9 @@ const Register = ({ navigation }: any) => {
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
-                textColor="#111827"
+                textColor="#fff"
                 placeholderTextColor="grey"
-                cursorColor='black'
+                cursorColor='white'
                 right={
                   <TextInput.Icon
                     icon={showConfirmPassword ? 'eye-off' : 'eye'}

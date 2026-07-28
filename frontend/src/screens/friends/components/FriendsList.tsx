@@ -290,7 +290,7 @@ const resolveAvatarUri = async (item: Friend) => {
   };
 
   return (
-    <MainLayout>
+    <MainLayout hideNavBar={true}>
       <View style={styles.root}>
         <View style={styles.baseBackground} />
         <View style={styles.glowTop} />
@@ -352,6 +352,7 @@ const resolveAvatarUri = async (item: Friend) => {
           keyExtractor={(item) => item._id}
           renderItem={renderFriend}
           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 18 }}
           ListEmptyComponent={
             <View style={{ paddingTop: 30, alignItems: "center" }}>

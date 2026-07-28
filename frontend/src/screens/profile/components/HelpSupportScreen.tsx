@@ -21,7 +21,7 @@ const HelpSupportScreen = () => {
         style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
-        <Icon name="arrow-left" size={24} color="#111827" />
+        <Icon name="arrow-left" size={24} color="#E5E7EB" />
       </TouchableOpacity>
       <Text style={styles.headerTitle}>FAQ & Help</Text>
       <View style={styles.headerRightSpacer} />
@@ -30,7 +30,15 @@ const HelpSupportScreen = () => {
 
   const Question = ({ q, a }: { q: string; a: string }) => (
     <View style={styles.questionCard}>
-      <Text style={styles.questionTitle}>{q}</Text>
+      <View style={styles.questionHeader}>
+        <Icon 
+          name="help-circle-outline" 
+          size={20} 
+          color="#6366f1" 
+          style={styles.questionIcon} 
+        />
+        <Text style={styles.questionTitle}>{q}</Text>
+      </View>
       <Text style={styles.questionText}>{a}</Text>
     </View>
   );
@@ -142,7 +150,7 @@ const HelpSupportScreen = () => {
               'Authorized devices are the phones or tablets that are currently logged into your StreakSphere account. ' +
               'We show you this list so that you can:\n\n' +
               '• See where your account is being used.\n' +
-              '• Log out devices you don&apos;t recognize or no longer use.\n\n' +
+              '• Log out devices you don\'t recognize or no longer use.\n\n' +
               'You can view and manage authorized devices in Profile → Privacy & Security → "Devices in which you are logged in".'
             }
           />
@@ -150,7 +158,7 @@ const HelpSupportScreen = () => {
           <Question
             q="I found a bug or something is not working. What should I do?"
             a={
-              'If something looks broken or doesn&apos;t behave as expected:\n\n' +
+              'If something looks broken or doesn\'t behave as expected:\n\n' +
               '1. Go to Profile → Help & Support → "Report a Problem".\n' +
               '2. Fill in the subject (optional) and describe what happened in as much detail as possible.\n' +
               '3. We automatically attach basic device information (model and OS version) to help us debug.\n\n' +
@@ -167,7 +175,7 @@ const HelpSupportScreen = () => {
             }
           />
 
-          <View style={{ height: 24 }} />
+          <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -177,25 +185,26 @@ const HelpSupportScreen = () => {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#020617', // Flat, deep dark background
   },
   kbWrapper: {
     flex: 1,
     paddingTop: Platform.OS === 'android' ? 32 : 48,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
+    marginTop: 20
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 16,
-    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -204,7 +213,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: '#F9FAFB',
   },
   headerRightSpacer: {
     width: 40,
@@ -217,34 +226,46 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 6,
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 13,
-    color: '#4B5563',
-    marginBottom: 18,
+    fontSize: 14,
+    color: '#94A3B8',
+    marginBottom: 24,
+    lineHeight: 22,
   },
   questionCard: {
     marginBottom: 16,
-    padding: 12,
-    borderRadius: 14,
-    backgroundColor: '#F9FAFB',
+    padding: 18,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.03)',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  questionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  questionIcon: {
+    marginRight: 10,
+    marginTop: 2,
   },
   questionTitle: {
-    color: '#111827',
+    color: '#F9FAFB',
     fontWeight: '700',
-    fontSize: 14,
-    marginBottom: 4,
+    fontSize: 16,
+    flex: 1,
+    lineHeight: 24,
   },
   questionText: {
-    color: '#374151',
-    fontSize: 13,
-    lineHeight: 18,
+    color: '#94A3B8',
+    fontSize: 14,
+    lineHeight: 22,
+    paddingLeft: 30, // Aligns perfectly under the text, clearing the icon
   },
 });
 
