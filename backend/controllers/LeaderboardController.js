@@ -68,17 +68,25 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
   const rawCity = getQueryVal(req.query, 'city');
 
   const scope = normalizeScope(rawScope);
+  
+  // ⚡ FIX: Added isPremium to select
   const user = await User.findById(req.user._id).select(
-    'monthlyXp totalXp level currentTitle country city username name avatarUrl following friends tick'
+    'monthlyXp totalXp level currentTitle country city username name avatarUrl following friends tick isPremium blockedUsers blockedBy'
   );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
+  // ⚡ Get blocked IDs
+  const blockedIds = [...(user.blockedUsers || []), ...(user.blockedBy || [])].map(String);
+
+  // ⚡ StreakSphere+ Benefit: 2x Multiplier on points if premium
+  const effectiveMonthlyXp = user.isPremium ? (user.monthlyXp || 0) * 2 : (user.monthlyXp || 0);
+
   if (scope === 'friends') {
-    const friendIds = getFriendIds(user);
+    const friendIds = getFriendIds(user).filter(id => !blockedIds.includes(String(id)));
 
     const topPlayers = await User.find(
-      { _id: { $in: friendIds } },
-      'username name monthlyXp level currentTitle country city avatarUrl tick'
+      { accountStatus: 'active', _id: { $in: friendIds } },
+      'username name monthlyXp level currentTitle country city avatarUrl tick isPremium'
     )
       .sort({ monthlyXp: -1, _id: 1 })
       .limit(100)
@@ -100,26 +108,28 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
         userId: u._id,
         username: u.username,
         name: u.name,
-        monthlyXp: u.monthlyXp,
+        monthlyXp: u.isPremium ? u.monthlyXp * 2 : u.monthlyXp, // Apply 2x multiplier for plus users
         level: u.level,
         title: u.currentTitle,
         country: u.country,
         city: u.city,
         avatarUrl: u.avatarUrl,
-        tick: u.tick
+        tick: u.tick,
+        isPremium: u.isPremium
       })),
       currentUser: {
         userId: user._id,
         username: user.username,
         name: user.name,
-        monthlyXp: user.monthlyXp,
+        monthlyXp: effectiveMonthlyXp,
         rank: userRank,
         level: user.level,
         title: user.currentTitle,
         country: user.country,
         city: user.city,
         avatarUrl: user.avatarUrl,
-        tick: user.tick
+        tick: user.tick,
+        isPremium: user.isPremium
       },
     });
   }
@@ -127,8 +137,12 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
   const scopeFilter = buildScopeFilter(scope, user, { country: rawCountry, city: rawCity });
 
   const topPlayers = await User.find(
-    { monthlyXp: { $gt: 0 }, ...scopeFilter },
-    'username name monthlyXp level currentTitle country city avatarUrl tick'
+    { accountStatus: 'active',
+      _id: { $nin: blockedIds },
+      monthlyXp: { $gt: 0 }, 
+      ...scopeFilter 
+    },
+    'username name monthlyXp level currentTitle country city avatarUrl tick isPremium'
   )
     .collation({ locale: 'en', strength: 2 })
     .sort({ monthlyXp: -1, _id: 1 })
@@ -136,6 +150,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
     .lean();
 
   const higherCount = await User.countDocuments({
+    _id: { $nin: blockedIds },
     monthlyXp: { $gt: user.monthlyXp },
     ...scopeFilter,
   }).collation({ locale: 'en', strength: 2 });
@@ -151,26 +166,28 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
       userId: u._id,
       username: u.username,
       name: u.name,
-      monthlyXp: u.monthlyXp,
+      monthlyXp: u.isPremium ? u.monthlyXp * 2 : u.monthlyXp,
       level: u.level,
       title: u.currentTitle,
       country: u.country,
       city: u.city,
       avatarUrl: u.avatarUrl,
-      tick: u.tick
+      tick: u.tick,
+      isPremium: u.isPremium
     })),
     currentUser: {
       userId: user._id,
       username: user.username,
       name: user.name,
-      monthlyXp: user.monthlyXp,
+      monthlyXp: effectiveMonthlyXp,
       rank: userRank,
       level: user.level,
       title: user.currentTitle,
       country: user.country,
       city: user.city,
       avatarUrl: user.avatarUrl,
-      tick: user.tick
+      tick: user.tick,
+      isPremium: user.isPremium
     },
   });
 });
@@ -182,17 +199,25 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
   const rawCity = getQueryVal(req.query, 'city');
 
   const scope = normalizeScope(rawScope);
+  
+  // ⚡ FIX: Added isPremium to select
   const user = await User.findById(req.user._id).select(
-    'totalXp level currentTitle country city username name avatarUrl following friends tick'
+    'totalXp level currentTitle country city username name avatarUrl following friends tick isPremium blockedUsers blockedBy'
   );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
+  // ⚡ Get blocked IDs
+  const blockedIds = [...(user.blockedUsers || []), ...(user.blockedBy || [])].map(String);
+
+  // ⚡ StreakSphere+ Benefit: 2x Multiplier on points if premium
+  const effectiveTotalXp = user.isPremium ? (user.totalXp || 0) * 2 : (user.totalXp || 0);
+
   if (scope === 'friends') {
-    const friendIds = getFriendIds(user);
+    const friendIds = getFriendIds(user).filter(id => !blockedIds.includes(String(id)));
 
     const topPlayers = await User.find(
-      { _id: { $in: friendIds } },
-      'username name totalXp level currentTitle country city avatarUrl tick'
+      { accountStatus: 'active', _id: { $in: friendIds } },
+      'username name totalXp level currentTitle country city avatarUrl tick isPremium'
     )
       .sort({ totalXp: -1, _id: 1 })
       .limit(100)
@@ -214,19 +239,20 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
         userId: u._id,
         username: u.username,
         name: u.name,
-        xp: u.totalXp,
+        xp: u.isPremium ? u.totalXp * 2 : u.totalXp, // Apply 2x multiplier for plus users
         level: u.level,
         title: u.currentTitle,
         country: u.country,
         city: u.city,
         avatarUrl: u.avatarUrl,
         tick: u.tick,
+        isPremium: u.isPremium,
       })),
       currentUser: {
         userId: user._id,
         username: user.username,
         name: user.name,
-        xp: user.totalXp,
+        xp: effectiveTotalXp,
         rank: userRank,
         level: user.level,
         title: user.currentTitle,
@@ -234,6 +260,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
         city: user.city,
         avatarUrl: user.avatarUrl,
         tick: user.tick,
+        isPremium: user.isPremium,
       },
     });
   }
@@ -241,8 +268,12 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
   const scopeFilter = buildScopeFilter(scope, user, { country: rawCountry, city: rawCity });
 
   const topPlayers = await User.find(
-    { totalXp: { $gt: 0 }, ...scopeFilter },
-    'username name totalXp level currentTitle country city avatarUrl tick'
+    { accountStatus: 'active',
+      _id: { $nin: blockedIds },
+      totalXp: { $gt: 0 }, 
+      ...scopeFilter 
+    },
+    'username name totalXp level currentTitle country city avatarUrl tick isPremium'
   )
     .collation({ locale: 'en', strength: 2 })
     .sort({ totalXp: -1, _id: 1 })
@@ -250,6 +281,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
     .lean();
 
   const higherCount = await User.countDocuments({
+    _id: { $nin: blockedIds },
     totalXp: { $gt: user.totalXp },
     ...scopeFilter,
   }).collation({ locale: 'en', strength: 2 });
@@ -265,19 +297,20 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
       userId: u._id,
       username: u.username,
       name: u.name,
-      xp: u.totalXp,
+      xp: u.isPremium ? u.totalXp * 2 : u.totalXp,
       level: u.level,
       title: u.currentTitle,
       country: u.country,
       city: u.city,
       avatarUrl: u.avatarUrl,
       tick: u.tick,
+      isPremium: u.isPremium,
     })),
     currentUser: {
       userId: user._id,
       username: user.username,
       name: user.name,
-      xp: user.totalXp,
+      xp: effectiveTotalXp,
       rank: userRank,
       level: user.level,
       title: user.currentTitle,
@@ -285,6 +318,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
       city: user.city,
       avatarUrl: user.avatarUrl,
       tick: user.tick,
+      isPremium: user.isPremium,
     },
   });
 });

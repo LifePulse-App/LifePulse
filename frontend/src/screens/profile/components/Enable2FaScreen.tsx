@@ -13,7 +13,7 @@ import {
 import { Text } from '@rneui/themed';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useNavigation } from '@react-navigation/native';
-import Clipboard from '@react-native-clipboard/clipboard'; // Make sure this package is installed, or use your project's clipboard solution
+import Clipboard from '@react-native-clipboard/clipboard'; 
 import { Linking } from 'react-native';
 
 import api_Login from '../../login/services/api_Login';
@@ -22,7 +22,7 @@ import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 
-const TWO_FA_CACHE_KEY = 'settings:2fa:setup:v1';
+const TWO_FA_CACHE_KEY = 'settings:2fa:setup:v2';
 
 const Enable2FAScreen = () => {
   const navigation = useNavigation<any>();
@@ -80,12 +80,17 @@ const Enable2FAScreen = () => {
       const raw = await AsyncStorage.getItem(TWO_FA_CACHE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed?.qrImage) {
-          setQrImage(parsed.qrImage);
+        if (parsed?.isAlreadyEnabled) {
+          setIsAlreadyEnabled(true);
           hasCachedData = true;
+        } else {
+          if (parsed?.qrImage) {
+            setQrImage(parsed.qrImage);
+            hasCachedData = true;
+          }
+          if (parsed?.manualKey) setManualKey(parsed.manualKey);
+          if (parsed?.otpauthUrl) setOtpauthUrl(parsed.otpauthUrl);
         }
-        if (parsed?.manualKey) setManualKey(parsed.manualKey);
-        if (parsed?.otpauthUrl) setOtpauthUrl(parsed.otpauthUrl);
         if (hasCachedData) setInitialLoading(false);
       }
     } catch {}
@@ -103,6 +108,7 @@ const Enable2FAScreen = () => {
         const msg = (res as any).data?.message || '';
         if (msg.toLowerCase().includes('already enabled') || msg.toLowerCase().includes('already set up')) {
           setIsAlreadyEnabled(true);
+          await AsyncStorage.setItem(TWO_FA_CACHE_KEY, JSON.stringify({ isAlreadyEnabled: true, ts: Date.now() }));
           setInitialLoading(false);
           return;
         }
@@ -118,6 +124,7 @@ const Enable2FAScreen = () => {
 
       if (data?.alreadyEnabled) {
         setIsAlreadyEnabled(true);
+        await AsyncStorage.setItem(TWO_FA_CACHE_KEY, JSON.stringify({ isAlreadyEnabled: true, ts: Date.now() }));
         setInitialLoading(false);
         return;
       }
@@ -134,6 +141,7 @@ const Enable2FAScreen = () => {
       await AsyncStorage.setItem(
         TWO_FA_CACHE_KEY,
         JSON.stringify({
+          isAlreadyEnabled: false,
           qrImage: data.qrImageDataUrl,
           manualKey: data.manualKey,
           otpauthUrl: data.otpauthUrl,
@@ -184,6 +192,12 @@ const Enable2FAScreen = () => {
 
   const handleConfirm = async () => {
     Keyboard.dismiss();
+
+    if (offline) {
+      showError("You're offline. Please connect to the internet to enable 2FA.");
+      return;
+    }
+
     if (!code) {
       showError('Please enter the 6-digit code from your authenticator app');
       return;
@@ -198,7 +212,7 @@ const Enable2FAScreen = () => {
       const data: any = res.data;
       if (data.backupCodes && Array.isArray(data.backupCodes)) {
         setBackupCodes(data.backupCodes);
-        await AsyncStorage.removeItem(TWO_FA_CACHE_KEY);
+        await AsyncStorage.setItem(TWO_FA_CACHE_KEY, JSON.stringify({ isAlreadyEnabled: true, ts: Date.now() }));
       }
     } catch {
       showError('Failed to confirm 2FA. Please try again.');
@@ -213,6 +227,11 @@ const Enable2FAScreen = () => {
 
   const handleDisable2FA = async () => {
     Keyboard.dismiss();
+
+    if (offline) {
+      showError("You're offline. Please connect to the internet to disable 2FA.");
+      return;
+    }
 
     if (!disablePassword) {
       showError('Please enter your current password');
@@ -257,6 +276,16 @@ const Enable2FAScreen = () => {
     </View>
   );
 
+  const renderOfflineBanner = () => {
+    if (!offline) return null;
+    return (
+      <View style={styles.offlineBanner}>
+        <Icon name="wifi-off" size={14} color="#94A3B8" />
+        <Text style={styles.offlineText}>Offline — showing cached data</Text>
+      </View>
+    );
+  };
+
   const renderDisableForm = () => (
     <View style={styles.formContainer}>
       <Text style={styles.instructionText}>
@@ -296,8 +325,9 @@ const Enable2FAScreen = () => {
 
       <TouchableOpacity
         onPress={handleDisable2FA}
-        style={styles.dangerButton}
-        disabled={disableLoading}
+        style={[styles.dangerButton, offline && styles.disabledButton]}
+        disabled={disableLoading || offline}
+        activeOpacity={offline ? 1 : 0.8}
       >
         {disableLoading ? (
           <LoaderKitView
@@ -306,14 +336,14 @@ const Enable2FAScreen = () => {
             color={'#FFFFFF'}
           />
         ) : (
-          <Text style={styles.buttonText}>Confirm Disable 2FA</Text>
+          <Text style={[styles.buttonText, offline && styles.disabledButtonText]}>Confirm Disable 2FA</Text>
         )}
       </TouchableOpacity>
     </View>
   );
 
   // 1. LOADING STATE
-  if (initialLoading && !qrImage && !manualKey) {
+  if (initialLoading && !qrImage && !manualKey && !isAlreadyEnabled) {
     return (
       <View style={styles.root}>
         {renderHeader()}
@@ -343,6 +373,8 @@ const Enable2FAScreen = () => {
             showsVerticalScrollIndicator={false}
           >
             {renderHeader()}
+            {renderOfflineBanner()}
+            
             <View style={styles.card}>
               <View style={styles.iconContainer}>
                 <Icon name="shield-check" size={56} color="#22C55E" />
@@ -412,6 +444,7 @@ const Enable2FAScreen = () => {
           showsVerticalScrollIndicator={false}
         >
           {renderHeader()}
+          {renderOfflineBanner()}
 
           <View style={styles.card}>
             <Text style={styles.mainTitle}>Enable Two-Factor</Text>
@@ -469,8 +502,9 @@ const Enable2FAScreen = () => {
 
               <TouchableOpacity 
                 onPress={handleConfirm} 
-                style={styles.primaryButton}
-                disabled={loading}
+                style={[styles.primaryButton, offline && styles.disabledButton]}
+                disabled={loading || offline}
+                activeOpacity={offline ? 1 : 0.8}
               >
                 {loading ? (
                   <LoaderKitView
@@ -479,7 +513,7 @@ const Enable2FAScreen = () => {
                     color={'#FFFFFF'}
                   />
                 ) : (
-                  <Text style={styles.buttonText}>Confirm & Enable</Text>
+                  <Text style={[styles.buttonText, offline && styles.disabledButtonText]}>Confirm & Enable</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -563,6 +597,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 22,
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    marginHorizontal: 24,
+    marginBottom: 16,
+    gap: 8,
+  },
+  offlineText: {
+    color: '#FBBF24',
+    fontSize: 13,
+    fontWeight: '600',
   },
   qrContainer: {
     alignSelf: 'center',
@@ -667,6 +719,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 10,
+  },
+  disabledButton: {
+    backgroundColor: 'rgba(71, 85, 105, 0.4)',
+    borderColor: 'rgba(71, 85, 105, 0.6)',
+  },
+  disabledButtonText: {
+    color: '#94A3B8',
   },
   buttonText: {
     color: '#FFFFFF',

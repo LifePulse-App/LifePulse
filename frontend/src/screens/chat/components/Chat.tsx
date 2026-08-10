@@ -64,8 +64,8 @@ const loadCache = async (userId: string): Promise<any[]> => {
 const baseUrl = apiClient.getBaseURL();
 const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
-const Avatar = ({ userId, url, avatarVersion }) => {
-  const [localUri, setLocalUri] = useState(null);
+const Avatar = ({ userId, url, avatarVersion }: any) => {
+  const [localUri, setLocalUri] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -91,11 +91,14 @@ const Avatar = ({ userId, url, avatarVersion }) => {
 };
 
 // --- Sub-component for Swipeable Row ---
-const ChatRowItem = ({ item, navigation, onHideRequest, onCallRequest }) => {
-  const swipeRef = useRef(null);
+const ChatRowItem = ({ item, navigation, onHideRequest, onCallRequest }: any) => {
+  const swipeRef = useRef<Swipeable>(null);
+
+  // ⚡ Check if this chat is blocked
+  const isBlockedChat = item.amIBlocked || item.didIBlock;
 
   // Swipe Left Action (Hide) -> Dragging Left (dragX is negative)
-  const renderRightActions = (progress, dragX) => {
+  const renderRightActions = (progress: any, dragX: any) => {
     const scale = dragX.interpolate({
       inputRange: [-80, 0],
       outputRange: [1, 0.6],
@@ -118,7 +121,10 @@ const ChatRowItem = ({ item, navigation, onHideRequest, onCallRequest }) => {
   };
 
   // Swipe Right Action (Call) -> Dragging Right (dragX is positive)
-  const renderLeftActions = (progress, dragX) => {
+  const renderLeftActions = (progress: any, dragX: any) => {
+    // ⚡ Disable Call swipe UI if blocked
+    if (isBlockedChat) return null;
+
     const scale = dragX.interpolate({
       inputRange: [0, 80],
       outputRange: [0.6, 1],
@@ -145,11 +151,14 @@ const ChatRowItem = ({ item, navigation, onHideRequest, onCallRequest }) => {
       ref={swipeRef} 
       renderRightActions={renderRightActions} 
       renderLeftActions={renderLeftActions}
-      leftThreshold={75} // The exact distance needed to trigger the call automatically
-      rightThreshold={75} // The exact distance needed to trigger hide automatically
+      leftThreshold={75}
+      rightThreshold={75}
       onSwipeableLeftWillOpen={() => {
         swipeRef.current?.close(); 
-        onCallRequest(item);       
+        // ⚡ Ensure call cannot trigger if blocked
+        if (!isBlockedChat) {
+          onCallRequest(item);
+        }       
       }}
       onSwipeableRightWillOpen={() => {
         swipeRef.current?.close(); 
@@ -158,7 +167,7 @@ const ChatRowItem = ({ item, navigation, onHideRequest, onCallRequest }) => {
     >
       <TouchableOpacity
         style={styles.row}
-        activeOpacity={1} // Keep at 1 to prevent flashing the background color on tap
+        activeOpacity={1}
         onPress={() =>
           navigation.navigate("chat", {
             conversationId: item.conversationId,
@@ -166,34 +175,51 @@ const ChatRowItem = ({ item, navigation, onHideRequest, onCallRequest }) => {
             peerName: item.peerName,
             peerMood: item.mood,
             peerAvatarUrl: item.peerAvatarUrl,
+            // ⚡ Pass Block Flags to ChatScreen
+            amIBlocked: item.amIBlocked,
+            didIBlock: item.didIBlock
           })
         }
       >
-        <Avatar
-          userId={item.peerUserId}
-          url={item.peerAvatarUrl}
-          avatarVersion={item.avatarUpdatedAt}
-        />
+        {/* ⚡ BLOCK LOGIC: Hide DP if blocked */}
+        {isBlockedChat ? (
+          <View style={styles.avatarFallback}>
+            <Icon name="account" size={22} color="#cbd5e1" />
+          </View>
+        ) : (
+          <Avatar
+            userId={item.peerUserId}
+            url={item.peerAvatarUrl}
+            avatarVersion={item.avatarVersion}
+          />
+        )}
         <View style={styles.rowContent}>
           <View style={styles.rowTop}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+            <View style={styles.nameBadgeContainer}>
               <Text style={styles.peer} numberOfLines={1}>
                 {item.peerName}
+              </Text>
+              
+              {/* ⚡ Clean wrapper container for Ticks & Premium Star Badge */}
+              <View style={styles.badgesWrapper}>
                 {item.tick === "verified" && (
-                  <Icon name="check-decagram" size={16} color="#3b82f6" style={{ marginLeft: 6, marginTop: 2 }} />
+                  <Icon name="check-decagram" size={16} color="#3b82f6" />
                 )}
                 {item.tick === "golden" && (
-                  <Icon name="check-decagram" size={16} color="#fbbf24" style={{ marginLeft: 6, marginTop: 2 }} />
+                  <Icon name="check-decagram" size={16} color="#fbbf24" />
                 )}
-              </Text>
+                {item?.isPremium && (
+                  <Icon name="star-circle" size={16} color="#fbbf24" />
+                )}
+              </View>
             </View>
             <Text style={styles.time}>{formatLastTime(item.lastAt)}</Text>
           </View>
           <View style={styles.rowTop}>
-            <Text style={styles.snippet} numberOfLines={1}>
-              {item.lastText || "No messages yet"}
+            <Text style={[styles.snippet, isBlockedChat && { color: "#f87171", fontStyle: "italic" }]} numberOfLines={1}>
+              {isBlockedChat ? "" : (item.lastText || "No messages yet")}
             </Text>
-            {item.unread > 0 && (
+            {item.unread > 0 && !isBlockedChat && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText} numberOfLines={1}>
                   {item.unread > 99 ? "99+" : item.unread}
@@ -275,10 +301,11 @@ export default function ChatListScreen({ navigation }: any) {
 
       for (const f of friends) {
         friendMap.set(String(f._id), {
-          name: String(f.name || f.username || "Friend"),
+          name: String(f.name || f.username || "User"),
           avatarUrl: String(f.avatar || ""),
           avatarVersion: f.avatarVersion,
           tick: f.tick || "none",
+          isPremium: !!f.isPremium,
         });
       }
 
@@ -290,14 +317,17 @@ export default function ChatListScreen({ navigation }: any) {
         return {
           conversationId: String(c.conversationId),
           peerUserId: peerId,
-          peerName: c.peerName || friend?.name || "Friend",
-          peerAvatarUrl: String(friend?.avatarUrl || ""),
-          avatarVersion: friend?.avatarVersion,
+          peerName: friend?.name || c.peerName || "User", 
+          peerAvatarUrl: String(friend?.avatarUrl || c.peerAvatarUrl || c.avatarUrl || ""), 
+          avatarVersion: friend?.avatarVersion || c.avatarVersion,
           mood: c.mood || "",
           lastText: c.lastText || "",
           lastAt: c.lastAt || "",
-          tick: friend?.tick || "none",
+          tick: friend?.tick || c.tick || "none",
+          isPremium: friend?.isPremium ?? c.isPremium ?? false, 
           unread: Number(getUnread(peerId) || c.unread || 0),
+          amIBlocked: !!c.amIBlocked,
+          didIBlock: !!c.didIBlock,
         };
       });
 
@@ -378,36 +408,13 @@ export default function ChatListScreen({ navigation }: any) {
       callContext.startCall(
         {
           id: String(item.peerUserId),
-          name: item.peerName || "Friend",
+          name: item.peerName || "User",
           avatar: newUrl + String(item.peerAvatarUrl || ""),
         }, 
         item.conversationId
       );
     }
   };
-
-  // if (!userLoaded || loadingCache) {
-  //   return (
-  //     <MainLayout>
-  //       <View style={styles.root}>
-  //        <FlatList
-  //           data={visibleFilteredRows}
-  //           keyExtractor={(item) => `${item.conversationId}:${item.peerUserId}`}
-  //           keyboardShouldPersistTaps="handled"
-  //           renderItem={({ item }) => (
-  //             <ChatRowItem 
-  //               item={item} 
-  //               navigation={navigation} 
-  //               onHideRequest={setDeleteCandidate} 
-  //               onCallRequest={handleCallRequest}
-  //             />
-  //           )}
-  //           ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-  //         />
-  //       </View>
-  //     </MainLayout>
-  //   );
-  // }
 
   return (
     <MainLayout>
@@ -440,23 +447,6 @@ export default function ChatListScreen({ navigation }: any) {
             />
           </View>
 
-          {(loadingApi && !visibleFilteredRows.length) ? (
-            <FlatList
-            data={visibleFilteredRows}
-            keyExtractor={(item) => `${item.conversationId}:${item.peerUserId}`}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <ChatRowItem 
-                item={item} 
-                navigation={navigation} 
-                onHideRequest={setDeleteCandidate} 
-                onCallRequest={handleCallRequest}
-              />
-            )}
-            ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-          />
-          ) :
           <FlatList
             data={visibleFilteredRows}
             keyExtractor={(item) => `${item.conversationId}:${item.peerUserId}`}
@@ -471,7 +461,7 @@ export default function ChatListScreen({ navigation }: any) {
               />
             )}
             ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
-          />}
+          />
         </View>
 
         <Modal
@@ -501,13 +491,11 @@ export default function ChatListScreen({ navigation }: any) {
             </View>
           </View>
         </Modal>
-
       </View>
     </MainLayout>
   );
 }
 
-// Styles
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0f172a", padding: 12 },
   baseBackground: { ...StyleSheet.absoluteFill, backgroundColor: "#020617" },
@@ -531,8 +519,6 @@ const styles = StyleSheet.create({
   },
 
   row: {
-    // Exact solid hex approximation of rgba(255,255,255,0.05) over #0f172a
-    // This stops the full-width backgrounds beneath from bleeding through.
     backgroundColor: "#0f172a", 
     borderRadius: 12,
     padding: 12,
@@ -541,16 +527,15 @@ const styles = StyleSheet.create({
   },
   rowContent: { flex: 1, marginLeft: 10 },
 
-  // --- Full Width Expanding Backgrounds ---
   leftActionContainer: {
-    width: "100%", // Fills the row
+    width: "100%", 
     backgroundColor: "#22c55e",
     justifyContent: "center",
     alignItems: "flex-start",
     borderRadius: 12,
   },
   rightActionContainer: {
-    width: "100%", // Fills the row
+    width: "100%", 
     backgroundColor: "#ef4444",
     justifyContent: "center",
     alignItems: "flex-end",
@@ -591,6 +576,20 @@ const styles = StyleSheet.create({
   },
   time: { color: "#94a3b8", fontSize: 12, marginLeft: 10 },
 
+  // ⚡ Name and Badge Layout Styling
+  nameBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  badgesWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+    gap: 4,
+  },
+
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -618,7 +617,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, color: "#fff", paddingVertical: 8, marginLeft: 6 },
 
-  peer: { color: "#fff", fontSize: 16, fontWeight: "700", flex: 1, marginRight: 8 },
+  peer: { color: "#fff", fontSize: 16, fontWeight: "700", flexShrink: 1 },
   snippet: { color: "#94a3b8", marginTop: 4, flex: 1, marginRight: 8 },
   badge: {
     marginLeft: 8,

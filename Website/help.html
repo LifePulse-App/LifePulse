@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Help Center & FAQ - StreakSphere</title>
+<meta name="description" content="Common questions and support for StreakSphere users."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link rel="icon" type="image/png" href="logo.png">
+<style>
+:root{
+  --bg:#03040A; --bg2:#0a0c16;
+  --surface:rgba(255,255,255,0.03); --surface2:rgba(255,255,255,0.06);
+  --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.15);
+  --text:#F8FAFC; --muted:#94A3B8;
+  --accent1:#6366F1; --accent2:#A855F7; --accent3:#EC4899; 
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{font-family:'DM Sans',sans-serif;color:var(--text);background:var(--bg);min-height:100vh;overflow-x:hidden;line-height:1.5;}
+a{-webkit-tap-highlight-color:transparent;}
+
+/* Subtle background noise */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;}
+
+.container{position:relative;z-index:1;width:min(1000px, 90%);margin-inline:auto;}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);-webkit-backdrop-filter:blur(24px) saturate(200%);border-bottom:1px solid var(--border);background:rgba(3,4,10,0.7);}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;padding:12px 0;}
+.logo-group{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.logo-img{width:32px;height:32px;border-radius:10px;object-fit:cover;border:1px solid rgba(255,255,255,0.1);}
+.logo-name{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:700;color:var(--text);letter-spacing:-0.02em;}
+.nav-links{display:flex;align-items:center;gap:20px;}
+.nav-link{color:var(--muted);text-decoration:none;font-size:0.85rem;font-weight:500;transition:color 0.2s;}
+.nav-link:hover{color:var(--text);}
+.nav-cta{background:var(--text);color:var(--bg);padding:7px 16px;border-radius:100px;font-size:0.8rem;font-weight:700;text-decoration:none;transition:transform 0.2s;}
+.nav-cta:hover{transform:scale(1.05);}
+
+/* Mobile Nav adjustments */
+@media(max-width: 480px){
+  .logo-name{font-size:0.9rem;}
+  .nav-links{gap:10px;}
+  .nav-link{font-size:0.75rem;}
+  .nav-cta{padding:6px 12px; font-size:0.75rem;}
+}
+
+/* HERO */
+.hero{padding:8vh 0 4vh;text-align:center;position:relative;z-index:1;}
+.hero-title{font-family:'Syne',sans-serif;font-size:clamp(2rem, 6vw, 3.5rem);font-weight:800;line-height:1.1;letter-spacing:-0.03em;margin-bottom:16px;}
+.hero-sub{max-width:600px;margin:0 auto;color:var(--muted);font-size:clamp(0.95rem, 2vw, 1.1rem);line-height:1.6;}
+
+/* FAQ ACCORDION */
+.faq-section{padding:4vh 0 8vh;}
+details{background:var(--surface);border:1px solid var(--border);border-radius:16px;margin-bottom:16px;overflow:hidden;transition:background 0.2s, border-color 0.2s;}
+details:hover{background:var(--surface2);border-color:var(--border2);}
+summary{padding:20px;font-weight:700;font-size:1.05rem;color:var(--text);cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;}
+summary::-webkit-details-marker{display:none;}
+summary::after{content:'+';color:var(--accent1);font-size:1.5rem;font-weight:400;line-height:1;transition:transform 0.3s;}
+details[open] summary::after{transform:rotate(45deg);}
+.faq-content{padding:0 20px 20px 20px;color:var(--muted);font-size:0.95rem;line-height:1.6;border-top:1px solid rgba(255,255,255,0.02);margin-top:4px;padding-top:16px;}
+.faq-content p{margin-bottom:12px;}
+.faq-content p:last-child{margin-bottom:0;}
+.faq-content ul, .faq-content ol{margin-left:20px;margin-bottom:12px;}
+.faq-content li{margin-bottom:6px;}
+
+/* REPORT A PROBLEM BOX */
+.support-box{background:linear-gradient(145deg, rgba(99,102,241,0.1), rgba(168,85,247,0.05));border:1px solid var(--accent1);border-radius:16px;padding:30px;text-align:center;margin-top:40px;}
+.support-box h3{font-family:'Syne',sans-serif;font-size:1.5rem;margin-bottom:10px;}
+.support-box p{color:var(--muted);margin-bottom:20px;font-size:0.95rem;}
+.btn-primary{display:inline-block;background:var(--accent1);color:#fff;padding:12px 24px;border-radius:100px;font-weight:700;text-decoration:none;font-size:0.9rem;transition:background 0.2s;}
+.btn-primary:hover{background:#4f46e5;}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:60px 0 30px;margin-top:40px;background:var(--bg2);}
+.footer-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:30px;margin-bottom:40px;}
+.footer-col h4{font-family:'Syne',sans-serif;font-size:0.9rem;font-weight:700;margin-bottom:16px;letter-spacing:0.02em;}
+.footer-col ul{list-style:none;}
+.footer-col ul li{margin-bottom:10px;}
+.footer-col ul li a{color:var(--muted);text-decoration:none;font-size:0.85rem;transition:color 0.2s;}
+.footer-col ul li a:hover{color:var(--text);}
+
+/* SOCIAL ICONS */
+.social-links{display:flex;align-items:center;gap:12px;margin-top:12px;}
+.social-icon{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--muted);transition:all 0.2s;text-decoration:none;}
+.social-icon:hover{color:var(--text);border-color:var(--border2);transform:translateY(-2px);background:rgba(255,255,255,0.1);}
+.social-icon svg{width:18px;height:18px;fill:currentColor;}
+
+.footer-bottom{border-top:1px solid var(--border);padding-top:24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;}
+.footer-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:var(--text);text-decoration:none;}
+.footer-copy{color:var(--muted);font-size:0.8rem;}
+
+/* Mobile Footer adjustments */
+@media(max-width: 600px){
+  .footer-grid {text-align: center; gap: 40px;}
+  .social-links {justify-content: center;}
+  .footer-bottom {flex-direction: column; text-align: center; justify-content: center; gap: 12px;}
+}
+
+.reveal{opacity:0;transform:translateY(20px);transition:all 0.5s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="container nav-inner">
+    <a href="index.html" class="logo-group">
+      <img src="logo.png" alt="StreakSphere" class="logo-img" onerror="this.style.display='none'"/>
+      <span class="logo-name">StreakSphere</span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="index.html#download" class="nav-cta">Download App</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero container reveal">
+  <h1 class="hero-title">Need some help?</h1>
+  <p class="hero-sub">
+    This page covers common questions and tips about using StreakSphere. If you can't find your answer here, you can always report a problem from the Profile → Help & Support section in the app.
+  </p>
+</section>
+
+<!-- FAQ SECTION -->
+<section class="faq-section container">
+  
+  <details class="reveal">
+    <summary>How do streaks work in StreakSphere?</summary>
+    <div class="faq-content">
+      <p>Streaks are a way to keep track of your consistent activity over time. Each day you complete your required activity, your streak increases by 1.</p>
+      <p>If you miss a day, your streak will reset back to 0, unless the app introduces a specific feature (like a "streak freeze" or "streak protection") that prevents it.</p>
+      <p>You can usually see your current streak on your profile or on the main dashboard.</p>
+    </div>
+  </details>
+
+  <details class="reveal">
+    <summary>How does the XP and Leveling system work?</summary>
+    <div class="faq-content">
+      <p>You earn XP by maintaining streaks, logging your mood, and completing daily habits.</p>
+      <ul>
+        <li><strong>Lifetime XP</strong> increases your overall Account Level permanently.</li>
+        <li><strong>Monthly XP</strong> resets at the beginning of every month and dictates your rank on the Monthly Leaderboards.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details class="reveal">
+    <summary>How does the Relationship / Partner system work?</summary>
+    <div class="faq-content">
+      <p>You can pair up with a friend or significant other to track your progress together! To start, visit their profile and send a relationship request.</p>
+      <p>Once partnered, you will share a "Days Together" counter. If either of you decides to break up, the app triggers a 24-hour grace period timer. During this time, you can patch things up and restore the relationship without losing your combined partner streak.</p>
+    </div>
+  </details>
+
+  <details class="reveal">
+    <summary>What are Reward balances?</summary>
+    <div class="faq-content">
+      <p>As you gain XP and hold long streaks, you earn a reward balance currency. This balance can be saved up and used to redeem special perks, avatar items, or premium app features in the store.</p>
+    </div>
+  </details>
+
+  <details class="reveal">
+    <summary>Can I customize my avatar?</summary>
+    <div class="faq-content">
+      <p>Absolutely! StreakSphere supports customized avatars and fully 3D Ready Player Me models.</p>
+      <p>Go to your Profile and tap the pencil icon next to your picture. You can design your avatar’s look, which will show up across leaderboards and friend lists.</p>
+    </div>
+  </details>
+
+  <details class="reveal">
+    <summary>How do I log my daily mood?</summary>
+    <div class="faq-content">
+      <p>Tracking your emotions helps you see how your habits affect your mental health. Tap "Share your mood" from the dashboard, pick the feeling that best matches your current state, and we will save it to your personal history.</p>
+    </div>
+  </details>
+
+  <details class="reveal">
+    <summary>Why can't I change my Country or City?</summary>
+    <div class="faq-content">
+      <p>To keep regional leaderboards fair and prevent cheating, changing your location (City/Country) locks it for 30 days.</p>
+      <p>If you recently updated it, you will need to wait for the countdown to expire. You can always hide your location from others by toggling "Show my location" off in the Edit Profile menu.</p>
+    </div>
+  </details>
+
+  <details class="reveal">
+    <summary>How do I enable two-factor authentication (2FA)?</summary>
+    <div class="faq-content">
+      <p>Go to <strong>Profile → Privacy & Security → Two-factor Authentication</strong>. Follow the on-screen steps to:</p>
+      <ol>
+        <li>Scan the QR code with an authenticator app (Google Authenticator, Authy, iOS Passwords, etc.).</li>
+        <li>Enter the 6-digit code from the app to confirm.</li>
+        <li>Save your backup codes in a secure place in case you lose access to your authenticator app.</li>
+      </ol>
+    </div>
+  </details>
+
+  <details class="reveal">
+    <summary>How can I reset my password?</summary>
+    <div class="faq-content">
+      <p>If you forgot your password:</p>
+      <ol>
+        <li>On the login screen, tap "Forget Password".</li>
+        <li>Enter your email or username.</li>
+        <li>Check your email for a verification code.</li>
+        <li>Enter the code in the app, then set a new password.</li>
+      </ol>
+      <p>For security reasons, the code is time-limited and can only be used once.</p>
+    </div>
+  </details>
+
+  <details class="reveal">
+    <summary>What are authorized devices and why do they matter?</summary>
+    <div class="faq-content">
+      <p>Authorized devices are the phones or tablets that are currently logged into your StreakSphere account. We show you this list so that you can:</p>
+      <ul>
+        <li>See where your account is being used.</li>
+        <li>Log out devices you don't recognize or no longer use.</li>
+      </ul>
+      <p>You can view and manage authorized devices in <strong>Profile → Privacy & Security → "Devices in which you are logged in"</strong>.</p>
+    </div>
+  </details>
+
+  <details id="guidelines" class="reveal">
+    <summary>Community Guidelines</summary>
+    <div class="faq-content">
+      <p>At StreakSphere, we want to create a safe, supportive, and authentic environment for everyone. By using the app, you agree to follow these community standards:</p>
+      <ul>
+        <li><strong>Be Respectful:</strong> Harassment, hate speech, bullying, or discrimination of any kind is strictly prohibited.</li>
+        <li><strong>Keep it Authentic:</strong> Do not use bots, scripts, or fake accounts to manipulate streaks, leaderboards, or AI-verified points.</li>
+        <li><strong>Zero Tolerance for Abuse:</strong> As outlined in our Child Safety Standards, any form of exploitation, grooming, or illegal content will result in immediate termination and reporting to law enforcement.</li>
+        <li><strong>Protect Privacy:</strong> Do not dox or share the personal information of others without explicit consent.</li>
+      </ul>
+      <p>If you see someone violating these guidelines, please use the in-app reporting tools so our moderation team can take swift action.</p>
+    </div>
+  </details>
+
+  <details id="safety" class="reveal">
+    <summary>How is my data and privacy handled?</summary>
+    <div class="faq-content">
+      <p>We only collect the information needed to provide and secure the service, such as your email, username, and basic device details. We do not sell your personal data.</p>
+      <p>For full details, you can read our Privacy Policy and Terms of Service via the footer links below.</p>
+    </div>
+  </details>
+
+  <details id="report" class="reveal">
+    <summary>I found a bug or something is not working. What should I do?</summary>
+    <div class="faq-content">
+      <p>If something looks broken or doesn't behave as expected:</p>
+      <ol>
+        <li>Go to <strong>Profile → Help & Support → "Report a Problem"</strong>.</li>
+        <li>Fill in the subject (optional) and describe what happened in as much detail as possible.</li>
+        <li>We automatically attach basic device information (model and OS version) to help us debug.</li>
+      </ol>
+      <p>This sends us an email so our team can review and address the issue.</p>
+    </div>
+  </details>
+
+  <!-- CTA Box -->
+  <div class="support-box reveal">
+    <h3>Still need help?</h3>
+    <p>If your issue isn't listed above, our support team is ready to assist you.</p>
+    <a href="mailto:support@streaksphere.app" class="btn-primary">Contact Support</a>
+  </div>
+
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <!-- Column 1: Product -->
+      <div class="footer-col">
+        <h4>StreakSphere</h4>
+        <ul>
+          <li><a href="index.html#features">Features</a></li>
+          <li><a href="index.html#download">Download App</a></li>
+          <li><a href="index.html#release-logs">Release Notes</a></li>
+          <li><a href="https://play.google.com/store/apps/details?id=com.streaksphere.app" target="_blank">Google Play</a></li>
+        </ul>
+      </div>
+
+      <!-- Column 2: Legal & Compliance -->
+      <div class="footer-col">
+        <h4>Safety & Legal</h4>
+        <ul>
+          <li><a href="privacy.html">Privacy Policy</a></li>
+          <li><a href="child-safety-standards.html">Child Safety & Protection</a></li>
+          <li><a href="delete-account.html">Account Deletion Request</a></li>
+          <li><a href="terms.html">Terms of Service</a></li>
+        </ul>
+      </div>
+
+      <!-- Column 3: Support -->
+      <div class="footer-col">
+        <h4>Support & Help</h4>
+        <ul>
+          <li><a href="help.html">Help Center / FAQ</a></li>
+          <li><a href="mailto:support@streaksphere.app">Contact Us</a></li>
+          <li><a href="community-guidelines.html">Community Guidelines</a></li>
+          <li><a href="help.html#report">Report an Issue</a></li>
+        </ul>
+      </div>
+
+      <!-- Column 4: Community & Socials -->
+      <div class="footer-col">
+        <h4>Follow Us</h4>
+        <p style="color:var(--muted); font-size:0.8rem; margin-bottom:12px;">Join our community across social platforms:</p>
+        <div class="social-links">
+          <!-- Instagram -->
+          <a href="https://www.instagram.com/streaksphere.official" class="social-icon" target="_blank" aria-label="Instagram">
+            <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+          </a>
+          <!-- X (Twitter) -->
+          <a href="https://x.com/StreakSphere" class="social-icon" target="_blank" aria-label="X">
+            <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+          <!-- LinkedIn -->
+          <a href="https://www.linkedin.com/company/streaksphere" class="social-icon" target="_blank" aria-label="LinkedIn">
+            <svg viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          </a>
+          <!-- TikTok -->
+          <a href="https://www.tiktok.com/@streaksphere_official" class="social-icon" target="_blank" aria-label="TikTok">
+            <svg viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.82.56-1.33 1.53-1.35 2.53-.05 1.18.57 2.37 1.55 3.01.95.63 2.21.72 3.23.26.96-.43 1.66-1.34 1.83-2.38.07-.63.07-1.27.07-1.91V.02z"/></svg>
+          </a>
+          <!-- YouTube -->
+          <a href="https://youtube.com/@streaksphere?si=JTLx7h_Vyaj2jLAF" class="social-icon" target="_blank" aria-label="YouTube">
+            <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Copyright & Branding -->
+    <div class="footer-bottom">
+      <a href="index.html" class="footer-logo">StreakSphere</a>
+      <p class="footer-copy">© <span id="year"></span> StreakSphere Inc. All rights reserved.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+document.getElementById('year').textContent = new Date().getFullYear();
+
+// Simple scroll animation observer
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => { 
+    if(e.isIntersecting){
+      e.target.classList.add('visible');
+      io.unobserve(e.target);
+    } 
+  });
+}, { threshold:0.1, rootMargin:'0px 0px -20px 0px' });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+</body>
+</html>

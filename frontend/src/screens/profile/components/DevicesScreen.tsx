@@ -46,7 +46,6 @@ const DevicesScreen = () => {
   const [targetDeviceId, setTargetDeviceId] = useState<string | null>(null);
   const [logoutLoading, setLogoutLoading] = useState(false);
 
-  const offlineRef = useRef(false);
   const [offline, setOffline] = useState(false);
 
   const showError = (message: string) => {
@@ -59,15 +58,8 @@ const DevicesScreen = () => {
   };
 
   useEffect(() => {
-    NetInfo.fetch().then((state) => {
-      const isOffline = !state.isConnected || state.isInternetReachable === false;
-      offlineRef.current = isOffline;
-      setOffline(isOffline);
-    });
-
     const unsub = NetInfo.addEventListener((state) => {
       const isOffline = !state.isConnected || state.isInternetReachable === false;
-      offlineRef.current = isOffline;
       setOffline(isOffline);
     });
     return () => unsub();
@@ -91,24 +83,34 @@ const DevicesScreen = () => {
       });
     };
 
+    // 1. Immediately load and show cached data if available
     try {
       const raw = await AsyncStorage.getItem(DEVICES_CACHE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (parsed && "devices" in parsed) {
+        if (parsed && "devices" in parsed && Array.isArray(parsed.devices)) {
           setDevices(sortDevices(parsed.devices));
           hasCachedData = true;
-          setLoading(false);
+          setLoading(false); // Stop skeleton loader immediately
         }
       }
     } catch {}
 
-    if (offlineRef.current) {
-      if (!hasCachedData) setLoading(false);
-      return;
+    // 2. Check current network status explicitly before making API call
+    const netState = await NetInfo.fetch();
+    const isOffline = !netState.isConnected || netState.isInternetReachable === false;
+    
+    if (isOffline) {
+      setOffline(true);
+      setLoading(false);
+      return; // Stick with cached data, don't attempt API call
+    } else {
+      setOffline(false);
     }
 
-    setLoading(true);
+    // 3. If online, fetch fresh data from API
+    if (!hasCachedData) setLoading(true);
+    
     try {
       const res = await api_Login.getDevices();
       if (!res.ok) {
@@ -122,19 +124,15 @@ const DevicesScreen = () => {
       const data: any = res.data;
       const list: DeviceInfoItem[] = data.devices || [];
 
-      if (!data.devices) {
-        if (!hasCachedData) setLoading(false);
-        setLoading(false);
-        return;
+      if (data.devices) {
+        const sortedList = sortDevices(list);
+        setDevices(sortedList);
+        
+        await AsyncStorage.setItem(
+          DEVICES_CACHE_KEY,
+          JSON.stringify({ ts: Date.now(), devices: sortedList })
+        );
       }
-
-      const sortedList = sortDevices(list);
-      setDevices(sortedList);
-      
-      await AsyncStorage.setItem(
-        DEVICES_CACHE_KEY,
-        JSON.stringify({ ts: Date.now(), devices: sortedList })
-      );
     } catch (e: any) {
       if (!hasCachedData) {
         showError('Unable to fetch devices. Please try again.');
@@ -148,11 +146,12 @@ const DevicesScreen = () => {
     loadDevices();
   }, [loadDevices]);
 
+  // Handle re-connections
   useEffect(() => {
     if (!offline) {
       loadDevices();
     }
-  }, [offline]);
+  }, [offline, loadDevices]);
 
   const formatDateTime = (value?: string | Date) => {
     if (!value) return 'Unknown';
@@ -186,13 +185,27 @@ const DevicesScreen = () => {
     </View>
   );
 
+  const renderOfflineBanner = () => {
+    if (!offline) return null;
+    return (
+      <View style={styles.offlineBanner}>
+        <Icon name="wifi-off" size={14} color="#94A3B8" />
+        <Text style={styles.offlineText}>Offline — showing cached data</Text>
+      </View>
+    );
+  };
+
   const openLogoutConfirm = (deviceId: string) => {
+    if (offline) {
+      showError("You're offline. Please connect to the internet to logout a device.");
+      return;
+    }
     setTargetDeviceId(deviceId);
     setConfirmVisible(true);
   };
 
   const performLogoutDevice = async () => {
-    if (!targetDeviceId) return;
+    if (!targetDeviceId || offline) return;
     setLogoutLoading(true);
     try {
       const res = await api_Login.logoutDevice(targetDeviceId);
@@ -211,7 +224,7 @@ const DevicesScreen = () => {
   };
 
   // Skeleton Loading State
-  if (loading) {
+  if (loading && devices.length === 0) {
     return (
       <View style={styles.root}>
         {renderHeader()}
@@ -248,6 +261,8 @@ const DevicesScreen = () => {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {renderOfflineBanner()}
+
           <View style={styles.headerTextWrap}>
             <Text style={styles.mainTitle}>Your active sessions</Text>
             <Text style={styles.mainSubtitle}>
@@ -307,10 +322,19 @@ const DevicesScreen = () => {
                       <View style={styles.actionRow}>
                         <TouchableOpacity
                           onPress={() => openLogoutConfirm(d.deviceId)}
-                          style={styles.logoutBtn}
+                          style={[styles.logoutBtn, offline && styles.disabledLogoutBtn]}
+                          disabled={offline}
+                          activeOpacity={offline ? 1 : 0.8}
                         >
-                          <Icon name="logout-variant" size={14} color="#F87171" style={{ marginRight: 6 }} />
-                          <Text style={styles.logoutBtnText}>Logout device</Text>
+                          <Icon 
+                            name="logout-variant" 
+                            size={14} 
+                            color={offline ? "#64748B" : "#F87171"} 
+                            style={{ marginRight: 6 }} 
+                          />
+                          <Text style={[styles.logoutBtnText, offline && styles.disabledLogoutBtnText]}>
+                            Logout device
+                          </Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -399,6 +423,23 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingBottom: 20,
+  },
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+    gap: 8,
+  },
+  offlineText: {
+    color: '#FBBF24',
+    fontSize: 13,
+    fontWeight: '600',
   },
   headerTextWrap: {
     marginBottom: 20,
@@ -511,6 +552,13 @@ const styles = StyleSheet.create({
     color: '#F87171',
     fontSize: 13,
     fontWeight: '600',
+  },
+  disabledLogoutBtn: {
+    backgroundColor: 'rgba(71, 85, 105, 0.15)',
+    borderColor: 'rgba(71, 85, 105, 0.3)',
+  },
+  disabledLogoutBtnText: {
+    color: '#64748B',
   },
 
   // Skeleton Styles

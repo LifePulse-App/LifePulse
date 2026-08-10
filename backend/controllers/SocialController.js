@@ -145,13 +145,15 @@ export const search = catchAsyncErrors(async (req, res, next) => {
     return res.status(200).json({ user: [], filteredUsersCount: 0 });
   }
 
-  const searchRegex = new RegExp(q, 'i');
+const blockedIds = [...(me.blockedUsers || []), ...(me.blockedBy || [])].map(String);
+
+  const searchRegex = new RegExp(q, "i");
   let users = await User.find({
-    _id: { $ne: currentUserId },
-    $or: [
-      { username: searchRegex },
-      { name: searchRegex }
-    ],
+    _id: { 
+      $ne: currentUserId,
+      $nin: blockedIds // ⚡ EXCLUDE BLOCKED USERS
+    },
+    $or: [{ username: searchRegex }, { name: searchRegex }],
   })
   .select("name username avatar bio followers followRequests")
   .lean();

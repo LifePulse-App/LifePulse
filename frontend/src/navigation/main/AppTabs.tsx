@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import { createNativeBottomTabNavigator } from '@react-navigation/bottom-tabs/unstable';
 
 import Dashboard from '../../screens/dashboard/components/dashboard/Dashboard';
@@ -11,6 +11,7 @@ import LeaderboardScreen from '../../screens/leaderboard/components/leaderboard/
 import { getUnreadChatCount, subscribeUnreadChanges } from '../../screens/chat/services/ChatNotifications';
 
 const Tab = createNativeBottomTabNavigator();
+const Dummy = () => <View style={{ flex: 1, backgroundColor: 'red' }} />;
 
 export default function AppTabs() {
 const [unreadChats, setUnreadChats] = useState(getUnreadChatCount());

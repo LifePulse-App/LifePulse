@@ -8,6 +8,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import multer from "multer";
+import sharp from "sharp";
 
 // Helper: extract avatarId from a models.readyplayer.me GLB URL
 const extractAvatarId = (url) => {
@@ -519,23 +520,49 @@ const storage = multer.diskStorage({
 export const upload = multer({ storage });
 
 // 3. Controller: Upload avatar and save path to user
+// 3. Controller: Upload avatar, compress, and save path to user
 export const uploadAvatar = catchAsyncErrors(async (req, res, next) => {
   if (!req.file) return next(new ErrorHandler("No file uploaded", 400));
   
-  const avatarUrl = `/avatars/${req.file.filename}`;
-  // Optionally delete previous avatar here (recommended for cleanup!)
-  const user = await User.findByIdAndUpdate(
-  req.user._id,
-  {
-    avatarUrl,
-    $inc: { avatarVersion: 1 }, // 🔥 force refresh
-  },
-  { new: true }
-);
+  const originalPath = req.file.path;
+  const compressedFilename = `${req.user._id}_${Date.now()}.webp`;
+  const compressedPath = path.join(AVATAR_DIR, compressedFilename);
 
-res.json(user);
-  
-  res.json({ success: true, url: avatarUrl });
+  try {
+    // ⚡ 1. Compress & Convert using Sharp
+    await sharp(originalPath)
+      .resize(400, 400, { fit: 'cover' }) // Force exact 400x400 size
+      .webp({ quality: 80 })              // Compress to lightweight WebP
+      .toFile(compressedPath);
+
+    // ⚡ 2. Delete the bulky original file from the server
+    if (fs.existsSync(originalPath)) {
+      fs.unlinkSync(originalPath);
+    }
+
+    const avatarUrl = `/avatars/${compressedFilename}`;
+
+    // ⚡ 3. Update the database
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        avatarUrl,
+        $inc: { avatarVersion: 1 }, // 🔥 force refresh on frontend
+      },
+      { new: true }
+    ).select("-password -resetPasswordCode -verificationCode -refreshTokens"); // Hide sensitive data
+
+    // ⚡ FIX: Only call res.json ONCE
+    res.json({ success: true, url: avatarUrl, user });
+
+  } catch (error) {
+    console.error("Image Compression Error:", error);
+    // Cleanup the temporary file if compression fails
+    if (fs.existsSync(originalPath)) {
+      fs.unlinkSync(originalPath);
+    }
+    return next(new ErrorHandler("Failed to process and compress image", 500));
+  }
 });
 
 // 4. Controller: Get current avatar of a user (by auth)

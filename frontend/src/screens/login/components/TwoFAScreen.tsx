@@ -20,6 +20,7 @@ import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
 import { loginStyles } from './Loginstyles';
 import api_Login from '../services/api_Login';
 import DeviceInfo from 'react-native-device-info';
+import { connectSocket } from '../../../auth/api-client/socket';
 
 type RouteParams = {
   twoFaToken: string;
@@ -121,13 +122,25 @@ const TwoFAScreen = () => {
       if (user.refreshToken) {
         await UserStorage.setRefreshToken(user.refreshToken);
       }
+       await connectSocket()
+       const isIOS26Plus =
+              Platform.OS === 'ios' &&
+              parseInt(Platform.Version, 10) >= 26;
 
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: 'Drawer' }],
-        }),
-      );
+       if (isIOS26Plus) {
+              navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'AppTabs' }],
+              }),
+            );
+            } else {
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'Drawer' }],
+              }),
+            )}
     } catch (e: any) {
       showError('Unexpected error during 2FA verification');
     } finally {

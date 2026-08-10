@@ -7,7 +7,12 @@ node_modules/
 frontend/node_modules/
 frontend/ota_build
 backend/node_modules/
+.env.development
+backend/.env.development
+.env.production
+backend/.env.production
 serviceAccountKey.json
+backend/serviceAccountKey.json
 venv
 ai/venv
 

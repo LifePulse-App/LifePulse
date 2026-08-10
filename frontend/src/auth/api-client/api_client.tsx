@@ -3,6 +3,7 @@ import { HTTP_Headers } from '../../shared/config/enum';
 import UserStorage from '../user/UserStorage';
 import { resetToLogin } from '../../navigation/main/RootNavigation';
 import { updateSocketToken } from './socket';
+import { navigationRef } from '../../navigation/main/RootNavigation'; // ⚡ Required for navigation reset
 
 let isRefreshing = false;
 let failedQueue: any[] = [];
@@ -17,7 +18,7 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 const apiClient = create({
-  baseURL: 'https://api-prod.streaksphere.app/api',
+  baseURL: 'http://192.168.18.210:40000/api',
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -71,10 +72,48 @@ apiClient.axiosInstance.interceptors.response.use(
   async error => {
     const originalRequest = error.config;
     const status = error.response?.status;
+    const data = error.response?.data;
     const url = originalRequest?.url || 'UNKNOWN_URL';
 
     console.log('[RES-ERR]', status, 'for', url);
-    console.log('[RES-ERR] Full error response data:', error.response?.data);
+    console.log('[RES-ERR] Full error response data:', data);
+
+  // ⚡ ADDED: Intercept suspended or banned accounts globally (HTTP 403)
+    if (status === 403 && (data?.accountStatus === 'suspended' || data?.accountStatus === 'banned')) {
+      console.log(data);
+      
+      
+      // ⚡ Skip redirecting if they are currently trying to submit an appeal!
+      if (url.includes('/appeal')) {
+        console.log('[AUTH] 403 on appeal route. Allowing component to handle response error.');
+        return Promise.reject(error);
+      }
+
+      console.log('[AUTH] Account is restricted/suspended/banned. Clearing tokens & redirecting.');
+      
+      await UserStorage.clearTokens();
+      await UserStorage.deleteUser();
+      clearAuthHeaders();
+
+      if (!isRefreshing) {
+        isRefreshing = true;
+        navigationRef.current?.reset({
+          index: 0,
+          routes: [{ 
+            name: 'SuspendedScreen', 
+            params: { 
+              reason: data.reason || data.message, 
+              liftAt: data.suspensionDetails?.liftAt || data.liftAt, 
+              isBanned: data.accountStatus === 'banned' ,
+              appealDetails: data.appealDetails
+            } 
+          }],
+        });
+        setTimeout(() => { isRefreshing = false; }, 2000);
+      }
+      
+      return Promise.reload ? null : Promise.reject(error);
+    }
 
     // If it's an auth endpoint, surface the error (e.g., invalid credentials)
     if (isAuthEndpoint(url)) {

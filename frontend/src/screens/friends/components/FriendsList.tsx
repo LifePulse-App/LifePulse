@@ -248,7 +248,7 @@ const resolveAvatarUri = async (item: Friend) => {
       priority: FastImage.priority.high,
       cache: FastImage.cacheControl.immutable,
     }}
-    style={{ width: 40, height: 40, borderRadius: 999 }}
+    style={{ width: 40, height: 40, borderRadius: 999, marginRight: 10, }}
   />
 ) : (
   <View style={styles.avatarCircle}>

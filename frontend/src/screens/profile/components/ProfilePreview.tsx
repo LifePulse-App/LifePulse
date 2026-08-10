@@ -10,6 +10,7 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  TextInput,
 } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
@@ -18,6 +19,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import LinearGradient from "react-native-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import socialApi from "../../friends/services/api_friends";
 import apiClient from "../../../auth/api-client/api_client";
 
@@ -44,6 +46,7 @@ type PreviewUser = {
   leaderboardRank?: number;
   streak?: number;
   tick?: string;
+  badge?: boolean;
   partner?: { 
     _id: string; 
     name: string; 
@@ -156,7 +159,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const [user, setUser] = useState<PreviewUser | null>(null);
   const [friendship, setFriendship] = useState<Friendship | null>(null);
   const [relationship, setRelationship] = useState<RelationshipStatus | null>(null);
-  console.log(relationship);
   
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
@@ -164,6 +166,21 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const [localAvatar, setLocalAvatar] = useState<string | null>(null);
   const [unfriendModalVisible, setUnfriendModalVisible] = useState(false);
   
+  // ⚡ Block Modal State
+  const [blockModalVisible, setBlockModalVisible] = useState(false);
+  
+  // ⚡ Report Success Card State
+  const [reportSuccessVisible, setReportSuccessVisible] = useState(false);
+
+  // ⚡ TrueSheet Refs
+  const menuSheetRef = useRef<TrueSheet>(null);
+  const reportSheetRef = useRef<TrueSheet>(null);
+
+  // Report Form States
+  const [selectedReason, setSelectedReason] = useState("spam");
+  const [reportDetails, setReportDetails] = useState("");
+  const [submittingReport, setSubmittingReport] = useState(false);
+
   const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
@@ -198,23 +215,31 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     seedFromRoute();
 
     const cached = await loadCache(cacheKey(userId));
-    if (cached) {
+    if (cached && cached.user) {
       setUser(cached.user); 
       setFriendship(cached.friendship);
       setRelationship(cached.relationship || null);
       setLoading(false); 
     }
 
-    if (offline) return;
+    if (offline) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await (socialApi as any).previewProfile(userId);
       const payload: PreviewResponse = res?.data;
       
+      if (!payload || !payload.user) {
+        throw new Error("Profile information is unavailable.");
+      }
+      
       const mergedUser: PreviewUser = {
         ...payload.user,
         _id: userId,
-        name: payload.user?.name || route.params?.name || "User",
-        username: payload.user?.username || route.params?.username || "",
+        name: payload.user.name || route.params?.name || "User",
+        username: payload.user.username || route.params?.username || "",
       };
       
       setUser(mergedUser);
@@ -291,15 +316,13 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       if (friendship.requestIncoming) {
         const response = await (socialApi as any).acceptFriendRequest(userId);
         if (!response.ok) {
-        // response.data contains your backend's JSON { message: "..." }
-        throw new Error(response.data?.message);
-      }
+          throw new Error(response.data?.message);
+        }
       } else if (!friendship.requestSent) {
         const response = await (socialApi as any).sendFriendRequest(userId);
         if (!response.ok) {
-        // response.data contains your backend's JSON { message: "..." }
-        throw new Error(response.data?.message);
-      }
+          throw new Error(response.data?.message);
+        }
       }
       await load();
     } catch (e: any) {
@@ -316,7 +339,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setErrorMsg(null);
       const response = await (socialApi as any).unfriend(userId);
       if (!response.ok) {
-        // response.data contains your backend's JSON { message: "..." }
         throw new Error(response.data?.message);
       }
       setUnfriendModalVisible(false);
@@ -336,7 +358,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setFriendship((prev) => prev ? { ...prev, requestSent: false } : null);
       const response = await (socialApi as any).removeFriendRequest(userId);
       if (!response.ok) {
-        // response.data contains your backend's JSON { message: "..." }
         throw new Error(response.data?.message);
       }
       await load();
@@ -348,7 +369,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     }
   };
 
-  // --- ⚡ Relationship Handlers (WITH PROPER ERROR CATCHING) ---
+  // --- Relationship Handlers ---
   const onSendRel = async () => {
     try { 
       setBusyAction(true); 
@@ -356,7 +377,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setRelationship((prev) => prev ? { ...prev, requestSent: true } : { isPartner: false, requestIncoming: false, requestSent: true });
       const response = await apiClient.post(`/relationship/request/${userId}`); 
       if (!response.ok) {
-        // response.data contains your backend's JSON { message: "..." }
         throw new Error(response.data?.message || "You are already in a relationship.");
       }
       await load(); 
@@ -372,7 +392,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setErrorMsg(null);
       const response = await apiClient.post(`/relationship/accept/${userId}`); 
        if (!response.ok) {
-        // response.data contains your backend's JSON { message: "..." }
         throw new Error(response.data?.message || "You are already in a relationship.");
       }
       await load(); 
@@ -388,7 +407,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setRelationship((prev) => prev ? { ...prev, requestSent: false, requestIncoming: false } : null);
       const response = await apiClient.post(`/relationship/cancel/${userId}`); 
        if (!response.ok) {
-        // response.data contains your backend's JSON { message: "..." }
         throw new Error(response.data?.message || "You are already in a relationship.");
       }
       await load(); 
@@ -403,7 +421,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setErrorMsg(null);
       const response = await apiClient.post(`/relationship/remove`);
        if (!response.ok) {
-        // response.data contains your backend's JSON { message: "..." }
         throw new Error(response.data?.message || "You are already in a relationship.");
       }
       await load(); 
@@ -418,7 +435,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setErrorMsg(null);
       const response = await apiClient.post(`/relationship/restore`); 
        if (!response.ok) {
-        // response.data contains your backend's JSON { message: "..." }
         throw new Error(response.data?.message || "You are already in a relationship.");
       }
       await load(); 
@@ -427,8 +443,59 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     } finally { setBusyAction(false); }
   };
 
-  console.log(errorMsg);
-  
+  // ⚡ Block Action Handler
+  const confirmBlockUser = async () => {
+    if (!userId || offline) return;
+    try {
+      setBusyAction(true);
+      setErrorMsg(null);
+      
+      const response = await apiClient.post(`/user/${userId}/block`);
+      
+      if (!response.ok && response.status !== 200) {
+        throw new Error(response.data?.message || "Failed to block user.");
+      }
+      
+      setBlockModalVisible(false);
+      navigation.goBack(); 
+    } catch (e: any) {
+      setErrorMsg(e?.response?.data?.message || "Failed to block user.");
+      setBlockModalVisible(false);
+    } finally {
+      setBusyAction(false);
+    }
+  };
+
+  // ⚡ Report Action Handler
+// ⚡ Report Action Handler
+  const handleReportUser = async () => {
+    if (!userId || offline) return;
+    try {
+      setSubmittingReport(true);
+      setErrorMsg(null);
+      
+      const response = await apiClient.post(`/moderate/user/${userId}/report`, {
+        reason: selectedReason,
+        details: reportDetails,
+      });
+
+      // Check if the backend responded with an error/failure
+      if (response.data && response.data.success === false) {
+        throw new Error(response.data.message || "Failed to submit report.");
+      }
+
+      await reportSheetRef.current?.dismiss();
+      setReportDetails("");
+      setReportSuccessVisible(true); // Only show success if it actually succeeded!
+    } catch (err: any) {
+      // ⚡ Extract the exact error message from the backend (e.g., "You have already submitted a report...")
+      const message = err?.response?.data?.message || err?.message || "Failed to submit report.";
+      setErrorMsg(message); 
+      await reportSheetRef.current?.dismiss();
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
 
   const handlePartnerClick = () => {
     if (user?.partner?._id) {
@@ -442,10 +509,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const hasMood = !!user?.mood;
   const locationHidden = user?.canSeeLocation === false;
   const hasLocation = !!locationText && !locationHidden;
-  
   const isSuspended = relationship?.isSuspended;
-
-  
 
   useEffect(() => {
     const loadLocalAvatar = async () => {
@@ -474,9 +538,21 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
         >
           <Icon name="arrow-left" size={22} color="#f1f5f9" />
         </TouchableOpacity>
+
+        <View style={{ flex: 1 }} />
+
         {loading && friendship && (
-          <ActivityIndicator size="small" color="#818cf8" style={{ position: 'absolute', right: 20, top: safeTopPadding + 16 }} />
+          <ActivityIndicator size="small" color="#818cf8" style={{ marginRight: 12 }} />
         )}
+
+        {/* ⚡ 3-Dots Menu Button (Opens TrueSheet) */}
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => menuSheetRef.current?.present()}
+          activeOpacity={0.8}
+        >
+          <Icon name="dots-vertical" size={22} color="#f1f5f9" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -514,6 +590,9 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                 {user?.tick === "golden" && (
                   <Icon name="check-decagram" size={22} color="#fbbf24" style={styles.tickIcon} />
                 )}
+                {user?.isPremium && (
+                    <Icon name="star-circle" size={20} color="#fbbf24" style={styles.tickIcon} />
+                  )}
               </View>
 
               {user?.username ? (
@@ -522,8 +601,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
 
               {/* Social Tags & Relationship Row */}
               <View style={styles.tagsRow}>
-                
-                {/* ⚡ RELATIONSHIP PILL */}
                 <TouchableOpacity 
                   activeOpacity={user?.partner?._id ? 0.8 : 1} 
                   style={[
@@ -567,7 +644,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
               </View>
             </View>
 
-            {/* ⚡ Error Message Row */}
+            {/* Error Message Row */}
             {errorMsg && (
               <View style={styles.errorRow}>
                 <Icon name="alert-circle-outline" size={16} color="#fca5a5" />
@@ -586,7 +663,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
               </View>
             )}
 
-            {/* ── Modern Inline Stats ── */}
+            {/* Modern Inline Stats */}
             <View style={styles.statsContainer}>
               <View style={styles.statBlock}>
                 <Text style={styles.statNumber}>{user?.points?.toLocaleString() ?? "—"}</Text>
@@ -604,10 +681,8 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
               </View>
             </View>
 
-            {/* ── Details Grid ── */}
+            {/* Details Grid */}
             <View style={styles.detailsGrid}>
-              
-              {/* Level Card */}
               <View style={[styles.detailCard, { flex: 1 }]}>
                 <View style={[styles.detailIconWrap, { backgroundColor: "rgba(167,139,250,0.15)" }]}>
                   <Icon name="star-four-points" size={18} color="#a78bfa" />
@@ -616,7 +691,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                 <Text style={styles.detailSub}>{levelTitle}</Text>
               </View>
 
-              {/* Mood Card */}
               <View style={[styles.detailCard, { flex: 1, marginLeft: 12 }]}>
                 <View style={[styles.detailIconWrap, { backgroundColor: hasMood ? "rgba(52,211,153,0.15)" : "rgba(71,85,105,0.15)" }]}>
                   <Text style={{ fontSize: 16 }}>{hasMood ? "✨" : "😶"}</Text>
@@ -643,8 +717,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
               </View>
             </View>
 
-            {/* ── Friendship Banners ── */}
-                             {/* ── Relationship Actions ── */}
+            {/* Relationship Actions */}
             <View style={[styles.actionContainer, { marginTop: -20 }]}>
               {relationship?.isPartner ? (
                 isSuspended ? (
@@ -686,7 +759,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
               ) : null}
             </View>
 
-            {/* ── Primary Actions (Friendship) ── */}
+            {/* Primary Actions (Friendship) */}
             <View style={[styles.actionContainer, { marginTop: -20 }]} >
               {!friendship?.requestSent ? (
                 <TouchableOpacity
@@ -751,15 +824,93 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                   </TouchableOpacity>
                 </View>
               )}
-
-
             </View>
-
           </View>
         )}
       </ScrollView>
 
-      {/* Custom Unfriend Confirmation Modal */}
+      {/* ⚡ 1. TrueSheet Bottom Sheet Menu (Block / Report options) */}
+      <TrueSheet
+        ref={menuSheetRef}
+        detents={[0.3]}
+        cornerRadius={30}
+        backgroundColor="#0F172A"
+        grabber={false}
+      >
+        <View style={{ padding: 20 }}>
+          <Text style={styles.sheetTitle}>Options</Text>
+          
+          <TouchableOpacity 
+            style={styles.sheetOptionRow} 
+            onPress={async () => {
+              await menuSheetRef.current?.dismiss();
+              setBlockModalVisible(true);
+            }}
+          >
+            <Icon name="block-helper" size={20} color="#f87171" style={{ marginRight: 12 }} />
+            <Text style={[styles.sheetOptionText, { color: "#f87171" }]}>Block User</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.sheetOptionRow} 
+            onPress={async () => {
+              await menuSheetRef.current?.dismiss();
+              reportSheetRef.current?.present();
+            }}
+          >
+            <Icon name="alert-octagon-outline" size={20} color="#fbbf24" style={{ marginRight: 12 }} />
+            <Text style={[styles.sheetOptionText, { color: "#fbbf24" }]}>Report Account</Text>
+          </TouchableOpacity>
+        </View>
+      </TrueSheet>
+
+      {/* ⚡ 2. TrueSheet Report Reason Selection Sheet */}
+      <TrueSheet
+        ref={reportSheetRef}
+        detents={[0.65]}
+        cornerRadius={30}
+        backgroundColor="#0F172A"
+        grabber={false}
+      >
+        <ScrollView style={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+          <Text style={styles.sheetTitle}>Why are you reporting?</Text>
+          
+          {['spam', 'harassment', 'inappropriate_content', 'fake_account', 'hate_speech', 'other'].map((item) => (
+            <TouchableOpacity
+              key={item}
+              style={[styles.reasonRow, selectedReason === item && styles.reasonRowSelected]}
+              onPress={() => setSelectedReason(item)}
+            >
+              <Text style={styles.reasonText}>{item.replace('_', ' ').toUpperCase()}</Text>
+              {selectedReason === item && <Icon name="check" size={18} color="#6366f1" />}
+            </TouchableOpacity>
+          ))}
+
+          <TextInput
+            style={styles.reportInput}
+            placeholder="Additional details (optional)..."
+            placeholderTextColor="#64748B"
+            multiline
+            value={reportDetails}
+            onChangeText={setReportDetails}
+          />
+
+          <TouchableOpacity 
+            style={styles.sheetSaveBtn} 
+            onPress={handleReportUser}
+            disabled={submittingReport}
+          >
+            {submittingReport ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Submit Report</Text>
+            )}
+          </TouchableOpacity>
+          <View style={{ height: 30 }} />
+        </ScrollView>
+      </TrueSheet>
+
+      {/* Unfriend Confirmation Modal */}
       <Modal
         visible={unfriendModalVisible}
         transparent
@@ -792,6 +943,73 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                 ) : (
                   <Text style={styles.confirmDangerText}>Remove</Text>
                 )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Block User Modal */}
+      <Modal
+        visible={blockModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBlockModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.confirmModal}>
+            <View style={styles.confirmIconWrap}>
+              <Icon name="block-helper" size={36} color="#ef4444" />
+            </View>
+            <Text style={styles.confirmTitle}>Block User</Text>
+            <Text style={styles.confirmDesc}>
+              Are you sure you want to block {user?.name || "this user"}? They will not be able to find your profile, send you messages, or see your activity.
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity 
+                style={styles.confirmCancelBtn} 
+                onPress={() => setBlockModalVisible(false)}
+              >
+                <Text style={styles.confirmCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.confirmDangerBtn} 
+                onPress={confirmBlockUser}
+                disabled={busyAction}
+              >
+                {busyAction ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.confirmDangerText}>Block</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ⚡ Report Success Card Modal */}
+      <Modal
+        visible={reportSuccessVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReportSuccessVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.confirmModal}>
+            <View style={[styles.confirmIconWrap, { backgroundColor: "rgba(52,211,153,0.1)" }]}>
+              <Icon name="check-circle-outline" size={36} color="#34d399" />
+            </View>
+            <Text style={styles.confirmTitle}>Report Submitted</Text>
+            <Text style={styles.confirmDesc}>
+              Thank you for helping keep our community safe. We will review this account shortly.
+            </Text>
+            <View style={styles.confirmActions}>
+              <TouchableOpacity 
+                style={[styles.confirmDangerBtn, { backgroundColor: "#6366f1" }]} 
+                onPress={() => setReportSuccessVisible(false)}
+              >
+                <Text style={styles.confirmDangerText}>Done</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -853,7 +1071,6 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
 
-  // Centered Hero Section
   heroSection: {
     alignItems: "center",
     marginBottom: 24,
@@ -876,7 +1093,6 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center",
     borderWidth: 3, borderColor: "#1e293b",
   },
-  avatarInitial: { color: "#fff", fontSize: 40, fontWeight: "800" },
   nameRow: { flexDirection: "row", alignItems: "center", marginBottom: 4 },
   displayName: {
     color: "#f8fafc", fontSize: 24,
@@ -890,7 +1106,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap", justifyContent: "center"
   },
   
-  // Relationship Style
   relationshipPill: {
     flexDirection: "row", alignItems: "center", gap: 6,
     backgroundColor: "rgba(244,63,94,0.12)",
@@ -903,11 +1118,11 @@ const styles = StyleSheet.create({
     borderColor: "rgba(148,163,184,0.2)",
   },
   relationshipPillSuspended: {
-    backgroundColor: "rgba(249, 115, 22, 0.15)", // Orange glow
-    borderColor: "rgba(249, 115, 22, 0.4)", // Orange border
+    backgroundColor: "rgba(249, 115, 22, 0.15)",
+    borderColor: "rgba(249, 115, 22, 0.4)",
   },
   relationshipText: { color: "#fda4af", fontSize: 13, fontWeight: "700" },
-  relationshipTextSuspended: { color: "#fdba74" }, // Orange text
+  relationshipTextSuspended: { color: "#fdba74" },
 
   titleChip: {
     flexDirection: "row", alignItems: "center", gap: 6,
@@ -957,12 +1172,6 @@ const styles = StyleSheet.create({
     color: "#f87171", fontSize: 15, fontWeight: "700",
   },
 
-  messageBtn: {
-    width: 56, borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.08)",
-    alignItems: "center", justifyContent: "center",
-  },
-
   detailsGrid: { flexDirection: "row", marginBottom: 12 },
   detailCard: {
     backgroundColor: "rgba(15,23,42,0.6)",
@@ -978,17 +1187,6 @@ const styles = StyleSheet.create({
   detailTitle: { color: "#f1f5f9", fontSize: 16, fontWeight: "700", marginBottom: 4, marginLeft: 0 },
   detailSub: { color: "#64748b", fontSize: 13, fontWeight: "500" },
 
-  friendBanner: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: "rgba(52,211,153,0.08)",
-    borderWidth: 1, borderColor: "rgba(52,211,153,0.2)",
-    borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16,
-    marginBottom: 16
-  },
-  friendBannerText: { color: "#34d399", fontSize: 14, fontWeight: "600", flex: 1 },
-  friendBannerDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#34d399" },
-
-  // ⚡ Updated Error Row
   errorRow: {
     flexDirection: "row", alignItems: "center", gap: 8,
     backgroundColor: "rgba(127,29,29,0.3)",
@@ -1003,6 +1201,65 @@ const styles = StyleSheet.create({
 
   offlineBanner: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 16, justifyContent: "center" },
   offlineText: { color: "#64748b", fontSize: 13 },
+
+  // ⚡ TrueSheet & Modal Styles matching Profile Screen
+  sheetTitle: { color: "#F9FAFB", fontSize: 19, fontWeight: "bold", marginBottom: 16, textAlign: "center" },
+  sheetOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.1)",
+  },
+  sheetOptionText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  reasonRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    backgroundColor: "rgba(30,41,59,0.65)",
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.15)",
+  },
+  reasonRowSelected: {
+    backgroundColor: "rgba(99,102,241,0.25)",
+    borderColor: "rgba(99,102,241,0.5)",
+  },
+  reasonText: {
+    color: "#f8fafc",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  reportInput: {
+    backgroundColor: "rgba(30,41,59,0.65)",
+    color: "#F9FAFB",
+    borderRadius: 13,
+    padding: 14,
+    fontSize: 15,
+    width: "100%",
+    height: 90,
+    textAlignVertical: "top",
+    marginTop: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.2)",
+  },
+  sheetSaveBtn: {
+    backgroundColor: "#6366f1", borderRadius: 15, paddingVertical: 13, alignItems: "center",
+    width: "100%", marginTop: 8, marginBottom: 8,
+    shadowColor: "#6366f1", shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 7,
+  },
 
   modalBackdrop: {
     flex: 1,

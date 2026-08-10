@@ -91,7 +91,7 @@ async function displayAppNotification(data) {
   try {
     await notifee.displayNotification({
       id: `${data.type || 'notif'}:${Date.now()}`,
-      title: data.title || 'Notification',
+      title: data.title || 'StreakSphere',
       body: data.body || '',
       android: {
         channelId: 'app_notifications',

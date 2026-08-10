@@ -69,8 +69,9 @@ const MOOD_METADATA: Record<
 };
 
 const Dashboard = ({ navigation }: any) => {
-  const [loading, setLoading] = useState(true); // Only true for very first render
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false); // Did we ever load anything?
+  const [isCheckingCache, setIsCheckingCache] = useState(true); // Prevents initial skeleton flash
+  const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [friendReqCount, setFriendReqCount] = useState(0);
@@ -125,7 +126,6 @@ const Dashboard = ({ navigation }: any) => {
     }
   };
 
-  // On first mount, load from cache, then background update but never set loading true again
   useEffect(() => {
     (async () => {
       let anyLoaded = false;
@@ -142,8 +142,10 @@ const Dashboard = ({ navigation }: any) => {
         setHabits(cachedHabits);
         anyLoaded = true;
       }
+      
       setHasLoadedOnce(anyLoaded);
       setLoading(!anyLoaded);
+      setIsCheckingCache(false); // Cache check finished, allow rendering
 
       // Background refresh right away, but not set loading
       fetchDashboardInBackground();
@@ -198,7 +200,6 @@ const Dashboard = ({ navigation }: any) => {
     }
   };
 
-  // These never set loading=true, only update UI in background
   const fetchDashboardInBackground = useCallback(async () => {
     try {
       setError(null);
@@ -214,11 +215,9 @@ const Dashboard = ({ navigation }: any) => {
       setHasLoadedOnce(true);
       setLoading(false);
     } catch (err: any) {
-      const msg =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to load dashboard";
-      setError(msg);
+  
+
+     return
     }
   }, [offline]);
 
@@ -244,23 +243,35 @@ const Dashboard = ({ navigation }: any) => {
     }, [fetchDashboardInBackground, refreshPendingCount, fetchTodayHabitsInBackground])
   );
 
-  // Auto-refresh habits every 10 seconds while dashboard screen is mounted
-useEffect(() => {
-  // Poll habits verification status
-  const interval = setInterval(() => {
-    fetchDashboardInBackground();
-    fetchTodayHabitsInBackground();
-  }, 20000); // refresh every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDashboardInBackground();
+      fetchTodayHabitsInBackground();
+    }, 20000); 
 
-  return () => clearInterval(interval);
-}, [      fetchDashboardInBackground, fetchTodayHabitsInBackground]);
+    return () => clearInterval(interval);
+  }, [fetchDashboardInBackground, fetchTodayHabitsInBackground]);
 
   const handleRetry = () => {
     fetchDashboardInBackground();
     fetchTodayHabitsInBackground();
   };
 
-  // Only show skeleton if there is NO data yet
+  // Brief clean background while retrieving local cache to prevent skeleton flicker
+  if (isCheckingCache) {
+    return (
+      <MainLayout>
+        <AppScreen style={styles.root}>
+          <View style={styles.baseBackground} />
+          <View style={styles.glowTop} />
+          <View style={styles.glowBottom} />
+          <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        </AppScreen>
+      </MainLayout>
+    );
+  }
+
+  // Only show skeleton if there is genuinely NO cache data and we are waiting on the network
   if (loading && !hasLoadedOnce) {
     return <DashboardSkeleton />;
   }
@@ -474,10 +485,9 @@ useEffect(() => {
                   )}
                   renderItem={({ item }: any) => (
                     <TouchableOpacity
-    activeOpacity={0.8}
-    style={styles.habitRow}
-    // onPress={() => navigation.navigate('HabitDetail', { habit: item })}
-  >
+                      activeOpacity={0.8}
+                      style={styles.habitRow}
+                    >
                       <View style={styles.habitLeft}>
                         <View style={styles.habitIconWrap}>
                           <Icon name={item.icon || "check"} size={22} color="#C4B5FD" />

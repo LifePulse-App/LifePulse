@@ -8,7 +8,7 @@ import {
   Platform,
   PermissionsAndroid,
   AppState,
-  DeviceEventEmitter, // ⚡ Added to dispatch wake up events
+  DeviceEventEmitter,
 } from 'react-native';
 import Toast, { BaseToast, BaseToastProps } from 'react-native-toast-message';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -29,7 +29,7 @@ import apiClient, { setSecretKey } from './src/auth/api-client/api_client';
 import { navigationRef, resetToLogin } from './src/navigation/main/RootNavigation';
 import AppUpdateGate from './AppUpdateGate';
 import { enableScreens } from 'react-native-screens';
-
+import { AnimatedSplash } from './AnimatedSplash';
 import {
   loadChatNotificationState,
   notifyIncoming,
@@ -47,8 +47,18 @@ import { TextEncoder, TextDecoder } from 'text-encoding';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { PaperProvider } from 'react-native-paper';
 import { connectSocket, disconnectSocket, getSocket } from './src/auth/api-client/socket';
+
+// ⚡ REVENUECAT: Import the SDK
+import Purchases, { LOG_LEVEL } from 'react-native-purchases';
+
 (global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
+
+// ⚡ REVENUECAT: Replace these with your actual public keys from the dashboard
+const REVENUECAT_API_KEYS = {
+  apple: "test_ABGyHRcQgTRDEYqDUCexpisaSbC",
+  google: "test_ABGyHRcQgTRDEYqDUCexpisaSbC",
+};
 
 const CHAT_CHANNEL_ID = 'default';
 
@@ -98,6 +108,7 @@ async function displayChatNotificationGroupedBySender(
     android: {
       channelId: CHAT_CHANNEL_ID,
       groupId,
+      groupSummary: true,
       pressAction: { id: 'default' },
       sound: 'default',
     },
@@ -127,7 +138,6 @@ async function displayChatNotificationGroupedBySender(
   });
 }
 
-// ⚡ CLEANED: Only asks for POST_NOTIFICATIONS on launch
 async function requestNotificationPermission() {
   if (Platform.OS === 'android') {
     if (Platform.Version >= 33) {
@@ -154,14 +164,24 @@ async function unregisterPushToken() {
 
 const App = () => {
   const [User, setUser] = useState<user | undefined>();
-
   const [isBiometricVerified, setIsBiometricVerified] = useState(false);
   const [isCheckingBiometric, setIsCheckingBiometric] = useState(true);
-
+  const [isSplashVisible, setIsSplashVisible] = useState(true);
+  
   const secretKeySetRef = useRef(false);
   const lastRegisteredTokenRef = useRef<string | null>(null);
   const deliveringAllRef = useRef(false);
   const lastDeliverAllAtRef = useRef(0);
+
+  // ⚡ REVENUECAT: Initialize the SDK immediately when the App mounts
+  useEffect(() => {
+    Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
+    if (Platform.OS === 'ios') {
+      Purchases.configure({ apiKey: REVENUECAT_API_KEYS.apple });
+    } else if (Platform.OS === 'android') {
+      Purchases.configure({ apiKey: REVENUECAT_API_KEYS.google });
+    }
+  }, []);
 
   const runMarkAllPendingDelivered = async (reason: string) => {
     const now = Date.now();
@@ -206,12 +226,11 @@ const App = () => {
     return () => sub.remove();
   }, []);
 
-  // ⚡ FIX: Emits Wake Up for calls, only navigates for chats
   useEffect(() => {
     const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
       if (type === EventType.PRESS && detail?.notification?.data) {
         const data = detail.notification.data;
-if (data.type === 'chat' && data.peerUserId) {
+        if (data.type === 'chat' && data.peerUserId) {
           navigationRef.current?.navigate('chat', {
             peerUserId: data.peerUserId,
             peerName: data.peerName,
@@ -222,16 +241,12 @@ if (data.type === 'chat' && data.peerUserId) {
     return () => unsubscribe();
   }, []);
 
-  // ⚡ FIX: Boot-up lock screen interceptor
- useEffect(() => {
+  useEffect(() => {
     async function checkInitialNotification() {
       const initial = await notifee.getInitialNotification();
       if (initial?.notification?.data) {
         const data = initial.notification.data;
-
         setTimeout(() => {
-          // ⚡ FIX: Removed incoming_call logic entirely. 
-          // Only handle chats here. CallProvider handles calls automatically!
           if (data.type === 'chat' && data.peerUserId) {
             navigationRef.current?.navigate('chat', {
               peerUserId: data.peerUserId,
@@ -243,13 +258,6 @@ if (data.type === 'chat' && data.peerUserId) {
     }
     checkInitialNotification();
   }, []);
-
-  // useEffect(() => {
-  //   if (Platform.OS === 'android') {
-  //     SystemNavigationBar.navigationHide();
-  //     SystemNavigationBar.stickyImmersive();
-  //   }
-  // }, []);
 
   enableScreens(true);
 
@@ -270,14 +278,38 @@ if (data.type === 'chat' && data.peerUserId) {
       const messagingInstance = getMessaging(firebaseApp);
 
       return onMessage(messagingInstance, async remoteMessage => {
+        console.log('📱 [FCM RAW FOREGROUND MESSAGE ARRIVED]:', JSON.stringify(remoteMessage));
         const data = remoteMessage?.data || {};
+
+        if (data.type === 'general' || data.type === 'admin_broadcast' || data.type === 'admin_direct' || data.title) {
+          try {
+            await notifee.displayNotification({
+              id: `${data.type || 'broadcast'}:${Date.now()}`,
+              title: String(data.title || 'StreakSphere'),
+              body: String(data.body || ''),
+              android: {
+                channelId: 'app_notifications',
+                pressAction: { id: 'default' },
+                sound: 'default',
+                importance: AndroidImportance.HIGH,
+              },
+              ios: {
+                sound: 'default',
+                foregroundPresentationOptions: ['alert', 'sound', 'badge'],
+              },
+              data: { ...data },
+            });
+          } catch (notifeeErr) {
+            console.log('❌ [Foreground Notification] Notifee error:', notifeeErr);
+          }
+          return; 
+        }
 
         if (data.type === 'chat' && data.peerUserId) {
           const incomingMessageId = String(data.messageId || data.msgId || data._id || '');
           if (incomingMessageId) {
             try {
               const socket = getSocket();
-              
               if (socket?.connected && data.conversationId) {
                 socket.emit("mark-delivered", {
                   messageIds: [incomingMessageId],
@@ -317,33 +349,45 @@ if (data.type === 'chat' && data.peerUserId) {
   }, []);
 
   useEffect(() => {
-    if (!User) return;
-    if (Platform.OS !== 'android') return;
+    if (Platform.OS !== 'android' && Platform.OS !== 'ios') return;
 
     let unsubscribeTokenRefresh: undefined | (() => void);
 
-    const register = async (token: string) => {
+    const registerTokenToServer = async (token: string) => {
       if (!token) return;
       if (lastRegisteredTokenRef.current === token) return;
-      await apiClient.post('/push/register', { token, platform: Platform.OS });
-      lastRegisteredTokenRef.current = token;
-      console.log('[FCM] Registered token:', token);
+      try {
+        await apiClient.post('/push/register', { token, platform: Platform.OS });
+        lastRegisteredTokenRef.current = token;
+      } catch (e) {
+        console.log('[FCM] Failed to post token to backend:', e);
+      }
     };
 
-    const run = async () => {
-      const firebaseApp = getApp();
-      const messagingInstance = getMessaging(firebaseApp);
-      const token = await getToken(messagingInstance);
-      await register(token);
+    const setupFCM = async () => {
+      try {
+        const firebaseApp = getApp();
+        const messagingInstance = getMessaging(firebaseApp);
+        
+        const token = await getToken(messagingInstance);
+        if (token) {
+          await registerTokenToServer(token);
+        }
 
-      unsubscribeTokenRefresh = onTokenRefresh(messagingInstance, async newToken => {
-        await register(newToken);
-      });
+        unsubscribeTokenRefresh = onTokenRefresh(messagingInstance, async newToken => {
+          await registerTokenToServer(newToken);
+        });
+      } catch (e) {
+        console.log('[FCM] token setup failed:', e);
+      }
     };
 
-    run().catch(e => console.log('[FCM] token setup failed', e));
-    return () => { if (unsubscribeTokenRefresh) unsubscribeTokenRefresh(); };
-  }, [User]);
+    setupFCM();
+
+    return () => {
+      if (unsubscribeTokenRefresh) unsubscribeTokenRefresh();
+    };
+  }, [User]); 
 
   useEffect(() => {
     if (!User) return;
@@ -359,13 +403,37 @@ if (data.type === 'chat' && data.peerUserId) {
     }
   }, [isBiometricVerified]);
 
-  useEffect(() => {
-    if (User) {
-      connectSocket().catch(e => console.log('Socket boot error:', e));
-    } else {
-      disconnectSocket();
+  // ⚡ REVENUECAT: This is the magic linking step. 
+// ⚡ REVENUECAT: Strict User Identity Management
+useEffect(() => {
+  if (User) {
+    connectSocket().catch(e => console.log('Socket boot error:', e));
+    
+    const userId = String(User.id || User._id || '');
+    if (userId && userId !== 'undefined') {
+      Purchases.logIn(userId).then(async ({ customerInfo }) => {
+        // Force sync with the backend to ensure we don't use stale device cache
+        try {
+          await Purchases.invalidateCustomerInfoCache();
+          await Purchases.getCustomerInfo();
+        } catch (e) {
+          console.log('RevenueCat Sync Error:', e);
+        }
+      }).catch(e => console.log('RevenueCat Login Error:', e));
     }
-  }, [User]);
+  } else {
+    disconnectSocket();
+    
+    Purchases.getAppUserID().then((anonymousId) => {
+      if (anonymousId && !anonymousId.startsWith('$RCAnonymousID:')) {
+        // Clear cache completely on logout
+        Purchases.logOut().then(() => {
+          Purchases.invalidateCustomerInfoCache();
+        }).catch(e => console.log('RevenueCat Logout Error:', e));
+      }
+    }).catch(() => {});
+  }
+}, [User]);
 
   useEffect(() => {
     const checkBiometric = async () => {
@@ -426,16 +494,6 @@ if (data.type === 'chat' && data.peerUserId) {
       />
     ),
   };
-
-  // if (isCheckingBiometric) {
-  //   return (
-  //     <PaperProvider settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
-  //       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#020617' }}>
-  //         <ActivityIndicator size="large" color="#A855F7" />
-  //       </View>
-  //     </PaperProvider>
-  //   );
-  // }
 
   return (
     <KeyboardProvider>

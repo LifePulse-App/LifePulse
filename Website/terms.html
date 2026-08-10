@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Terms of Service & Privacy Policy - StreakSphere</title>
+<meta name="description" content="StreakSphere Terms of Service and Privacy Policy."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link rel="icon" type="image/png" href="logo.png">
+<style>
+:root{
+  --bg:#03040A; --bg2:#0a0c16;
+  --surface:rgba(255,255,255,0.03); --surface2:rgba(255,255,255,0.06);
+  --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.15);
+  --text:#F8FAFC; --muted:#94A3B8;
+  --accent1:#6366F1; --accent2:#A855F7; --accent3:#EC4899; 
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{font-family:'DM Sans',sans-serif;color:var(--text);background:var(--bg);min-height:100vh;overflow-x:hidden;line-height:1.6;}
+a{-webkit-tap-highlight-color:transparent;}
+
+/* Subtle background noise */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;}
+
+.container{position:relative;z-index:1;width:min(1200px, 90%);margin-inline:auto;}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);-webkit-backdrop-filter:blur(24px) saturate(200%);border-bottom:1px solid var(--border);background:rgba(3,4,10,0.7);}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;padding:12px 0;}
+.logo-group{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.logo-img{width:32px;height:32px;border-radius:10px;object-fit:cover;border:1px solid rgba(255,255,255,0.1);}
+.logo-name{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:700;color:var(--text);letter-spacing:-0.02em;}
+.nav-links{display:flex;align-items:center;gap:20px;}
+.nav-link{color:var(--muted);text-decoration:none;font-size:0.85rem;font-weight:500;transition:color 0.2s;}
+.nav-link:hover{color:var(--text);}
+.nav-cta{background:var(--text);color:var(--bg);padding:7px 16px;border-radius:100px;font-size:0.8rem;font-weight:700;text-decoration:none;transition:transform 0.2s;}
+.nav-cta:hover{transform:scale(1.05);}
+
+@media(max-width: 480px){
+  .logo-name{font-size:0.9rem;}
+  .nav-links{gap:10px;}
+  .nav-link{font-size:0.75rem;}
+  .nav-cta{padding:6px 12px; font-size:0.75rem;}
+}
+
+/* HERO */
+.hero{padding:8vh 0 2vh;text-align:center;position:relative;z-index:1;}
+.hero-title{font-family:'Syne',sans-serif;font-size:clamp(1.8rem, 5vw, 3rem);font-weight:800;line-height:1.1;letter-spacing:-0.03em;margin-bottom:12px;}
+.hero-sub{color:var(--accent1);font-size:0.9rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;}
+
+/* LEGAL CONTENT CONTAINER */
+.legal-container{max-width:850px;margin:0 auto;padding:4vh 0 8vh;position:relative;z-index:1;}
+.legal-content{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:clamp(20px, 5vw, 50px);}
+
+.legal-content p.intro{font-size:1.05rem;color:var(--text);margin-bottom:30px;}
+.legal-content h2{font-family:'Syne',sans-serif;color:var(--text);font-size:1.7rem;margin-top:40px;margin-bottom:20px;border-bottom:1px solid var(--border2);padding-bottom:12px;}
+.legal-content h3{font-family:'Syne',sans-serif;color:var(--text);font-size:1.2rem;margin-top:30px;margin-bottom:12px;}
+.legal-content p, .legal-content ul{font-size:0.95rem;color:var(--muted);margin-bottom:16px;}
+.legal-content ul{padding-left:24px;}
+.legal-content li{margin-bottom:8px;}
+.legal-content strong{color:var(--text);font-weight:700;}
+.legal-content a{color:var(--accent1);text-decoration:none;}
+.legal-content a:hover{text-decoration:underline;}
+
+/* FOOTER */
+footer{border-top:1px solid var(--border);padding:60px 0 30px;margin-top:40px;background:var(--bg2);}
+.footer-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:30px;margin-bottom:40px;}
+.footer-col h4{font-family:'Syne',sans-serif;font-size:0.9rem;font-weight:700;margin-bottom:16px;letter-spacing:0.02em;}
+.footer-col ul{list-style:none;}
+.footer-col ul li{margin-bottom:10px;}
+.footer-col ul li a{color:var(--muted);text-decoration:none;font-size:0.85rem;transition:color 0.2s;}
+.footer-col ul li a:hover{color:var(--text);}
+.social-links{display:flex;align-items:center;gap:12px;margin-top:12px;}
+.social-icon{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--muted);transition:all 0.2s;text-decoration:none;}
+.social-icon:hover{color:var(--text);border-color:var(--border2);transform:translateY(-2px);background:rgba(255,255,255,0.1);}
+.social-icon svg{width:18px;height:18px;fill:currentColor;}
+.footer-bottom{border-top:1px solid var(--border);padding-top:24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;}
+.footer-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:var(--text);text-decoration:none;}
+.footer-copy{color:var(--muted);font-size:0.8rem;}
+@media(max-width: 600px){
+  .footer-grid {text-align: center; gap: 40px;}
+  .social-links {justify-content: center;}
+  .footer-bottom {flex-direction: column; text-align: center; justify-content: center; gap: 12px;}
+}
+
+.reveal{opacity:0;transform:translateY(20px);transition:all 0.5s ease;}
+.reveal.visible{opacity:1;transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="container nav-inner">
+    <a href="index.html" class="logo-group">
+      <img src="logo.png" alt="StreakSphere" class="logo-img" onerror="this.style.display='none'"/>
+      <span class="logo-name">StreakSphere</span>
+    </a>
+    <div class="nav-links">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="index.html#download" class="nav-cta">Download App</a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero container reveal">
+  <h1 class="hero-title">Terms of Service &<br>Privacy Policy</h1>
+  <p class="hero-sub">Last Updated: July 2026</p>
+</section>
+
+<!-- LEGAL CONTENT -->
+<section class="container legal-container reveal">
+  <div class="legal-content">
+    <p class="intro">Welcome to StreakSphere. These Terms of Service and Privacy Policy ("Terms") govern your use of the StreakSphere mobile application, website, and related services (collectively, the "Service"). By creating an account or using the Service, you agree to be bound by these Terms.</p>
+
+    <h2>PART 1: PRIVACY POLICY</h2>
+    <p>We are committed to protecting your privacy. This section explains how we collect, use, and share your personal data.</p>
+
+    <h3>1. Information We Collect</h3>
+    <p>To provide and secure the Service, we collect the following information:</p>
+    <ul>
+        <li><strong>Information you provide:</strong> Email address, username, profile picture, bio, and content you post.</li>
+        <li><strong>App Usage Data:</strong> How you interact with the app, including streak tracking, challenges, social interactions, and crash reports.</li>
+        <li><strong>Device & Log Data:</strong> Device model, operating system version, unique device identifiers (e.g., Advertising IDs), IP address, and login timestamps.</li>
+        <li><strong>Security Data:</strong> 2FA status, backup codes, and a list of authorized devices to prevent unauthorized access.</li>
+        <li><strong>Device Permissions:</strong> With your consent, we may access your camera, photo library, or push notifications to enable specific app features.</li>
+    </ul>
+
+    <h3>2. How We Use Your Information</h3>
+    <p>We use your data strictly to operate and improve StreakSphere:</p>
+    <ul>
+        <li>To maintain your account, streaks, and data synchronization across devices.</li>
+        <li>To enable social features, such as sharing progress or participating in challenges.</li>
+        <li>To secure your account, detect fraud, and alert you of suspicious logins.</li>
+        <li>To send administrative emails (e.g., password resets, policy updates) and push notifications.</li>
+        <li>To analyze app performance and fix technical bugs.</li>
+    </ul>
+
+    <h3>3. Third-Party Services</h3>
+    <p>We do not sell your personal data. However, we use trusted third-party service providers to help operate the Service (e.g., cloud hosting (MongoDB, AWS/GCP), analytics, and email delivery). These third parties are contractually obligated to protect your data and may only process it based on our instructions.</p>
+
+    <h3>4. User Rights & Data Deletion (GDPR & CCPA Compliant)</h3>
+    <p>Depending on your location, you have the right to access, update, or delete your personal data. <strong>Account Deletion:</strong> You may permanently delete your account and associated data at any time via the in-app settings (Settings &gt; Account &gt; Delete Account). Upon deletion:</p>
+    <ul>
+        <li>Your profile, streaks, and personal data are removed from our active databases.</li>
+        <li>Active sessions and authentication tokens are immediately revoked.</li>
+        <li>Some anonymized analytical data may be retained securely for legal or operational purposes.</li>
+    </ul>
+
+    <h3>5. Children's Privacy</h3>
+    <p>StreakSphere is not intended for children under the age of 13. We do not knowingly collect personal information from children under 13. If we discover that a user is under 13, we will delete their account and data immediately.</p>
+
+    <h2>PART 2: TERMS OF SERVICE</h2>
+
+    <h3>6. Acceptable Use & Conduct</h3>
+    <p>You agree not to misuse the Service. You are strictly prohibited from:</p>
+    <ul>
+        <li>Attempting to hack, reverse-engineer, or disrupt the app’s infrastructure.</li>
+        <li>Using automated bots, scrapers, or scripts to manipulate streaks or accounts.</li>
+        <li>Impersonating others or providing false registration information.</li>
+    </ul>
+
+    <h3>7. User-Generated Content (UGC) & Moderation</h3>
+    <p>StreakSphere allows users to post content and interact. We have a zero-tolerance policy for objectionable content. You agree NOT to post content that is:</p>
+    <ul>
+        <li>Unlawful, harassing, abusive, threatening, or defamatory.</li>
+        <li>Hate speech, discriminatory, or inciting violence.</li>
+        <li>Sexually explicit or pornographic.</li>
+    </ul>
+    <p><strong>Moderation:</strong> We reserve the right to review, flag, and remove any content that violates these Terms. Users can report inappropriate content or block other users directly within the app. Violators will face immediate account suspension or termination.</p>
+
+    <h3>8. Intellectual Property</h3>
+    <p>You retain ownership of the content you create. By posting content, you grant StreakSphere a non-exclusive, worldwide, royalty-free license to use, display, and distribute your content solely for the purpose of operating the Service.</p>
+    <p>The StreakSphere app, its logo, code, and design are the intellectual property of StreakSphere and may not be copied or reproduced without permission.</p>
+
+    <h3>9. Disclaimers & Limitation of Liability</h3>
+    <p><strong>"AS IS" Basis:</strong> StreakSphere is provided on an "AS IS" and "AS AVAILABLE" basis. We make no warranties that the app will be error-free, completely secure, or operate without interruptions.</p>
+    <p><strong>Limitation of Liability:</strong> To the maximum extent permitted by law, StreakSphere and its developers shall not be liable for any indirect, incidental, special, or consequential damages resulting from your use of, or inability to use, the Service, including data loss or unauthorized access to your account.</p>
+
+    <h3>10. Changes to These Terms</h3>
+    <p>We may update this document periodically. If we make significant changes, we will notify you via the app or email. Your continued use of the Service after changes are published constitutes your acceptance of the updated Terms.</p>
+
+    <h3>11. Contact Us</h3>
+    <p>If you have questions regarding these terms, data privacy, or require support, please contact us at:</p>
+    <p><strong>Email:</strong> <a href="mailto:contact@streaksphere.app">contact@streaksphere.app</a></p>
+    <p>Please include "Privacy Inquiry" or "Legal" in the subject line for faster routing.</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-col">
+        <h4>StreakSphere</h4>
+        <ul>
+          <li><a href="index.html#features">Features</a></li>
+          <li><a href="index.html#download">Download App</a></li>
+          <li><a href="index.html#release-logs">Release Notes</a></li>
+          <li><a href="https://play.google.com/store/apps/details?id=com.streaksphere.app" target="_blank">Google Play</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Safety & Legal</h4>
+        <ul>
+          <li><a href="terms.html">Privacy Policy</a></li>
+          <li><a href="child-safety-standards.html">Child Safety & Protection</a></li>
+          <li><a href="delete-account.html">Account Deletion Request</a></li>
+          <li><a href="terms.html">Terms of Service</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Support & Help</h4>
+        <ul>
+          <li><a href="help.html">Help Center / FAQ</a></li>
+          <li><a href="mailto:contact@streaksphere.app">Contact Us</a></li>
+          <li><a href="community-guidelines.html">Community Guidelines</a></li>
+          <li><a href="help.html#report">Report an Issue</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Follow Us</h4>
+        <p style="color:var(--muted); font-size:0.8rem; margin-bottom:12px;">Join our community across social platforms:</p>
+        <div class="social-links">
+          <!-- Instagram -->
+          <a href="https://www.instagram.com/streaksphere.official" class="social-icon" target="_blank" aria-label="Instagram">
+            <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+          </a>
+          <!-- X (Twitter) -->
+          <a href="https://x.com/StreakSphere" class="social-icon" target="_blank" aria-label="X">
+            <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+          <!-- LinkedIn -->
+          <a href="https://www.linkedin.com/company/streaksphere" class="social-icon" target="_blank" aria-label="LinkedIn">
+            <svg viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          </a>
+          <!-- TikTok -->
+          <a href="https://www.tiktok.com/@streaksphere_official" class="social-icon" target="_blank" aria-label="TikTok">
+            <svg viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.82.56-1.33 1.53-1.35 2.53-.05 1.18.57 2.37 1.55 3.01.95.63 2.21.72 3.23.26.96-.43 1.66-1.34 1.83-2.38.07-.63.07-1.27.07-1.91V.02z"/></svg>
+          </a>
+          <!-- YouTube -->
+          <a href="https://youtube.com/@streaksphere?si=JTLx7h_Vyaj2jLAF" class="social-icon" target="_blank" aria-label="YouTube">
+            <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <a href="index.html" class="footer-logo">StreakSphere</a>
+      <p class="footer-copy">© <span id="year"></span> StreakSphere Inc. All rights reserved.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+document.getElementById('year').textContent = new Date().getFullYear();
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => { 
+    if(e.isIntersecting){
+      e.target.classList.add('visible');
+      io.unobserve(e.target);
+    } 
+  });
+}, { threshold:0.1, rootMargin:'0px 0px -20px 0px' });
+document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+</body>
+</html>
