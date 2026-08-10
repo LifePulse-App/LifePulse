@@ -1,6 +1,6 @@
 import express from "express";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
-import { checkAccountStatus } from "../middlewares/checkAccountStatus.js"; // ⚡ Suspension guard middleware
+import { checkAccountStatus } from "../middlewares/CheckAccountStatus.js"; // ⚡ Suspension guard middleware
 import {
   reportUser,
   submitAppeal,
