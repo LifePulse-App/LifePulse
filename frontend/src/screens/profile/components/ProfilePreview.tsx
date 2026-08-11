@@ -47,6 +47,7 @@ type PreviewUser = {
   streak?: number;
   tick?: string;
   badge?: boolean;
+  relationshipHidden?: boolean; // ⚡ ADDED FLAG
   partner?: { 
     _id: string; 
     name: string; 
@@ -159,17 +160,11 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const [user, setUser] = useState<PreviewUser | null>(null);
   const [friendship, setFriendship] = useState<Friendship | null>(null);
   const [relationship, setRelationship] = useState<RelationshipStatus | null>(null);
-  
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  
   const [avatarPreviewVisible, setAvatarPreviewVisible] = useState(false);
   const [localAvatar, setLocalAvatar] = useState<string | null>(null);
   const [unfriendModalVisible, setUnfriendModalVisible] = useState(false);
-  
-  // ⚡ Block Modal State
   const [blockModalVisible, setBlockModalVisible] = useState(false);
-  
-  // ⚡ Report Success Card State
   const [reportSuccessVisible, setReportSuccessVisible] = useState(false);
 
   // ⚡ TrueSheet Refs
@@ -205,7 +200,8 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       avatarUrl: prev?.avatarUrl,
       isPublic: prev?.isPublic,
       canSeeLocation: prev?.canSeeLocation,
-      partner: prev?.partner
+      partner: prev?.partner,
+      relationshipHidden: prev?.relationshipHidden,
     }));
   }, [userId, route.params?.name, route.params?.username]);
 
@@ -230,22 +226,18 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     try {
       const res = await (socialApi as any).previewProfile(userId);
       const payload: PreviewResponse = res?.data;
-      
       if (!payload || !payload.user) {
         throw new Error("Profile information is unavailable.");
       }
-      
       const mergedUser: PreviewUser = {
         ...payload.user,
         _id: userId,
         name: payload.user.name || route.params?.name || "User",
         username: payload.user.username || route.params?.username || "",
       };
-      
       setUser(mergedUser);
       setFriendship(payload.friendship);
-      setRelationship(payload.relationship || { isPartner: false, requestSent: false, requestIncoming: false });
-      
+      setRelationship(payload.relationship || { isPartner: false, requestSent: false, requestIncoming: false, isSuspended: false });
       await saveCache(cacheKey(userId), {
         user: mergedUser,
         friendship: payload.friendship,
@@ -285,10 +277,10 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const avatarUri = localAvatar
     ? localAvatar
     : user?.avatarUrl
-      ? user.avatarUrl.startsWith("http")
-        ? user.avatarUrl
-        : newUrl + user.avatarUrl
-      : null;
+    ? user.avatarUrl.startsWith("http")
+      ? user.avatarUrl
+      : newUrl + user.avatarUrl
+    : null;
 
   // --- Friendship Handlers ---
   const actionLabel = friendship?.isFriend
@@ -304,7 +296,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const onPressAction = async () => {
     if (!userId || !friendship) return;
     if (offline) return;
-    
     if (friendship.isFriend) {
       setUnfriendModalVisible(true);
       return; 
@@ -374,7 +365,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     try { 
       setBusyAction(true); 
       setErrorMsg(null);
-      setRelationship((prev) => prev ? { ...prev, requestSent: true } : { isPartner: false, requestIncoming: false, requestSent: true });
+      setRelationship((prev) => prev ? { ...prev, requestSent: true } : { isPartner: false, requestIncoming: false, requestSent: true, isSuspended: false });
       const response = await apiClient.post(`/relationship/request/${userId}`); 
       if (!response.ok) {
         throw new Error(response.data?.message || "You are already in a relationship.");
@@ -385,13 +376,12 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setErrorMsg(e?.response?.data?.message || "You are already in a relationship.");
     } finally { setBusyAction(false); }
   };
-  
   const onAcceptRel = async () => {
     try { 
       setBusyAction(true); 
       setErrorMsg(null);
       const response = await apiClient.post(`/relationship/accept/${userId}`); 
-       if (!response.ok) {
+      if (!response.ok) {
         throw new Error(response.data?.message || "You are already in a relationship.");
       }
       await load(); 
@@ -399,14 +389,13 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setErrorMsg(e?.response?.data?.message || "Could not accept request.");
     } finally { setBusyAction(false); }
   };
-  
   const onCancelRel = async () => {
     try { 
       setBusyAction(true); 
       setErrorMsg(null);
       setRelationship((prev) => prev ? { ...prev, requestSent: false, requestIncoming: false } : null);
       const response = await apiClient.post(`/relationship/cancel/${userId}`); 
-       if (!response.ok) {
+      if (!response.ok) {
         throw new Error(response.data?.message || "You are already in a relationship.");
       }
       await load(); 
@@ -414,13 +403,12 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setErrorMsg(e?.response?.data?.message || "Could not cancel request.");
     } finally { setBusyAction(false); }
   };
-  
   const onSuspendRel = async () => {
     try { 
       setBusyAction(true); 
       setErrorMsg(null);
       const response = await apiClient.post(`/relationship/remove`);
-       if (!response.ok) {
+      if (!response.ok) {
         throw new Error(response.data?.message || "You are already in a relationship.");
       }
       await load(); 
@@ -428,13 +416,12 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setErrorMsg(e?.response?.data?.message || "Could not suspend relationship.");
     } finally { setBusyAction(false); }
   };
-  
   const onRestoreRel = async () => {
     try { 
       setBusyAction(true); 
       setErrorMsg(null);
       const response = await apiClient.post(`/relationship/restore`); 
-       if (!response.ok) {
+      if (!response.ok) {
         throw new Error(response.data?.message || "You are already in a relationship.");
       }
       await load(); 
@@ -443,19 +430,15 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     } finally { setBusyAction(false); }
   };
 
-  // ⚡ Block Action Handler
   const confirmBlockUser = async () => {
     if (!userId || offline) return;
     try {
       setBusyAction(true);
       setErrorMsg(null);
-      
       const response = await apiClient.post(`/user/${userId}/block`);
-      
       if (!response.ok && response.status !== 200) {
         throw new Error(response.data?.message || "Failed to block user.");
       }
-      
       setBlockModalVisible(false);
       navigation.goBack(); 
     } catch (e: any) {
@@ -466,29 +449,24 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     }
   };
 
-  // ⚡ Report Action Handler
-// ⚡ Report Action Handler
   const handleReportUser = async () => {
     if (!userId || offline) return;
     try {
       setSubmittingReport(true);
       setErrorMsg(null);
-      
       const response = await apiClient.post(`/moderate/user/${userId}/report`, {
         reason: selectedReason,
         details: reportDetails,
       });
 
-      // Check if the backend responded with an error/failure
       if (response.data && response.data.success === false) {
         throw new Error(response.data.message || "Failed to submit report.");
       }
 
       await reportSheetRef.current?.dismiss();
       setReportDetails("");
-      setReportSuccessVisible(true); // Only show success if it actually succeeded!
+      setReportSuccessVisible(true); 
     } catch (err: any) {
-      // ⚡ Extract the exact error message from the backend (e.g., "You have already submitted a report...")
       const message = err?.response?.data?.message || err?.message || "Failed to submit report.";
       setErrorMsg(message); 
       await reportSheetRef.current?.dismiss();
@@ -498,7 +476,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   };
 
   const handlePartnerClick = () => {
-    if (user?.partner?._id) {
+    if (user?.partner?._id && !user?.relationshipHidden) {
       navigation.push("ProfilePreview", {
         userId: user.partner._id,
         name: user.partner.name,
@@ -510,6 +488,10 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const locationHidden = user?.canSeeLocation === false;
   const hasLocation = !!locationText && !locationHidden;
   const isSuspended = relationship?.isSuspended;
+  
+  // ⚡ RELATIONSHIP TOGGLE FLAGS
+  const isHidden = !!user?.relationshipHidden;
+  const hasPartner = !!user?.partner?._id;
 
   useEffect(() => {
     const loadLocalAvatar = async () => {
@@ -529,7 +511,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       <View style={styles.bg} />
       <View style={styles.glowTL} />
       <View style={styles.glowBR} />
-      
       <View style={[styles.header, { paddingTop: safeTopPadding + 12 }]}>
         <TouchableOpacity
           style={styles.backBtn}
@@ -545,7 +526,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
           <ActivityIndicator size="small" color="#818cf8" style={{ marginRight: 12 }} />
         )}
 
-        {/* ⚡ 3-Dots Menu Button (Opens TrueSheet) */}
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => menuSheetRef.current?.present()}
@@ -561,10 +541,9 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {loading && !friendship ? (
-           <ProfileSkeleton />
+          <ProfileSkeleton />
         ) : (
           <View style={{ gap: 12 }}>
-            {/* ── Center Social Hero ── */}
             <View style={styles.heroSection}>
               <TouchableOpacity
                 style={styles.avatarWrap}
@@ -590,48 +569,49 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                 {user?.tick === "golden" && (
                   <Icon name="check-decagram" size={22} color="#fbbf24" style={styles.tickIcon} />
                 )}
-                {user?.isPremium && (
-                    <Icon name="star-circle" size={20} color="#fbbf24" style={styles.tickIcon} />
-                  )}
+                {user?.badge && (
+                  <Icon name="star-circle" size={20} color="#fbbf24" style={styles.tickIcon} />
+                )}
               </View>
 
               {user?.username ? (
                 <Text style={styles.handle}>@{user.username}</Text>
               ) : null}
 
-              {/* Social Tags & Relationship Row */}
+              {/* ⚡ Social Tags & Relationship Row */}
               <View style={styles.tagsRow}>
                 <TouchableOpacity 
-                  activeOpacity={user?.partner?._id ? 0.8 : 1} 
+                  activeOpacity={hasPartner && !isHidden ? 0.8 : 1} 
                   style={[
                     styles.relationshipPill, 
-                    !user?.partner?._id && styles.relationshipPillEmpty,
-                    isSuspended && styles.relationshipPillSuspended
+                    (!hasPartner || isHidden) && styles.relationshipPillEmpty,
+                    isSuspended && !isHidden && styles.relationshipPillSuspended
                   ]}
                   onPress={handlePartnerClick}
-                  disabled={!user?.partner?._id}
+                  disabled={!hasPartner || isHidden}
                 >
-                  {!isSuspended ? (
+                  {!isSuspended || isHidden ? (
                     <Icon 
-                      name={user?.partner?._id ? "cards-heart" : "heart-outline"} 
+                      name={isHidden ? "eye-off" : hasPartner ? "cards-heart" : "heart-outline"} 
                       size={14} 
-                      color={user?.partner?._id ? "#f43f5e" : "#94a3b8"} 
+                      color={isHidden ? "#94a3b8" : hasPartner ? "#f43f5e" : "#94a3b8"} 
                     />
                   ) : (
                     <Text style={{ fontSize: 13, marginRight: 2, includeFontPadding: false }}>❤️‍🩹</Text>
                   )}
-                  
                   <Text 
                     style={[
                       styles.relationshipText, 
-                      !user?.partner?._id && { color: "#94a3b8" },
-                      isSuspended && styles.relationshipTextSuspended
+                      (!hasPartner || isHidden) && { color: "#94a3b8" },
+                      isSuspended && !isHidden && styles.relationshipTextSuspended
                     ]} 
                     numberOfLines={1}
                   >
-                    {user?.partner?.name 
-                      ? `With ${user.partner.name}${user.partner.days !== undefined ? ` • ${user.partner.days}d` : ""}` 
-                      : "No one"}
+                    {isHidden 
+                      ? "Hidden" 
+                      : hasPartner && user?.partner
+                        ? `With ${user.partner.name}${user.partner.days !== undefined ? ` • ${user.partner.days}d` : ""}` 
+                        : "No one"}
                   </Text>
                 </TouchableOpacity>
 
@@ -839,7 +819,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       >
         <View style={{ padding: 20 }}>
           <Text style={styles.sheetTitle}>Options</Text>
-          
           <TouchableOpacity 
             style={styles.sheetOptionRow} 
             onPress={async () => {
@@ -874,7 +853,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       >
         <ScrollView style={{ padding: 20 }} showsVerticalScrollIndicator={false}>
           <Text style={styles.sheetTitle}>Why are you reporting?</Text>
-          
           {['spam', 'harassment', 'inappropriate_content', 'fake_account', 'hate_speech', 'other'].map((item) => (
             <TouchableOpacity
               key={item}
@@ -1100,12 +1078,10 @@ const styles = StyleSheet.create({
   },
   tickIcon: { marginLeft: 6, marginTop: 2 },
   handle: { color: "#94a3b8", fontSize: 15, fontWeight: "500", marginBottom: 16 },
-  
   tagsRow: {
     flexDirection: "row", alignItems: "center", gap: 10,
     flexWrap: "wrap", justifyContent: "center"
   },
-  
   relationshipPill: {
     flexDirection: "row", alignItems: "center", gap: 6,
     backgroundColor: "rgba(244,63,94,0.12)",
@@ -1159,9 +1135,7 @@ const styles = StyleSheet.create({
   primaryBtnPink: { backgroundColor: "rgba(244,63,94,0.1)", borderWidth: 1, borderColor: "rgba(244,63,94,0.3)" },
   primaryBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   btnDisabled: { opacity: 0.5 },
-  
   requestedRow: { flex: 1, flexDirection: "row", gap: 10 },
-  
   cancelBtn: {
     paddingHorizontal: 20, borderRadius: 16,
     backgroundColor: "rgba(239,68,68,0.08)",
@@ -1202,7 +1176,7 @@ const styles = StyleSheet.create({
   offlineBanner: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 16, justifyContent: "center" },
   offlineText: { color: "#64748b", fontSize: 13 },
 
-  // ⚡ TrueSheet & Modal Styles matching Profile Screen
+  // ⚡ TrueSheet & Modal Styles
   sheetTitle: { color: "#F9FAFB", fontSize: 19, fontWeight: "bold", marginBottom: 16, textAlign: "center" },
   sheetOptionRow: {
     flexDirection: "row",

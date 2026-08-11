@@ -461,7 +461,7 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
       // This ensures older frontend code automatically hides the star icon.
       isPremium: showBadge, 
       showPremiumBadge: showBadge, 
-      
+      relationshipHidden: hideRel,
       isPublic: !!targetDoc.isPublic,
       canSeeLocation,
       partner: partnerData, // ⚡ Will be null if hidden
