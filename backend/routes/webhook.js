@@ -10,6 +10,8 @@ router.post('/revenuecat', async (req, res) => {
   try {
     // 1. Authenticate the request
     const authHeader = req.headers.authorization;
+    console.log(authHeader);
+    
     if (authHeader !== `Bearer ${process.env.REVENUECAT_WEBHOOK_SECRET}`) {
       return res.status(401).send("Unauthorized Access");
     }
