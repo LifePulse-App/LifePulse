@@ -54,11 +54,14 @@ import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 (global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
 
-// ⚡ REVENUECAT: Replace these with your actual public keys from the dashboard
+// ⚡ REVENUECAT: API Keys from Dashboard
 const REVENUECAT_API_KEYS = {
   apple: "test_ABGyHRcQgTRDEYqDUCexpisaSbC",
   google: "test_ABGyHRcQgTRDEYqDUCexpisaSbC",
 };
+
+// Guard flag to prevent duplicate configurations across re-renders
+let isRevenueCatConfigured = false;
 
 const CHAT_CHANNEL_ID = 'default';
 
@@ -173,13 +176,16 @@ const App = () => {
   const deliveringAllRef = useRef(false);
   const lastDeliverAllAtRef = useRef(0);
 
-  // ⚡ REVENUECAT: Initialize the SDK immediately when the App mounts
+  // ⚡ REVENUECAT: Safe One-Time Initialization
   useEffect(() => {
-    Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
-    if (Platform.OS === 'ios') {
-      Purchases.configure({ apiKey: REVENUECAT_API_KEYS.apple });
-    } else if (Platform.OS === 'android') {
-      Purchases.configure({ apiKey: REVENUECAT_API_KEYS.google });
+    if (!isRevenueCatConfigured) {
+      Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
+      if (Platform.OS === 'ios') {
+        Purchases.configure({ apiKey: REVENUECAT_API_KEYS.apple });
+      } else if (Platform.OS === 'android') {
+        Purchases.configure({ apiKey: REVENUECAT_API_KEYS.google });
+      }
+      isRevenueCatConfigured = true;
     }
   }, []);
 
@@ -403,37 +409,35 @@ const App = () => {
     }
   }, [isBiometricVerified]);
 
-  // ⚡ REVENUECAT: This is the magic linking step. 
-// ⚡ REVENUECAT: Strict User Identity Management
-useEffect(() => {
-  if (User) {
-    connectSocket().catch(e => console.log('Socket boot error:', e));
-    
-    const userId = String(User.id || User._id || '');
-    if (userId && userId !== 'undefined') {
-      Purchases.logIn(userId).then(async ({ customerInfo }) => {
-        // Force sync with the backend to ensure we don't use stale device cache
-        try {
-          await Purchases.invalidateCustomerInfoCache();
-          await Purchases.getCustomerInfo();
-        } catch (e) {
-          console.log('RevenueCat Sync Error:', e);
-        }
-      }).catch(e => console.log('RevenueCat Login Error:', e));
-    }
-  } else {
-    disconnectSocket();
-    
-    Purchases.getAppUserID().then((anonymousId) => {
-      if (anonymousId && !anonymousId.startsWith('$RCAnonymousID:')) {
-        // Clear cache completely on logout
-        Purchases.logOut().then(() => {
-          Purchases.invalidateCustomerInfoCache();
-        }).catch(e => console.log('RevenueCat Logout Error:', e));
+  // ⚡ REVENUECAT: Strict User Identity Management & Safe Logout
+  useEffect(() => {
+    if (User) {
+      connectSocket().catch(e => console.log('Socket boot error:', e));
+      
+      const userId = String(User.id || User._id || '');
+      if (userId && userId !== 'undefined') {
+        Purchases.logIn(userId).then(async () => {
+          try {
+            await Purchases.invalidateCustomerInfoCache();
+            await Purchases.getCustomerInfo();
+          } catch (e) {
+            console.log('RevenueCat Sync Error:', e);
+          }
+        }).catch(e => console.log('RevenueCat Login Error:', e));
       }
-    }).catch(() => {});
-  }
-}, [User]);
+    } else {
+      disconnectSocket();
+      
+      // ✅ SAFE LOGOUT: Only log out if currently identified as a non-anonymous user
+      Purchases.getAppUserID().then((appUserId) => {
+        if (appUserId && !appUserId.startsWith('$RCAnonymousID:')) {
+          Purchases.logOut().then(() => {
+            Purchases.invalidateCustomerInfoCache();
+          }).catch(e => console.log('RevenueCat Logout Error:', e));
+        }
+      }).catch(() => {});
+    }
+  }, [User]);
 
   useEffect(() => {
     const checkBiometric = async () => {
@@ -497,19 +501,19 @@ useEffect(() => {
 
   return (
     <KeyboardProvider>
-     <GestureHandlerRootView style={{ flex: 1 }}>
-    <PaperProvider settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
-      <AuthContext.Provider value={{ User, setUser }}>
-        <AppUpdateGate>
-          {isBiometricVerified ? (
-            <NavigationContainer ref={navigationRef}>
-              <AuthNavigator />
-            </NavigationContainer>
-          ) : null}
-        </AppUpdateGate>
-      </AuthContext.Provider>
-    </PaperProvider>
-    </GestureHandlerRootView>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <PaperProvider settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
+          <AuthContext.Provider value={{ User, setUser }}>
+            <AppUpdateGate>
+              {isBiometricVerified ? (
+                <NavigationContainer ref={navigationRef}>
+                  <AuthNavigator />
+                </NavigationContainer>
+              ) : null}
+            </AppUpdateGate>
+          </AuthContext.Provider>
+        </PaperProvider>
+      </GestureHandlerRootView>
     </KeyboardProvider>
   );
 };

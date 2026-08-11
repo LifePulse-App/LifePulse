@@ -16,6 +16,8 @@ router.post('/revenuecat', async (req, res) => {
 
     // 2. Extract the event payload
     const { event } = req.body;
+    console.log(event);
+    
     const userId = event.app_user_id; 
     const eventType = event.type; 
 
