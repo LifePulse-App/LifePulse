@@ -277,6 +277,9 @@ const resolveAvatarUri = async (item: Friend) => {
         style={{ marginLeft: 6, marginTop: 2 }}
       />
     )}
+    {item?.isPremium && (
+        <Icon name="star-circle" size={17} color="#fbbf24" style={{ marginLeft: 5, marginTop: 2 }} />
+      )}
   </View>
   <Text style={styles.username} numberOfLines={1}>
     {item.username ? `@${item.username}` : "@"}

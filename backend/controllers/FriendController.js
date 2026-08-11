@@ -370,17 +370,20 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const { userId } = req.params;
 
+  // ⚡ 1. Added premiumPreferences to the .select()
   let targetDoc = await User.findById(userId)
-    .select("name username avatarUrl avatarVersion avatarThumbnailUrl level isPremium currentTitle country city isPublic tick partner partnerSince partnerGracePeriodEnd")
+    .select("name username avatarUrl avatarVersion avatarThumbnailUrl level isPremium premiumPreferences currentTitle country city isPublic tick partner partnerSince partnerGracePeriodEnd")
     .lean();
 
-  if (!targetDoc || targetDoc.accountStatus === 'suspended'  || targetDoc.accountStatus === 'banned') return res.status(404).json({ message: "User not found" });
+  if (!targetDoc || targetDoc.accountStatus === 'suspended' || targetDoc.accountStatus === 'banned') {
+    return res.status(404).json({ message: "User not found" });
+  }
 
   const targetUserObj = await User.findById(userId);
   const wasCleanedUp = await checkAndCleanupGracePeriod(targetUserObj);
   if (wasCleanedUp) {
     targetDoc = await User.findById(userId)
-       .select("name username avatarUrl avatarVersion avatarThumbnailUrl level isPremium currentTitle country city isPublic tick partner partnerSince partnerGracePeriodEnd")
+       .select("name username avatarUrl avatarVersion avatarThumbnailUrl level isPremium premiumPreferences currentTitle country city isPublic tick partner partnerSince partnerGracePeriodEnd")
        .lean();
   }
 
@@ -406,8 +409,20 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
   const relRequestSent = me?.relationshipOutgoing?.some(r => String(r.user) === userId);
   const relRequestIncoming = me?.relationshipIncoming?.some(r => String(r.user) === userId);
 
+  // ==========================================
+  // ⚡ PREMIUM PRIVACY MASKS
+  // ==========================================
+  
+  // Only hide the relationship if they are Premium, toggled it ON, AND the viewer is NOT their partner
+  const hideRel = targetDoc.isPremium && targetDoc.premiumPreferences?.hideRelationship && !isPartner;
+  
+  // Show badge if Premium AND they haven't explicitly toggled it off
+  const showBadge = targetDoc.isPremium && targetDoc.premiumPreferences?.premiumBadge !== false;
+
   let partnerData = null;
-  if (targetDoc.partner) {
+  
+  // ⚡ If hideRel is true, we skip building the partnerData entirely
+  if (targetDoc.partner && !hideRel) {
     const partnerUser = await User.findById(targetDoc.partner).select("name").lean();
     if (partnerUser) {
       const msInDay = 24 * 60 * 60 * 1000;
@@ -423,7 +438,8 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
     }
   }
 
-  const isSuspended = !!targetDoc.partnerGracePeriodEnd;
+  // ⚡ Hide suspension status if relationship is hidden
+  const isSuspended = !hideRel ? !!targetDoc.partnerGracePeriodEnd : false;
 
   res.json({
     user: {
@@ -440,10 +456,15 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
       moodCreatedAt: moodDoc?.createdAt || null,
       moodExpiresAt: moodDoc?.expiresAt || null,
       tick: targetDoc?.tick,
-      isPremium: targetDoc?.isPremium,
+      
+      // ⚡ Only return true for isPremium if they want the badge shown!
+      // This ensures older frontend code automatically hides the star icon.
+      isPremium: showBadge, 
+      showPremiumBadge: showBadge, 
+      
       isPublic: !!targetDoc.isPublic,
       canSeeLocation,
-      partner: partnerData, 
+      partner: partnerData, // ⚡ Will be null if hidden
     },
     friendship: {
       isFriend: isFriendFlag,
@@ -455,9 +476,9 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
       requestSent: !!relRequestSent,
       requestIncoming: !!relRequestIncoming,
       isSuspended: isSuspended,
-      gracePeriodEnd: targetDoc.partnerGracePeriodEnd || null
+      gracePeriodEnd: !hideRel ? targetDoc.partnerGracePeriodEnd || null : null
     },
-    isPremium: me?.isPremium
+    isPremium: me?.isPremium // This is for the viewer's premium status, keep as is
   });
 });
 
@@ -777,4 +798,51 @@ export const unblockUser = catchAsyncErrors(async (req, res) => {
   await them.save();
 
   return res.status(200).json({ message: "User unblocked successfully", success: true, isPremium: me.isPremium });
+});
+
+// ⚡ GET My Relationship History
+export const getMyRelationshipHistory = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user.id).select("relationshipHistory isPremium");
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  const history = user.relationshipHistory.map(h => {
+    const msInDay = 24 * 60 * 60 * 1000;
+    const duration = Math.floor((new Date(h.endedAt) - new Date(h.startedAt)) / msInDay) || 0;
+    return {
+      _id: h._id,
+      partnerId: h.partnerId,
+      partnerName: h.partnerName,
+      durationDays: duration,
+      endDate: h.endedAt
+    };
+  }).reverse(); // Newest first
+
+  res.status(200).json({ success: true, history });
+});
+
+// ⚡ GET Partner's Relationship History
+export const getPartnerRelationshipHistory = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user.id).select("partner isPremium");
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  if (!user.partner) {
+    return res.status(200).json({ success: true, history: [] });
+  }
+
+  const partner = await User.findById(user.partner).select("relationshipHistory");
+  if (!partner) return res.status(404).json({ success: false, message: "Partner not found" });
+
+  const history = partner.relationshipHistory.map(h => {
+    const msInDay = 24 * 60 * 60 * 1000;
+    const duration = Math.floor((new Date(h.endedAt) - new Date(h.startedAt)) / msInDay) || 0;
+    return {
+      _id: h._id,
+      partnerId: h.partnerId,
+      partnerName: h.partnerName,
+      durationDays: duration,
+      endDate: h.endedAt
+    };
+  }).reverse();
+
+  res.status(200).json({ success: true, history });
 });

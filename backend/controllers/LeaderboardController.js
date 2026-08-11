@@ -5,7 +5,6 @@ import catchAsyncErrors from '../utils/catchAsyncErrors.js';
 const normalizeScope = (scope) => (scope || 'world').toString().trim().toLowerCase();
 const normalizeLocation = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : v);
 
-// Read query params safely (flat, nested under params, or bracketed like params[scope])
 const getQueryVal = (q, key) =>
   q?.[key] ??
   q?.params?.[key] ??
@@ -39,19 +38,16 @@ const buildScopeFilter = (scope, user, query) => {
   }
 };
 
-// Friends = friends array + following + self
 const getFriendIds = (userDoc) => {
   const ids = new Set();
   ids.add(String(userDoc._id));
 
-  // friends may be an array of ObjectId or objects containing a user ref
   (userDoc.friends || []).forEach((f) => {
     if (f?.user) ids.add(String(f.user));
     else if (f?._id) ids.add(String(f._id));
     else if (typeof f === 'string' || typeof f === 'object') ids.add(String(f));
   });
 
-  // following as before
   (userDoc.following || []).forEach((f) => {
     if (f?.user) ids.add(String(f.user));
     else if (f?._id) ids.add(String(f._id));
@@ -69,17 +65,15 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
 
   const scope = normalizeScope(rawScope);
   
-  // ⚡ FIX: Added isPremium to select
   const user = await User.findById(req.user._id).select(
     'monthlyXp totalXp level currentTitle country city username name avatarUrl following friends tick isPremium blockedUsers blockedBy'
   );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
-  // ⚡ Get blocked IDs
   const blockedIds = [...(user.blockedUsers || []), ...(user.blockedBy || [])].map(String);
 
-  // ⚡ StreakSphere+ Benefit: 2x Multiplier on points if premium
-  const effectiveMonthlyXp = user.isPremium ? (user.monthlyXp || 0) * 2 : (user.monthlyXp || 0);
+  // ⚡ Removed effectiveMonthlyXp. The DB value is already doubled for premium.
+  const userMonthlyXp = user.monthlyXp || 0;
 
   if (scope === 'friends') {
     const friendIds = getFriendIds(user).filter(id => !blockedIds.includes(String(id)));
@@ -94,10 +88,10 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
 
     const higherCount = await User.countDocuments({
       _id: { $in: friendIds },
-      monthlyXp: { $gt: user.monthlyXp },
+      monthlyXp: { $gt: userMonthlyXp },
     });
 
-    const userRank = user.monthlyXp > 0 ? higherCount + 1 : null;
+    const userRank = userMonthlyXp > 0 ? higherCount + 1 : null;
 
     return res.status(200).json({
       success: true,
@@ -108,7 +102,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
         userId: u._id,
         username: u.username,
         name: u.name,
-        monthlyXp: u.isPremium ? u.monthlyXp * 2 : u.monthlyXp, // Apply 2x multiplier for plus users
+        monthlyXp: u.monthlyXp, // ⚡ Raw DB value used directly
         level: u.level,
         title: u.currentTitle,
         country: u.country,
@@ -121,7 +115,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
         userId: user._id,
         username: user.username,
         name: user.name,
-        monthlyXp: effectiveMonthlyXp,
+        monthlyXp: userMonthlyXp,
         rank: userRank,
         level: user.level,
         title: user.currentTitle,
@@ -151,11 +145,11 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
 
   const higherCount = await User.countDocuments({
     _id: { $nin: blockedIds },
-    monthlyXp: { $gt: user.monthlyXp },
+    monthlyXp: { $gt: userMonthlyXp },
     ...scopeFilter,
   }).collation({ locale: 'en', strength: 2 });
 
-  const userRank = user.monthlyXp > 0 ? higherCount + 1 : null;
+  const userRank = userMonthlyXp > 0 ? higherCount + 1 : null;
 
   res.status(200).json({
     success: true,
@@ -166,7 +160,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
       userId: u._id,
       username: u.username,
       name: u.name,
-      monthlyXp: u.isPremium ? u.monthlyXp * 2 : u.monthlyXp,
+      monthlyXp: u.monthlyXp,
       level: u.level,
       title: u.currentTitle,
       country: u.country,
@@ -179,7 +173,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
       userId: user._id,
       username: user.username,
       name: user.name,
-      monthlyXp: effectiveMonthlyXp,
+      monthlyXp: userMonthlyXp,
       rank: userRank,
       level: user.level,
       title: user.currentTitle,
@@ -200,17 +194,15 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
 
   const scope = normalizeScope(rawScope);
   
-  // ⚡ FIX: Added isPremium to select
   const user = await User.findById(req.user._id).select(
     'totalXp level currentTitle country city username name avatarUrl following friends tick isPremium blockedUsers blockedBy'
   );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
-  // ⚡ Get blocked IDs
   const blockedIds = [...(user.blockedUsers || []), ...(user.blockedBy || [])].map(String);
 
-  // ⚡ StreakSphere+ Benefit: 2x Multiplier on points if premium
-  const effectiveTotalXp = user.isPremium ? (user.totalXp || 0) * 2 : (user.totalXp || 0);
+  // ⚡ Removed effectiveTotalXp. The DB value is already doubled for premium.
+  const userTotalXp = user.totalXp || 0;
 
   if (scope === 'friends') {
     const friendIds = getFriendIds(user).filter(id => !blockedIds.includes(String(id)));
@@ -225,10 +217,10 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
 
     const higherCount = await User.countDocuments({
       _id: { $in: friendIds },
-      totalXp: { $gt: user.totalXp },
+      totalXp: { $gt: userTotalXp },
     });
 
-    const userRank = user.totalXp > 0 ? higherCount + 1 : null;
+    const userRank = userTotalXp > 0 ? higherCount + 1 : null;
 
     return res.status(200).json({
       success: true,
@@ -239,7 +231,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
         userId: u._id,
         username: u.username,
         name: u.name,
-        xp: u.isPremium ? u.totalXp * 2 : u.totalXp, // Apply 2x multiplier for plus users
+        xp: u.totalXp, // ⚡ Raw DB value used directly
         level: u.level,
         title: u.currentTitle,
         country: u.country,
@@ -252,7 +244,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
         userId: user._id,
         username: user.username,
         name: user.name,
-        xp: effectiveTotalXp,
+        xp: userTotalXp,
         rank: userRank,
         level: user.level,
         title: user.currentTitle,
@@ -282,11 +274,11 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
 
   const higherCount = await User.countDocuments({
     _id: { $nin: blockedIds },
-    totalXp: { $gt: user.totalXp },
+    totalXp: { $gt: userTotalXp },
     ...scopeFilter,
   }).collation({ locale: 'en', strength: 2 });
 
-  const userRank = user.totalXp > 0 ? higherCount + 1 : null;
+  const userRank = userTotalXp > 0 ? higherCount + 1 : null;
 
   res.status(200).json({
     success: true,
@@ -297,7 +289,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
       userId: u._id,
       username: u.username,
       name: u.name,
-      xp: u.isPremium ? u.totalXp * 2 : u.totalXp,
+      xp: u.totalXp,
       level: u.level,
       title: u.currentTitle,
       country: u.country,
@@ -310,7 +302,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
       userId: user._id,
       username: user.username,
       name: user.name,
-      xp: effectiveTotalXp,
+      xp: userTotalXp,
       rank: userRank,
       level: user.level,
       title: user.currentTitle,

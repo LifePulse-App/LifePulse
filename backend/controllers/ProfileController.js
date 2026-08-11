@@ -9,6 +9,7 @@ import os from "os";
 import path from "path";
 import multer from "multer";
 import sharp from "sharp";
+import { recalculateXp } from "./XpController.js";
 
 // Helper: extract avatarId from a models.readyplayer.me GLB URL
 const extractAvatarId = (url) => {
@@ -625,4 +626,43 @@ export const requestDeleteAccountOtp = catchAsyncErrors(async (req, res, next) =
     success: true,
     message: "OTP sent to your registered email address for account deletion."
   });
+});
+
+// GET /profile/premium-preferences
+export const getPremiumPreferences = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select("premiumPreferences isPremium");
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  res.status(200).json({
+    success: true,
+    isPremium: user.isPremium,
+    preferences: user.premiumPreferences || { hideRelationship: false, xpMultiplier: true, premiumBadge: true }
+  });
+});
+
+// POST /profile/premium-preferences
+export const updatePremiumPreferences = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  const { hideRelationship, xpMultiplier, premiumBadge } = req.body;
+
+  // Initialize if empty
+  if (!user.premiumPreferences) {
+    user.premiumPreferences = { hideRelationship: false, xpMultiplier: true, premiumBadge: true };
+  }
+
+  if (typeof hideRelationship === "boolean") user.premiumPreferences.hideRelationship = hideRelationship;
+  if (typeof xpMultiplier === "boolean") user.premiumPreferences.xpMultiplier = xpMultiplier;
+  if (typeof premiumBadge === "boolean") user.premiumPreferences.premiumBadge = premiumBadge;
+
+  await user.save();
+
+  // If they just toggled XP Multiplier, force an immediate recalculation of their rank!
+  if (typeof xpMultiplier === "boolean") {
+    // Import recalculateXp at the top of ProfileController: import { recalculateXp } from "../helpers/levels.js";
+    await recalculateXp(user._id); 
+  }
+
+  res.status(200).json({ success: true, preferences: user.premiumPreferences });
 });

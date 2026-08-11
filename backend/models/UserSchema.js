@@ -310,6 +310,11 @@ passwordChangeOtp: String,
     type: String, 
     default: null 
   },
+  premiumPreferences: {
+      hideRelationship: { type: Boolean, default: false },
+      xpMultiplier: { type: Boolean, default: true },
+      premiumBadge: { type: Boolean, default: true }
+    },
     accountStatus: {
   type: String,
   enum: ['active', 'suspended', 'banned'],

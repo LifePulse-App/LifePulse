@@ -975,7 +975,7 @@ export default function ProfileScreen({ navigation }: any) {
                 <Icon name="check-decagram" size={20} color="#fbbf24" style={{ marginLeft: 5, marginTop: 7 }} />
               )}
               {profile?.isPremium && (
-    <Icon name="star-circle" size={20} color="#fbbf24" style={{ marginLeft: 5, marginTop: 2 }} />
+    <Icon name="star-circle" size={20} color="#fbbf24" style={{ marginLeft: 5, marginTop: 7 }} />
   )}
             </View>
 
