@@ -73,7 +73,7 @@ router.delete("/me/delete-avatar", isAuthenticatedUser, deleteAvatar);
 // routes/avatarRoutes.js
 router.get("/avatar/:userId", getUserProfile);
 
-router.get("/profile/premium-preferences", isAuthenticatedUser, getPremiumPreferences);
-router.post("/profile/premium-preferences", isAuthenticatedUser, updatePremiumPreferences);
+router.get("/premium-preferences", isAuthenticatedUser, getPremiumPreferences);
+router.post("/premium-preferences", isAuthenticatedUser, updatePremiumPreferences);
 
 export default router;
