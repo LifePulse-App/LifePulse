@@ -10,25 +10,24 @@ router.post('/revenuecat', async (req, res) => {
   try {
     // 1. Authenticate the request
     const authHeader = req.headers.authorization;
-    console.log(authHeader);
-    
     if (authHeader !== `Bearer ${process.env.REVENUECAT_WEBHOOK_SECRET}`) {
       return res.status(401).send("Unauthorized Access");
     }
 
     // 2. Extract the event payload
     const { event } = req.body;
-    console.log(event);
-    
     const userId = event.app_user_id; 
     const eventType = event.type; 
 
-    // Handle RevenueCat Dashboard "Test Webhook" fake IDs gracefully
-    if (userId === '$RCAnonymousID:test_user' || userId === 'test_user') {
-      return res.status(200).send("Test webhook received.");
+    // ⚡ FIX: Gracefully ignore ALL anonymous IDs and dashboard test webhooks
+    // If RevenueCat sends an anonymous ID, the frontend will eventually merge it 
+    // when Purchases.logIn() is called, triggering a new valid webhook later.
+    if (!userId || userId.startsWith('$RCAnonymousID') || userId === 'test_user') {
+      console.log(`⚠️ Ignored Webhook: ID is anonymous or test (${userId})`);
+      return res.status(200).send("Anonymous or test ID, skipping DB update.");
     }
 
-    // 3. Locate the user in MongoDB safely using findOne to prevent CastErrors
+    // 3. Locate the user in MongoDB safely using findOne
     let user;
     try {
       user = await User.findOne({ _id: userId });
@@ -38,6 +37,7 @@ router.post('/revenuecat', async (req, res) => {
     }
 
     if (!user) {
+      console.log(`❌ User not found for valid ID: ${userId}`);
       return res.status(200).send("User not found, but webhook received.");
     }
 
