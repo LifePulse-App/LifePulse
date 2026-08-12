@@ -57,6 +57,15 @@ const getFriendStatus = async (userId: string) => {
   }
 };
 
+const blockUser = async (userId: string) => {
+  try {
+    return await client.post<FriendStatusResponse>(`/friends/user/${userId}/block`);
+  } catch (error: any) {
+    if (!error.response) throw new Error("Server is offline, try again later.");
+    throw error;
+  }
+};
+
 // My friends list
 const getFriends = async () => {
   try {
@@ -108,6 +117,7 @@ const previewProfile = async (userId: string) => {
 
 export default {
   sendFriendRequest,
+  blockUser,
   acceptFriendRequest,
   removeFriendRequest,
   unfriend,

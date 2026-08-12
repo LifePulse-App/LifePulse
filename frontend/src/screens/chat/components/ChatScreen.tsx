@@ -436,7 +436,6 @@ const MessageBubble = memo(({
 
   const renderContent = () => {
     if (isCallLog) {
-      // ⚡ UNIQUE TEXT STYLE FOR CALL LOGS
       return <Text style={[styles.text, { color: '#cbd5e1', fontWeight: '500' }]}>{plaintext}</Text>;
     }
     if (messageType === "text") {
@@ -463,14 +462,67 @@ const MessageBubble = memo(({
 
     if (!mediaUrl) return null;
 
-    if (messageType === "image") {
-      return (
-        <View style={styles.mediaContainer}>
-          <Image source={{ uri: mediaUrl }} style={styles.mediaImage} resizeMode="cover" />
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleImagePress} android_ripple={{ color: "rgba(255,255,255,0.10)" }} />
+if (messageType === "image") {
+  // ⚡ CHECK IF SHARED POST WAS REMOVED BY ADMIN
+  if (plaintext?.startsWith("__SHARED_POST_REMOVED__|")) {
+    return (
+      <View style={[styles.sharedPostCard, { backgroundColor: '#0A0A0A', padding: 24, alignItems: 'center', justifyContent: 'center' }]}>
+        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(239, 68, 68, 0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+          <Icon name="shield-alert-outline" size={24} color="#EF4444" />
         </View>
-      );
-    }
+        <Text style={{ color: "#F8FAFC", fontSize: 16, fontWeight: "700", textAlign: "center" }}>Post Removed</Text>
+        <Text style={{ color: "#94A3B8", fontSize: 12, textAlign: "center", marginTop: 4, lineHeight: 16 }}>
+          This shared post was removed because it violated our community guidelines.
+        </Text>
+      </View>
+    );
+  }
+
+  // ⚡ NORMAL SHARED POST RENDER
+  if (plaintext?.startsWith("__SHARED_POST__|")) {
+    const parts = plaintext.split("|");
+    const sPostId = parts[1] || "";
+    const sUserId = parts[2] || ""; 
+    const sUsername = parts[3] || "user";
+    const sCaption = parts[4] || "";
+
+    const navData = JSON.stringify({ postId: sPostId, userId: sUserId });
+
+    return (
+      <View style={styles.sharedPostCard}>
+        <View style={styles.sharedPostHeader}>
+          <Icon name="play-box-multiple-outline" size={16} color="#F8FAFC" />
+          <Text style={styles.sharedPostHeaderName}>@{sUsername}</Text>
+        </View>
+        
+        <View style={styles.sharedPostImageWrap}>
+          <Image source={{ uri: mediaUrl }} style={styles.sharedPostImage} resizeMode="cover" />
+        </View>
+        
+        <View style={styles.sharedPostFooter}>
+          <Text style={styles.sharedPostCaption} numberOfLines={2}>{sCaption}</Text>
+          
+          <TouchableOpacity 
+            style={styles.sharedPostBtn} 
+            activeOpacity={0.85}
+            onPress={() => onImagePress("shared_post", mediaUrl, navData)} 
+          >
+            <Text style={styles.sharedPostBtnText}>View Post</Text>
+            <Icon name="chevron-right" size={16} color="#FFF" style={{ marginLeft: 2 }} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ⚡ Normal Image Render (if it's not a shared post)
+  return (
+    <View style={styles.mediaContainer}>
+      <Image source={{ uri: mediaUrl }} style={styles.mediaImage} resizeMode="cover" />
+      <Pressable style={StyleSheet.absoluteFill} onPress={handleImagePress} android_ripple={{ color: "rgba(255,255,255,0.10)" }} />
+    </View>
+  );
+}
 
     if (messageType === "video") {
       return (
@@ -549,7 +601,6 @@ return (
                 )}
               </>
             ) : (
-              // ⚡ FIX: TIME IS NOW WRAPPED INSIDE THE TEXT BUBBLE
               <View style={isMe ? styles.textBubbleMe : styles.textBubbleOther}>
                 {renderContent()}
                 <View style={styles.metaRow}>
@@ -720,7 +771,6 @@ return (
           )}
         </>
       ) : (
-        // ⚡ FIX: TIME IS NOW WRAPPED INSIDE THE TEXT BUBBLE
         <View style={isMe ? styles.textBubbleMe : styles.textBubbleOther}>
           {content()}
           <View style={styles.metaRow}>
@@ -1178,19 +1228,17 @@ function VoiceRecordOverlay({
 
 export default function ChatScreen({ route, navigation }: any) {
   const user = useContext(AuthContext);
-  // 1. ADD THIS: Grab the call engine
   const callContext = useContext(CallContext);
   
+  // ⚡ DESTRUCTURE BLOCK FLAGS
+  const { peerUserId, peerName, peerMood, peerAvatarUrl, avatarUrl, amIBlocked, didIBlock } = route.params;
+  const isBlockedChat = amIBlocked || didIBlock;
 
-  // 2. ADD THIS: Create the trigger function
-// ✅ FIXED TRIGGER
- const handleVoiceCallPress = () => {
-
-  if (offline) {
+  const handleVoiceCallPress = () => {
+    if (offline) {
       showGlassyError("You are offline. Connect to the internet to call.");
       return;
     }
-
     if (!conversationId) {
       showGlassyError("Cannot call until conversation is initialized");
       return;
@@ -1198,18 +1246,16 @@ export default function ChatScreen({ route, navigation }: any) {
     
     if (callContext) {
       callContext.startCall(
-        // First Argument: The targetUser object
         {
           id: String(route.params.peerUserId),
           name: route.params.peerName || "Friend",
           avatar: newUrl + String(route.params.peerAvatarUrl || route.params.avatarUrl || ""),
         }, 
-        // Second Argument: The conversationId string
         conversationId 
       );
     }
   };
-  const { peerUserId, peerName, peerMood, peerAvatarUrl, avatarUrl } = route.params;
+
   const insets = useSafeAreaInsets();
   const myUserId = String(user?.User?.user?.id || user?.User?.user?._id || "");
 
@@ -1249,10 +1295,8 @@ export default function ChatScreen({ route, navigation }: any) {
   const messageRefs = useRef<Map<string, View>>(new Map());
   const flatListRef = useRef<FlatList>(null);
   
-  // ⚡ 1. ADD THIS REF TO TRACK WHO STARTED THE CALL
   const activeCallCallerIdRef = useRef<string | null>(null);
 
-  // ⚡ 2. ADD THIS EFFECT TO UPDATE IT WHILE THE CALL IS ACTIVE
   useEffect(() => {
     if (callContext?.currentSession) {
       activeCallCallerIdRef.current = callContext.currentSession.isIncoming 
@@ -1372,11 +1416,9 @@ export default function ChatScreen({ route, navigation }: any) {
 const [localMediaPaths, setLocalMediaPaths] = useState<Record<string, string>>({});
 
 const getMediaUrlCb = useCallback((m: any) => {
-    // Added fallback to m?.media?.uri for local/optimistic uploads
     const raw = String(m?.media?.url || m?.media?.uri || "");
     if (!raw) return "";
     
-    // Normalize Windows backslashes to forward slashes
     const normalizedRaw = raw.replace(/\\/g, "/");
     
     const remote = (normalizedRaw.startsWith("http://") || normalizedRaw.startsWith("https://") || normalizedRaw.startsWith("file://"))
@@ -1387,11 +1429,9 @@ const getMediaUrlCb = useCallback((m: any) => {
   }, [newUrl, localMediaPaths]);
 
   const getThumbnailUrlCb = useCallback((m: any) => {
-    // Added m?.media?.thumbnail as a fallback
     const raw = String(m?.media?.thumbnailUrl || m?.media?.localThumbnailUri || m?.media?.thumbnail || "");
     if (!raw) return "";
     
-    // Normalize Windows backslashes
     const normalizedRaw = raw.replace(/\\/g, "/");
     
     if (normalizedRaw.startsWith("http://") || normalizedRaw.startsWith("https://") || normalizedRaw.startsWith("file://")) {
@@ -1493,11 +1533,9 @@ useEffect(() => {
 
     if (!socket?.connected) socket?.connect();
 
-    // 1. Join relevant rooms
     socket?.emit("join", myUserId);
     if (conversationId) socket?.emit("join-conversation", conversationId);
 
-    // 2. Define explicit handler functions to maintain stable references
     const handleChatMessage = (msg: any) => {
       if (!msg) return;
       const normalized = normalizeServer([msg]);
@@ -1515,7 +1553,6 @@ useEffect(() => {
     };
 
     const handleMsgDelivered = (payload: any) => {
-      // ⚡ Support both single msgId and array of messageIds
       const idsToUpdate = payload.messageIds || (payload.msgId ? [payload.msgId] : []);
       if (!idsToUpdate.length) return;
       const now = new Date().toISOString();
@@ -1524,7 +1561,6 @@ useEffect(() => {
         if (idsToUpdate.includes(String(m._id))) {
           const updated = { ...m, deliveredAt: m.deliveredAt || now, tickState: m.seenAt ? "seen" : "delivered" };
           
-          // ⚡ CRITICAL: Save the double-tick to the SQLite Cache!
           upsertThreadMessageV2(String(myUserId), String(conversationId), {
             _id: String(updated._id),
             conversationId: String(conversationId),
@@ -1552,11 +1588,9 @@ useEffect(() => {
       setMessages(prev => prev.map(m => {
         const isSentByMe = String(m.fromUserId) === String(myUserId);
         
-        // If it explicitly matches the ID, OR if it's an older message we sent
         if (isSentByMe && (!idsToUpdate.length || idsToUpdate.includes(String(m._id)) || !m.seenAt)) {
           const updated = { ...m, seenAt: m.seenAt || now, tickState: "seen" };
 
-          // ⚡ CRITICAL: Save the blue-tick to the SQLite Cache!
           upsertThreadMessageV2(String(myUserId), String(conversationId), {
             _id: String(updated._id),
             conversationId: String(conversationId),
@@ -1567,7 +1601,7 @@ useEffect(() => {
             media: updated.media,
             createdAt: updated.createdAt,
             clientMessageId: updated.clientMessageId,
-            deliveredAt: updated.deliveredAt || now, // If it's seen, it must be delivered
+            deliveredAt: updated.deliveredAt || now, 
             seenAt: updated.seenAt
           }).catch(() => {});
 
@@ -1601,15 +1635,9 @@ useEffect(() => {
       );
     };
 
-    // ⚡ 3. UPGRADED CALL LOG HANDLER (WITH TS FIX)
-// ⚡ 3. UPGRADED CALL LOG HANDLER (FIXED DB & CACHE SYNC)
-// Inside ChatScreen.tsx > useEffect for sockets
-
-// ⚡ UPGRADED CALL LOG HANDLER
 const handleCallLog = async (payload: any, text: string) => {
   const safePayload = payload || {};
   
-  // 1. Always prioritize the backend's explicit payload
   const cid = safePayload.conversationId || conversationId;
   if (!cid || !myUserId) return;
 
@@ -1620,7 +1648,6 @@ const handleCallLog = async (payload: any, text: string) => {
   const localId = `loc:${clientMessageId}`;
   const now = new Date().toISOString();
 
-  // 2. Instantly display in UI
   const uiMsg = {
     _id: localId,
     fromUserId: String(callerId),
@@ -1636,7 +1663,6 @@ const handleCallLog = async (payload: any, text: string) => {
   };
   setMessages((prev) => dedupeMessages([...prev, uiMsg]));
   
-  // 3. Update SQLite Local Cache
   await upsertThreadMessageV2(String(myUserId), String(cid), {
     _id: localId,
     conversationId: String(cid),
@@ -1664,7 +1690,6 @@ const handleCallLog = async (payload: any, text: string) => {
   notifyConversationChanged();
   setTimeout(() => scrollToBottom(true), 50);
 
-  // 4. Ensure ONLY the caller pushes the network request to MongoDB to avoid duplicates
   if (String(callerId) === String(myUserId)) {
     try {
       const { data } = await sendMessage({
@@ -1676,7 +1701,6 @@ const handleCallLog = async (payload: any, text: string) => {
         notifyUser: false, 
       } as any); 
 
-      // 5. Swap local loc:ID with true MongoDB _id
       if (data?.message?._id) {
         setMessages((prev) => dedupeMessages(prev.map((m) =>
           m.clientMessageId === clientMessageId
@@ -1690,9 +1714,7 @@ const handleCallLog = async (payload: any, text: string) => {
   }
 };
 
-    // ⚡ 4. CRASH-PROOF LISTENERS
-    // Added "payload?.duration" to prevent crashes if duration is undefined
-const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended (${formatPlaybackTime(payload?.duration || 0)})`);
+    const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended (${formatPlaybackTime(payload?.duration || 0)})`);
     const onCallMissed = (payload: any) => handleCallLog(payload, "🔴 Missed Call");
     const onCallCancelled = (payload: any) => handleCallLog(payload, "🔴 Call Cancelled");
     const onCallBusy = (payload: any) => handleCallLog(payload, "🔴 User Busy");
@@ -1714,7 +1736,6 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
     socket?.on("msg-deleted", handleMsgDeleted);
     socket?.on("msg-reacted", handleMsgReacted);
 
-    // 5. Cleanup: Securely detach ALL listeners
     return () => {
       socket?.off("chat-message", handleChatMessage);
       socket?.off("typing", handleTyping);
@@ -1724,7 +1745,6 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
       socket?.off("msg-deleted", handleMsgDeleted);
       socket?.off("msg-reacted", handleMsgReacted);
       
-      // ⚡ DETACH CALL LOGS TOO
       socket?.off("call:ended", onCallEnded);
       socket?.off("call:missed", onCallMissed);
       socket?.off("call:cancelled", onCallCancelled);
@@ -1789,7 +1809,6 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
   const loadThread = useCallback(async () => {
   if (!conversationId || !myUserId) return;
 
-  // 1. ⚡ INSTANT LOAD: Grab from local SQLite cache instantly so the screen is never blank
   const cached = await loadThreadCacheV2(String(myUserId), String(conversationId));
   if (cached.length) {
     setMessages(dedupeMessages(normalizeServer(cached.map((m: any) => ({
@@ -1803,7 +1822,6 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
 
   if (offline) return;
 
-  // 2. ⚡ SILENT BACKGROUND SYNC: Fetch from MongoDB without blocking the UI
   try {
     const { data } = await fetchThread(String(conversationId), { limit: 200 });
     const serverMsgs = data?.messages || [];
@@ -1811,7 +1829,6 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
     if (serverMsgs.length) {
       const normalizedServer = normalizeServer(serverMsgs);
       
-      // Update UI silently
       setMessages((prev) => {
         const serverClientIds = new Set(normalizedServer.map((m: any) => m.clientMessageId).filter(Boolean).map((x: any) => String(x)));
         const serverIds = new Set(normalizedServer.map((m: any) => String(m._id)));
@@ -1822,7 +1839,6 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
         return dedupeMessages([...normalizedServer, ...stillPendingLocal]);
       });
 
-      // Update Cache silently
       await saveThreadCacheV2(String(myUserId), String(conversationId), serverMsgs.map((m: any) => ({
         _id: String(m._id), conversationId: String(conversationId),
         senderId: String(m.senderId), receiverId: String(m.receiverId),
@@ -1845,8 +1861,6 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
         lastText: previewText, lastAt: String(last.createdAt || new Date().toISOString()), unread: 0,
       });
 
-      // ⚡ CRITICAL FIX: Removed the slow `markSeen` and `markDelivered` HTTP calls from here!
-      // WebSockets handle this perfectly down below.
       notifyConversationChanged();
     }
   } catch (e) {
@@ -1855,14 +1869,12 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
   }
 }, [conversationId, myUserId, peerUserId, peerName, peerMood, offline, normalizeServer]);
 
-// ⚡ FIX 1: Automatically fetch thread AS SOON AS conversationId resolves
   useEffect(() => {
     if (conversationId) {
       loadThread();
     }
   }, [conversationId, loadThread]);
 
-  // ⚡ FIX 2: Only re-fetch if the user navigates away and comes back
   useEffect(() => {
     const unsub = navigation.addListener("focus", async () => {
       if (didInitialAutoScrollRef.current && conversationId) {
@@ -1886,7 +1898,6 @@ const onCallEnded = (payload: any) => handleCallLog(payload, `📞 Call ended ($
     };
   }, []);
 
-// ⚡ PURE WEBSOCKET READ RECEIPTS ⚡
 useEffect(() => {
   if (!conversationId || !myUserId || offline) return;
   
@@ -1895,7 +1906,6 @@ useEffect(() => {
     .slice(-1)[0];
 
   if (latestIncoming) {
-    // 1. Fire pure WebSocket event instantly (Backend DB checks this automatically)
     if (socketRef.current) {
       socketRef.current.emit("mark-seen", {
         conversationId: String(conversationId),
@@ -1905,14 +1915,13 @@ useEffect(() => {
       });
     }
 
-    // 2. Optimistic Local Update (Silences the UI pop)
     setMessages(prev => prev.map(m => 
       (String(m.toUserId) === String(myUserId) && !m.seenAt)
         ? { ...m, seenAt: new Date().toISOString() }
         : m
     ));
   }
-}, [messages.length, conversationId, myUserId, peerUserId, offline]); // ⚡ FIX: Bind to messages.length to prevent infinite loops
+}, [messages.length, conversationId, myUserId, peerUserId, offline]); 
 
   useEffect(() => {
     if (!conversationId || !myUserId) return;
@@ -1921,6 +1930,7 @@ useEffect(() => {
       setDeletedForMe(ids);
     })();
   }, [myUserId, conversationId]);
+
   useEffect(() => {
   messages.forEach((m) => {
     const raw = String(m?.media?.url || "");
@@ -2610,14 +2620,12 @@ const handleReact = useCallback(async (emoji: string) => {
     const msgId = activeMenu.msgId;
     dismissMenu();
 
-    // 1. OPTIMISTIC LOCAL UPDATE: Instantly show the reaction on the UI
     setMessages(prevMessages =>
       prevMessages.map(m => {
         if (String(m._id) !== msgId) return m;
         const myPrevReaction = (m.reactions || []).find((r: any) => String(r.userId) === String(myUserId));
         let newReactions;
         
-        // Toggle logic: if clicking the same emoji, remove it. Otherwise, swap/add it.
         if (myPrevReaction && myPrevReaction.emoji === emoji) {
           newReactions = m.reactions.filter((r: any) => !(String(r.userId) === String(myUserId) && r.emoji === emoji));
         } else {
@@ -2630,7 +2638,6 @@ const handleReact = useCallback(async (emoji: string) => {
       })
     );
 
-    // 2. PURE WEBSOCKET EMIT (Zero HTTP)
     if (socketRef.current) {
       const msgObj = messages.find((m: any) => String(m._id) === msgId);
       const myReaction = (msgObj?.reactions || []).find((r: any) => String(r.userId) === String(myUserId));
@@ -2639,7 +2646,7 @@ const handleReact = useCallback(async (emoji: string) => {
       
       socketRef.current.emit("react-message", {
         messageId: msgId,
-        emoji: isRemoving ? null : emoji, // Send null if we are removing the reaction
+        emoji: isRemoving ? null : emoji, 
         myUserId: String(myUserId),
         conversationId: String(conversationId)
       });
@@ -2679,25 +2686,21 @@ const handleReact = useCallback(async (emoji: string) => {
     setEmojiPickerVisible(true);
   }, [activeMenu]);
 
-// ⚡ UNIFIED WEBSOCKET REACTION HANDLER ⚡
   const toggleReaction = useCallback((msgId: string, emoji: string) => {
     if (!conversationId) return;
 
-    // 1. Instantly dismiss modals
     dismissMenu();
     setEmojiPickerVisible(false);
     setEmojiPickerTarget(null);
 
-    // 2. Synchronously check current state to prevent closure race conditions
     const msgObj = messages.find((m: any) => String(m._id || m.clientMessageId) === String(msgId));
     const myPrevReaction = (msgObj?.reactions || []).find((r: any) => String(r.userId) === String(myUserId));
     const isRemoving = myPrevReaction && myPrevReaction.emoji === emoji;
 
-    // 3. Pure WebSocket Emit (Zero HTTP)
     if (socketRef.current) {
       socketRef.current.emit("react-message", {
         messageId: msgId,
-        emoji: isRemoving ? null : emoji, // Server expects null for removal
+        emoji: isRemoving ? null : emoji,
         myUserId: String(myUserId),
         conversationId: String(conversationId),
       });
@@ -2705,7 +2708,6 @@ const handleReact = useCallback(async (emoji: string) => {
       showGlassyError("Not connected to chat server");
     }
 
-    // 4. Optimistic Local Update (Instant UI feedback)
     setMessages((prevMessages) =>
       prevMessages.map((m) => {
         const currentMsgId = String(m._id || m.clientMessageId || "");
@@ -2713,12 +2715,10 @@ const handleReact = useCallback(async (emoji: string) => {
 
         let newReactions;
         if (isRemoving) {
-          // Remove the specific emoji
           newReactions = (m.reactions || []).filter(
             (r: any) => !(String(r.userId) === String(myUserId) && r.emoji === emoji)
           );
         } else {
-          // Swap/Add the new emoji
           newReactions = [
             ...(m.reactions || []).filter((r: any) => String(r.userId) !== String(myUserId)),
             { userId: myUserId, emoji },
@@ -2729,11 +2729,29 @@ const handleReact = useCallback(async (emoji: string) => {
     );
   }, [conversationId, myUserId, messages, dismissMenu, showGlassyError]);
 
-  const handleImagePress = useCallback((type: string, url: string, name: string) => {
+const handleImagePress = useCallback((type: string, url: string, name: string) => {
+    // ⚡ Redirect to UserFeedScreen if it's a shared post
+    if (type === 'shared_post') {
+      try {
+        // Parse the JSON data we sent from the button
+        const data = JSON.parse(name);
+        
+        navigation.navigate("UserFeedScreen", { 
+          userId: data.userId, 
+          initialPostId: data.postId 
+        });
+      } catch (e) {
+        // Fallback for older messages
+        navigation.navigate("UserFeedScreen", { initialPostId: name });
+      }
+      return;
+    }
+    
+    // Normal media handling
     if (type === 'image') openImageViewerCb(url);
     if (type === 'video') openVideoViewerCb(url);
     if (type === 'document') openDocInAppCb(url, name);
-  }, [openImageViewerCb, openVideoViewerCb, openDocInAppCb]);
+  }, [openImageViewerCb, openVideoViewerCb, openDocInAppCb, navigation]);
 
   const handleDoubleTap = useCallback((msgId: string, isMe: boolean) => {
     toggleReaction(msgId, "❤️");
@@ -2974,12 +2992,16 @@ const handleReact = useCallback(async (emoji: string) => {
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
               <Icon name="arrow-left" size={22} color="#fff" />
             </TouchableOpacity>
+
+            {/* ⚡ BLOCK LOGIC: Disable profile click if blocked */}
             <TouchableOpacity
               style={styles.titlePressable}
               activeOpacity={0.7}
               onPress={() => navigation.navigate("ProfilePreview", { userId: String(peerUserId) })}
+              disabled={isBlockedChat}
             >
-              {resolvedPeerAvatar && !avatarFailed ? (
+              {/* ⚡ BLOCK LOGIC: Hide DP if blocked */}
+              {resolvedPeerAvatar && !avatarFailed && !isBlockedChat ? (
                 <Image
                   source={{ uri: newUrl + resolvedPeerAvatar }}
                   style={styles.headerAvatar}
@@ -2994,33 +3016,28 @@ const handleReact = useCallback(async (emoji: string) => {
                 {peerName || "Friend"}
               </Text>
             </TouchableOpacity>
-            {/* <TouchableOpacity
-  style={styles.iconBtn}
-  onPress={() => navigation.navigate("VideoCall", { peerUserId: String(peerUserId), peerName })}
->
-  <Icon name="video-outline" size={20} color="#fff" />
-</TouchableOpacity> */}
-            <TouchableOpacity
-  style={styles.iconBtn}
-  onPress={handleVoiceCallPress}
->
-  <Icon name="phone-outline" size={20} color="#fff" />
-</TouchableOpacity>
+
+            {/* ⚡ BLOCK LOGIC: Hide Call Button if blocked */}
+            {!isBlockedChat && (
+              <TouchableOpacity style={styles.iconBtn} onPress={handleVoiceCallPress}>
+                <Icon name="phone-outline" size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
           </View>
 
-        {/* ⚡ Nicer UI for the typing indicator */}
-          {peerTyping && (
+          {peerTyping && !isBlockedChat && (
             <View style={{ paddingHorizontal: 22, paddingBottom: 6 }}>
               <Text style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: 13 }}>
                 {peerName || "Friend"} is typing...
               </Text>
             </View>
           )}
-        <FlatList
+          
+          <FlatList
             ref={flatListRef}
             onScrollToIndexFailed={onScrollToIndexFailed}
             data={items}
-            extraData={messages} // ⚡ ADD THIS: Forces UI to redraw when reactions change
+            extraData={messages} 
             keyExtractor={keyExtractor}
             renderItem={renderItem}
             inverted={true}
@@ -3043,121 +3060,134 @@ const handleReact = useCallback(async (emoji: string) => {
 
         <KeyboardStickyView offset={{ closed: 0, opened: insets.bottom }}>
           <View style={styles.inputBar}>
-            {!isRecordingFlow && replyToMessage && (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => replyToMessage._id && scrollToMessage(replyToMessage._id)}
-                style={styles.replyPreviewContainer}
-              >
-                <View style={styles.replyPreviewLeftBorder} />
-                {replyToMessage.messageType !== 'text' && replyToMessage.messageType !== 'voice' && replyToMessage.media?.url && (
-                  <View style={styles.replyPreviewThumbnail}>
-                    {replyToMessage.messageType === 'image' ? (
-                      <Image source={{ uri: getMediaUrlCb(replyToMessage) }} style={styles.replyPreviewThumbImage} />
-                    ) : replyToMessage.messageType === 'video' ? (
-                      <View style={styles.replyPreviewThumbVideo}>
-                        <Image source={{ uri: getMediaUrlCb(replyToMessage) }} style={styles.replyPreviewThumbImage} blurRadius={2} />
-                        <View style={styles.replyPreviewPlayIcon}>
-                          <Icon name="play" size={12} color="#fff" />
-                        </View>
+            {/* ⚡ BLOCK LOGIC: Replace Input Area with Blocked Banner */}
+            {isBlockedChat ? (
+              <View style={styles.blockedContainer}>
+                <Icon name="lock-outline" size={18} color="#94a3b8" style={{ marginRight: 8 }} />
+                <Text style={styles.blockedText}>
+                  {didIBlock 
+                    ? "You blocked this account." 
+                    : "You cannot reply to this conversation."}
+                </Text>
+              </View>
+            ) : (
+              <>
+                {!isRecordingFlow && replyToMessage && (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => replyToMessage._id && scrollToMessage(replyToMessage._id)}
+                    style={styles.replyPreviewContainer}
+                  >
+                    <View style={styles.replyPreviewLeftBorder} />
+                    {replyToMessage.messageType !== 'text' && replyToMessage.messageType !== 'voice' && replyToMessage.media?.url && (
+                      <View style={styles.replyPreviewThumbnail}>
+                        {replyToMessage.messageType === 'image' ? (
+                          <Image source={{ uri: getMediaUrlCb(replyToMessage) }} style={styles.replyPreviewThumbImage} />
+                        ) : replyToMessage.messageType === 'video' ? (
+                          <View style={styles.replyPreviewThumbVideo}>
+                            <Image source={{ uri: getMediaUrlCb(replyToMessage) }} style={styles.replyPreviewThumbImage} blurRadius={2} />
+                            <View style={styles.replyPreviewPlayIcon}>
+                              <Icon name="play" size={12} color="#fff" />
+                            </View>
+                          </View>
+                        ) : null}
                       </View>
-                    ) : null}
+                    )}
+                    <View style={styles.replyPreviewContent}>
+                      <Text style={styles.replyPreviewName} numberOfLines={1}>
+                        {String(replyToMessage.fromUserId) === String(myUserId) ? "You" : peerName}
+                      </Text>
+                      <Text style={styles.replyPreviewText} numberOfLines={1}>
+                        {replyToMessage.messageType === 'image' ? 'sent a Photo' :
+                         replyToMessage.messageType === 'video' ? 'sent a video' :
+                         replyToMessage.messageType === 'voice' ? 'sent a voice message' :
+                         replyToMessage.messageType === 'document' ? 'sent a document' :
+                         replyToMessage.plaintext || 'Message'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.replyPreviewClose}
+                      onPress={(e) => { e.stopPropagation(); setReplyToMessage(null); resetAllSwipes(); }}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Icon name="close" size={16} color="#94a3b8" />
+                    </TouchableOpacity>
+                  </TouchableOpacity>
+                )}
+
+                <View style={[styles.inputRow, isRecordingFlow && { opacity: 0 }]} pointerEvents={isRecordingFlow ? "none" : "auto"}>
+                  <TextInput
+                    style={[styles.input, replyToMessage && styles.inputWithReply]}
+                    placeholder={offline ? "Offline: message will stay local" : "Type a message"}
+                    placeholderTextColor="#94a3b8"
+                    value={input}
+                    onChangeText={handleInputChange}
+                    multiline
+                  />
+
+                  {sendingMedia ? (
+                    <View style={styles.sendBtn}><ActivityIndicator size="small" color="#fff" /></View>
+                  ) : (
+                    <>
+                      <View style={styles.morphSlotsWrap}>
+                        <Animated.View
+                          style={[
+                            styles.morphSlotAbsolute,
+                            { opacity: attachMicOpacity, transform: [{ scale: attachMicScale }] },
+                          ]}
+                          pointerEvents={input.trim().length ? "none" : "auto"}
+                        >
+                          <View style={styles.micBtn} {...micPanResponder.panHandlers}>
+                            <Icon name="microphone" size={20} color="#fff" />
+                          </View>
+                        </Animated.View>
+
+                        <Animated.View
+                          style={[
+                            styles.morphSlotAbsolute,
+                            { opacity: sendOpacity, transform: [{ scale: sendScale }] },
+                          ]}
+                          pointerEvents={input.trim().length ? "auto" : "none"}
+                        >
+                          <TouchableOpacity style={styles.sendBtn} onPress={send}>
+                            <Icon name="send" size={20} color="#fff" />
+                          </TouchableOpacity>
+                        </Animated.View>
+                      </View>
+
+                      <Animated.View style={{ width: plusWidth, opacity: plusOpacity, marginLeft: plusMargin, overflow: 'hidden' }}>
+                        <TouchableOpacity style={styles.attachBtnRight} onPress={() => setSheetOpen(!sheetOpen)}>
+                          <Animated.View style={{ transform: [{ rotate: attachIconRotate }] }}>
+                            <Icon name="plus" size={24} color="#fff" />
+                          </Animated.View>
+                        </TouchableOpacity>
+                      </Animated.View>
+                    </>
+                  )}
+                </View>
+
+                {isRecordingFlow && (
+                  <View style={styles.recordingOverlayAbsolute}>
+                    <VoiceRecordOverlay
+                      phase={(voicePhase === "idle" ? "holding" : voicePhase) as "holding" | "locked" | "preview"}
+                      elapsedMs={voiceElapsedMs}
+                      liveBars={voiceLiveBars}
+                      cancelDragX={cancelDragX}
+                      lockDragY={lockDragY}
+                      isLocked={voicePhase === "locked"}
+                      previewPeaks={voicePreviewPeaks}
+                      previewDurationMs={voicePreviewDurationMs}
+                      isPreviewPlaying={voicePreviewPlaying}
+                      previewProgress={voicePreviewProgress}
+                      onTogglePreviewPlay={togglePreviewPlayback}
+                      onDeleteAndClose={voicePhase === "preview" ? discardPreviewAndClose : cancelVoiceRecording}
+                      onStopToPreview={stopVoiceRecordingToPreview}
+                      onSend={sendPreviewVoiceMessage}
+                    />
                   </View>
                 )}
-                <View style={styles.replyPreviewContent}>
-                  <Text style={styles.replyPreviewName} numberOfLines={1}>
-                    {String(replyToMessage.fromUserId) === String(myUserId) ? "You" : peerName}
-                  </Text>
-                  <Text style={styles.replyPreviewText} numberOfLines={1}>
-                    {replyToMessage.messageType === 'image' ? 'sent a Photo' :
-                     replyToMessage.messageType === 'video' ? 'sent a video' :
-                     replyToMessage.messageType === 'voice' ? 'sent a voice message' :
-                     replyToMessage.messageType === 'document' ? 'sent a document' :
-                     replyToMessage.plaintext || 'Message'}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.replyPreviewClose}
-                  onPress={(e) => { e.stopPropagation(); setReplyToMessage(null); resetAllSwipes(); }}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Icon name="close" size={16} color="#94a3b8" />
-                </TouchableOpacity>
-              </TouchableOpacity>
+              </>
             )}
-
-            <View style={[styles.inputRow, isRecordingFlow && { opacity: 0 }]} pointerEvents={isRecordingFlow ? "none" : "auto"}>
-              <TextInput
-                style={[styles.input, replyToMessage && styles.inputWithReply]}
-                placeholder={offline ? "Offline: message will stay local" : "Type a message"}
-                placeholderTextColor="#94a3b8"
-                value={input}
-                onChangeText={handleInputChange}
-                multiline
-              />
-
-              {sendingMedia ? (
-                <View style={styles.sendBtn}><ActivityIndicator size="small" color="#fff" /></View>
-              ) : (
-                <>
-                  <View style={styles.morphSlotsWrap}>
-                    <Animated.View
-                      style={[
-                        styles.morphSlotAbsolute,
-                        { opacity: attachMicOpacity, transform: [{ scale: attachMicScale }] },
-                      ]}
-                      pointerEvents={input.trim().length ? "none" : "auto"}
-                    >
-                      <View style={styles.micBtn} {...micPanResponder.panHandlers}>
-                        <Icon name="microphone" size={20} color="#fff" />
-                      </View>
-                    </Animated.View>
-
-                    <Animated.View
-                      style={[
-                        styles.morphSlotAbsolute,
-                        { opacity: sendOpacity, transform: [{ scale: sendScale }] },
-                      ]}
-                      pointerEvents={input.trim().length ? "auto" : "none"}
-                    >
-                      <TouchableOpacity style={styles.sendBtn} onPress={send}>
-                        <Icon name="send" size={20} color="#fff" />
-                      </TouchableOpacity>
-                    </Animated.View>
-                  </View>
-
-                  <Animated.View style={{ width: plusWidth, opacity: plusOpacity, marginLeft: plusMargin, overflow: 'hidden' }}>
-                    <TouchableOpacity style={styles.attachBtnRight} onPress={() => setSheetOpen(!sheetOpen)}>
-                      <Animated.View style={{ transform: [{ rotate: attachIconRotate }] }}>
-                        <Icon name="plus" size={24} color="#fff" />
-                      </Animated.View>
-                    </TouchableOpacity>
-                  </Animated.View>
-                </>
-              )}
-            </View>
-
-            {isRecordingFlow && (
-              <View style={styles.recordingOverlayAbsolute}>
-                <VoiceRecordOverlay
-                  phase={(voicePhase === "idle" ? "holding" : voicePhase) as "holding" | "locked" | "preview"}
-                  elapsedMs={voiceElapsedMs}
-                  liveBars={voiceLiveBars}
-                  cancelDragX={cancelDragX}
-                  lockDragY={lockDragY}
-                  isLocked={voicePhase === "locked"}
-                  previewPeaks={voicePreviewPeaks}
-                  previewDurationMs={voicePreviewDurationMs}
-                  isPreviewPlaying={voicePreviewPlaying}
-                  previewProgress={voicePreviewProgress}
-                  onTogglePreviewPlay={togglePreviewPlayback}
-                  onDeleteAndClose={voicePhase === "preview" ? discardPreviewAndClose : cancelVoiceRecording}
-                  onStopToPreview={stopVoiceRecordingToPreview}
-                  onSend={sendPreviewVoiceMessage}
-                />
-              </View>
-            )}
-
           </View>
         </KeyboardStickyView>
       </KeyboardAvoidingView>
@@ -3205,7 +3235,6 @@ const handleReact = useCallback(async (emoji: string) => {
           newUrl={newUrl}
           myUserId={myUserId}
           currentReaction={reactions[activeMenu.msgId]}
-          // Trigger 3: Quick Menu Selection
           onReact={(emoji) => toggleReaction(activeMenu.msgId, emoji)}
           onDeleteForEveryone={activeMenu.isMe ? handleDeleteForEveryone : undefined}
           onDeleteForMe={handleDeleteForMe}
@@ -3234,6 +3263,27 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#020617" },
   root: { flex: 1, backgroundColor: "#020617" },
   innerContainer: { flex: 1, backgroundColor: "#020617" },
+  
+  // ⚡ Blocked UI Styles
+  blockedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    marginHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(148,163,184,0.1)'
+  },
+  blockedText: {
+    color: '#94a3b8',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center'
+  },
+
   replyBubbleTouchable: {
     marginBottom: 2,
     marginTop: 2,
@@ -3370,20 +3420,19 @@ const styles = StyleSheet.create({
   bubble: { paddingHorizontal: 0, paddingVertical: 0, maxWidth: "100%", minWidth: 5, position: "relative", alignSelf: "flex-start" },
   bubbleMe: { backgroundColor: "transparent" },
   bubbleOther: { backgroundColor: "transparent" },
-// ⚡ FIX: Added borderBottomRightRadius and borderBottomLeftRadius to create the "Chat Tail"
   textBubbleMe: { 
     backgroundColor: "#4f46e5", 
     paddingHorizontal: 12, 
     paddingVertical: 8, 
     borderRadius: 16, 
-    borderBottomRightRadius: 4 // 👈 Gives it the sharp corner on your side
+    borderBottomRightRadius: 4 
   },
   textBubbleOther: { 
     backgroundColor: "rgba(255,255,255,0.08)", 
     paddingHorizontal: 12, 
     paddingVertical: 8, 
     borderRadius: 16, 
-    borderBottomLeftRadius: 4 // 👈 Gives it the sharp corner on their side
+    borderBottomLeftRadius: 4 
   },
   text: { color: "#fff", flexShrink: 1, flexWrap: "wrap" },
   mediaContainer: { paddingBottom: 0 },
@@ -3769,5 +3818,66 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 8,
+  },
+  // ⚡ SHARED POST STYLES
+  sharedPostCard: {
+    width: 240,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.15)",
+  },
+  sharedPostHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+  },
+  sharedPostHeaderName: {
+    color: "#F8FAFC",
+    fontSize: 13,
+    fontWeight: "600",
+    marginLeft: 6,
+  },
+  sharedPostImageWrap: {
+    width: "100%",
+    height: 240,
+    position: "relative",
+  },
+  sharedPostImage: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#1E293B",
+  },
+  sharedPostPlayOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(0,0,0,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sharedPostFooter: {
+    padding: 12,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+  },
+  sharedPostCaption: {
+    color: "#CBD5E1",
+    fontSize: 12,
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  sharedPostBtn: {
+    flexDirection: "row",
+    backgroundColor: "#6366F1",
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sharedPostBtnText: {
+    color: "#FFF",
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

@@ -373,6 +373,9 @@ const Friends = ({ navigation }: any) => {
               {user.tick === "golden" && (
                 <Icon name="check-decagram" size={18} color="#fbbf24" style={{ marginLeft: 6, marginTop: 2 }} />
               )}
+              {user?.isPremium && (
+                <Icon name="star-circle" size={18} color="#fbbf24" style={{ marginLeft: 3, marginTop: 2.5 }} />
+            )}
             </View>
             <Text style={styles.userUsername} numberOfLines={1}>
               {user.username}

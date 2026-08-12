@@ -8,6 +8,8 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import multer from "multer";
+import sharp from "sharp";
+import { recalculateXp } from "./XpController.js";
 
 // Helper: extract avatarId from a models.readyplayer.me GLB URL
 const extractAvatarId = (url) => {
@@ -519,23 +521,49 @@ const storage = multer.diskStorage({
 export const upload = multer({ storage });
 
 // 3. Controller: Upload avatar and save path to user
+// 3. Controller: Upload avatar, compress, and save path to user
 export const uploadAvatar = catchAsyncErrors(async (req, res, next) => {
   if (!req.file) return next(new ErrorHandler("No file uploaded", 400));
   
-  const avatarUrl = `/avatars/${req.file.filename}`;
-  // Optionally delete previous avatar here (recommended for cleanup!)
-  const user = await User.findByIdAndUpdate(
-  req.user._id,
-  {
-    avatarUrl,
-    $inc: { avatarVersion: 1 }, // 🔥 force refresh
-  },
-  { new: true }
-);
+  const originalPath = req.file.path;
+  const compressedFilename = `${req.user._id}_${Date.now()}.webp`;
+  const compressedPath = path.join(AVATAR_DIR, compressedFilename);
 
-res.json(user);
-  
-  res.json({ success: true, url: avatarUrl });
+  try {
+    // ⚡ 1. Compress & Convert using Sharp
+    await sharp(originalPath)
+      .resize(400, 400, { fit: 'cover' }) // Force exact 400x400 size
+      .webp({ quality: 80 })              // Compress to lightweight WebP
+      .toFile(compressedPath);
+
+    // ⚡ 2. Delete the bulky original file from the server
+    if (fs.existsSync(originalPath)) {
+      fs.unlinkSync(originalPath);
+    }
+
+    const avatarUrl = `/avatars/${compressedFilename}`;
+
+    // ⚡ 3. Update the database
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        avatarUrl,
+        $inc: { avatarVersion: 1 }, // 🔥 force refresh on frontend
+      },
+      { new: true }
+    ).select("-password -resetPasswordCode -verificationCode -refreshTokens"); // Hide sensitive data
+
+    // ⚡ FIX: Only call res.json ONCE
+    res.json({ success: true, url: avatarUrl, user });
+
+  } catch (error) {
+    console.error("Image Compression Error:", error);
+    // Cleanup the temporary file if compression fails
+    if (fs.existsSync(originalPath)) {
+      fs.unlinkSync(originalPath);
+    }
+    return next(new ErrorHandler("Failed to process and compress image", 500));
+  }
 });
 
 // 4. Controller: Get current avatar of a user (by auth)
@@ -599,3 +627,81 @@ export const requestDeleteAccountOtp = catchAsyncErrors(async (req, res, next) =
     message: "OTP sent to your registered email address for account deletion."
   });
 });
+
+// GET /profile/premium-preferences
+export const getPremiumPreferences = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user._id).select("premiumPreferences isPremium");
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  res.status(200).json({
+    success: true,
+    isPremium: user.isPremium,
+    preferences: user.premiumPreferences || { hideRelationship: false, xpMultiplier: true, premiumBadge: true }
+  });
+});
+
+// POST /profile/premium-preferences
+export const updatePremiumPreferences = catchAsyncErrors(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+  if (!user) return next(new ErrorHandler("User not found", 404));
+
+  const { hideRelationship, xpMultiplier, premiumBadge } = req.body;
+
+  // Initialize if empty
+  if (!user.premiumPreferences) {
+    user.premiumPreferences = { hideRelationship: false, xpMultiplier: true, premiumBadge: true };
+  }
+
+  if (typeof hideRelationship === "boolean") user.premiumPreferences.hideRelationship = hideRelationship;
+  if (typeof xpMultiplier === "boolean") user.premiumPreferences.xpMultiplier = xpMultiplier;
+  if (typeof premiumBadge === "boolean") user.premiumPreferences.premiumBadge = premiumBadge;
+
+  await user.save();
+
+  // If they just toggled XP Multiplier, force an immediate recalculation of their rank!
+  if (typeof xpMultiplier === "boolean") {
+    // Import recalculateXp at the top of ProfileController: import { recalculateXp } from "../helpers/levels.js";
+    await recalculateXp(user._id); 
+  }
+
+  res.status(200).json({ success: true, preferences: user.premiumPreferences });
+});
+
+export const updateActivityPrivacy = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { defaultVisibilityScope } = req.body;
+
+    const validScopes = ["foryou", "world", "country", "city", "friends", "private"];
+    if (!validScopes.includes(defaultVisibilityScope)) {
+      return res.status(400).json({ success: false, message: "Invalid visibility scope." });
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { defaultVisibilityScope },
+      { new: true }
+    ).select("name username isPublic defaultVisibilityScope");
+
+    res.status(200).json({
+      success: true,
+      message: "Activity feed privacy updated successfully.",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Update Activity Privacy Error:", error);
+    res.status(500).json({ success: false, message: "Error updating privacy setting." });
+  }
+};
+
+export const getActivityPrivacy = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("defaultVisibilityScope");
+    res.status(200).json({
+      success: true,
+      defaultVisibilityScope: user?.defaultVisibilityScope || "friends",
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error fetching privacy setting." });
+  }
+};

@@ -12,6 +12,8 @@
 <link rel="icon" type="image/png" href="logo.png">
 <meta property="og:description" content="Live MoodMap, Relationship Pills, AR Chat, and AI Activity Competition." />
 <meta property="og:image" content="https://www.streaksphere.app/logo.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
 <style>
 :root{
   --bg:#03040A; --bg2:#0a0c16;
@@ -37,8 +39,19 @@ nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);
 .logo-group{display:flex;align-items:center;gap:10px;text-decoration:none;}
 .logo-img{width:32px;height:32px;border-radius:10px;object-fit:cover;border:1px solid rgba(255,255,255,0.1);}
 .logo-name{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:700;color:var(--text);letter-spacing:-0.02em;}
+.nav-links{display:flex;align-items:center;gap:20px;}
+.nav-link{color:var(--muted);text-decoration:none;font-size:0.85rem;font-weight:500;transition:color 0.2s;}
+.nav-link:hover{color:var(--text);}
 .nav-cta{background:var(--text);color:var(--bg);padding:7px 16px;border-radius:100px;font-size:0.8rem;font-weight:700;text-decoration:none;transition:transform 0.2s;}
 .nav-cta:hover{transform:scale(1.05);}
+
+/* Mobile Nav adjustments */
+@media(max-width: 480px){
+  .logo-name{font-size:0.9rem;}
+  .nav-links{gap:10px;}
+  .nav-link{font-size:0.75rem;}
+  .nav-cta{padding:6px 12px; font-size:0.75rem;}
+}
 
 /* HERO */
 .hero{padding:6vh 0 4vh;text-align:center;position:relative;z-index:1;}
@@ -54,7 +67,7 @@ nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);
 @media(min-width:768px){.hero-mockup{width:220px;height:480px;border-width:6px;border-radius:32px;}}
 .hero-mockup img{width:100%;height:100%;object-fit:cover;}
 
-/* Pre-animation states (hidden and lowered) */
+/* Pre-animation states */
 .hero-mockup.left{transform:translateX(-80px) rotate(0deg) scale(0.9) translateY(60px);z-index:1;}
 .hero-mockup.right{transform:translateX(80px) rotate(0deg) scale(0.9) translateY(60px);z-index:1;}
 .hero-mockup.center{transform:translateY(60px);z-index:2;box-shadow:0 30px 60px rgba(99,102,241,0.2);}
@@ -63,7 +76,7 @@ nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);
   .hero-mockup.right{transform:translateX(130px) rotate(0deg) scale(0.9) translateY(60px);}
 }
 
-/* Post-animation states triggered by JS observer (.reveal.visible) */
+/* Post-animation states triggered by JS */
 .reveal.visible .hero-mockup{opacity:1;}
 .reveal.visible .hero-mockup.center{transform:translateY(-10px); transition-delay: 0.1s;}
 .reveal.visible .hero-mockup.left{transform:translateX(-80px) rotate(-5deg) scale(0.9); transition-delay: 0.3s;}
@@ -74,13 +87,24 @@ nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);
   .reveal.visible .hero-mockup.center{transform:translateY(-20px);}
 }
 
+/* Fix for Extra Small Mobile Screens (iPhone SE etc.) */
+@media(max-width: 400px){
+  .hero-phones{height: 280px;}
+  .hero-mockup{width: 130px; height: 280px;}
+  .hero-mockup.left{transform:translateX(-60px) rotate(0deg) scale(0.9) translateY(50px);}
+  .hero-mockup.right{transform:translateX(60px) rotate(0deg) scale(0.9) translateY(50px);}
+  .reveal.visible .hero-mockup.left{transform:translateX(-60px) rotate(-5deg) scale(0.9);}
+  .reveal.visible .hero-mockup.right{transform:translateX(60px) rotate(5deg) scale(0.9);}
+}
+
 /* IMMEDIATE DOWNLOAD CARDS */
 .download-section{padding:2vh 0 6vh; position:relative; z-index:10;}
 .grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px;}
 .apple-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px;transition:transform 0.3s;position:relative;overflow:hidden; text-align:center;}
 @media(min-width:768px){.apple-card{padding:32px; text-align:left;}}
 .apple-card:hover{border-color:var(--border2);background:var(--surface2);}
-.apple-card-icon{font-size:2rem;margin-bottom:12px;}
+.apple-card-icon{display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,0.05);margin:0 auto 16px;}
+@media(min-width:768px){.apple-card-icon{margin:0 0 16px 0;}}
 .apple-card h3{font-family:'Syne',sans-serif;font-size:1.25rem;font-weight:700;margin-bottom:8px;}
 .apple-card p{color:var(--muted);font-size:0.85rem;margin-bottom:20px; line-height:1.5;}
 .btn-primary{display:inline-block;background:var(--text);color:var(--bg);padding:10px 20px;border-radius:100px;font-weight:700;text-decoration:none;font-size:0.85rem;}
@@ -127,10 +151,31 @@ nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);
 .tl-list li{position:relative;padding-left:14px;margin-bottom:6px;}
 .tl-list li::before{content:'-';position:absolute;left:0;color:var(--border2);}
 
-/* FOOTER */
-footer{border-top:1px solid var(--border);padding:30px 0;text-align:center;margin-top:40px;}
-.footer-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:var(--text);text-decoration:none;display:inline-block;margin-bottom:10px;}
+/* FOOTER (WHATSAPP STYLE EXTENSION) */
+footer{border-top:1px solid var(--border);padding:60px 0 30px;margin-top:60px;background:var(--bg2);}
+.footer-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:30px;margin-bottom:40px;}
+.footer-col h4{font-family:'Syne',sans-serif;font-size:0.9rem;font-weight:700;color:var(--text);margin-bottom:16px;letter-spacing:0.02em;}
+.footer-col ul{list-style:none;}
+.footer-col ul li{margin-bottom:10px;}
+.footer-col ul li a{color:var(--muted);text-decoration:none;font-size:0.85rem;transition:color 0.2s;}
+.footer-col ul li a:hover{color:var(--text);}
+
+/* SOCIAL ICONS */
+.social-links{display:flex;align-items:center;gap:12px;margin-top:12px;}
+.social-icon{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--muted);transition:all 0.2s;text-decoration:none;}
+.social-icon:hover{color:var(--text);border-color:var(--border2);transform:translateY(-2px);background:rgba(255,255,255,0.1);}
+.social-icon svg{width:18px;height:18px;fill:currentColor;}
+
+.footer-bottom{border-top:1px solid var(--border);padding-top:24px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px;}
+.footer-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;color:var(--text);text-decoration:none;}
 .footer-copy{color:var(--muted);font-size:0.8rem;}
+
+/* Mobile Footer adjustments */
+@media(max-width: 600px){
+  .footer-grid {text-align: center; gap: 40px;}
+  .social-links {justify-content: center;}
+  .footer-bottom {flex-direction: column; text-align: center; justify-content: center; gap: 12px;}
+}
 
 /* ANIMATIONS */
 .reveal{opacity:0;transform:translateY(30px);transition:all 0.6s cubic-bezier(0.23, 1, 0.32, 1);}
@@ -146,7 +191,10 @@ footer{border-top:1px solid var(--border);padding:30px 0;text-align:center;margi
       <img src="logo.png" alt="StreakSphere" class="logo-img" onerror="this.style.display='none'"/>
       <span class="logo-name">StreakSphere</span>
     </a>
-    <a href="#download" class="nav-cta">Download v5.0</a>
+    <div class="nav-links">
+      <a href="help.html" class="nav-link">Help Center</a>
+      <a href="#download" class="nav-cta">Download</a>
+    </div>
   </div>
 </nav>
 
@@ -154,11 +202,11 @@ footer{border-top:1px solid var(--border);padding:30px 0;text-align:center;margi
 <section class="hero container">
   <span class="hero-eyebrow reveal">The New Era Of Social Media</span>
   <h1 class="hero-title reveal">
-    Track Together.<br>
-    <span class="gradient">Feel the World.</span>
+    Track Together<br>
+    <span class="gradient">Feel the World</span>
   </h1>
   <p class="hero-sub reveal">
-    AR Chat, Live Moods, Relationship Streaks, and AI-Verified Activity Competition.
+    AR Chat, Live Moods, Relationship Streaks, AI-Verified Activity Competition, and the Global Activity Feed.
   </p>
 
   <!-- COMPACT HERO PHONES -->
@@ -167,10 +215,10 @@ footer{border-top:1px solid var(--border);padding:30px 0;text-align:center;margi
       <img src="screenshot-1.png" alt="MoodMap" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNjAgNTYwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWExZjM1Ii8+PC9zdmc+'" />
     </div>
     <div class="hero-mockup center">
-      <img src="screenshot-2.png" alt="Relationship Streaks" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNjAgNTYwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMGEwYzE2Ii8+PC9zdmc+'" />
+      <img src="screenshot-2.png" alt="Relationship Streaks" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNjAgNTYwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIjMGEwYzE2Ii8+PC9zdmc+'" />
     </div>
     <div class="hero-mockup right">
-      <img src="screenshot-3.png" alt="Dashboard" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNjAgNTYwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWExZjM1Ii8+PC9zdmc+'" />
+      <img src="screenshot-3.png" alt="Dashboard" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNjAgNTYwIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIjMWExZjM1Ii8+PC9zdmc+'" />
     </div>
   </div>
 </section>
@@ -179,42 +227,56 @@ footer{border-top:1px solid var(--border);padding:30px 0;text-align:center;margi
 <section id="download" class="container download-section">
   <div class="grid-2">
   <div class="apple-card reveal">
-    <!-- Corrected Android SVG Icon -->
+    <!-- Play Store SVG Icon -->
     <div class="apple-card-icon">
-      <svg xmlns="http://w3.org" viewBox="0 0 576 512" width="40" height="40" fill="#3DDC84">
-        <path d="M420.6 301.9a24 24 0 1 1 24-24 24 24 0 0 1 -24 24zm-265.1 0a24 24 0 1 1 24-24 24 24 0 0 1 -24 24zm307.2-133.4l27-46.7a13.3 13.3 0 0 0 -4.9-18.2 13.5 13.5 0 0 0 -18.3 4.9l-27.4 47.4a261.3 261.3 0 0 0 -252.3 0l-27.4-47.4a13.5 13.5 0 0 0 -18.3-4.9 13.3 13.3 0 0 0 -4.9 18.2l27 46.7A241.2 241.2 0 0 0 64 361.3h448A241.2 241.2 0 0 0 462.7 168.5z"/>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="28" height="28" fill="#3DDC84">
+        <path d="M325.3 234.3L104.6 13l280.8 161.2-60.1 60.1zM47 0C34 6.8 25.3 19.2 25.3 35.3v441.3c0 16.1 8.7 28.5 21.7 35.3l256.6-256L47 0zm425.2 225.6l-58.9-34.1-65.7 64.5 65.7 64.5 60.1-34.1c18-14.3 18-46.5-1.2-60.8zM104.6 499l220.7-221.3 60.1 60.1L104.6 499z"/>
       </svg>
     </div>
-    <h3>Android APK</h3>
-    <p>Direct installation. Enable unknown sources and jump into the ecosystem.</p>
-    <a href="https://github.com/StreakSphere-App/StreakSphere/releases/download/v5.0.0/StreakSphere.apk" class="btn-primary" download>Get Android App</a>
+    <h3>Google Play Store</h3>
+    <p>Official download available for all supported Android devices globally.</p>
+    <a href="https://play.google.com/store/apps/details?id=com.streaksphere.app" class="btn-primary" target="_blank" rel="noopener">Get it on Google Play</a>
   </div>
 
   <div class="apple-card reveal">
     <!-- Apple SVG Icon -->
     <div class="apple-card-icon">
-      <svg xmlns="http://w3.org" viewBox="0 0 384 512" width="40" height="40" fill="#FFFFFF">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" width="28" height="28" fill="#FFFFFF">
         <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 47.5-24.4 76.5 26.9 2.4 51.2-16 68.3-38.9z"/>
       </svg>
     </div>
     <h3>iOS Sideload</h3>
     <p>Use AltStore or Sideloadly. Requires Developer Mode enabled.</p>
-    <a href="https://github.com/StreakSphere-App/StreakSphere/releases/download/v5.0.0/StreakSphere.ipa" class="btn-secondary" download>Get iOS App</a>
+    <a href="https://github.com/StreakSphere-App/StreakSphere/releases/download/v6.0.0/StreakSphere.ipa" class="btn-secondary" download>Get iOS App</a>
   </div>
 </div>
-
 </section>
 
 <!-- MARQUEE -->
 <div class="marquee-section">
   <div class="marquee-track" aria-hidden="true">
-    <span class="marquee-item">🌍 See the World's Mood &nbsp;&nbsp;•&nbsp;&nbsp; 👥 Relationship Streaks & Status Pills &nbsp;&nbsp;•&nbsp;&nbsp; ✨ AR Spatial Chat &nbsp;&nbsp;•&nbsp;&nbsp; 🏆 AI Verified Activity Points &nbsp;&nbsp;•&nbsp;&nbsp; 🌍 See the World's Mood &nbsp;&nbsp;•&nbsp;&nbsp; 👥 Relationship Streaks & Status Pills</span>
+    <span class="marquee-item">🌍 Global Activity Feed &nbsp;&nbsp;•&nbsp;&nbsp; 👥 Relationship Streaks & Status Pills &nbsp;&nbsp;•&nbsp;&nbsp; ✨ AR Spatial Chat &nbsp;&nbsp;•&nbsp;&nbsp; 🏆 AI Verified Activity Points &nbsp;&nbsp;•&nbsp;&nbsp; 🌍 Global Activity Feed &nbsp;&nbsp;•&nbsp;&nbsp; 👥 Relationship Streaks & Status Pills</span>
   </div>
 </div>
 
 <!-- SEQUENTIAL FEATURES -->
 <section id="features" class="container">
   
+  <div class="apple-feature reveal">
+    <div class="apple-text">
+      <span class="apple-eyebrow" style="color:var(--accent4);">Activity Feed</span>
+      <h2 class="apple-heading">The Pulse<br>of Your World.</h2>
+      <p class="apple-sub">Discover what your city, country, and the world are up to. Our new Global Activity Feed lets you engage with verified community moments, share your streak achievements, and flag inappropriate content instantly to keep our community safe.</p>
+    </div>
+    <div class="apple-visual">
+      <div class="apple-mockup-wrapper">
+        <div class="apple-mockup">
+          <img src="screenshot-8.jpg" alt="Activity Feed View" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgMTYwMCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzBhMGMxNiIvPjwvc3Zn+'"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="apple-feature reveal">
     <div class="apple-text">
       <span class="apple-eyebrow" style="color:var(--accent3);">Mood & Relationships</span>
@@ -224,7 +286,7 @@ footer{border-top:1px solid var(--border);padding:30px 0;text-align:center;margi
     <div class="apple-visual">
       <div class="apple-mockup-wrapper">
         <div class="apple-mockup">
-          <img src="screenshot-4.png" alt="MoodMap & Relationships UI" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgMTYwMCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzBhMGMxNiIvPjwvc3ZnPg=='"/>
+          <img src="screenshot-4.png" alt="MoodMap & Relationships UI" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgMTYwMCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzBhMGMxNiIvPjwvc3Zn+'"/>
         </div>
       </div>
     </div>
@@ -239,7 +301,7 @@ footer{border-top:1px solid var(--border);padding:30px 0;text-align:center;margi
     <div class="apple-visual">
       <div class="apple-mockup-wrapper">
         <div class="apple-mockup">
-          <img src="screenshot-5.png" alt="AR Chat View" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgMTYwMCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFhMWYzNSIvPjwvc3ZnPg=='"/>
+          <img src="screenshot-5.png" alt="AR Chat View" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgMTYwMCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzFhMWYzNSIvPjwvc3Zn+'"/>
         </div>
       </div>
     </div>
@@ -254,7 +316,7 @@ footer{border-top:1px solid var(--border);padding:30px 0;text-align:center;margi
     <div class="apple-visual">
       <div class="apple-mockup-wrapper">
         <div class="apple-mockup">
-          <img src="screenshot-6.png" alt="Points and Leaderboard" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgMTYwMCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzBhMGMxNiIvPjwvc3ZnPg=='"/>
+          <img src="screenshot-6.png" alt="Points and Leaderboard" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MDAgMTYwMCI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0iIzBhMGMxNiIvPjwvc3Zn+'"/>
         </div>
       </div>
     </div>
@@ -271,8 +333,17 @@ footer{border-top:1px solid var(--border);padding:30px 0;text-align:center;margi
 
   <div class="timeline reveal">
     <div class="tl-item">
+      <span class="tl-version">v6.0.0</span>
+      <span class="tl-date">August 2026 • Latest</span>
+      <ul class="tl-list">
+        <li><strong>Global Activity Feed:</strong> Explore and interact with verified community posts (For You, World, Country, City, Friends).</li>
+        <li><strong>StreakSphere+ Premium:</strong> Exclusive relationship management features, priority moderation, and custom user controls.</li>
+        <li><strong>Enhanced Moderation:</strong> Secure in-app reporting, automatic snapshot caching, and admin blackout overrides.</li>
+      </ul>
+    </div>
+    <div class="tl-item">
       <span class="tl-version">v5.0.0</span>
-      <span class="tl-date">July 2026 • Latest</span>
+      <span class="tl-date">July 2026</span>
       <ul class="tl-list">
         <li>New AR Chat feature introduced — accountability enters augmented reality.</li>
         <li>Relationship Pills & Mood Badges integrated into social graphs.</li>
@@ -283,8 +354,8 @@ footer{border-top:1px solid var(--border);padding:30px 0;text-align:center;margi
       <span class="tl-version">v4.0.0</span>
       <span class="tl-date">April 2026 - June 2026</span>
       <ul class="tl-list">
-        <li>Calling end to end encrypted</li>
-        <li>Chat features and bug fixes</li>
+        <li>Calling end to end encrypted.</li>
+        <li>Chat features and bug fixes.</li>
       </ul>
     </div>
     <div class="tl-item">
@@ -298,10 +369,78 @@ footer{border-top:1px solid var(--border);padding:30px 0;text-align:center;margi
   </div>
 </section>
 
-<!-- FOOTER -->
-<footer class="container">
-  <a href="#" class="footer-logo">StreakSphere</a>
-  <p class="footer-copy">© <span id="year"></span> StreakSphere. All rights reserved.</p>
+<!-- FOOTER (Structured with Socials & Compliance Links) -->
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <!-- Column 1: Product -->
+      <div class="footer-col">
+        <h4>StreakSphere</h4>
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#download">Download App</a></li>
+          <li><a href="#release-logs">Release Notes</a></li>
+          <li><a href="https://play.google.com/store/apps/details?id=com.streaksphere.app" target="_blank">Google Play</a></li>
+        </ul>
+      </div>
+
+      <!-- Column 2: Legal & Compliance -->
+      <div class="footer-col">
+        <h4>Safety & Legal</h4>
+        <ul>
+          <li><a href="privacy.html">Privacy Policy</a></li>
+          <li><a href="child-safety-standards.html">Child Safety & Protection</a></li>
+          <li><a href="delete-account.html">Account Deletion Request</a></li>
+          <li><a href="terms.html">Terms of Service</a></li>
+        </ul>
+      </div>
+
+      <!-- Column 3: Support -->
+      <div class="footer-col">
+        <h4>Support & Help</h4>
+        <ul>
+          <li><a href="help.html">Help Center / FAQ</a></li>
+          <li><a href="mailto:support@streaksphere.app">Contact Us</a></li>
+          <li><a href="community-guidelines.html">Community Guidelines</a></li>
+          <li><a href="help.html#report">Report an Issue</a></li>
+        </ul>
+      </div>
+
+      <!-- Column 4: Community & Socials -->
+      <div class="footer-col">
+        <h4>Follow Us</h4>
+        <p style="color:var(--muted); font-size:0.8rem; margin-bottom:12px;">Join our community across social platforms:</p>
+        <div class="social-links">
+          <!-- Instagram -->
+          <a href="https://www.instagram.com/streaksphere.official" class="social-icon" target="_blank" aria-label="Instagram">
+            <svg viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
+          </a>
+          <!-- X (Twitter) -->
+          <a href="https://x.com/StreakSphere" class="social-icon" target="_blank" aria-label="X">
+            <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+          <!-- LinkedIn -->
+          <a href="https://www.linkedin.com/company/streaksphere" class="social-icon" target="_blank" aria-label="LinkedIn">
+            <svg viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+          </a>
+          <!-- TikTok -->
+          <a href="https://www.tiktok.com/@streaksphere_official" class="social-icon" target="_blank" aria-label="TikTok">
+            <svg viewBox="0 0 24 24"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.82.56-1.33 1.53-1.35 2.53-.05 1.18.57 2.37 1.55 3.01.95.63 2.21.72 3.23.26.96-.43 1.66-1.34 1.83-2.38.07-.63.07-1.27.07-1.91V.02z"/></svg>
+          </a>
+          <!-- YouTube -->
+          <a href="https://youtube.com/@streaksphere?si=JTLx7h_Vyaj2jLAF" class="social-icon" target="_blank" aria-label="YouTube">
+            <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Copyright & Branding -->
+    <div class="footer-bottom">
+      <a href="#" class="footer-logo">StreakSphere</a>
+      <p class="footer-copy">© <span id="year"></span> StreakSphere Inc. All rights reserved.</p>
+    </div>
+  </div>
 </footer>
 
 <script>

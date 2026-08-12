@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext } from "react";
-import { View, TouchableOpacity, ScrollView, StyleSheet } from "react-native";
+import { View, TouchableOpacity, ScrollView, StyleSheet, Platform } from "react-native";
 import { Text } from "@rneui/themed";
 import { CommonActions } from "@react-navigation/native";
 import DeviceInfo from "react-native-device-info";
@@ -89,12 +89,23 @@ const SavedAccountsScreen = ({ navigation }: any) => {
 
       await connectSocket();
 
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: "Drawer" }],
-        })
-      );
+      const isIOS26Plus =
+             Platform.OS === 'ios' &&
+             parseInt(Platform.Version, 10) >= 26;
+           if (isIOS26Plus) {
+             navigation.dispatch(
+             CommonActions.reset({
+               index: 0,
+               routes: [{ name: 'Drawer' }],
+             }),
+           );
+           } else {
+           navigation.dispatch(
+             CommonActions.reset({
+               index: 0,
+               routes: [{ name: 'Drawer' }],
+             }),
+           )}
     } finally {
       setLoadingId(null);
       setActionType(null);

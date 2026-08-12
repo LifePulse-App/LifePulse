@@ -69,8 +69,9 @@ const MOOD_METADATA: Record<
 };
 
 const Dashboard = ({ navigation }: any) => {
-  const [loading, setLoading] = useState(true); // Only true for very first render
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false); // Did we ever load anything?
+  const [isCheckingCache, setIsCheckingCache] = useState(true); // Prevents initial skeleton flash
+  const [loading, setLoading] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [friendReqCount, setFriendReqCount] = useState(0);
@@ -100,6 +101,7 @@ const Dashboard = ({ navigation }: any) => {
   } | null>(null);
 
   const [habits, setHabits] = useState([]);
+  
   const [currentMood, setCurrentMood] = useState<{
     mood: string;
     createdAt: string;
@@ -125,7 +127,6 @@ const Dashboard = ({ navigation }: any) => {
     }
   };
 
-  // On first mount, load from cache, then background update but never set loading true again
   useEffect(() => {
     (async () => {
       let anyLoaded = false;
@@ -142,8 +143,10 @@ const Dashboard = ({ navigation }: any) => {
         setHabits(cachedHabits);
         anyLoaded = true;
       }
+      
       setHasLoadedOnce(anyLoaded);
       setLoading(!anyLoaded);
+      setIsCheckingCache(false); // Cache check finished, allow rendering
 
       // Background refresh right away, but not set loading
       fetchDashboardInBackground();
@@ -198,7 +201,6 @@ const Dashboard = ({ navigation }: any) => {
     }
   };
 
-  // These never set loading=true, only update UI in background
   const fetchDashboardInBackground = useCallback(async () => {
     try {
       setError(null);
@@ -214,11 +216,9 @@ const Dashboard = ({ navigation }: any) => {
       setHasLoadedOnce(true);
       setLoading(false);
     } catch (err: any) {
-      const msg =
-        err?.response?.data?.message ||
-        err?.message ||
-        "Failed to load dashboard";
-      setError(msg);
+  
+
+     return
     }
   }, [offline]);
 
@@ -244,23 +244,35 @@ const Dashboard = ({ navigation }: any) => {
     }, [fetchDashboardInBackground, refreshPendingCount, fetchTodayHabitsInBackground])
   );
 
-  // Auto-refresh habits every 10 seconds while dashboard screen is mounted
-useEffect(() => {
-  // Poll habits verification status
-  const interval = setInterval(() => {
-    fetchDashboardInBackground();
-    fetchTodayHabitsInBackground();
-  }, 20000); // refresh every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDashboardInBackground();
+      fetchTodayHabitsInBackground();
+    }, 20000); 
 
-  return () => clearInterval(interval);
-}, [      fetchDashboardInBackground, fetchTodayHabitsInBackground]);
+    return () => clearInterval(interval);
+  }, [fetchDashboardInBackground, fetchTodayHabitsInBackground]);
 
   const handleRetry = () => {
     fetchDashboardInBackground();
     fetchTodayHabitsInBackground();
   };
 
-  // Only show skeleton if there is NO data yet
+  // Brief clean background while retrieving local cache to prevent skeleton flicker
+  if (isCheckingCache) {
+    return (
+      <MainLayout>
+        <AppScreen style={styles.root}>
+          <View style={styles.baseBackground} />
+          <View style={styles.glowTop} />
+          <View style={styles.glowBottom} />
+          <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+        </AppScreen>
+      </MainLayout>
+    );
+  }
+
+  // Only show skeleton if there is genuinely NO cache data and we are waiting on the network
   if (loading && !hasLoadedOnce) {
     return <DashboardSkeleton />;
   }
@@ -474,10 +486,9 @@ useEffect(() => {
                   )}
                   renderItem={({ item }: any) => (
                     <TouchableOpacity
-    activeOpacity={0.8}
-    style={styles.habitRow}
-    // onPress={() => navigation.navigate('HabitDetail', { habit: item })}
-  >
+                      activeOpacity={0.8}
+                      style={styles.habitRow}
+                    >
                       <View style={styles.habitLeft}>
                         <View style={styles.habitIconWrap}>
                           <Icon name={item.icon || "check"} size={22} color="#C4B5FD" />
@@ -515,6 +526,14 @@ useEffect(() => {
 
             <View style={{ height: 40 }} />
           </ScrollView>
+          {/* Floating Feed Button */}
+<TouchableOpacity
+  activeOpacity={0.8}
+  style={styles.floatingFeedButton}
+  onPress={() => navigation.navigate("PublicActivityFeed")}
+>
+  <Icon name="telescope" size={26} color="#F9FAFB" />
+</TouchableOpacity>
           {/* Floating Camera Button */}
           <TouchableOpacity
             activeOpacity={0.8}
@@ -849,7 +868,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowOffset: { width: 0, height: 14 },
     shadowRadius: 24,
-    elevation: 8,
+    elevation: 0,
   },
   levelSection: {
     flexDirection: "row",
@@ -1032,6 +1051,24 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginBottom: 10,
   },
+ floatingFeedButton: {
+  position: "absolute",
+  left: 20,
+  bottom: Platform.OS === "android" ? 20 : 25, // Aligned at the same bottom level as the camera button
+  width: 56,
+  height: 56,
+  borderRadius: 28,
+  backgroundColor: "rgba(147, 51, 234, 0.25)", // Purple-tinted glass effect
+  justifyContent: "center",
+  alignItems: "center",
+  borderWidth: 1,
+  borderColor: "rgba(216, 180, 254, 0.4)",
+  shadowColor: "#000",
+  shadowOpacity: 0.3,
+  shadowOffset: { width: 0, height: 10 },
+  shadowRadius: 18,
+  elevation: 10,
+},
   errorTitle: {
     color: "#FCA5A5",
     fontSize: 13,
@@ -1151,7 +1188,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowOffset: { width: 0, height: 10 },
     shadowRadius: 18,
-    elevation: 10,
+    elevation: 0,
   },
   badgeBubble: {
     position: "absolute",

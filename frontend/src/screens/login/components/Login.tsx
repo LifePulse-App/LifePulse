@@ -124,7 +124,7 @@ const Login = ({ navigation }: any) => {
     Keyboard.dismiss();
 
     if (offline) {
-      showError("You’re offline. Please connect to the internet and try again.");
+      showError("Please connect to the internet and try again.");
       return;
     }
 
@@ -186,12 +186,23 @@ const Login = ({ navigation }: any) => {
         await UserStorage.setRefreshToken(user.refreshToken);
       }
       await connectSocket()
-      navigation.dispatch(
+       const isIOS26Plus =
+        Platform.OS === 'ios' &&
+        parseInt(Platform.Version, 10) >= 26;
+      if (isIOS26Plus) {
+        navigation.dispatch(
         CommonActions.reset({
           index: 0,
           routes: [{ name: 'Drawer' }],
         }),
       );
+      } else {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Drawer' }],
+        }),
+      )}
     } catch (e) {
       showError('Unexpected error while logging in');
     } finally {
@@ -366,7 +377,7 @@ const Login = ({ navigation }: any) => {
               </View>
 
               <Text style={styles.termsText}>
-                By logging in or continuing, you agree to our Terms of Service
+                By continuing, you agree to our Terms of Service
                 and Privacy Policy
               </Text>
             </View>

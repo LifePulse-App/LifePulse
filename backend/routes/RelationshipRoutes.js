@@ -5,7 +5,9 @@ import {
   acceptRelationshipRequest,
   cancelRelationshipRequest,
   removeRelationship,
-  restoreRelationship
+  restoreRelationship,
+  getMyRelationshipHistory,
+  getPartnerRelationshipHistory
 } from "../controllers/FriendController.js";
 
 const router = express.Router();
@@ -16,5 +18,8 @@ router.post("/accept/:targetUserId", isAuthenticatedUser, acceptRelationshipRequ
 router.post("/cancel/:targetUserId", isAuthenticatedUser, cancelRelationshipRequest);
 router.post("/remove", isAuthenticatedUser, removeRelationship);
 router.post("/restore", isAuthenticatedUser, restoreRelationship);
+
+router.get("/history", isAuthenticatedUser, getMyRelationshipHistory);
+router.get("/partner-history", isAuthenticatedUser, getPartnerRelationshipHistory);
 
 export default router;

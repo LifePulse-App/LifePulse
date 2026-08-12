@@ -7,11 +7,26 @@ AI_PATH="$BASE_PATH/ai"
 PROJECT_ROOT="$BASE_PATH"
 APP_NAME="StreakSphere"
 
+# 🔒 Define where your permanent secrets live on the server
+SECRETS_VAULT="/home/server-pc/secrets/StreakSphere"
+
 echo "🚀 Deploying $APP_NAME in $ENV mode..."
 echo "-----------------------------------------"
 
 # -------------------------------------
-# 1️⃣ Install backend dependencies
+# 1️⃣ Inject Secrets
+# -------------------------------------
+echo "🔐 Injecting secure environment files..."
+
+# Copy both environment files and the Firebase key exactly as named
+cp "$SECRETS_VAULT/.env.development" "$NODE_BACKEND_PATH/.env.development"
+cp "$SECRETS_VAULT/.env.production" "$NODE_BACKEND_PATH/.env.production"
+cp "$SECRETS_VAULT/serviceAccountKey.json" "$NODE_BACKEND_PATH/serviceAccountKey.json"
+
+echo "✅ Injected .env.development, .env.production, and serviceAccountKey.json"
+
+# -------------------------------------
+# 2️⃣ Install backend dependencies
 # -------------------------------------
 cd "$NODE_BACKEND_PATH" || {
     echo "❌ Backend folder not found!"
@@ -22,7 +37,7 @@ echo "📦 Installing backend dependencies..."
 npm install --legacy-peer-deps
 
 # -------------------------------------
-# 2️⃣ Restart backend (only target env)
+# 3️⃣ Restart backend (only target env)
 # -------------------------------------
 echo "🔄 Restarting Backend..."
 
@@ -48,7 +63,7 @@ else
 fi
 
 # -------------------------------------
-# 3️⃣ Prepare AI Environment
+# 4️⃣ Prepare AI Environment
 # -------------------------------------
 cd "$AI_PATH" || {
     echo "❌ AI folder not found!"
@@ -57,7 +72,6 @@ cd "$AI_PATH" || {
 
 echo "🐍 Preparing Python environment..."
 
-# Create venv if not exists
 if [ ! -d "venv" ]; then
     echo "📦 Creating virtual environment..."
     python3 -m venv venv
@@ -86,7 +100,7 @@ if [ -f "requirements.txt" ]; then
 fi
 
 # -------------------------------------
-# 4️⃣ Restart AI Model
+# 5️⃣ Restart AI Model
 # -------------------------------------
 echo "🔄 Restarting AI Model..."
 
@@ -100,7 +114,7 @@ else
 fi
 
 # -------------------------------------
-# 5️⃣ Save PM2 State
+# 6️⃣ Save PM2 State
 # -------------------------------------
 echo "💾 Saving PM2 state..."
 pm2 save >/dev/null 2>&1

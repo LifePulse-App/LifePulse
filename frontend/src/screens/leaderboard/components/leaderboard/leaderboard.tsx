@@ -8,6 +8,7 @@ import {
   Platform,
   Modal,
   Image,
+  Animated,
 } from "react-native";
 import { Text } from "@rneui/themed";
 import { useFocusEffect } from "@react-navigation/native";
@@ -60,6 +61,52 @@ const RowAvatar = ({ url }: { url?: string }) => {
   );
 };
 
+// ⚡ SKELETON LOADER COMPONENT
+const SkeletonRow = () => {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.7,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  return (
+    <View style={styles.row}>
+      <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 10 }}>
+        {/* Rank Skeleton */}
+        <Animated.View style={[styles.skeletonBlock, { width: 22, height: 18, opacity: pulseAnim, marginRight: 10 }]} />
+        
+        {/* Avatar Skeleton */}
+        <Animated.View style={[styles.skeletonBlock, { width: 34, height: 34, borderRadius: 17, opacity: pulseAnim }]} />
+        
+        {/* Name & Title Skeleton */}
+        <View style={{ marginLeft: 10, flex: 1, justifyContent: "center" }}>
+          <Animated.View style={[styles.skeletonBlock, { width: "60%", height: 14, marginBottom: 6, opacity: pulseAnim }]} />
+          <Animated.View style={[styles.skeletonBlock, { width: "40%", height: 10, opacity: pulseAnim }]} />
+        </View>
+      </View>
+      
+      {/* XP Skeleton */}
+      <View style={{ alignItems: "flex-end", justifyContent: "center" }}>
+        <Animated.View style={[styles.skeletonBlock, { width: 50, height: 10, marginBottom: 6, opacity: pulseAnim }]} />
+        <Animated.View style={[styles.skeletonBlock, { width: 30, height: 14, opacity: pulseAnim }]} />
+      </View>
+    </View>
+  );
+};
+
 const LeaderboardScreen = ({ navigation }: any) => {
   const [tab, setTab] = useState<"monthly" | "permanent">("monthly");
   const [scope, setScope] = useState<"world" | "country" | "city" | "friends">("world");
@@ -96,8 +143,6 @@ const LeaderboardScreen = ({ navigation }: any) => {
 
   const currentUserRef = useRef<any>(null);
 
-  // FIX 1: Use a ref for offline status so load() always reads the latest value
-  // without needing it as a useCallback dependency (avoids stale closure bug).
   const offlineRef = useRef(false);
   const [offline, setOffline] = useState(false);
 
@@ -128,8 +173,6 @@ const LeaderboardScreen = ({ navigation }: any) => {
       const raw = await AsyncStorage.getItem(key);
       if (!raw) return null;
       const parsed = JSON.parse(raw);
-      // FIX 2: Check parsed exists but don't gate on .value being truthy —
-      // a valid payload could theoretically be falsy; check key existence instead.
       if (parsed === null || parsed === undefined || !("value" in parsed)) return null;
       return { ts: parsed.ts ?? 0, value: parsed.value as T };
     } catch (e) {
@@ -138,18 +181,15 @@ const LeaderboardScreen = ({ navigation }: any) => {
     }
   };
 
-  // FIX 3: Keep offlineRef in sync with offline state so load() can read it synchronously.
   useEffect(() => {
     const unsub = NetInfo.addEventListener((state) => {
       const connected = state.isConnected === true;
-      const reachable = state.isInternetReachable !== false; // treat null as reachable to avoid false offline
+      const reachable = state.isInternetReachable !== false; 
       const isOffline = !connected || !reachable;
       offlineRef.current = isOffline;
       setOffline(isOffline);
     });
 
-    // FIX 4: Fetch initial network state immediately so offlineRef is populated
-    // before the first load() call, not just on change events.
     NetInfo.fetch().then((state) => {
       const connected = state.isConnected === true;
       const reachable = state.isInternetReachable !== false;
@@ -211,7 +251,6 @@ const LeaderboardScreen = ({ navigation }: any) => {
       setLockStatus(cached.value);
     }
 
-    // FIX 5: Use offlineRef.current instead of offline state for synchronous read
     if (offlineRef.current) return;
 
     try {
@@ -231,7 +270,7 @@ const LeaderboardScreen = ({ navigation }: any) => {
         setLockStatus({ locked: false, daysLeft: 0, locationLockUntil: null });
       }
     }
-  }, []); // no offline dependency — uses ref
+  }, []); 
 
   const resolveCountryCityParams = useCallback(() => {
     if (scope === "country" || scope === "city") {
@@ -253,27 +292,21 @@ const LeaderboardScreen = ({ navigation }: any) => {
 
     const { country, city } = resolveCountryCityParams();
 
-    // FIX 6: For country/city scope, don't hard-block if country missing when offline —
-    // still attempt to load cache first, then show error only if cache is also empty.
     const needsCountry = scope === "country" || scope === "city";
     const needsCity = scope === "city";
 
     const key = cacheKeyForLeaderboard(tab, scope, country, city);
 
-    // FIX 7: Always load cache first, unconditionally — before any online/offline checks.
     const cached = await loadCache<any>(key);
     if (cached?.value) {
       currentUserRef.current = cached.value?.currentUser || null;
       setData(cached.value);
       setDataSource("cache");
-      console.log("Cache restored for key:", key);
     }
 
-    // FIX 8: Read offline status from ref (synchronous, always current).
     const isOffline = offlineRef.current;
 
     if (isOffline) {
-      // Offline path: show cache if available, otherwise friendly error.
       if (!cached?.value) {
         if (needsCountry && !country) {
           setErrorMsg("You are offline. Please set your country when back online.");
@@ -284,14 +317,12 @@ const LeaderboardScreen = ({ navigation }: any) => {
         }
         setData(null);
       } else {
-        // Cache loaded — clear any previous error, show offline notice softly.
         setErrorMsg("You are offline — showing cached data.");
       }
       setLoading(false);
       return;
     }
 
-    // Online path: now enforce country/city requirements.
     if (needsCountry && !country) {
       setLoading(false);
       setErrorMsg("Please set your country first to view this leaderboard.");
@@ -307,10 +338,8 @@ const LeaderboardScreen = ({ navigation }: any) => {
       const api = tab === "monthly" ? getMonthlyLeaderboard : getPermanentLeaderboard;
       const res = await api(scope, country, city);
       const payload = res?.data;
-
-      // FIX 9: Guard against undefined/null API response — don't overwrite good cache.
+      
       if (!payload || !payload.leaderboard) {
-        console.log("API returned empty/undefined payload — keeping cache.");
         if (!cached?.value) {
           setErrorMsg("No leaderboard data available right now.");
           setData(null);
@@ -323,10 +352,7 @@ const LeaderboardScreen = ({ navigation }: any) => {
       setData(payload);
       setDataSource("live");
       await saveCache(key, payload);
-      console.log("Live data loaded and cached for key:", key);
     } catch (e: any) {
-      // FIX 10: On API error, keep the cache that was already set above — don't clear it.
-      console.log("API error — keeping cache if available:", e?.message);
       if (!cached?.value) {
         setData(null);
         setErrorMsg(e?.response?.data?.message || e?.message || "Failed to load leaderboard");
@@ -336,10 +362,8 @@ const LeaderboardScreen = ({ navigation }: any) => {
     } finally {
       setLoading(false);
     }
-  }, [tab, scope, resolveCountryCityParams]); // FIX 11: removed `offline` — using offlineRef instead
+  }, [tab, scope, resolveCountryCityParams]); 
 
-  // FIX 12: Single source of truth for triggering load — only useEffect, not both
-  // useEffect + useFocusEffect, which caused double-fire race conditions.
   const hasMountedRef = useRef(false);
 
   useEffect(() => {
@@ -348,7 +372,6 @@ const LeaderboardScreen = ({ navigation }: any) => {
 
   useFocusEffect(
     useCallback(() => {
-      // Skip the very first mount since the useEffect above handles it.
       if (!hasMountedRef.current) {
         hasMountedRef.current = true;
         return;
@@ -442,31 +465,34 @@ const LeaderboardScreen = ({ navigation }: any) => {
         <RowAvatar url={item.avatarUrl || ""} />
 
         <View style={{ marginLeft: 10, flex: 1 }}>
-  <View style={{ flexDirection: "row", alignItems: "center" }}>
-    <Text style={styles.name} numberOfLines={1}>
-      {item.name || item.username}
-    </Text>
-    {item.tick === "verified" && (
-      <Icon
-        name="check-decagram"
-        size={16}
-        color="#3b82f6"
-        style={{ marginLeft: 6, marginTop: 2 }}
-      />
-    )}
-    {item.tick === "golden" && (
-      <Icon
-        name="check-decagram"
-        size={16}
-        color="#fbbf24"
-        style={{ marginLeft: 6, marginTop: 2 }}
-      />
-    )}
-  </View>
-  <Text style={styles.sub} numberOfLines={1}>
-    {item.title ? `${item.title} (Lv ${item.level})` : `Lv ${item.level}`}
-  </Text>
-</View>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Text style={styles.name} numberOfLines={1}>
+              {item.name || item.username}
+            </Text>
+            {item.tick === "verified" && (
+              <Icon
+                name="check-decagram"
+                size={16}
+                color="#3b82f6"
+                style={{ marginLeft: 6, marginTop: 2 }}
+              />
+            )}
+            {item.tick === "golden" && (
+              <Icon
+                name="check-decagram"
+                size={16}
+                color="#fbbf24"
+                style={{ marginLeft: 6, marginTop: 2 }}
+              />
+            )}
+            {item?.isPremium && (
+              <Icon name="star-circle" size={16} color="#fbbf24" style={{ marginLeft: 6, marginTop: 2 }} />
+            )}
+          </View>
+          <Text style={styles.sub} numberOfLines={1}>
+            {item.title ? `${item.title} (Lv ${item.level})` : `Lv ${item.level}`}
+          </Text>
+        </View>
       </View>
 
       <View style={{ alignItems: "flex-end" }}>
@@ -501,9 +527,9 @@ const LeaderboardScreen = ({ navigation }: any) => {
             <TouchableOpacity onPress={() => setShowRules(true)} style={styles.infoBtn}>
               <Icon name="information-outline" size={20} color="#E5E7EB" />
             </TouchableOpacity>
-      <TouchableOpacity onPress={() => setShowStoreNotice(true)} style={styles.storeBtn}>
-    <Icon name="shopping" size={20} color="#E5E7EB" />
-  </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowStoreNotice(true)} style={styles.storeBtn}>
+              <Icon name="shopping" size={20} color="#E5E7EB" />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.tabs}>
@@ -672,8 +698,16 @@ const LeaderboardScreen = ({ navigation }: any) => {
             </View>
           )}
 
+          {/* ⚡ SKELETON LOADER CONDITION */}
           {loading ? (
-            <ActivityIndicator color="#A855F7" style={{ marginTop: 12 }} />
+            <View style={{ marginTop: 8 }}>
+              {[1, 2, 3, 4, 5].map((key) => (
+                <React.Fragment key={key}>
+                  <SkeletonRow />
+                  <View style={styles.separator} />
+                </React.Fragment>
+              ))}
+            </View>
           ) : (
             <FlatList
               data={data?.leaderboard || []}
@@ -738,26 +772,26 @@ const LeaderboardScreen = ({ navigation }: any) => {
         </Modal>
       </View>
       {showStoreNotice && (
-  <Modal transparent animationType="fade" visible onRequestClose={() => setShowStoreNotice(false)}>
-    <View style={styles.modalOverlay}>
-      <View style={styles.modalCard}>
-        <Icon name="shopping" size={28} color="#6366f1" style={{ alignSelf: "center", marginBottom: 12 }} />
-        <Text style={styles.modalTitle}>Redeem Store</Text>
-        <Text style={styles.modalText}>
-          Redeem store will come soon! Stay tuned for exclusive rewards and offers!
-        </Text>
-        <View style={styles.modalButtons}>
-          <TouchableOpacity
-            style={[styles.modalBtn, styles.modalConfirm]}
-            onPress={() => setShowStoreNotice(false)}
-          >
-            <Text style={styles.modalBtnText}>Got it</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  </Modal>
-)}
+        <Modal transparent animationType="fade" visible onRequestClose={() => setShowStoreNotice(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Icon name="shopping" size={28} color="#6366f1" style={{ alignSelf: "center", marginBottom: 12 }} />
+              <Text style={styles.modalTitle}>Redeem Store</Text>
+              <Text style={styles.modalText}>
+                Redeem store will come soon! Stay tuned for exclusive rewards and offers!
+              </Text>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalBtn, styles.modalConfirm]}
+                  onPress={() => setShowStoreNotice(false)}
+                >
+                  <Text style={styles.modalBtnText}>Got it</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </MainLayout>
   );
 };
@@ -947,6 +981,12 @@ const styles = StyleSheet.create({
   xpLabel: { color: "#94a3b8", fontSize: 11 },
   xpValue: { color: "#fff", fontSize: 15, fontWeight: "700" },
 
+  // ⚡ SKELETON STYLING
+  skeletonBlock: {
+    backgroundColor: "rgba(148, 163, 184, 0.25)",
+    borderRadius: 6,
+  },
+
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
@@ -972,16 +1012,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   storeBtn: {
-  width: 32,
-  height: 32,
-  borderRadius: 16,
-  borderWidth: 1,
-  borderColor: "rgba(148,163,184,0.5)",
-  justifyContent: "center",
-  alignItems: "center",
-  backgroundColor: "rgba(255,255,255,0.06)",
-  marginLeft: 8,
-},
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.06)",
+    marginLeft: 8,
+  },
   modalCancel: {
     borderColor: "rgba(148, 163, 184, 0.5)",
     backgroundColor: "rgba(255,255,255,0.05)",

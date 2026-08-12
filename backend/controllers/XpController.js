@@ -263,35 +263,54 @@ export const HABIT_XP = {
 export const recalculateXp = async (userId) => {
   const objectId = new mongoose.Types.ObjectId(userId);
 
-  // ----- TOTAL XP -----
-  let totalXp = 0;
+  // 1. Fetch user
+  const user = await User.findById(objectId);
+  if (!user) return null;
 
+  let totalXp = 0;
+  let monthlyXp = 0;
+
+  const startOfMonth = new Date();
+  startOfMonth.setUTCDate(1);
+  startOfMonth.setUTCHours(0, 0, 0, 0);
+
+  // ----- PROOFS -----
   const verifiedProofs = await Proof.find({
     user: objectId,
     verified: true,
   }).populate("habit");
 
-for (const proof of verifiedProofs) {
-  const habit = proof.habit;
-  if (!habit) continue;
+  for (const proof of verifiedProofs) {
+    const habit = proof.habit;
+    if (!habit) continue;
 
-  const type = (habit.habitName || "").trim().toLowerCase();
+    const type = (habit.habitName || "").trim().toLowerCase();
 
-  // 1) Habit XP
-  if (HABIT_XP[type]) {
-    totalXp += HABIT_XP[type].base + HABIT_XP[type].verified;
-  } else {
-    totalXp += 10;
+    // 1) Base Habit XP
+    let itemXp = HABIT_XP[type] ? HABIT_XP[type].base + HABIT_XP[type].verified : 10;
+
+    // 2) AI proof points bonus
+    const proofPoints = Number(proof.points || 0);
+    itemXp += Math.max(0, proofPoints - 1);
+
+    // ⚡ 3) ONLY MULTIPLY THIS SPECIFIC PROOF IF EARNED WHILE PREMIUM
+    if (proof.isPremiumXP) {
+      itemXp *= 2;
+    }
+
+    // Add to total
+    totalXp += itemXp;
+
+    // Add to monthly if it happened this month
+    if (new Date(proof.createdAt) >= startOfMonth) {
+      monthlyXp += itemXp;
+    }
   }
 
-  // 2) AI proof points bonus (50 -> +49)
-  const proofPoints = Number(proof.points || 0);
-  totalXp += Math.max(0, proofPoints - 1);
-}
-
-  // Mood XP (one per calendar day)
+  // ----- MOODS -----
   const moodDayAgg = await Mood.aggregate([
     { $match: { user: objectId } },
+    { $sort: { createdAt: 1 } },
     {
       $group: {
         _id: {
@@ -299,71 +318,38 @@ for (const proof of verifiedProofs) {
           month: { $month: "$createdAt" },
           day: { $dayOfMonth: "$createdAt" },
         },
-        firstMood: { $min: "$createdAt" },
+        createdAt: { $first: "$createdAt" },
+        isPremiumXP: { $first: "$isPremiumXP" }, // ⚡ Grab premium flag for this mood
       },
     },
   ]);
-  totalXp += moodDayAgg.length * 10;
 
-  // ----- MONTHLY XP (same data scope) -----
-  const startOfMonth = new Date();
-  startOfMonth.setUTCDate(1);
-  startOfMonth.setUTCHours(0, 0, 0, 0);
+  for (const dayMood of moodDayAgg) {
+    let moodXp = 10; // Base points for mood
 
-  let monthlyXp = 0;
+    // ⚡ ONLY MULTIPLY THIS SPECIFIC MOOD IF EARNED WHILE PREMIUM
+    if (dayMood.isPremiumXP) {
+      moodXp *= 2;
+    }
 
-  const verifiedProofsMonth = await Proof.find({
-    user: objectId,
-    verified: true,
-    createdAt: { $gte: startOfMonth },
-  }).populate("habit");
-
-for (const proof of verifiedProofsMonth) {
-  const habit = proof.habit;
-  if (!habit) continue;
-
-  const type = (habit.habitName || "").trim().toLowerCase();
-
-  // 1) Habit XP
-  if (HABIT_XP[type]) {
-    monthlyXp += HABIT_XP[type].base + HABIT_XP[type].verified;
-  } else {
-    monthlyXp += 10;
+    totalXp += moodXp;
+    
+    if (new Date(dayMood.createdAt) >= startOfMonth) {
+      monthlyXp += moodXp;
+    }
   }
 
-  // 2) AI proof points bonus
-  const proofPoints = Number(proof.points || 0);
-  monthlyXp += Math.max(0, proofPoints - 1);
-}
+  // ⚡ Save directly to database
+  user.totalXp = totalXp;
+  user.monthlyXp = monthlyXp;
+  user.xp = totalXp; 
 
-  const moodDayAggMonth = await Mood.aggregate([
-    { $match: { user: objectId, createdAt: { $gte: startOfMonth } } },
-    {
-      $group: {
-        _id: {
-          year: { $year: "$createdAt" },
-          month: { $month: "$createdAt" },
-          day: { $dayOfMonth: "$createdAt" },
-        },
-        firstMood: { $min: "$createdAt" },
-      },
-    },
-  ]);
-  monthlyXp += moodDayAggMonth.length * 10;
+  // Levels and titles are now calculated using the highly accurate, mixed XP!
+  const { level, title } = calculateXpProgress(totalXp);
+  user.level = level;
+  user.currentTitle = title;
 
-  // ----- Save to User -----
-  const user = await User.findById(objectId);
-  if (user) {
-    user.totalXp = totalXp;
-    user.monthlyXp = monthlyXp;
-    user.xp = totalXp; // legacy field if you still use it
-
-    const { level, title } = calculateXpProgress(totalXp);
-    user.level = level;
-    user.currentTitle = title;
-
-    await user.save();
-  }
+  await user.save();
 
   return calculateXpProgress(totalXp);
 };

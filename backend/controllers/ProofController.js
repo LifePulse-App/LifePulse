@@ -1,13 +1,12 @@
 import Proof from "../models/ProofSchema.js";
 import Habit from "../models/HabitSchema.js";
+import User from "../models/UserSchema.js";
 import axios from "axios";
 import { recalculateXp } from "./XpController.js";
 import { getTimeSlotForDate } from "../utils/timeSlotCheck.js";
 import fs from "fs";
-import FormData from "form-data"; // also import FormData
+import FormData from "form-data"; 
 
-
-// Submit a habit proof (image + AI verification)
 export const submitProof = async (req, res) => {
   try {
     const { habitId, userId } = req.body;
@@ -18,9 +17,18 @@ export const submitProof = async (req, res) => {
     const habit = await Habit.findOne({ _id: habitId, active: true });
     if (!habit) return res.status(404).json({ success: false, message: "Habit not found." });
 
+    const userDoc = await User.findById(userId);
+    const xpMultEnabled = userDoc?.premiumPreferences?.xpMultiplier !== false;
+    const isPremiumXP = !!(userDoc?.isPremium && xpMultEnabled);
+
     const currentSlot = getTimeSlotForDate(new Date());
     const expectedSlot = habit.timeSlot;
     const isTimeValid = !expectedSlot || currentSlot === expectedSlot;
+
+    // 🔥 DYNAMIC CAPTION & VISIBILITY:
+    // Fallback to habit.key if habit.name doesn't exist on your schema
+    const habitName = habit.name || habit.title || habit.key; 
+    const generatedCaption = `${habitName}`;
 
     const proof = await Proof.create({
       user: userId,
@@ -30,6 +38,11 @@ export const submitProof = async (req, res) => {
       points: 1,
       verified: false,
       timeSlotAtProof: currentSlot,
+      isPremiumXP: isPremiumXP,
+      caption: generatedCaption, // ⚡ Automatically sets to Habit Name
+      visibilityScope: userDoc.postVisibility || "friend", // ⚡ Fetches from user settings
+      city: userDoc.city || "",
+      country: userDoc.country || ""
     });
 
     // Send image to FastAPI AI verification

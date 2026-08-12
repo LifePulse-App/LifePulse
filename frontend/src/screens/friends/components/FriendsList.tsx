@@ -248,7 +248,7 @@ const resolveAvatarUri = async (item: Friend) => {
       priority: FastImage.priority.high,
       cache: FastImage.cacheControl.immutable,
     }}
-    style={{ width: 40, height: 40, borderRadius: 999 }}
+    style={{ width: 40, height: 40, borderRadius: 999, marginRight: 10, }}
   />
 ) : (
   <View style={styles.avatarCircle}>
@@ -277,6 +277,9 @@ const resolveAvatarUri = async (item: Friend) => {
         style={{ marginLeft: 6, marginTop: 2 }}
       />
     )}
+    {item?.isPremium && (
+        <Icon name="star-circle" size={17} color="#fbbf24" style={{ marginLeft: 5, marginTop: 2 }} />
+      )}
   </View>
   <Text style={styles.username} numberOfLines={1}>
     {item.username ? `@${item.username}` : "@"}

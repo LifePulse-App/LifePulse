@@ -3,6 +3,10 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
+// ⚡ IMPORT USER SCHEMA TO CHECK BLOCKS
+import User from "../models/UserSchema.js"; 
+import Proof from "../models/ProofSchema.js"; 
+
 import ChatMessage from "../models/ChatMessage.js";
 import Conversation from "../models/Conversation.js";
 import Mood from "../models/MoodSchema.js";
@@ -154,6 +158,8 @@ export const uploadChatMedia = async (req, res) => {
           peaks: first.peaks,
         },
         files: uploaded,
+        isPremium: req.user.isPremium,
+        tick: req.user.tick
       });
     }
 
@@ -161,6 +167,8 @@ export const uploadChatMedia = async (req, res) => {
       success: true,
       files: uploaded,
       count: uploaded.length,
+      isPremium: req.user.isPremium,
+      tick: req.user.tick
     });
   } catch (err) {
     console.error("[chat] uploadChatMedia error", err);
@@ -187,7 +195,7 @@ export const openDirectConversation = async (req, res) => {
       });
     }
 
-    res.json({ conversation: convo });
+    res.json({ conversation: convo, isPremium: req.user.isPremium, tick: req.user.tick });
   } catch (err) {
     console.error("[chat] openDirectConversation error", err);
     res.status(500).json({ message: "Internal error" });
@@ -225,6 +233,15 @@ export const sendMessage = async (req, res) => {
     const recvObj = toObjectId(receiverId);
     if (!convoObj || !recvObj) {
       return res.status(400).json({ message: "Invalid ids" });
+    }
+
+    const me = await User.findById(senderId).select("blockedUsers blockedBy isPremium tick").lean();
+    const blockedUsersIds = (me?.blockedUsers || []).map(String);
+    const blockedByIds = (me?.blockedBy || []).map(String);
+    const peerIdStr = String(receiverId);
+
+    if (blockedUsersIds.includes(peerIdStr) || blockedByIds.includes(peerIdStr)) {
+      return res.status(403).json({ message: "Cannot send message to this user." });
     }
 
     const convo = await Conversation.findById(convoObj).lean();
@@ -278,6 +295,8 @@ export const sendMessage = async (req, res) => {
       success: true,
       message: msg,
       serverAcceptedAt: new Date().toISOString(),
+      isPremium: me?.isPremium,
+      tick: me?.tick,
     });
   } catch (err) {
     console.error("[chat] sendMessage error", err);
@@ -309,8 +328,22 @@ export const getThread = async (req, res) => {
       .sort({ createdAt: -1 }) 
       .limit(limit)
       .lean();
+
+    // ⚡ CHECK FOR ADMIN REMOVED PROOFS IN SHARED POSTS
+    for (let m of messages) {
+      if (m.text && m.text.startsWith("__SHARED_POST__|")) {
+        const parts = m.text.split("|");
+        const postId = parts[1];
+        if (postId) {
+          const proof = await Proof.findById(postId).select("adminRemoved").lean();
+          if (proof && proof.adminRemoved) {
+            m.text = `__SHARED_POST_REMOVED__|${postId}`;
+          }
+        }
+      }
+    }
       
-    res.json({ messages: messages.reverse() });
+    res.json({ messages: messages.reverse(), isPremium: req.user.isPremium, tick: req.user.tick });
   } catch (err) {
     console.error("[chat] getThread error", err);
     res.status(500).json({ message: "Internal error" });
@@ -328,7 +361,6 @@ export const markDelivered = async (req, res) => {
 
     const ids = messageIds.map((id) => toObjectId(id)).filter(Boolean);
 
-    // ⚡ FIX 1: Fetch clientMessageId so the frontend knows exactly which local message to double-tick
     const msgs = await ChatMessage.find({
       _id: { $in: ids },
       receiverId: me,
@@ -338,7 +370,7 @@ export const markDelivered = async (req, res) => {
       .lean();
 
     if (!msgs.length) {
-      return res.json({ success: true, count: 0 });
+      return res.json({ success: true, count: 0, isPremium: req.user.isPremium, tick: req.user.tick });
     }
 
     const msgIdsToUpdate = msgs.map((m) => m._id);
@@ -359,7 +391,6 @@ export const markDelivered = async (req, res) => {
       await sendDeliveredNotification(senderId, me, deliveredMsgIds);
     }
 
-    // ⚡ FIX 2: Emit the payload with exact matching IDs to both the convo room AND the sender's direct room
     for (const msg of msgs) {
       const payload = {
         msgId: String(msg._id),
@@ -368,14 +399,11 @@ export const markDelivered = async (req, res) => {
         conversationId: String(msg.conversationId)
       };
 
-      // Emit to conversation
       req.io.to(`conversation:${msg.conversationId}`).emit("msg-delivered", payload);
-      
-      // GUARANTEE emit directly to sender
       req.io.to(String(msg.senderId)).emit("msg-delivered", payload);
     }
 
-    res.json({ success: true, count: msgIdsToUpdate.length });
+    res.json({ success: true, count: msgIdsToUpdate.length, isPremium: req.user.isPremium, tick: req.user.tick });
   } catch (err) {
     console.error("[chat] markDelivered error", err);
     res.status(500).json({ message: "Internal error" });
@@ -417,7 +445,6 @@ export const markSeen = async (req, res) => {
       await sendSeenNotification(peerObj, me);
     }
 
-    // ⚡ FIX: Emit to both convo room AND sender directly
     const payload = {
       msgId: lastSeenMessageId,
       userId: String(me),
@@ -427,7 +454,7 @@ export const markSeen = async (req, res) => {
     req.io.to(`conversation:${conversationId}`).emit("msg-seen", payload);
     req.io.to(String(peerObj)).emit("msg-seen", payload);
 
-    res.json({ success: true, count: changed });
+    res.json({ success: true, count: changed, isPremium: req.user.isPremium, tick: req.user.tick });
   } catch (err) {
     console.error("[chat] markSeen error", err);
     res.status(500).json({ message: "Internal error" });
@@ -436,17 +463,25 @@ export const markSeen = async (req, res) => {
 
 export const listConversationPreviews = async (req, res) => {
   try {
-    const me = req.user._id;
+    const meId = req.user._id;
+
+    const me = await User.findById(meId).select("blockedUsers blockedBy isPremium tick").lean();
+    const blockedUsersIds = (me?.blockedUsers || []).map(String);
+    const blockedByIds = (me?.blockedBy || []).map(String);
 
     const convos = await Conversation.find({
       type: "direct",
-      participants: me,
+      participants: meId,
     }).lean();
 
     const out = [];
     for (const c of convos) {
-      const peer = c.participants.find((p) => String(p) !== String(me));
+      const peer = c.participants.find((p) => String(p) !== String(meId));
       if (!peer) continue;
+      
+      const peerIdStr = String(peer);
+
+      const peerUser = await User.findById(peer).select("name username avatarUrl avatarVersion isPremium tick").lean();
 
       const last = await ChatMessage.findOne({ conversationId: c._id })
         .sort({ createdAt: -1 })
@@ -454,33 +489,62 @@ export const listConversationPreviews = async (req, res) => {
 
       const unread = await ChatMessage.countDocuments({
         conversationId: c._id,
-        receiverId: me,
+        receiverId: meId,
         seenAt: null,
       });
 
-      const moodDoc = await Mood.findOne({ user: peer }).sort({ createdAt: -1 }).lean();
+      let moodDoc = null;
+      if (!blockedUsersIds.includes(peerIdStr) && !blockedByIds.includes(peerIdStr)) {
+        moodDoc = await Mood.findOne({ user: peer }).sort({ createdAt: -1 }).lean();
+      }
 
       let lastText = "";
       if (last) {
-        if (last.messageType === "image") lastText = "📷 Photo";
-        else if (last.messageType === "video") lastText = "🎥 Video";
-        else if (last.messageType === "document") lastText = "📎 Document";
-        else if (last.messageType === "voice" || last.messageType === "audio") lastText = "🎤 Voice message";
-        else lastText = last.text || "";
+        if (last.text && last.text.startsWith("__SHARED_POST_REMOVED__|")) {
+          lastText = "Shared a post";
+        }
+        else if (last.text && last.text.startsWith("__SHARED_POST__|")) {
+          lastText = "Shared a post";
+        } 
+        else if (last.messageType === "image") {
+          lastText = "sent a photo";
+        } 
+        else if (last.messageType === "video") {
+          lastText = "sent a video";
+        } 
+        else if (last.messageType === "document") {
+          lastText = "sent a Document";
+        } 
+        else if (last.messageType === "voice" || last.messageType === "audio") {
+          lastText = "sent a voice message";
+        } 
+        else {
+          lastText = last.text || "";
+        }
       }
 
       out.push({
         conversationId: c._id,
         peerUserId: peer,
+        
+        peerName: peerUser?.name || peerUser?.username || "User",
+        peerAvatarUrl: peerUser?.avatarUrl || "",
+        avatarVersion: peerUser?.avatarVersion || 1,
+        isPremium: peerUser?.isPremium || false,
+        tick: peerUser?.tick || "none",
+
         lastText,
         lastAt: last?.createdAt || c.updatedAt,
         unread,
         mood: moodDoc?.mood || "",
+        
+        didIBlock: blockedUsersIds.includes(peerIdStr),
+        amIBlocked: blockedByIds.includes(peerIdStr),
       });
     }
 
     out.sort((a, b) => new Date(b.lastAt).getTime() - new Date(a.lastAt).getTime());
-    res.json({ conversations: out });
+    res.json({ conversations: out, isPremium: me?.isPremium, tick: me?.tick });
   } catch (err) {
     console.error("[chat] listConversationPreviews error", err);
     res.status(500).json({ message: "Internal error" });
@@ -495,10 +559,10 @@ export const markDeliveredAll = async (req, res) => {
       receiverId: me,
       deliveredAt: null,
     })
-      .select("_id senderId conversationId clientMessageId") // ⚡ FIX 1: Add clientMessageId
+      .select("_id senderId conversationId clientMessageId") 
       .lean();
 
-    if (!pending.length) return res.json({ success: true, count: 0 });
+    if (!pending.length) return res.json({ success: true, count: 0, isPremium: req.user.isPremium, tick: req.user.tick });
 
     const ids = pending.map((m) => m._id);
 
@@ -507,7 +571,6 @@ export const markDeliveredAll = async (req, res) => {
       { $set: { deliveredAt: new Date() } }
     );
 
-    // ⚡ FIX 2: Emit to both convo room AND direct sender room
     for (const msg of pending) {
       const payload = {
         msgId: String(msg._id),
@@ -531,7 +594,7 @@ export const markDeliveredAll = async (req, res) => {
       await sendDeliveredNotification(senderId, me, messageIds);
     }
 
-    return res.json({ success: true, count: ids.length });
+    return res.json({ success: true, count: ids.length, isPremium: req.user.isPremium, tick: req.user.tick });
   } catch (e) {
     console.error("[chat] markDeliveredAll error", e);
     return res.status(500).json({ message: "Internal error" });
@@ -572,7 +635,7 @@ export const reactToMessage = async (req, res) => {
       emoji,
     });
 
-    res.json({ success: true, reactions: msg.reactions });
+    res.json({ success: true, reactions: msg.reactions, isPremium: req.user.isPremium, tick: req.user.tick });
   } catch (e) {
     console.error("[chat] reactToMessage error", e);
     res.status(500).json({ message: "Internal error" });
@@ -608,7 +671,7 @@ export const removeReaction = async (req, res) => {
       emoji: null,
     });
 
-    res.json({ success: true, reactions: msg.reactions });
+    res.json({ success: true, reactions: msg.reactions, isPremium: req.user.isPremium, tick: req.user.tick });
   } catch (e) {
     console.error("[chat] removeReaction error", e);
     res.status(500).json({ message: "Internal error" });
@@ -638,7 +701,7 @@ export const deleteForEveryone = async (req, res) => {
       msgId: String(msg._id),
     });
 
-    res.json({ success: true });
+    res.json({ success: true, isPremium: req.user.isPremium, tick: req.user.tick });
   } catch (e) {
     console.error("[chat] deleteForEveryone error", e);
     res.status(500).json({ message: "Internal error" });
@@ -681,6 +744,8 @@ export const markListened = async (req, res) => {
       success: true,
       messageId: msg._id,
       listenedAt: msg.listenedAt,
+      isPremium: req.user.isPremium,
+      tick: req.user.tick,
     });
   } catch (err) {
     console.error("[chat] markListened error", err);

@@ -110,9 +110,9 @@ const SplashScreen = () => {
       <Animated.View style={[styles.glowBottom, glowBottomStyle]} />
 
       {/* Centered Loading Indicator */}
-      {/* <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
         <ActivityIndicator size="large" color="#A855F7" />
-      </View> */}
+      </View>
     </View>
   );
 };
@@ -156,9 +156,17 @@ import { IncomingCallScreen } from '../../screens/call/components/IncomingCallSc
 import { VoiceCallScreen } from '../../screens/call/components/VoiceCallScreen';
 import { CallComingScreen } from '../../screens/call/components/CallComingScreen';
 import { loginStyles } from '../../screens/login/components/Loginstyles';
+import BlockedUsersScreen from '../../screens/profile/components/BlockedUsersScreen';
+import SuspendedScreen from '../../../SuspendedScreen';
+import PaywallScreen from '../../screens/profile/components/Paywall';
+import PublicActivityFeed from '../../screens/activity-feed/components/ActivityFeedScreen';
+import VerifySelfScreen from '../../screens/profile/components/VerifySelfScreen';
+import UserProfile from '../../screens/activity-feed/components/UserProfile';
+import UserFeedScreen from '../../screens/activity-feed/components/UserFeedScreen';
+import ShareToChatScreen from '../../screens/activity-feed/components/ShareToChat';
 
   const AuthNavigator = () => {
-    const [initialRoute, setInitialRoute] = useState<'Login' | 'AppTabs' | 'Drawer' | 'SavedAccounts' | null>(null);
+    const [initialRoute, setInitialRoute] = useState<'Drawer' | 'AppTabs' | 'Login' | 'SavedAccounts' | null>(null);
     const authContext = useContext(AuthContext);
 
   
@@ -182,7 +190,7 @@ import { loginStyles } from '../../screens/login/components/Loginstyles';
             if (accessToken && isIOS26Plus) {
               await setAuthHeaders(accessToken);
               authContext?.setUser?.(storedUser);
-              setInitialRoute("AppTabs");
+              setInitialRoute("Drawer");
               return;
             }
 
@@ -218,7 +226,7 @@ import { loginStyles } from '../../screens/login/components/Loginstyles';
 
   // Show splash while deciding where to go
   if (!initialRoute) {
-    return <SplashScreen />;
+   return null;
   }
 
 return (
@@ -248,12 +256,17 @@ return (
         <Stack.Screen name="Drawer" component={DrawerNavigator} />
 <Stack.Screen name="AppTabs" component={AppTabs} />
         <Stack.Screen name="ProofCamera" component={ProofVisionCameraScreen} />
+        <Stack.Screen name="PublicActivityFeed" component={PublicActivityFeed} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         <Stack.Screen name="Enable2FA" component={Enable2FAScreen} />
         <Stack.Screen name="Devices" component={DevicesScreen} />
         <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
         <Stack.Screen name="ReportProblem" component={ReportProblemScreen} />
         <Stack.Screen name="LegalPolicy" component={LegalPolicyScreen} />
+        <Stack.Screen name="VerifySelf" component={VerifySelfScreen} />
+        <Stack.Screen name="UserProfile" component={UserProfile} />
+        <Stack.Screen name="UserFeedScreen" component={UserFeedScreen} />
+        <Stack.Screen name="ShareToChat" component={ShareToChatScreen} />
 
 
         <Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
@@ -279,6 +292,18 @@ return (
           options={{ unmountOnBlur: false, freezeOnBlur: true }}
         />
 
+        <Stack.Screen
+          name="BlockedUsers"
+          component={BlockedUsersScreen}
+          options={{ unmountOnBlur: false, freezeOnBlur: true }}
+        />
+
+          <Stack.Screen
+          name="SuspendedScreen"
+          component={SuspendedScreen}
+          options={{ unmountOnBlur: false, freezeOnBlur: true }}
+        />
+
         <Stack.Screen name="HabitDetail" component={HabitDetailScreen} />
 
         <Stack.Screen
@@ -290,6 +315,12 @@ return (
         <Stack.Screen
           name="Friends"
           component={Friends}
+          options={{ unmountOnBlur: false, freezeOnBlur: true }}
+        />
+
+          <Stack.Screen
+          name="plus"
+          component={PaywallScreen}
           options={{ unmountOnBlur: false, freezeOnBlur: true }}
         />
 

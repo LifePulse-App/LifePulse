@@ -296,6 +296,52 @@ passwordChangeOtp: String,
       type: Object,
       default: {},
     },
+    // RevenueCat Subscription Fields
+  isPremium: { 
+    type: Boolean, 
+    default: false 
+  },
+  premiumExpirationDate: { 
+    type: Date, 
+    default: null 
+  },
+  // Tracks which specific tier they have (e.g., 'streaksphere_plus')
+  activeEntitlement: { 
+    type: String, 
+    default: null 
+  },
+  premiumPreferences: {
+      hideRelationship: { type: Boolean, default: false },
+      xpMultiplier: { type: Boolean, default: true },
+      premiumBadge: { type: Boolean, default: true }
+    },
+    accountStatus: {
+  type: String,
+  enum: ['active', 'suspended', 'banned'],
+  default: 'active',
+},
+suspensionDetails: {
+  reason: { type: String },
+  suspendedAt: { type: Date, default: Date.now },
+  liftAt: { type: Date }, // Optional temporary timer expiration
+},
+appealDetails: {
+  status: { type: String, enum: ['none', 'pending', 'approved', 'rejected'], default: 'none' },
+  appealText: { type: String },
+  submittedAt: { type: Date },
+},
+    blockedUsers: [
+  { type: mongoose.Schema.Types.ObjectId, ref: "User" }
+],
+blockedBy: [
+  { type: mongoose.Schema.Types.ObjectId, ref: "User" }
+],
+// Add this with your other user fields
+    postVisibility: { 
+      type: String, 
+      enum: ["foryou", "world", "country", "city", "friends", "private"], 
+      default: "friends" 
+    },
 // In your User schema
 resetPasswordCode: String,
 resetPasswordCodeExpire: Date,

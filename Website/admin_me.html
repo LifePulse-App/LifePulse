@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>StreakSphere - Admin Control Center</title>
+<meta name="description" content="StreakSphere Administration Panel - Moderation, Sanctions, Verifications, and Metrics."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<!-- Axios CDN for API requests -->
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+<style>
+:root{
+  --bg:#03040A; --bg2:#0a0c16;
+  --surface:rgba(255,255,255,0.03); --surface2:rgba(255,255,255,0.06);
+  --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.15);
+  --text:#F8FAFC; --muted:#94A3B8;
+  --accent1:#6366F1; --accent2:#A855F7; --accent3:#EC4899; --accent4:#10B981; --accent5:#F59E0B; --danger:#EF4444;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{font-family:'DM Sans',sans-serif;color:var(--text);background:var(--bg);min-height:100vh;overflow-x:hidden;line-height:1.5;}
+a{-webkit-tap-highlight-color:transparent;}
+
+/* Subtle background noise */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;}
+
+.container{position:relative;z-index:1;width:min(1200px, 94%);margin-inline:auto;padding-bottom:60px;}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);-webkit-backdrop-filter:blur(24px) saturate(200%);border-bottom:1px solid var(--border);background:rgba(3,4,10,0.85);}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;padding:14px 0;}
+.logo-group{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.logo-img{width:32px;height:32px;border-radius:10px;object-fit:cover;border:1px solid rgba(255,255,255,0.1);}
+.logo-name{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:700;color:var(--text);letter-spacing:-0.02em;}
+.nav-badge{background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.3);color:var(--accent1);padding:3px 10px;border-radius:100px;font-size:0.7rem;font-weight:700;text-transform:uppercase;}
+.logout-btn{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:var(--danger);padding:7px 16px;border-radius:100px;font-size:0.8rem;font-weight:700;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:6px;}
+.logout-btn:hover{background:rgba(239,68,68,0.2);}
+
+/* CARDS & PANELS */
+.glass-card{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:24px;margin-bottom:20px;position:relative;backdrop-filter:blur(10px);}
+@media(min-width:768px){.glass-card{padding:36px;margin-bottom:24px;}}
+
+/* LOGIN SCREEN */
+.login-wrap{min-height:80vh;display:flex;align-items:center;justify-content:center;padding:20px 0;}
+.login-card{width:100%;max-width:420px;background:var(--bg2);border:1px solid var(--border2);border-radius:28px;padding:32px;box-shadow:0 30px 60px rgba(0,0,0,0.8);}
+@media(min-width:768px){.login-card{padding:40px;}}
+.login-title{font-family:'Syne',sans-serif;font-size:1.7rem;font-weight:800;margin-bottom:6px;letter-spacing:-0.03em;}
+.login-sub{color:var(--muted);font-size:0.85rem;margin-bottom:24px;}
+
+/* FORM ELEMENTS */
+.form-group{margin-bottom:18px;}
+.form-label{display:block;font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;}
+.form-input, .form-select{width:100%;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:14px;padding:12px 16px;color:var(--text);font-size:0.9rem;font-family:'DM Sans',sans-serif;transition:border-color 0.2s;}
+.form-input:focus, .form-select:focus{outline:none;border-color:var(--accent1);background:rgba(255,255,255,0.07);}
+.form-select option { background: var(--bg2); color: var(--text); }
+
+.btn-primary{display:block;width:100%;background:var(--text);color:var(--bg);padding:13px 20px;border-radius:14px;font-weight:700;text-align:center;border:none;cursor:pointer;font-size:0.9rem;transition:transform 0.2s, background 0.2s;}
+.btn-primary:hover{transform:scale(1.02);background:#fff;}
+.error-box{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:var(--danger);padding:12px;border-radius:12px;font-size:0.85rem;margin-bottom:18px;text-align:center;display:none;}
+
+/* DASHBOARD TABS */
+.tab-row{display:grid;grid-template-columns:repeat(7, 1fr);gap:6px;background:var(--surface2);padding:6px;border-radius:18px;border:1px solid var(--border);margin:30px 0 24px;}
+@media(max-width:992px){
+  .tab-row{grid-template-columns:repeat(3, 1fr);}
+}
+@media(max-width:540px){
+  .tab-row{grid-template-columns:repeat(2, 1fr);}
+}
+.tab-btn{background:transparent;border:none;color:var(--muted);padding:10px 4px;font-size:0.62rem;font-weight:700;border-radius:12px;cursor:pointer;transition:all 0.2s;text-transform:uppercase;letter-spacing:0.02em;text-align:center;white-space:nowrap;}
+.tab-btn.active{background:var(--accent1);color:#fff;box-shadow:0 4px 16px rgba(99,102,241,0.4);}
+
+/* STATS GRID */
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px;}
+@media(min-width:768px){.stats-grid{grid-template-columns:repeat(4,1fr);gap:20px;}}
+.stat-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px 16px;text-align:center;}
+.stat-num{font-family:'Syne',sans-serif;font-size:2rem;font-weight:800;color:var(--text);margin-bottom:4px;}
+.stat-lbl{font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;}
+
+/* ACTION GRIDS */
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px;}
+.btn-suspend{background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:var(--accent5);padding:12px;border-radius:14px;font-weight:700;cursor:pointer;font-size:0.85rem;transition:background 0.2s;}
+.btn-suspend:hover{background:rgba(245,158,11,0.25);}
+.btn-ban{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:var(--danger);padding:12px;border-radius:14px;font-weight:700;cursor:pointer;font-size:0.85rem;transition:background 0.2s;}
+.btn-ban:hover{background:rgba(239,68,68,0.25);}
+.btn-unlift{background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:var(--accent4);padding:12px;border-radius:14px;font-weight:700;cursor:pointer;font-size:0.85rem;width:100%;margin-top:12px;transition:background 0.2s;}
+.btn-unlift:hover{background:rgba(16,185,129,0.25);}
+
+/* FEED CARDS */
+.appeal-card{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:20px;padding:20px;margin-bottom:16px;}
+.appeal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:10px;}
+.appeal-user{font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem;}
+.appeal-sub{color:var(--muted);font-size:0.8rem;}
+.evidence-box{background:rgba(0,0,0,0.4);border-radius:12px;padding:12px;margin:10px 0;font-size:0.8rem;color:var(--muted);border-left:3px solid var(--danger);}
+.appeal-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
+@media(min-width:540px){.appeal-actions{flex-wrap:nowrap;}}
+
+/* IMAGE PREVIEW MODAL / GRID */
+.doc-preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0;}
+.doc-preview-box{background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center;}
+.doc-preview-box img{width:100%;height:140px;object-fit:cover;border-radius:8px;margin-top:6px;cursor:pointer;transition:transform 0.2s;}
+.doc-preview-box img:hover{transform:scale(1.02);}
+
+/* TOAST NOTIFICATION */
+#toast{position:fixed;bottom:24px;left:20px;right:20px;max-width:420px;margin-inline:auto;z-index:9999;background:var(--bg2);border:1px solid var(--border2);padding:14px 20px;border-radius:16px;box-shadow:0 15px 40px rgba(0,0,0,0.7);font-size:0.85rem;font-weight:700;display:flex;align-items:center;gap:12px;transform:translateY(120px);opacity:0;transition:all 0.35s cubic-bezier(0.16, 1, 0.3, 1);}
+#toast.show{transform:translateY(0);opacity:1;}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="container nav-inner">
+    <a href="#" class="logo-group">
+      <img src="logo.png" alt="StreakSphere" class="logo-img" onerror="this.style.display='none'"/>
+      <span class="logo-name">StreakSphere</span>
+      <span class="nav-badge">Admin</span>
+    </a>
+    <div id="navControls" style="display:none;">
+      <button class="logout-btn" onclick="handleLogout()">
+        <i class="fa-solid fa-right-from-bracket"></i> Logout
+      </button>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+
+  <!-- ================= LOGIN SCREEN ================= -->
+  <div id="loginSection" class="login-wrap">
+    <div class="login-card">
+      <h2 class="login-title">Admin Access</h2>
+      <p class="login-sub">Enter your credentials. Account must have admin privileges.</p>
+      
+      <div id="loginError" class="error-box"></div>
+
+      <form onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label">Email or Username</label>
+          <input type="text" id="loginIdentifier" class="form-input" required placeholder="admin@streaksphere.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="loginPassword" class="form-input" required placeholder="••••••••">
+        </div>
+        <button type="submit" id="loginBtn" class="btn-primary" style="margin-top:24px;">Sign In to Console</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= DASHBOARD APP CONTAINER ================= -->
+  <div id="dashboardSection" style="display:none;">
+    
+    <!-- TABS -->
+    <div class="tab-row">
+      <button class="tab-btn active" id="tabBtn-stats" onclick="switchTab('stats')">Metrics</button>
+      <button class="tab-btn" id="tabBtn-moderation" onclick="switchTab('moderation')">Sanctions</button>
+      <button class="tab-btn" id="tabBtn-verifications" onclick="switchTab('verifications')">Verifications</button>
+      <button class="tab-btn" id="tabBtn-appeals" onclick="switchTab('appeals')">Appeals</button>
+      <button class="tab-btn" id="tabBtn-reports" onclick="switchTab('reports')">Reports</button>
+      <button class="tab-btn" id="tabBtn-postreports" onclick="switchTab('postreports')">Post Flags</button>
+      <button class="tab-btn" id="tabBtn-notify" onclick="switchTab('notify')">Broadcast</button>
+    </div>
+
+    <!-- TAB 1: METRICS -->
+    <div id="view-stats" class="dashboard-view">
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-num" id="stat-total">0</div>
+          <div class="stat-lbl">Total Users</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-reachable" style="color:var(--accent4);">0</div>
+          <div class="stat-lbl">Push Reachable</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-android">0</div>
+          <div class="stat-lbl">Android Tokens</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="stat-ios">0</div>
+          <div class="stat-lbl">iOS Tokens</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: SANCTIONS & TICKS -->
+    <div id="view-moderation" class="dashboard-view" style="display:none;">
+      <div class="glass-card" style="margin-bottom:20px;">
+        <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;margin-bottom:18px;">Manage User Sanctions</h3>
+        <div class="form-group">
+          <label class="form-label">Target User MongoDB ID</label>
+          <input type="text" id="modUserId" class="form-input" placeholder="e.g. 66a21e4f...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Reason / Infraction Note</label>
+          <input type="text" id="modReason" class="form-input" placeholder="Violation of community guidelines">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Suspension Duration (Hours)</label>
+          <input type="number" id="modDuration" class="form-input" value="24" placeholder="24 (Leave blank for indefinite)">
+        </div>
+        <div class="action-grid">
+          <button class="btn-suspend" onclick="executeSanction('suspend')">Suspend User</button>
+          <button class="btn-ban" onclick="executeSanction('ban')">Permanent Ban</button>
+        </div>
+        <button class="btn-unlift" onclick="executeSanction('unlift')">Unlift / Restore Account</button>
+      </div>
+
+      <!-- Tick Management Card -->
+      <div class="glass-card">
+        <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;margin-bottom:18px;">User Verification Badge (Tick)</h3>
+        <div class="form-group">
+          <label class="form-label">Target User MongoDB ID</label>
+          <input type="text" id="tickUserId" class="form-input" placeholder="e.g. 66a21e4f...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Verification Status</label>
+          <select id="tickValue" class="form-select">
+            <option value="none">None (Remove Tick)</option>
+            <option value="verified">Verified (Blue Check)</option>
+            <option value="golden">Golden (Elite Badge)</option>
+          </select>
+        </div>
+        <button class="btn-primary" onclick="updateUserTick()" style="background:var(--accent1); color:#fff; margin-top:16px;">Update Verification Badge</button>
+      </div>
+    </div>
+
+    <!-- TAB 3: CREATOR VERIFICATIONS -->
+    <div id="view-verifications" class="dashboard-view" style="display:none;">
+      <div class="glass-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:10px;">
+          <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;">Pending Creator Verifications</h3>
+          <button onclick="loadVerifications()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;cursor:pointer;font-size:0.75rem;font-weight:700;"><i class="fa-solid fa-rotate"></i> Refresh</button>
+        </div>
+        <div id="verificationsContainer"></div>
+      </div>
+    </div>
+
+    <!-- TAB 4: APPEALS & EVIDENCE -->
+    <div id="view-appeals" class="dashboard-view" style="display:none;">
+      <div class="glass-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:10px;">
+          <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;">Pending Appeals & Evidence Logs</h3>
+          <button onclick="loadAppeals()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;cursor:pointer;font-size:0.75rem;font-weight:700;"><i class="fa-solid fa-rotate"></i> Refresh</button>
+        </div>
+        <div id="appealsContainer"></div>
+      </div>
+    </div>
+
+    <!-- TAB 5: ALL REPORTS FEED -->
+    <div id="view-reports" class="dashboard-view" style="display:none;">
+      <div class="glass-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:10px;">
+          <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;">All Platform Reports / Flags</h3>
+          <button onclick="loadAllReports()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;cursor:pointer;font-size:0.75rem;font-weight:700;"><i class="fa-solid fa-rotate"></i> Refresh</button>
+        </div>
+        <div id="reportsContainer"></div>
+      </div>
+    </div>
+
+    <!-- TAB 6: REPORTED POSTS (PROOFS) -->
+    <div id="view-postreports" class="dashboard-view" style="display:none;">
+      <div class="glass-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:10px;">
+          <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;">Reported Posts & Proofs</h3>
+          <button onclick="loadPostReports()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;cursor:pointer;font-size:0.75rem;font-weight:700;"><i class="fa-solid fa-rotate"></i> Refresh</button>
+        </div>
+        <div id="postReportsContainer"></div>
+      </div>
+    </div>
+
+    <!-- TAB 7: PUSH BROADCAST & NOTIFICATIONS -->
+    <div id="view-notify" class="dashboard-view" style="display:none;">
+      <div class="glass-card">
+        <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;margin-bottom:18px;">Send Admin Broadcast Notification</h3>
+        <div class="form-group">
+          <label class="form-label">Notification Title</label>
+          <input type="text" id="broadcastTitle" class="form-input" placeholder="Important Platform Update">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notification Body Message</label>
+          <textarea id="broadcastBody" class="form-input" rows="3" placeholder="Write your notification content here..."></textarea>
+        </div>
+        <button class="btn-primary" onclick="sendBroadcast()" style="background:var(--accent2); color:#fff; margin-top:16px;">Broadcast to All Users</button>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div id="toast">
+  <i id="toastIcon" class="fa-solid fa-circle-check" style="color:var(--accent4);"></i>
+  <span id="toastText">Action successful</span>
+</div>
+
+<script>
+const API_BASE = "https://api-prod.streaksphere.app/api";
+const ADMIN_API_KEY = "StreakSphere_Security";
+
+const api = axios.create({
+  baseURL: API_BASE,
+  params: { apiKey: ADMIN_API_KEY },
+  headers: {
+    "Content-Type": "application/json",
+    "api-key": ADMIN_API_KEY
+  }
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("accessToken");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+}, (error) => Promise.reject(error), { synchronous: true });
+
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      try {
+        const refreshToken = localStorage.getItem("refreshToken");
+        const res = await api.post("/auth/refresh-token", { token: refreshToken });
+        if (res.data.success) {
+          localStorage.setItem("accessToken", res.data.accessToken);
+          localStorage.setItem("refreshToken", res.data.refreshToken);
+          originalRequest.headers.Authorization = `Bearer ${res.data.accessToken}`;
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        handleLogout();
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const identifier = document.getElementById("loginIdentifier").value;
+  const password = document.getElementById("loginPassword").value;
+  const btn = document.getElementById("loginBtn");
+  const errBox = document.getElementById("loginError");
+
+  btn.textContent = "Verifying...";
+  errBox.style.display = "none";
+
+  try {
+    const res = await api.post("/auth/login", { identifier, password, deviceId: "admin-mobile-web" });
+    if (res.data.success) {
+      localStorage.setItem("accessToken", res.data.accessToken);
+      localStorage.setItem("refreshToken", res.data.refreshToken);
+      verifyAdminAccess();
+    }
+  } catch (err) {
+    errBox.textContent = err.response?.data?.message || err.message || "Authentication failed.";
+    errBox.style.display = "block";
+  } finally {
+    btn.textContent = "Sign In to Console";
+  }
+}
+
+async function verifyAdminAccess() {
+  try {
+    const res = await api.get("/profile/");
+    if (res.data.success && (res.data.user.isAdmin || res.data.user.role === 'admin')) {
+      document.getElementById("loginSection").style.display = "none";
+      document.getElementById("dashboardSection").style.display = "block";
+      document.getElementById("navControls").style.display = "block";
+      loadMetrics();
+    } else {
+      showToast("Access Denied: Account lacks admin privileges.", "error");
+      handleLogout();
+    }
+  } catch (e) {
+    handleLogout();
+  }
+}
+
+function handleLogout() {
+  localStorage.clear();
+  document.getElementById("loginSection").style.display = "flex";
+  document.getElementById("dashboardSection").style.display = "none";
+  document.getElementById("navControls").style.display = "none";
+}
+
+function switchTab(tab) {
+  ['stats', 'moderation', 'verifications', 'appeals', 'reports', 'postreports', 'notify'].forEach(t => {
+    document.getElementById(`view-${t}`).style.display = t === tab ? 'block' : 'none';
+    document.getElementById(`tabBtn-${t}`).className = `tab-btn ${t === tab ? 'active' : ''}`;
+  });
+
+  if (tab === 'stats') loadMetrics();
+  if (tab === 'verifications') loadVerifications();
+  if (tab === 'appeals') loadAppeals();
+  if (tab === 'reports') loadAllReports();
+  if (tab === 'postreports') loadPostReports();
+}
+
+async function loadMetrics() {
+  try {
+    const res = await api.get("/admin/notify/stats");
+    if (res.data.success) {
+      const s = res.data.stats;
+      document.getElementById("stat-total").textContent = s.totalUsers;
+      document.getElementById("stat-reachable").textContent = s.reachableUsers;
+      document.getElementById("stat-android").textContent = s.androidTokens;
+      document.getElementById("stat-ios").textContent = s.iosTokens;
+    }
+  } catch (e) { showToast("Failed to fetch platform metrics", "error"); }
+}
+
+// --- REPORTED POSTS (PROOFS) ---
+async function loadPostReports() {
+  const container = document.getElementById("postReportsContainer");
+  container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);"><i class="fa-solid fa-spinner fa-spin text-xl"></i></div>`;
+  
+  try {
+    const res = await api.get("/admin/reports/posts");
+    const reports = res.data.reports || [];
+    
+    if (reports.length === 0) {
+      container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:0.85rem;">No pending post reports.</div>`;
+      return;
+    }
+
+    container.innerHTML = reports.map(rep => {
+      const post = rep.reportedPost;
+      
+      if (!post || post.adminRemoved) return '';
+
+      return `
+        <div class="appeal-card">
+          <div class="appeal-header">
+            <div>
+              <div class="appeal-user">Flagged Reason: <span style="color:var(--danger); text-transform:uppercase;">${rep.reason}</span></div>
+              <div class="appeal-sub" style="margin-top:2px;">Reported by: @${rep.reporter?.username || 'user'}</div>
+            </div>
+            <span style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:var(--danger);padding:4px 10px;border-radius:100px;font-size:0.65rem;font-weight:700;text-transform:uppercase;">Pending</span>
+          </div>
+          
+          <div style="margin: 14px 0;">
+            <img src="${API_BASE}/${post.mediaUrl}" style="width: 100%; max-width: 280px; height: 180px; object-fit: cover; border-radius: 12px; border: 1px solid var(--border);" onerror="this.src='https://via.placeholder.com/280x180?text=Media+Error'" />
+            <div style="margin-top: 8px; color: var(--muted); font-size: 0.85rem;">Caption: "${post.caption || 'No caption'}"</div>
+          </div>
+
+          <div class="appeal-actions">
+            <button onclick="adminRemovePost('${post._id}', '${rep._id}')" style="flex:1;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:var(--danger);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Remove Post</button>
+            <button onclick="adminDismissPostReport('${rep._id}')" style="flex:1;background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.3);color:var(--text);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Dismiss Report</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) { 
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);font-size:0.85rem;">Failed to load post reports.</div>`; 
+  }
+}
+
+async function adminRemovePost(postId, reportId) {
+  if (!confirm("Are you sure you want to remove this post? It will show as a black blocked box to users.")) return;
+  try {
+    const res = await api.post("/admin/posts/remove", { postId, reportId });
+    if (res.data.success) {
+      showToast("Post removed successfully.");
+      loadPostReports();
+    }
+  } catch (e) { showToast("Failed to remove post.", "error"); }
+}
+
+async function adminDismissPostReport(reportId) {
+  try {
+    const res = await api.post("/admin/reports/posts/dismiss", { reportId });
+    if (res.data.success) {
+      showToast("Report dismissed.");
+      loadPostReports();
+    }
+  } catch (e) { showToast("Failed to dismiss report.", "error"); }
+}
+
+async function executeSanction(type) {
+  const userId = document.getElementById("modUserId").value.trim();
+  const reason = document.getElementById("modReason").value.trim();
+  const durationHours = document.getElementById("modDuration").value;
+
+  if (!userId) return showToast("Target User ID required", "error");
+
+  try {
+    let endpoint = "/admin/user/suspend";
+    let payload = { userId, reason, durationHours: durationHours ? Number(durationHours) : null };
+
+    if (type === 'ban') {
+      endpoint = "/admin/user/ban";
+      payload = { userId, reason };
+    } else if (type === 'unlift') {
+      endpoint = "/admin/user/unlift";
+      payload = { userId };
+    }
+
+    const res = await api.post(endpoint, payload);
+    if (res.data.success) {
+      showToast(res.data.message);
+      document.getElementById("modUserId").value = "";
+      document.getElementById("modReason").value = "";
+    }
+  } catch (e) { showToast(e.response?.data?.message || "Action failed", "error"); }
+}
+
+async function updateUserTick() {
+  const userId = document.getElementById("tickUserId").value.trim();
+  const tick = document.getElementById("tickValue").value;
+
+  if (!userId) return showToast("Target User ID required", "error");
+
+  try {
+    const res = await api.patch(`/admin/user/${userId}/tick`, { tick });
+    if (res.data.success) {
+      showToast(`User tick updated to '${tick}' successfully!`);
+      document.getElementById("tickUserId").value = "";
+    }
+  } catch (e) { showToast(e.response?.data?.message || "Failed to update tick", "error"); }
+}
+
+async function loadVerifications() {
+  const container = document.getElementById("verificationsContainer");
+  container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);"><i class="fa-solid fa-spinner fa-spin text-xl"></i></div>`;
+  
+  try {
+    const res = await api.get("/admin/pending");
+    if (res.data.success) {
+      const requests = res.data.requests;
+      if (requests.length === 0) {
+        container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:0.85rem;">No pending verification requests found.</div>`;
+        return;
+      }
+      
+      container.innerHTML = requests.map(req => {
+        const u = req.user || {};
+        return `
+          <div class="appeal-card">
+            <div class="appeal-header">
+              <div>
+                <div class="appeal-user">${req.stageName} <span class="appeal-sub">(@${u.username || 'unknown'})</span></div>
+                <div class="appeal-sub" style="margin-top:2px;">Legal Name: <strong>${req.fullName}</strong> • Category: <span style="color:var(--accent1);">${req.category}</span></div>
+              </div>
+              <span style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:var(--accent5);padding:4px 10px;border-radius:100px;font-size:0.65rem;font-weight:700;text-transform:uppercase;">Pending Review</span>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:12px;font-size:0.85rem;margin-bottom:12px;">
+              <strong>Public Profile Link:</strong><br><a href="${req.publicProfileLink}" target="_blank" style="color:var(--accent1);word-break:break-all;">${req.publicProfileLink}</a>
+            </div>
+
+            <div style="background:rgba(99, 102, 241, 0.1); border:1px solid rgba(99, 102, 241, 0.3); border-radius:12px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.8rem; color:var(--muted); font-weight:bold;">EXPECTED CODE ON PAPER:</span>
+              <span style="font-size:1.1rem; color:var(--accent1); font-weight:800; letter-spacing:1px;">${req.verificationCode || 'N/A'}</span>
+            </div>
+
+            <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Submitted Credentials:</div>
+            <div class="doc-preview-grid">
+              <div class="doc-preview-box">
+                <span style="font-size:0.7rem;color:var(--muted);font-weight:bold;">Government ID</span>
+                <img src="${req.documentUrl}" alt="Government ID" onclick="window.open('${req.documentUrl}', '_blank')" onerror="this.src='https://via.placeholder.com/300x140?text=Image+Load+Error'"/>
+              </div>
+              <div class="doc-preview-box">
+                <span style="font-size:0.7rem;color:var(--muted);font-weight:bold;">Verification Selfie</span>
+                <img src="${req.selfieUrl}" alt="Verification Selfie" onclick="window.open('${req.selfieUrl}', '_blank')" onerror="this.src='https://via.placeholder.com/300x140?text=Image+Load+Error'"/>
+              </div>
+            </div>
+
+            <div class="appeal-actions">
+              <button onclick="promptReviewVerification('${req._id}', 'approve')" style="flex:1;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:var(--accent4);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.78rem;"><i class="fa-solid fa-check"></i> Approve</button>
+              <button onclick="promptReviewVerification('${req._id}', 'reject')" style="flex:1;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:var(--danger);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.78rem;"><i class="fa-solid fa-xmark"></i> Reject</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  } catch (e) { container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);font-size:0.85rem;">Failed to fetch verification requests.</div>`; }
+}
+
+function promptReviewVerification(requestId, action) {
+  let defaultNote = "Approved by administration.";
+  if (action === 'reject') defaultNote = "Application did not meet verification criteria or code mismatch.";
+  const adminNotes = window.prompt(`Enter moderator note for this ${action} action:`, defaultNote);
+  if (adminNotes !== null) {
+    reviewVerification(requestId, action, adminNotes);
+  }
+}
+
+async function reviewVerification(requestId, action, adminNotes = "") {
+  try {
+    const res = await api.put(`/admin/review/${requestId}`, { action, adminNotes });
+    if (res.data.success) {
+      showToast(res.data.message);
+      loadVerifications();
+    }
+  } catch (e) { showToast(e.response?.data?.message || "Failed to process verification action", "error"); }
+}
+
+async function loadAppeals() {
+  const container = document.getElementById("appealsContainer");
+  container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);"><i class="fa-solid fa-spinner fa-spin text-xl"></i></div>`;
+  
+  try {
+    const res = await api.get("/admin/appeals");
+    if (res.data.success) {
+      const appeals = res.data.appeals;
+      if (appeals.length === 0) {
+        container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:0.85rem;">No pending appeals found.</div>`;
+        return;
+      }
+      container.innerHTML = appeals.map(item => {
+        const appealStatus = item.status || 'pending';
+        const isPending = appealStatus === 'pending';
+
+        return `
+          <div class="appeal-card">
+            <div class="appeal-header">
+              <div>
+                <div class="appeal-user">${item.user.name} <span class="appeal-sub">@${item.user.username || 'user'}</span></div>
+                <div class="appeal-sub" style="margin-top:2px;">Reason: <span style="color:var(--danger);">${item.suspensionReason}</span></div>
+              </div>
+              <span style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:var(--accent5);padding:4px 10px;border-radius:100px;font-size:0.65rem;font-weight:700;text-transform:uppercase;">${appealStatus}</span>
+            </div>
+            
+            <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:12px;font-size:0.85rem;margin-bottom:12px;">
+              <strong>Appeal Message:</strong><br>"${item.appealText || 'No comment provided.'}"
+            </div>
+
+            ${isPending ? `
+              <div class="appeal-actions">
+                <button onclick="resolveAppeal('${item.user._id}', 'approve')" style="flex:1;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:var(--accent4);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.80rem;">Approve & Unlift</button>
+                <button onclick="resolveAppeal('${item.user._id}', 'reject')" style="flex:1;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:var(--danger);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.80rem;">Reject Appeal</button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+  } catch (e) { container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);font-size:0.85rem;">Failed to load appeals.</div>`; }
+}
+
+async function resolveAppeal(userId, decision, moderatorNote = "") {
+  try {
+    const res = await api.post("/admin/appeal/resolve", { userId, decision, moderatorNote });
+    if (res.data.success) {
+      showToast(res.data.message);
+      loadAppeals();
+    }
+  } catch (e) { showToast("Failed to process appeal resolution", "error"); }
+}
+
+async function loadAllReports() {
+  const container = document.getElementById("reportsContainer");
+  container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);"><i class="fa-solid fa-spinner fa-spin text-xl"></i></div>`;
+  
+  try {
+    const res = await api.get("/admin/reports");
+    const reports = res.data.reports || [];
+    
+    if (reports.length === 0) {
+      container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:0.85rem;">No active reports found.</div>`;
+      return;
+    }
+
+    container.innerHTML = reports.map(rep => {
+      const reportedUserObj = rep.reportedUser || {};
+      return `
+        <div class="appeal-card">
+          <div class="appeal-header">
+            <div>
+              <div class="appeal-user">${reportedUserObj.name || 'User'} <span class="appeal-sub">@${reportedUserObj.username || 'unknown'}</span></div>
+              <div class="appeal-sub" style="margin-top:2px;">Reason: <span style="color:var(--danger); text-transform:uppercase; font-weight:bold;">${rep.reason}</span></div>
+            </div>
+          </div>
+          <div style="font-size:0.75rem; color:var(--muted);">Filed on: ${new Date(rep.createdAt).toLocaleString()}</div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) { 
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);font-size:0.85rem;">Failed to fetch reports.</div>`; 
+  }
+}
+
+async function sendBroadcast() {
+  const title = document.getElementById("broadcastTitle").value.trim();
+  const body = document.getElementById("broadcastBody").value.trim();
+
+  if (!title || !body) return showToast("Title and Body are required", "error");
+
+  try {
+    const res = await api.post("/admin/notify/broadcast", { title, body });
+    if (res.data.success) {
+      showToast(`Notification broadcasted successfully to ${res.data.sent} device(s)!`);
+      document.getElementById("broadcastTitle").value = "";
+      document.getElementById("broadcastBody").value = "";
+    }
+  } catch (e) { showToast(e.response?.data?.message || "Broadcast failed", "error"); }
+}
+
+function showToast(text, type = "success") {
+  const toast = document.getElementById("toast");
+  const icon = document.getElementById("toastIcon");
+  const msg = document.getElementById("toastText");
+
+  msg.textContent = text;
+  icon.className = type === "success" ? "fa-solid fa-circle-check" : "fa-solid fa-circle-exclamation";
+  icon.style.color = type === "success" ? "var(--accent4)" : "var(--danger)";
+  
+  toast.classList.add("show");
+  setTimeout(() => { toast.classList.remove("show"); }, 3500);
+}
+
+window.onload = () => {
+  if (localStorage.getItem("accessToken")) {
+    verifyAdminAccess();
+  }
+};
+</script>
+</body>
+</html>

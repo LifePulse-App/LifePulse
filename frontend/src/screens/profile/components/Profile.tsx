@@ -2,7 +2,6 @@ import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } 
 import { View, TouchableOpacity, StyleSheet, ScrollView, TextInput, Image, ActivityIndicator } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
-import Modal from "react-native-modal";
 import MainLayout from "../../../shared/components/MainLayout";
 import AuthContext from '../../../auth/user/UserContext';
 import { logout } from "../../../navigation/main/RootNavigation";
@@ -19,25 +18,6 @@ import { getAvatar } from "../../../storage/AvatarManager";
 import { disconnectSocket } from "../../../auth/api-client/socket";
 
 const PROFILE_CACHE_KEY = 'sbjkshiuhuw';
-
-const GlassyConfirmModal = ({ visible, message, onConfirm, onCancel }: any) => {
-  if (!visible) return null;
-  return (
-    <View style={styles.modalOverlay}>
-      <View style={styles.glassyModal}>
-        <Text style={styles.confirmText}>{message}</Text>
-        <View style={styles.modalBtns}>
-          <TouchableOpacity style={styles.cancelBtn} onPress={onCancel}>
-            <Text style={{ color: "#374151", fontWeight: "bold" }}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.confirmBtn} onPress={onConfirm}>
-            <Text style={{ color: "#fff", fontWeight: "bold" }}>Confirm</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-};
 
 const GlassyResultCard = ({ visible, type = "success", message, onClose }: any) => {
   if (!visible) return null;
@@ -56,7 +36,7 @@ const GlassyResultCard = ({ visible, type = "success", message, onClose }: any) 
   );
 };
 
-// --- Edit Profile Modal ---
+// --- Edit Profile Modal (Cleaned up: privacy setting moved out) ---
 function EditProfileModal({ user, onClose, setResultCard, onChange }: any) {
   const [data, setData] = useState({
     name: user?.name || "",
@@ -79,9 +59,8 @@ function EditProfileModal({ user, onClose, setResultCard, onChange }: any) {
     try {
       await profileApi.editProfile(data);
       setLoading(false);
-      setResultCard({ visible: true, type: "success", message: "Profile updated!" });
       onChange?.();
-      onClose();
+      onClose(); // ⚡ Silently closes without success alert card
     } catch (err: any) {
       setLoading(false);
       setResultCard({
@@ -145,6 +124,76 @@ function EditProfileModal({ user, onClose, setResultCard, onChange }: any) {
       </TouchableOpacity>
       <View style={{ height: 20 }} />
     </ScrollView>
+  );
+}
+
+// --- ⚡ NEW: Activity Posting Privacy Modal ---
+function ActivityPrivacyModal({ currentScope, onClose, onChange }: any) {
+  const [selectedScope, setSelectedScope] = useState(currentScope || "world");
+  const [loading, setLoading] = useState(false);
+
+  const scopes = [
+    { label: "World (Everyone)", value: "world", icon: "earth" },
+    { label: "Country Only", value: "country", icon: "flag" },
+    { label: "City Only", value: "city", icon: "city" },
+    { label: "Friends Only", value: "friends", icon: "account-multiple" },
+    { label: "Private (Only Me)", value: "private", icon: "lock" },
+  ];
+
+  const handleSelect = async (val: string) => {
+    setSelectedScope(val);
+    setLoading(true);
+    try {
+      await profileApi.updateActivityPrivacy(val);
+      setLoading(false);
+      onChange?.(val);
+      onClose(); // ⚡ Silently closes without alerts
+    } catch (err) {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={styles.glassyInner}>
+      <Text style={styles.sheetTitle}>Activity Posting Privacy</Text>
+      <Text style={{ color: "#94a3b8", fontSize: 13, marginBottom: 16, textAlign: "center" }}>
+        Choose who can see your new activity feed posts by default.
+      </Text>
+
+      <View style={{ marginBottom: 12 }}>
+        {scopes.map(scope => {
+          const isSelected = selectedScope === scope.value;
+          return (
+            <TouchableOpacity
+              key={scope.value}
+              activeOpacity={0.8}
+              style={[
+                styles.scopeOptionRow,
+                isSelected && styles.scopeOptionRowActive
+              ]}
+              onPress={() => handleSelect(scope.value)}
+              disabled={loading}
+            >
+              <Icon
+                name={scope.icon}
+                size={18}
+                color={isSelected ? "#6366f1" : "#94a3b8"}
+                style={{ marginRight: 10 }}
+              />
+              <Text style={[styles.scopeOptionText, isSelected && styles.scopeOptionTextActive]}>
+                {scope.label}
+              </Text>
+              {isSelected && (
+                <Icon name="check-circle" size={18} color="#6366f1" style={{ marginLeft: "auto" }} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
+        <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -259,6 +308,9 @@ function ChangePasswordModal({ onClose, setResultCard, onChange }: any) {
           </TouchableOpacity>
         </>
       )}
+      <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
+        <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Cancel</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -285,6 +337,9 @@ function ChangeNumberModal({ user, onClose, setResultCard }: any) {
       <TextInput style={styles.sheetInput} placeholder="Phone Number" placeholderTextColor="#6366f1" value={number} keyboardType="phone-pad" onChangeText={setNumber} />
       <TouchableOpacity style={styles.sheetSaveBtn} onPress={onSave} disabled={loading}>
         <Text style={{ color: "#fff", fontWeight: "bold" }}>{loading ? "Saving..." : "Update"}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
+        <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Cancel</Text>
       </TouchableOpacity>
     </View>
   );
@@ -422,7 +477,89 @@ function LinkedAccountModal({ onClose, onChange, setResultCard }: any) {
         </>
       )}
       <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
-        <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Close</Text>
+        <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// --- Delete Account Modal ---
+function DeleteAccountModal({ onClose, setResultCard, onSuccess }: any) {
+  const [step, setStep] = useState(1);
+  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const requestOtp = async () => {
+    setLoading(true);
+    try {
+      await profileApi.deleteAccount(); 
+      setLoading(false);
+      setStep(2);
+      setResultCard({ visible: true, type: "success", message: "OTP sent to your email." });
+    } catch (error: any) {
+      setLoading(false);
+      setResultCard({ visible: true, type: "error", message: error?.response?.data?.message || error?.message || "Error sending OTP." });
+    }
+  };
+
+  const confirmDelete = async () => {
+    setLoading(true);
+    try {
+      await profileApi.deleteAccountWithOtp(otp);
+      setLoading(false);
+      setResultCard({ visible: true, type: "success", message: "Account deleted!" });
+      onClose();
+      onSuccess();
+    } catch (error: any) {
+      setLoading(false);
+      setResultCard({ visible: true, type: "error", message: error?.response?.data?.message || error?.message || "Error deleting account." });
+    }
+  };
+
+  return (
+    <View style={styles.glassyInner}>
+      <Text style={[styles.sheetTitle, { color: "#ef4444" }]}>Delete Account</Text>
+      {step === 1 ? (
+        <>
+          <Text style={{ color: "#cbd5e1", marginBottom: 16, textAlign: "center", lineHeight: 22 }}>
+            Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.
+          </Text>
+          <TouchableOpacity
+            style={[styles.sheetSaveBtn, { backgroundColor: "#ef4444", shadowColor: "#ef4444" }]}
+            onPress={requestOtp}
+            disabled={loading}
+          >
+            <Text style={{ color: "#fff", fontWeight: "bold" }}>
+              {loading ? "Sending OTP..." : "Yes, Delete My Account"}
+            </Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <>
+          <Text style={{ marginBottom: 12, color: "#cbd5e1", textAlign: "center" }}>
+            Enter the OTP sent to your registered email to confirm account deletion:
+          </Text>
+          <TextInput
+            style={styles.sheetInput}
+            placeholder="OTP"
+            placeholderTextColor="#ef4444"
+            value={otp}
+            keyboardType="number-pad"
+            onChangeText={setOtp}
+          />
+          <TouchableOpacity
+            style={[styles.sheetSaveBtn, { backgroundColor: "#ef4444", shadowColor: "#ef4444" }]}
+            onPress={confirmDelete}
+            disabled={loading || !otp}
+          >
+            <Text style={{ color: "#fff", fontWeight: "bold" }}>
+              {loading ? "Deleting..." : "Confirm Deletion"}
+            </Text>
+          </TouchableOpacity>
+        </>
+      )}
+      <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
+        <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Cancel</Text>
       </TouchableOpacity>
     </View>
   );
@@ -435,7 +572,7 @@ const settingSections = [
       { icon: "account-edit", label: "Edit Profile", route: "EditProfile" },
       { icon: "key", label: "Change Password", route: "ChangePassword" },
       { icon: "link", label: "Manage Linked Account", route: "LinkedAccount" },
-      { icon: "crown-outline", label: "StreakSphere+", route: "Plus", disabled: true },
+      { icon: "crown-outline", label: "StreakSphere+", route: "plus" },
     ],
   },
   {
@@ -443,12 +580,9 @@ const settingSections = [
     items: [
       { icon: "security", label: "Two-factor Authentication", route: "Enable2FA" },
       { icon: "devices", label: "Devices in which you are logged in", route: "Devices" },
-      {
-        icon: "check-decagram",
-        label: "Verify Yourself",
-        route: "VerifySelf",
-        disabled: true, 
-      },
+      { icon: "account-cancel", label: "Blocked Users", route: "BlockedUsers" }, 
+      { icon: "eye-outline", label: "Activity Posting Privacy", route: "ActivityPrivacy" }, // ⚡ Moved here
+      { icon: "check-decagram", label: "Verify Yourself", route: "VerifySelf" },
     ],
   },
   {
@@ -469,14 +603,14 @@ export default function ProfileScreen({ navigation }: any) {
   const [profile, setProfile] = useState<any>(null);
   const [activeModal, setActiveModal] = useState<string | null>(null);
 
-  // Store the actual file:// path returned by AvatarManager
   const [localAvatarUri, setLocalAvatarUri] = useState<string | null>(null);
-
   const [actionLoading, setActionLoading] = useState(false);
 
   const sheetRef = useRef<TrueSheet>(null);
   const logoutSheetRef = useRef<TrueSheet>(null);
   const relReqSheetRef = useRef<TrueSheet>(null); 
+  const breakupSheetRef = useRef<TrueSheet>(null);
+
   const sheetDetents = useMemo(() => [0.65], []); 
 
   const openSheet = useCallback(async (type: string) => {
@@ -505,10 +639,6 @@ export default function ProfileScreen({ navigation }: any) {
     return `${hours}h ${minutes}m ${seconds}s`;
   };
 
-  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
-  const [deleteOtpStep, setDeleteOtpStep] = useState(0);
-  const [deleteOtp, setDeleteOtp] = useState("");
-  const [deleteLoading, setDeleteLoading] = useState(false);
   const [resultCard, setResultCard] = useState({ visible: false, type: "success", message: "" });
 
   const baseUrl = apiClient.getBaseURL();
@@ -544,18 +674,19 @@ export default function ProfileScreen({ navigation }: any) {
     if (offlineRef.current) return;
 
     try {
-      const [profileRes, avatarRes] = await Promise.all([
+      const [profileRes, avatarRes, privacyRes] = await Promise.all([
         profileApi.getProfile(),
         profileApi.getAvatarUrl(),
+        profileApi.getActivityPrivacy().catch(() => null), // ⚡ Fetch privacy setting
       ]);
       
       const fetchedUser = (profileRes as any)?.data?.user;
       if (!fetchedUser) return;
 
       const { avatarThumbnailUrl, avatarUrl: fetchedAvatarUrl } = (avatarRes as any)?.data || {};
+      const defaultVisibilityScope = (privacyRes as any)?.data?.defaultVisibilityScope || fetchedUser.defaultVisibilityScope || "world";
       
-      // Merge all retrieved properties together
-      const merged = { ...fetchedUser, avatarThumbnailUrl, avatarUrl: fetchedAvatarUrl };
+      const merged = { ...fetchedUser, avatarThumbnailUrl, avatarUrl: fetchedAvatarUrl, defaultVisibilityScope };
       
       setProfile(merged);
       await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
@@ -565,7 +696,6 @@ export default function ProfileScreen({ navigation }: any) {
     }
   }, []); 
 
-  // Initialize Cache First, then fetch Online
   useEffect(() => {
     let isMounted = true;
     (async () => {
@@ -587,20 +717,17 @@ export default function ProfileScreen({ navigation }: any) {
     }, [fetchProfileOnline])
   );
 
-  // 🔥 Let AvatarManager handle the image caching seamlessly
   useEffect(() => {
     const loadAvatarFromManager = async () => {
       if (!profile?._id) return;
       
       const rawUrl = profile?.avatarUrl || profile?.avatarThumbnailUrl;
       
-      // If the backend has no avatar for this user, safely clear the local state
       if (!rawUrl || rawUrl.trim() === '' || rawUrl === 'null' || rawUrl === 'undefined') {
         setLocalAvatarUri(null);
         return;
       }
 
-      // Download/Fetch local path via your AvatarManager
       const localPath = await getAvatar(profile._id, rawUrl, profile.avatarVersion);
       setLocalAvatarUri(localPath); 
     };
@@ -626,38 +753,13 @@ export default function ProfileScreen({ navigation }: any) {
     navigation.replace("SavedAccounts");
   };
 
-  const handleRequestDeleteOtp = async () => {
-    setDeleteLoading(true);
-    try {
-      await profileApi.deleteAccount(); 
-      setDeleteOtpStep(1);
-      setDeleteLoading(false);
-      setResultCard({ visible: true, type: "success", message: "OTP sent to your email." });
-    } catch (error: any) {
-      setDeleteLoading(false);
-      setResultCard({ visible: true, type: "error", message: error?.response?.data?.message || error?.message || "Error sending OTP." });
-    }
-  };
-
-  const handleDeleteAccountWithOtp = async () => {
-    setDeleteLoading(true);
-    try {
-      await profileApi.deleteAccountWithOtp(deleteOtp);
-      await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
-      setDeleteConfirmVisible(false);
-      setDeleteOtp("");
-      setDeleteOtpStep(0);
-      setResultCard({ visible: true, type: "success", message: "Account deleted!" });
-      setTimeout(() => {
-        setResultCard({ visible: false, type: "success", message: "" });
-        authContext?.setUser(null);
-        UserStorage.clearTokens();
-        navigation.replace("Login");
-      }, 1400);
-    } catch (error: any) {
-      setDeleteLoading(false);
-      setResultCard({ visible: true, type: "error", message: error?.response?.data?.message || error?.message || "Error deleting account." });
-    }
+  const handleDeleteSuccess = async () => {
+    await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
+    authContext?.setUser(null);
+    UserStorage.clearTokens();
+    setTimeout(() => {
+      navigation.replace("Login");
+    }, 1400);
   };
 
   const handleAcceptRequest = async (targetId: string) => {
@@ -684,10 +786,11 @@ export default function ProfileScreen({ navigation }: any) {
     }
   };
 
-  const handleSuspendRelationship = async () => {
+  const handleSuspendRelationship = async (instant: boolean) => {
     try {
+      breakupSheetRef.current?.dismiss();
       setActionLoading(true);
-      await apiClient.post(`/relationship/remove`);
+      await apiClient.post(`/relationship/remove`, { instant });
       await fetchProfileOnline();
     } catch (error: any) {
       setResultCard({ visible: true, type: "error", message: error?.response?.data?.message || "Error suspending relationship." });
@@ -719,7 +822,6 @@ export default function ProfileScreen({ navigation }: any) {
     }
   };
 
-  // ⚡ Calculate Relationship Metrics & Suspended Status 
   let daysTogether = 0;
   if (profile?.partner && profile?.partnerSince) {
     const msInDay = 24 * 60 * 60 * 1000;
@@ -730,8 +832,8 @@ export default function ProfileScreen({ navigation }: any) {
   const incomingReqs = Array.isArray(profile?.relationshipIncoming) ? profile.relationshipIncoming : [];
   const hasIncoming = incomingReqs.length > 0;
 
-  // 🔥 Apply Cache Buster strictly via Version so FastImage never flashes white randomly
   const finalAvatarUri = localAvatarUri ? `${localAvatarUri}?v=${profile?.avatarVersion || 1}` : null;
+  const anyPremium = profile?.isPremium || profile?.partner?.isPremium;
 
   const renderActionModal = () => {
     return (
@@ -753,6 +855,17 @@ export default function ProfileScreen({ navigation }: any) {
             />
           )}
 
+          {activeModal === "ActivityPrivacy" && (
+            <ActivityPrivacyModal
+              currentScope={profile?.defaultVisibilityScope}
+              onClose={closeSheet}
+              onChange={async (newScope: string) => {
+                setProfile((prev: any) => ({ ...prev, defaultVisibilityScope: newScope }));
+                await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ ...profile, defaultVisibilityScope: newScope }));
+              }}
+            />
+          )}
+
           {activeModal === "ChangePassword" && (
             <ChangePasswordModal
               onClose={closeSheet}
@@ -769,11 +882,19 @@ export default function ProfileScreen({ navigation }: any) {
             />
           )}
 
-         {activeModal === "LinkedAccount" && (
+          {activeModal === "LinkedAccount" && (
             <LinkedAccountModal
               onClose={closeSheet}
               onChange={fetchProfileOnline}
               setResultCard={setResultCard} 
+            />
+          )}
+
+          {activeModal === "DeleteAccount" && (
+            <DeleteAccountModal
+              onClose={closeSheet}
+              setResultCard={setResultCard}
+              onSuccess={handleDeleteSuccess}
             />
           )}
         </View>
@@ -817,7 +938,7 @@ export default function ProfileScreen({ navigation }: any) {
     );
   };
 
-const renderRelReqSheet = () => {
+  const renderRelReqSheet = () => {
     return (
       <TrueSheet
         ref={relReqSheetRef}
@@ -837,53 +958,53 @@ const renderRelReqSheet = () => {
             </Text>
           ) : (
             <View style={{ flex: 1 }}>
-{incomingReqs.map((req: any, index: number) => {
-  const reqUser = req.user || req; 
-  
-  return (
-    <View key={reqUser?._id || index} style={styles.reqCard}>
-      <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-        {reqUser.avatarUrl ? (
-          <Image 
-            source={{ uri: reqUser.avatarUrl.startsWith("http") ? reqUser.avatarUrl : newUrl + reqUser.avatarUrl }} 
-            style={styles.reqAvatar} 
-          />
-        ) : (
-          <View style={styles.reqAvatarFallback}>
-            <Icon name="account" size={24} color="#6366f1" />
-          </View>
-        )}
-        
-        <View style={styles.textContainer}>
-          <Text style={{ color: "#F9FAFB", fontSize: 16, fontWeight: "bold" }}>
-            {reqUser.name || "Unknown"}
-          </Text>
-          <Text style={{ color: "#9CA3AF", fontSize: 13 }}>
-            @{reqUser.username || "user"}
-          </Text>
-        </View>
-      </View>
-      
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        <TouchableOpacity 
-          style={styles.reqBtnAccept} 
-          onPress={() => {
-            handleAcceptRequest(reqUser._id);
-            closeRelReqSheet();
-          }}
-        >
-          <Icon name="check" size={20} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.reqBtnDecline} 
-          onPress={() => handleCancelRequest(reqUser._id)}
-        >
-          <Icon name="close" size={20} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-})}
+              {incomingReqs.map((req: any, index: number) => {
+                const reqUser = req.user || req; 
+                
+                return (
+                  <View key={reqUser?._id || index} style={styles.reqCard}>
+                    <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+                      {reqUser.avatarUrl ? (
+                        <Image 
+                          source={{ uri: reqUser.avatarUrl.startsWith("http") ? reqUser.avatarUrl : newUrl + reqUser.avatarUrl }} 
+                          style={styles.reqAvatar} 
+                        />
+                      ) : (
+                        <View style={styles.reqAvatarFallback}>
+                          <Icon name="account" size={24} color="#6366f1" />
+                        </View>
+                      )}
+                      
+                      <View style={styles.textContainer}>
+                        <Text style={{ color: "#F9FAFB", fontSize: 16, fontWeight: "bold" }}>
+                          {reqUser.name || "Unknown"}
+                        </Text>
+                        <Text style={{ color: "#9CA3AF", fontSize: 13 }}>
+                          @{reqUser.username || "user"}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <TouchableOpacity 
+                        style={styles.reqBtnAccept} 
+                        onPress={() => {
+                          handleAcceptRequest(reqUser._id);
+                          closeRelReqSheet();
+                        }}
+                      >
+                        <Icon name="check" size={20} color="#fff" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.reqBtnDecline} 
+                        onPress={() => handleCancelRequest(reqUser._id)}
+                      >
+                        <Icon name="close" size={20} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           )}
         </View>
@@ -934,6 +1055,9 @@ const renderRelReqSheet = () => {
               {profile?.tick === "golden" && (
                 <Icon name="check-decagram" size={20} color="#fbbf24" style={{ marginLeft: 5, marginTop: 7 }} />
               )}
+              {profile?.isPremium && (
+                <Icon name="star-circle" size={20} color="#fbbf24" style={{ marginLeft: 5, marginTop: 7 }} />
+              )}
             </View>
 
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 4 }}>
@@ -942,11 +1066,9 @@ const renderRelReqSheet = () => {
           </View>
         </View>
 
-        {/* ⚡ RELATIONSHIP STATUS SECTION */}
+        {/* RELATIONSHIP STATUS SECTION */}
         <Text style={styles.sectionTitle}>Relationship Status</Text>
         <View style={styles.relationshipCard}>
-          
-          {/* SCENARIO 1: HAS PARTNER */}
           {profile?.partner ? (
             <View>
               <View style={styles.pillRow}>
@@ -977,13 +1099,15 @@ const renderRelReqSheet = () => {
               {!isSuspended ? (
                 <TouchableOpacity 
                   style={[styles.actionBtn, styles.btnDanger]} 
-                  onPress={handleSuspendRelationship}
+                  onPress={() => anyPremium ? breakupSheetRef.current?.present() : handleSuspendRelationship(false)}
                   disabled={actionLoading}
                 >
                   {actionLoading ? <ActivityIndicator size="small" color="#f87171" /> : (
                     <>
                       <Icon name="heart-broken" size={18} color="#f87171" />
-                      <Text style={styles.btnTextDanger}>Break-up (Start 24h Timer)</Text>
+                      <Text style={styles.btnTextDanger}>
+                        {anyPremium ? "Break Up Options" : "Break-up (Start 24h Timer)"}
+                      </Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -1004,7 +1128,6 @@ const renderRelReqSheet = () => {
             </View>
 
           ) : (
-            // SCENARIO 2: NO PARTNER
             <View>
               <View style={[styles.pillRow, { justifyContent: "space-between", alignItems: "center" }]}>
                 <View style={[styles.relationshipPill, styles.relationshipPillEmpty]}>
@@ -1012,7 +1135,6 @@ const renderRelReqSheet = () => {
                   <Text style={[styles.relationshipText, { color: "#94a3b8" }]}>No one</Text>
                 </View>
 
-                {/* ⚡ See all reqs button */}
                 {hasIncoming && (
                 <TouchableOpacity onPress={openRelReqSheet} style={{ paddingHorizontal: 8 }}>
                   <Text style={{ 
@@ -1044,7 +1166,7 @@ const renderRelReqSheet = () => {
                 disabled={item.disabled}
                 onPress={() => {
                   if (!item.disabled) {
-                    if (["Enable2FA", "Devices", "HelpSupport", "ReportProblem", "LegalPolicy"].includes(item.route)) {
+                    if (["Enable2FA", "Devices", "HelpSupport", "ReportProblem", "LegalPolicy", "BlockedUsers", "VerifySelf", "plus"].includes(item.route)) {
                       navigation.navigate(item.route);
                     } else {
                       openSheet(item.route);
@@ -1060,7 +1182,17 @@ const renderRelReqSheet = () => {
                     <Text style={{ color: "#64748b", fontWeight: "600", marginLeft: 9 }}>Coming soon</Text>
                   )}
                 </View>
-                <Icon name="chevron-right" size={22} color="#9CA3AF" />
+                
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  {item.route === "BlockedUsers" && profile?.blockedUsers?.length > 0 && (
+                    <View style={styles.blockedBadge}>
+                      <Text style={styles.blockedBadgeText}>
+                        {profile.blockedUsers.length}
+                      </Text>
+                    </View>
+                  )}
+                  <Icon name="chevron-right" size={22} color="#9CA3AF" />
+                </View>
               </TouchableOpacity>
             ))}
           </View>
@@ -1070,66 +1202,10 @@ const renderRelReqSheet = () => {
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.deleteBtn} onPress={() => {
-          setDeleteConfirmVisible(true);
-          setDeleteOtpStep(0);
-          setDeleteOtp("");
-        }}>
+        <TouchableOpacity style={styles.deleteBtn} onPress={() => openSheet("DeleteAccount")}>
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
 
-        {deleteConfirmVisible && (
-          <Modal
-            isVisible={deleteConfirmVisible}
-            backdropOpacity={0.54}
-            useNativeDriver
-            onBackdropPress={() => {
-              setDeleteConfirmVisible(false);
-              setDeleteOtp("");
-              setDeleteOtpStep(0);
-            }}
-            style={{ justifyContent: "center", alignItems: "center" }}
-          >
-            <View style={styles.glassyModal}>
-              <Text style={styles.confirmText}>
-                {deleteOtpStep === 0
-                  ? "Are you sure you want to delete your account? This cannot be undone."
-                  : "Enter the OTP sent to your registered email to confirm account deletion."}
-              </Text>
-              {deleteOtpStep === 0 ? (
-                <View style={styles.modalBtns}>
-                  <TouchableOpacity style={styles.confirmBtn} onPress={handleRequestDeleteOtp}>
-                    <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                      {deleteLoading ? "Sending OTP..." : "Send OTP"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <>
-                  <TextInput
-                    style={[styles.sheetInput, { width: 200 }]}
-                    placeholder="Enter OTP"
-                    placeholderTextColor="#6366f1"
-                    value={deleteOtp}
-                    onChangeText={setDeleteOtp}
-                    keyboardType="number-pad"
-                  />
-                  <View style={styles.modalBtns}>
-                    <TouchableOpacity
-                      style={styles.confirmBtn}
-                      onPress={handleDeleteAccountWithOtp}
-                      disabled={deleteLoading || !deleteOtp}
-                    >
-                      <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                        {deleteLoading ? "Deleting..." : "Confirm Deletion"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
-            </View>
-          </Modal>
-        )}
       </ScrollView>
 
       <GlassyResultCard
@@ -1141,6 +1217,46 @@ const renderRelReqSheet = () => {
       {renderActionModal()}
       {renderLogoutSheet()}
       {renderRelReqSheet()}
+
+      <TrueSheet
+        ref={breakupSheetRef}
+        detents={[0.4]}
+        cornerRadius={30}
+        backgroundColor="#0F172A"
+        grabber={false}
+      >
+        <View style={{ padding: 24, paddingBottom: 40 }}>
+          <View style={{ alignItems: "center", marginBottom: 16 }}>
+            <Icon name="heart-broken" size={36} color="#f87171" style={{ marginBottom: 8 }} />
+            <Text style={styles.sheetTitle}>End Relationship</Text>
+            <Text style={{ color: "#9ca3b8", textAlign: "center" }}>
+              As a StreakSphere+ member, how do you want to handle this?
+            </Text>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.sheetOptionRow} 
+            onPress={() => handleSuspendRelationship(false)}
+          >
+            <Icon name="timer-sand" size={22} color="#fbbf24" style={{ marginRight: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sheetOptionText, { color: "#fbbf24" }]}>Suspend (36h Timer)</Text>
+              <Text style={{ color: "#9ca3b8", fontSize: 12, marginTop: 2 }}>You can restore the streak within 36 hours.</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.sheetOptionRow} 
+            onPress={() => handleSuspendRelationship(true)}
+          >
+            <Icon name="lightning-bolt" size={22} color="#f87171" style={{ marginRight: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sheetOptionText, { color: "#f87171" }]}>Break Up Instantly</Text>
+              <Text style={{ color: "#9ca3b8", fontSize: 12, marginTop: 2 }}>Skip the timer. Move to history immediately.</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </TrueSheet>
     </MainLayout>
   );
 }
@@ -1158,6 +1274,19 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: "#F9FAFB", marginTop: 16, marginBottom: 5 },
   settingCard: { backgroundColor: "rgba(15,23,42,0.34)", borderRadius: 14, padding: 13, marginBottom: 7, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   settingLabel: { color: "#F9FAFB", fontWeight: "bold", fontSize: 15, marginLeft: 13 },
+  
+  blockedBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginRight: 8
+  },
+  blockedBadgeText: {
+    color: "#b4b1b1",
+    fontSize: 13,
+    fontWeight: "bold"
+  },
+
   logoutBtn: { backgroundColor: "#ef4444", borderRadius: 20, paddingVertical: 11, alignItems: 'center', marginTop: 18, marginBottom: 10 },
   logoutText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
   deleteBtn: { backgroundColor: "#333", borderRadius: 20, paddingVertical: 10, alignItems: 'center', marginTop: 8, marginBottom: 60 },
@@ -1173,25 +1302,12 @@ const styles = StyleSheet.create({
   },
   pageTitle: { flex: 1, textAlign: "center", fontSize: 18, fontWeight: "700", color: "#F9FAFB" },
   rightSpacer: { width: 40, height: 40 },
-  modalOverlay: {
-    position: "absolute", left: 0, top: 0, right: 0, bottom: 0,
-    backgroundColor: "rgba(30,41,59,0.6)", justifyContent: "center", alignItems: "center", zIndex: 1000,
-  },
-  glassyModal: {
-    backgroundColor: "rgba(15,23,42,0.82)", borderColor: "white",
-    borderWidth: 1, borderRadius: 28, padding: 26, alignItems: "center", width: 280,
-    shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 18, elevation: 18,
-  },
-  confirmText: { color: "#F9FAFB", fontSize: 18, fontWeight: "700", marginBottom: 22, textAlign: "center" },
-  modalBtns: { flexDirection: "row", justifyContent: "space-evenly", width: '100%' },
-  cancelBtn: { backgroundColor: "rgba(228,227,236,1)", borderRadius: 12, paddingVertical: 9, paddingHorizontal: 23, marginRight: 10 },
-  confirmBtn: { backgroundColor: "#6366f1", borderRadius: 12, paddingVertical: 9, paddingHorizontal: 23 },
+  
   resultOverlay: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: "rgba(30,41,59,0.45)", justifyContent: "center", alignItems: "center", zIndex: 2000 },
   resultCard: { backgroundColor: "rgba(15,23,42,0.94)", borderColor: "#fff", borderWidth: 1, borderRadius: 24, padding: 26, width: 270, alignItems: "center" },
   resultMessage: { fontSize: 17, fontWeight: "bold", textAlign: "center", marginBottom: 18, marginTop: 2 },
   resultOkBtn: { backgroundColor: "#6366f1", borderRadius: 14, paddingVertical: 9, paddingHorizontal: 34, marginTop: 2 },
   
-  // ⚡ Inputs and Forms
   glassyInner: { width: "100%", paddingTop: 10, paddingBottom: 20 },
   sheetTitle: { color: "#F9FAFB", fontSize: 19, fontWeight: "bold", marginBottom: 16, textAlign: "center" },
   inputLabel: {
@@ -1219,10 +1335,33 @@ const styles = StyleSheet.create({
   dotOn: { backgroundColor: "#22c55e", alignSelf: "flex-end" },
   dotOff: { backgroundColor: "#e5e7eb", alignSelf: "flex-start" },
 
-  // ⚡ Relationship Card Styles
   relationshipCard: {
     backgroundColor: "rgba(30,41,59,0.4)", borderRadius: 16, padding: 14,
     borderWidth: 1, borderColor: "rgba(148,163,184,0.15)", marginBottom: 16, width: "100%",
+  },
+  scopeOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(30,41,59,0.4)",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.1)",
+  },
+  scopeOptionRowActive: {
+    backgroundColor: "rgba(99,102,241,0.15)",
+    borderColor: "rgba(99,102,241,0.4)",
+  },
+  scopeOptionText: {
+    color: "#94a3b8",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  scopeOptionTextActive: {
+    color: "#F9FAFB",
+    fontWeight: "700",
   },
   pillRow: { flexDirection: "row", marginBottom: 12 },
   relationshipPill: {
@@ -1239,20 +1378,8 @@ const styles = StyleSheet.create({
   btnTextDanger: { color: "#f87171", fontWeight: "700", fontSize: 13 },
   btnSuccess: { backgroundColor: "rgba(52,211,153,0.1)", borderColor: "rgba(52,211,153,0.3)" },
   btnTextSuccess: { color: "#34d399", fontWeight: "700", fontSize: 13 },
-  btnNeutral: { backgroundColor: "rgba(148,163,184,0.1)", borderColor: "rgba(148,163,184,0.3)" },
-  btnTextNeutral: { color: "#94a3b8", fontWeight: "700", fontSize: 13 },
 
-  sheetContent: {
-    backgroundColor: "rgba(15,23,42,0.96)", borderTopLeftRadius: 32, borderTopRightRadius: 32,
-    padding: 28, minHeight: 360, borderColor: "white", borderTopWidth: 0.1, borderLeftWidth: 0.2, borderRightWidth: 0.2,
-  },
-  modalSheet: { justifyContent: "flex-end", margin: 0 },
-  resultSoftCard: { backgroundColor: "rgba(30,41,59,0.61)", borderRadius: 16, position: "absolute", left: 20, right: 20, top: '45%', zIndex: 400 },
-  resultSoftOkBtn: { backgroundColor: "#6366f1", borderRadius: 10, alignSelf: "center", marginBottom: 12, marginTop: 5, paddingHorizontal: 32, paddingVertical: 9 },
-
-  // ⚡ Relationship Requests Styles
-// ⚡ Updated reqCard for full visibility
-reqCard: { 
+  reqCard: { 
     flexDirection: "row", 
     alignItems: "center", 
     backgroundColor: "rgba(30,41,59,0.5)", 
@@ -1260,23 +1387,35 @@ reqCard: {
     borderRadius: 16, 
     marginBottom: 10, 
     width: "100%", 
-    minHeight: 70, // ⚡ Added minHeight to prevent collapse
+    minHeight: 70, 
     borderWidth: 1, 
     borderColor: "rgba(148,163,184,0.15)" 
   },
-  
   textContainer: { 
     marginLeft: 12, 
     flex: 1,           
     flexShrink: 1,     
     justifyContent: "center",
-    // ⚡ ADDED THESE TO FORCE VISIBILITY
     overflow: "hidden" 
   },
   reqAvatar: { width: 44, height: 44, borderRadius: 22 },
   reqAvatarFallback: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(99,102,241,0.15)", justifyContent: "center", alignItems: "center" },
-  reqName: { color: "#F9FAFB", fontSize: 15, fontWeight: "bold" },
-  reqUsername: { color: "#9CA3AF", fontSize: 13 },
   reqBtnAccept: { backgroundColor: "#10b981", width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center" },
   reqBtnDecline: { backgroundColor: "#ef4444", width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center" },
+  
+  sheetOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.1)",
+  },
+  sheetOptionText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });

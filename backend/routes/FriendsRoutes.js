@@ -16,7 +16,10 @@ import {
   acceptRelationshipRequest,
   cancelRelationshipRequest,
   removeRelationship,
-  restoreRelationship
+  restoreRelationship,
+  blockUser,
+  getBlockedUsers,
+  unblockUser
 } from "../controllers/FriendController.js";
 
 const router = express.Router();
@@ -32,5 +35,8 @@ router.get("/pending", isAuthenticatedUser, pendingFriendRequests);
 router.get("/search", isAuthenticatedUser, searchUsers);
 router.get("/suggested", isAuthenticatedUser, suggestedFriends);
 router.get("/preview/:userId", isAuthenticatedUser, previewProfile);
+router.post('/user/:targetUserId/block',isAuthenticatedUser, blockUser)
+router.get('/user/blocked', isAuthenticatedUser, getBlockedUsers);
+router.post('/user/:targetUserId/unblock', isAuthenticatedUser, unblockUser);
 
 export default router;

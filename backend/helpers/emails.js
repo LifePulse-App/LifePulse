@@ -262,3 +262,89 @@ export const loginAlertEmailHtml = ({ username, email, deviceInfo, location, ip,
       <div style="${s.alertBox}">🚨 <strong>Not you?</strong> Reset your password immediately and revoke all active sessions from your security settings.</div>
     `
   });
+
+  // --- ADD THESE TO THE BOTTOM OF YOUR emails.js FILE ---
+
+export const sendSuspensionEmail = async ({ to, username, reason, liftAt }) => {
+  const liftDateText = liftAt ? new Date(liftAt).toLocaleString() : 'Indefinitely pending review';
+  return sendHtml({
+    to,
+    subject: "Account Suspended - StreakSphere",
+    html: baseLayout({
+      title: "Account Suspended",
+      preview: "Your StreakSphere account has been temporarily restricted.",
+      bodyHtml: `
+        <div style="${s.badge('rgba(245,158,11,0.1)', '#F59E0B')}">⚠️ Account Suspended</div>
+        <h1 style="${s.h1}">Account Restriction Notice</h1>
+        <p style="${s.p}">Hi ${username || 'User'}, your account has been suspended due to a violation of our community guidelines.</p>
+        <div style="${s.infoBox}">
+          <p style="${s.infoLabel}">Reason</p><p style="${s.infoValue};margin-bottom:12px;">${reason}</p>
+          <p style="${s.infoLabel}">Restricted Until</p><p style="${s.infoValue}">${liftDateText}</p>
+        </div>
+        <p style="${s.p}">You can open the app to submit an appeal if you believe this was a mistake.</p>
+      `
+    })
+  });
+};
+
+export const sendBanEmail = async ({ to, username, reason }) =>
+  sendHtml({
+    to,
+    subject: "Account Permanently Banned - StreakSphere",
+    html: baseLayout({
+      title: "Account Banned",
+      preview: "Your StreakSphere account has been permanently deactivated.",
+      bodyHtml: `
+        <div style="${s.badge('rgba(239,68,68,0.1)', '#EF4444')}">🚫 Account Banned</div>
+        <h1 style="${s.h1}">Account Deactivated</h1>
+        <p style="${s.p}">Hi ${username || 'User'}, after a thorough review, your account has been permanently banned.</p>
+        <div style="${s.infoBox}">
+          <p style="${s.infoLabel}">Reason</p><p style="${s.infoValue}">${reason}</p>
+        </div>
+        <div style="${s.alertBox}">This decision is final and all associated data will be queued for deletion.</div>
+      `
+    })
+  });
+
+export const sendUnliftEmail = async ({ to, username }) =>
+  sendHtml({
+    to,
+    subject: "Account Restored - StreakSphere",
+    html: baseLayout({
+      title: "Account Restored",
+      preview: "Your StreakSphere account is active again.",
+      bodyHtml: `
+        <div style="${s.badge('rgba(16,185,129,0.1)', '#10B981')}">✅ Account Restored</div>
+        <h1 style="${s.h1}">Welcome Back</h1>
+        <p style="${s.p}">Hi ${username || 'User'}, the restrictions on your account have been lifted. Your account is now fully active.</p>
+        <p style="${s.p}">You can log in and resume using StreakSphere normally.</p>
+      `
+    })
+  });
+
+export const sendAppealDecisionEmail = async ({ to, username, decision, note }) => {
+  const isApproved = decision === 'approve';
+  const badgeColor = isApproved ? '#10B981' : '#EF4444';
+  const badgeBg = isApproved ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+  const badgeText = isApproved ? '✅ Appeal Approved' : '❌ Appeal Denied';
+
+  return sendHtml({
+    to,
+    subject: `Appeal ${isApproved ? 'Approved' : 'Denied'} - StreakSphere`,
+    html: baseLayout({
+      title: "Appeal Decision",
+      preview: `Your recent appeal has been ${isApproved ? 'approved' : 'denied'}.`,
+      bodyHtml: `
+        <div style="${s.badge(badgeBg, badgeColor)}">${badgeText}</div>
+        <h1 style="${s.h1}">Appeal Decision</h1>
+        <p style="${s.p}">Hi ${username || 'User'}, our moderation team has reviewed your recent appeal.</p>
+        <p style="${s.p}"><strong>Status:</strong> Your appeal was ${isApproved ? 'successful, and your account has been restored.' : 'denied, and the ban remains in place.'}</p>
+        ${note ? `
+          <div style="${s.infoBox}">
+            <p style="${s.infoLabel}">Moderator Note</p><p style="${s.infoValue}">${note}</p>
+          </div>
+        ` : ''}
+      `
+    })
+  });
+};

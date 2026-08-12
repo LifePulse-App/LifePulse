@@ -41,11 +41,19 @@ mongoose.connect(process.env.MONGO_URI)
 const HOME_DIR = os.homedir();
 app.use('/avatars', express.static(path.join(HOME_DIR, "uploads", "avatars")));
 app.use('/chat-media', express.static(path.join(HOME_DIR, "uploads", "chat")));
+app.use('/proofs', express.static(path.join(HOME_DIR, "uploads", "proofs")));
+// Replace your old /uploads line with this:
+app.use('/api/uploads', express.static(path.join(process.cwd(), "uploads")));
 
 // --- Middlewares
 app.use(cookieParser());
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+  origin: "*", // Or specify your frontend URL if hosting locally/live
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "api-key"],
+  credentials: true
+}));
 app.use("/api", apiKeyMiddleware);
 
 // --- Routes
@@ -65,9 +73,13 @@ import LocationRoutes from "./routes/LocationRoutes.js";
 import ChatRoutes from "./routes/ChatRoutes.js";
 import CallRoutes from "./routes/CallRoutes.js";
 import appVersionRoutes from './routes/AppVersion.js';
-import adminNotifyRoutes from './routes/AdminNotificationRoutes.js';
+import AdminRoutes from './routes/AdminRoutes.js';
 import ArPortalRoutes from "./routes/ArPortalRoutes.js";
 import ArPrivatePortalRoutes from "./routes/ArPrivatePortalRoutes.js";
+import ModerationRoutes from "./routes/ModerationRoutes.js";
+import VerifyRoutes from "./routes/VerificationRoutes.js";
+import WebhookRoutes from "./routes/webhook.js";
+import FeedRoutes from "./routes/FeedRoutes.js";
 
 // --- Attach io to req
 app.use((req, res, next) => {
@@ -93,7 +105,11 @@ app.use("/api/chat", ChatRoutes);
 app.use("/api/call", CallRoutes);
 app.use("/api/ar-portal", ArPortalRoutes);
 app.use("/api/ar-private-portal", ArPrivatePortalRoutes);
-app.use("/api/admin/notify", adminNotifyRoutes);
+app.use("/api/moderate", ModerationRoutes);
+app.use("/api/verify", VerifyRoutes);
+app.use("/api/feed", FeedRoutes);
+app.use("/api/admin", AdminRoutes);
+app.use("/webhook", WebhookRoutes);
 
 // --- Health
 app.get('/health', (req, res) => {
