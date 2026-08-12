@@ -36,7 +36,7 @@ const GlassyResultCard = ({ visible, type = "success", message, onClose }: any) 
   );
 };
 
-// --- Edit Profile Modal ---
+// --- Edit Profile Modal (Cleaned up: privacy setting moved out) ---
 function EditProfileModal({ user, onClose, setResultCard, onChange }: any) {
   const [data, setData] = useState({
     name: user?.name || "",
@@ -59,9 +59,8 @@ function EditProfileModal({ user, onClose, setResultCard, onChange }: any) {
     try {
       await profileApi.editProfile(data);
       setLoading(false);
-      setResultCard({ visible: true, type: "success", message: "Profile updated!" });
       onChange?.();
-      onClose();
+      onClose(); // ⚡ Silently closes without success alert card
     } catch (err: any) {
       setLoading(false);
       setResultCard({
@@ -125,6 +124,76 @@ function EditProfileModal({ user, onClose, setResultCard, onChange }: any) {
       </TouchableOpacity>
       <View style={{ height: 20 }} />
     </ScrollView>
+  );
+}
+
+// --- ⚡ NEW: Activity Posting Privacy Modal ---
+function ActivityPrivacyModal({ currentScope, onClose, onChange }: any) {
+  const [selectedScope, setSelectedScope] = useState(currentScope || "world");
+  const [loading, setLoading] = useState(false);
+
+  const scopes = [
+    { label: "World (Everyone)", value: "world", icon: "earth" },
+    { label: "Country Only", value: "country", icon: "flag" },
+    { label: "City Only", value: "city", icon: "city" },
+    { label: "Friends Only", value: "friends", icon: "account-multiple" },
+    { label: "Private (Only Me)", value: "private", icon: "lock" },
+  ];
+
+  const handleSelect = async (val: string) => {
+    setSelectedScope(val);
+    setLoading(true);
+    try {
+      await profileApi.updateActivityPrivacy(val);
+      setLoading(false);
+      onChange?.(val);
+      onClose(); // ⚡ Silently closes without alerts
+    } catch (err) {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={styles.glassyInner}>
+      <Text style={styles.sheetTitle}>Activity Posting Privacy</Text>
+      <Text style={{ color: "#94a3b8", fontSize: 13, marginBottom: 16, textAlign: "center" }}>
+        Choose who can see your new activity feed posts by default.
+      </Text>
+
+      <View style={{ marginBottom: 12 }}>
+        {scopes.map(scope => {
+          const isSelected = selectedScope === scope.value;
+          return (
+            <TouchableOpacity
+              key={scope.value}
+              activeOpacity={0.8}
+              style={[
+                styles.scopeOptionRow,
+                isSelected && styles.scopeOptionRowActive
+              ]}
+              onPress={() => handleSelect(scope.value)}
+              disabled={loading}
+            >
+              <Icon
+                name={scope.icon}
+                size={18}
+                color={isSelected ? "#6366f1" : "#94a3b8"}
+                style={{ marginRight: 10 }}
+              />
+              <Text style={[styles.scopeOptionText, isSelected && styles.scopeOptionTextActive]}>
+                {scope.label}
+              </Text>
+              {isSelected && (
+                <Icon name="check-circle" size={18} color="#6366f1" style={{ marginLeft: "auto" }} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+      <TouchableOpacity style={styles.sheetCancelBtn} onPress={onClose}>
+        <Text style={{ color: "#a1a1aa", fontWeight: "bold" }}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -414,7 +483,7 @@ function LinkedAccountModal({ onClose, onChange, setResultCard }: any) {
   );
 }
 
-// ⚡ NEW: Delete Account Modal
+// --- Delete Account Modal ---
 function DeleteAccountModal({ onClose, setResultCard, onSuccess }: any) {
   const [step, setStep] = useState(1);
   const [otp, setOtp] = useState("");
@@ -512,12 +581,8 @@ const settingSections = [
       { icon: "security", label: "Two-factor Authentication", route: "Enable2FA" },
       { icon: "devices", label: "Devices in which you are logged in", route: "Devices" },
       { icon: "account-cancel", label: "Blocked Users", route: "BlockedUsers" }, 
-      {
-        icon: "check-decagram",
-        label: "Verify Yourself",
-        route: "VerifySelf",
-        disabled: true, 
-      },
+      { icon: "eye-outline", label: "Activity Posting Privacy", route: "ActivityPrivacy" }, // ⚡ Moved here
+      { icon: "check-decagram", label: "Verify Yourself", route: "VerifySelf" },
     ],
   },
   {
@@ -544,6 +609,8 @@ export default function ProfileScreen({ navigation }: any) {
   const sheetRef = useRef<TrueSheet>(null);
   const logoutSheetRef = useRef<TrueSheet>(null);
   const relReqSheetRef = useRef<TrueSheet>(null); 
+  const breakupSheetRef = useRef<TrueSheet>(null);
+
   const sheetDetents = useMemo(() => [0.65], []); 
 
   const openSheet = useCallback(async (type: string) => {
@@ -607,17 +674,19 @@ export default function ProfileScreen({ navigation }: any) {
     if (offlineRef.current) return;
 
     try {
-      const [profileRes, avatarRes] = await Promise.all([
+      const [profileRes, avatarRes, privacyRes] = await Promise.all([
         profileApi.getProfile(),
         profileApi.getAvatarUrl(),
+        profileApi.getActivityPrivacy().catch(() => null), // ⚡ Fetch privacy setting
       ]);
       
       const fetchedUser = (profileRes as any)?.data?.user;
       if (!fetchedUser) return;
 
       const { avatarThumbnailUrl, avatarUrl: fetchedAvatarUrl } = (avatarRes as any)?.data || {};
+      const defaultVisibilityScope = (privacyRes as any)?.data?.defaultVisibilityScope || fetchedUser.defaultVisibilityScope || "world";
       
-      const merged = { ...fetchedUser, avatarThumbnailUrl, avatarUrl: fetchedAvatarUrl };
+      const merged = { ...fetchedUser, avatarThumbnailUrl, avatarUrl: fetchedAvatarUrl, defaultVisibilityScope };
       
       setProfile(merged);
       await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(merged));
@@ -717,10 +786,11 @@ export default function ProfileScreen({ navigation }: any) {
     }
   };
 
-  const handleSuspendRelationship = async () => {
+  const handleSuspendRelationship = async (instant: boolean) => {
     try {
+      breakupSheetRef.current?.dismiss();
       setActionLoading(true);
-      await apiClient.post(`/relationship/remove`);
+      await apiClient.post(`/relationship/remove`, { instant });
       await fetchProfileOnline();
     } catch (error: any) {
       setResultCard({ visible: true, type: "error", message: error?.response?.data?.message || "Error suspending relationship." });
@@ -763,6 +833,7 @@ export default function ProfileScreen({ navigation }: any) {
   const hasIncoming = incomingReqs.length > 0;
 
   const finalAvatarUri = localAvatarUri ? `${localAvatarUri}?v=${profile?.avatarVersion || 1}` : null;
+  const anyPremium = profile?.isPremium || profile?.partner?.isPremium;
 
   const renderActionModal = () => {
     return (
@@ -784,6 +855,17 @@ export default function ProfileScreen({ navigation }: any) {
             />
           )}
 
+          {activeModal === "ActivityPrivacy" && (
+            <ActivityPrivacyModal
+              currentScope={profile?.defaultVisibilityScope}
+              onClose={closeSheet}
+              onChange={async (newScope: string) => {
+                setProfile((prev: any) => ({ ...prev, defaultVisibilityScope: newScope }));
+                await AsyncStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ ...profile, defaultVisibilityScope: newScope }));
+              }}
+            />
+          )}
+
           {activeModal === "ChangePassword" && (
             <ChangePasswordModal
               onClose={closeSheet}
@@ -800,7 +882,7 @@ export default function ProfileScreen({ navigation }: any) {
             />
           )}
 
-         {activeModal === "LinkedAccount" && (
+          {activeModal === "LinkedAccount" && (
             <LinkedAccountModal
               onClose={closeSheet}
               onChange={fetchProfileOnline}
@@ -808,7 +890,6 @@ export default function ProfileScreen({ navigation }: any) {
             />
           )}
 
-          {/* ⚡ NEW Delete Account Bottom Sheet Injection */}
           {activeModal === "DeleteAccount" && (
             <DeleteAccountModal
               onClose={closeSheet}
@@ -975,8 +1056,8 @@ export default function ProfileScreen({ navigation }: any) {
                 <Icon name="check-decagram" size={20} color="#fbbf24" style={{ marginLeft: 5, marginTop: 7 }} />
               )}
               {profile?.isPremium && (
-    <Icon name="star-circle" size={20} color="#fbbf24" style={{ marginLeft: 5, marginTop: 7 }} />
-  )}
+                <Icon name="star-circle" size={20} color="#fbbf24" style={{ marginLeft: 5, marginTop: 7 }} />
+              )}
             </View>
 
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 4 }}>
@@ -985,11 +1066,9 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* ⚡ RELATIONSHIP STATUS SECTION */}
+        {/* RELATIONSHIP STATUS SECTION */}
         <Text style={styles.sectionTitle}>Relationship Status</Text>
         <View style={styles.relationshipCard}>
-          
-          {/* SCENARIO 1: HAS PARTNER */}
           {profile?.partner ? (
             <View>
               <View style={styles.pillRow}>
@@ -1020,13 +1099,15 @@ export default function ProfileScreen({ navigation }: any) {
               {!isSuspended ? (
                 <TouchableOpacity 
                   style={[styles.actionBtn, styles.btnDanger]} 
-                  onPress={handleSuspendRelationship}
+                  onPress={() => anyPremium ? breakupSheetRef.current?.present() : handleSuspendRelationship(false)}
                   disabled={actionLoading}
                 >
                   {actionLoading ? <ActivityIndicator size="small" color="#f87171" /> : (
                     <>
                       <Icon name="heart-broken" size={18} color="#f87171" />
-                      <Text style={styles.btnTextDanger}>Break-up (Start 24h Timer)</Text>
+                      <Text style={styles.btnTextDanger}>
+                        {anyPremium ? "Break Up Options" : "Break-up (Start 24h Timer)"}
+                      </Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -1047,7 +1128,6 @@ export default function ProfileScreen({ navigation }: any) {
             </View>
 
           ) : (
-            // SCENARIO 2: NO PARTNER
             <View>
               <View style={[styles.pillRow, { justifyContent: "space-between", alignItems: "center" }]}>
                 <View style={[styles.relationshipPill, styles.relationshipPillEmpty]}>
@@ -1055,7 +1135,6 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text style={[styles.relationshipText, { color: "#94a3b8" }]}>No one</Text>
                 </View>
 
-                {/* ⚡ See all reqs button */}
                 {hasIncoming && (
                 <TouchableOpacity onPress={openRelReqSheet} style={{ paddingHorizontal: 8 }}>
                   <Text style={{ 
@@ -1087,7 +1166,7 @@ export default function ProfileScreen({ navigation }: any) {
                 disabled={item.disabled}
                 onPress={() => {
                   if (!item.disabled) {
-                    if (["Enable2FA", "Devices", "HelpSupport", "ReportProblem", "LegalPolicy", "BlockedUsers", "plus"].includes(item.route)) {
+                    if (["Enable2FA", "Devices", "HelpSupport", "ReportProblem", "LegalPolicy", "BlockedUsers", "VerifySelf", "plus"].includes(item.route)) {
                       navigation.navigate(item.route);
                     } else {
                       openSheet(item.route);
@@ -1104,7 +1183,6 @@ export default function ProfileScreen({ navigation }: any) {
                   )}
                 </View>
                 
-                {/* ⚡ RIGHT SIDE BADGE & CHEVRON */}
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   {item.route === "BlockedUsers" && profile?.blockedUsers?.length > 0 && (
                     <View style={styles.blockedBadge}>
@@ -1124,7 +1202,6 @@ export default function ProfileScreen({ navigation }: any) {
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
 
-        {/* ⚡ DELETE ACCOUNT TRIGGER */}
         <TouchableOpacity style={styles.deleteBtn} onPress={() => openSheet("DeleteAccount")}>
           <Text style={styles.deleteText}>Delete Account</Text>
         </TouchableOpacity>
@@ -1140,6 +1217,46 @@ export default function ProfileScreen({ navigation }: any) {
       {renderActionModal()}
       {renderLogoutSheet()}
       {renderRelReqSheet()}
+
+      <TrueSheet
+        ref={breakupSheetRef}
+        detents={[0.4]}
+        cornerRadius={30}
+        backgroundColor="#0F172A"
+        grabber={false}
+      >
+        <View style={{ padding: 24, paddingBottom: 40 }}>
+          <View style={{ alignItems: "center", marginBottom: 16 }}>
+            <Icon name="heart-broken" size={36} color="#f87171" style={{ marginBottom: 8 }} />
+            <Text style={styles.sheetTitle}>End Relationship</Text>
+            <Text style={{ color: "#9ca3b8", textAlign: "center" }}>
+              As a StreakSphere+ member, how do you want to handle this?
+            </Text>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.sheetOptionRow} 
+            onPress={() => handleSuspendRelationship(false)}
+          >
+            <Icon name="timer-sand" size={22} color="#fbbf24" style={{ marginRight: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sheetOptionText, { color: "#fbbf24" }]}>Suspend (36h Timer)</Text>
+              <Text style={{ color: "#9ca3b8", fontSize: 12, marginTop: 2 }}>You can restore the streak within 36 hours.</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.sheetOptionRow} 
+            onPress={() => handleSuspendRelationship(true)}
+          >
+            <Icon name="lightning-bolt" size={22} color="#f87171" style={{ marginRight: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sheetOptionText, { color: "#f87171" }]}>Break Up Instantly</Text>
+              <Text style={{ color: "#9ca3b8", fontSize: 12, marginTop: 2 }}>Skip the timer. Move to history immediately.</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </TrueSheet>
     </MainLayout>
   );
 }
@@ -1191,7 +1308,6 @@ const styles = StyleSheet.create({
   resultMessage: { fontSize: 17, fontWeight: "bold", textAlign: "center", marginBottom: 18, marginTop: 2 },
   resultOkBtn: { backgroundColor: "#6366f1", borderRadius: 14, paddingVertical: 9, paddingHorizontal: 34, marginTop: 2 },
   
-  // ⚡ Inputs and Forms
   glassyInner: { width: "100%", paddingTop: 10, paddingBottom: 20 },
   sheetTitle: { color: "#F9FAFB", fontSize: 19, fontWeight: "bold", marginBottom: 16, textAlign: "center" },
   inputLabel: {
@@ -1222,6 +1338,30 @@ const styles = StyleSheet.create({
   relationshipCard: {
     backgroundColor: "rgba(30,41,59,0.4)", borderRadius: 16, padding: 14,
     borderWidth: 1, borderColor: "rgba(148,163,184,0.15)", marginBottom: 16, width: "100%",
+  },
+  scopeOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(30,41,59,0.4)",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.1)",
+  },
+  scopeOptionRowActive: {
+    backgroundColor: "rgba(99,102,241,0.15)",
+    borderColor: "rgba(99,102,241,0.4)",
+  },
+  scopeOptionText: {
+    color: "#94a3b8",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  scopeOptionTextActive: {
+    color: "#F9FAFB",
+    fontWeight: "700",
   },
   pillRow: { flexDirection: "row", marginBottom: 12 },
   relationshipPill: {
@@ -1262,4 +1402,20 @@ const styles = StyleSheet.create({
   reqAvatarFallback: { width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(99,102,241,0.15)", justifyContent: "center", alignItems: "center" },
   reqBtnAccept: { backgroundColor: "#10b981", width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center" },
   reqBtnDecline: { backgroundColor: "#ef4444", width: 36, height: 36, borderRadius: 18, justifyContent: "center", alignItems: "center" },
+  
+  sheetOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "rgba(148,163,184,0.1)",
+  },
+  sheetOptionText: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
 });

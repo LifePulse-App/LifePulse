@@ -255,6 +255,26 @@ const restoreRelationship = async () => {
   }
 };
 
+// Get Activity Posting Privacy
+const getActivityPrivacy = async () => {
+  try {
+    return await client.get<object>('/profile/activity-privacy');
+  } catch (error: any) {
+    if (!error.response) throw new Error('Server is offline, try again later.');
+    throw error;
+  }
+};
+
+// Update Activity Posting Privacy
+const updateActivityPrivacy = async (defaultVisibilityScope: string) => {
+  try {
+    return await client.patch<object>('/profile/activity-privacy', { defaultVisibilityScope });
+  } catch (error: any) {
+    if (!error.response) throw new Error('Server is offline, try again later.');
+    throw error;
+  }
+};
+
 
 export default {
   getProfile,
@@ -282,5 +302,7 @@ export default {
   acceptRelationshipRequest,
   sendRelationshipRequest,
   removeRelationship,
-  restoreRelationship
+  restoreRelationship,
+  getActivityPrivacy,
+  updateActivityPrivacy
 };

@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>StreakSphere - Admin Control Center</title>
-<meta name="description" content="StreakSphere Administration Panel - Moderation, Sanctions, Notifications, and Metrics."/>
+<meta name="description" content="StreakSphere Administration Panel - Moderation, Sanctions, Verifications, and Metrics."/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet"/>
@@ -63,11 +63,14 @@ nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);
 .error-box{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:var(--danger);padding:12px;border-radius:12px;font-size:0.85rem;margin-bottom:18px;text-align:center;display:none;}
 
 /* DASHBOARD TABS */
-.tab-row{display:grid;grid-template-columns:repeat(5, 1fr);gap:6px;background:var(--surface2);padding:6px;border-radius:18px;border:1px solid var(--border);margin:30px 0 24px;}
-@media(max-width:768px){
+.tab-row{display:grid;grid-template-columns:repeat(7, 1fr);gap:6px;background:var(--surface2);padding:6px;border-radius:18px;border:1px solid var(--border);margin:30px 0 24px;}
+@media(max-width:992px){
+  .tab-row{grid-template-columns:repeat(3, 1fr);}
+}
+@media(max-width:540px){
   .tab-row{grid-template-columns:repeat(2, 1fr);}
 }
-.tab-btn{background:transparent;border:none;color:var(--muted);padding:10px 6px;font-size:0.7rem;font-weight:700;border-radius:12px;cursor:pointer;transition:all 0.2s;text-transform:uppercase;letter-spacing:0.02em;text-align:center;white-space:nowrap;}
+.tab-btn{background:transparent;border:none;color:var(--muted);padding:10px 4px;font-size:0.62rem;font-weight:700;border-radius:12px;cursor:pointer;transition:all 0.2s;text-transform:uppercase;letter-spacing:0.02em;text-align:center;white-space:nowrap;}
 .tab-btn.active{background:var(--accent1);color:#fff;box-shadow:0 4px 16px rgba(99,102,241,0.4);}
 
 /* STATS GRID */
@@ -86,7 +89,7 @@ nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);
 .btn-unlift{background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:var(--accent4);padding:12px;border-radius:14px;font-weight:700;cursor:pointer;font-size:0.85rem;width:100%;margin-top:12px;transition:background 0.2s;}
 .btn-unlift:hover{background:rgba(16,185,129,0.25);}
 
-/* APPEALS & REPORTS FEED */
+/* FEED CARDS */
 .appeal-card{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:20px;padding:20px;margin-bottom:16px;}
 .appeal-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:10px;}
 .appeal-user{font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem;}
@@ -94,6 +97,12 @@ nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);
 .evidence-box{background:rgba(0,0,0,0.4);border-radius:12px;padding:12px;margin:10px 0;font-size:0.8rem;color:var(--muted);border-left:3px solid var(--danger);}
 .appeal-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;}
 @media(min-width:540px){.appeal-actions{flex-wrap:nowrap;}}
+
+/* IMAGE PREVIEW MODAL / GRID */
+.doc-preview-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0;}
+.doc-preview-box{background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center;}
+.doc-preview-box img{width:100%;height:140px;object-fit:cover;border-radius:8px;margin-top:6px;cursor:pointer;transition:transform 0.2s;}
+.doc-preview-box img:hover{transform:scale(1.02);}
 
 /* TOAST NOTIFICATION */
 #toast{position:fixed;bottom:24px;left:20px;right:20px;max-width:420px;margin-inline:auto;z-index:9999;background:var(--bg2);border:1px solid var(--border2);padding:14px 20px;border-radius:16px;box-shadow:0 15px 40px rgba(0,0,0,0.7);font-size:0.85rem;font-weight:700;display:flex;align-items:center;gap:12px;transform:translateY(120px);opacity:0;transition:all 0.35s cubic-bezier(0.16, 1, 0.3, 1);}
@@ -149,8 +158,10 @@ nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);
     <div class="tab-row">
       <button class="tab-btn active" id="tabBtn-stats" onclick="switchTab('stats')">Metrics</button>
       <button class="tab-btn" id="tabBtn-moderation" onclick="switchTab('moderation')">Sanctions</button>
+      <button class="tab-btn" id="tabBtn-verifications" onclick="switchTab('verifications')">Verifications</button>
       <button class="tab-btn" id="tabBtn-appeals" onclick="switchTab('appeals')">Appeals</button>
-      <button class="tab-btn" id="tabBtn-reports" onclick="switchTab('reports')">All Reports</button>
+      <button class="tab-btn" id="tabBtn-reports" onclick="switchTab('reports')">Reports</button>
+      <button class="tab-btn" id="tabBtn-postreports" onclick="switchTab('postreports')">Post Flags</button>
       <button class="tab-btn" id="tabBtn-notify" onclick="switchTab('notify')">Broadcast</button>
     </div>
 
@@ -218,33 +229,51 @@ nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);
       </div>
     </div>
 
-    <!-- TAB 3: APPEALS & EVIDENCE -->
+    <!-- TAB 3: CREATOR VERIFICATIONS -->
+    <div id="view-verifications" class="dashboard-view" style="display:none;">
+      <div class="glass-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:10px;">
+          <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;">Pending Creator Verifications</h3>
+          <button onclick="loadVerifications()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;cursor:pointer;font-size:0.75rem;font-weight:700;"><i class="fa-solid fa-rotate"></i> Refresh</button>
+        </div>
+        <div id="verificationsContainer"></div>
+      </div>
+    </div>
+
+    <!-- TAB 4: APPEALS & EVIDENCE -->
     <div id="view-appeals" class="dashboard-view" style="display:none;">
       <div class="glass-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:10px;">
           <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;">Pending Appeals & Evidence Logs</h3>
           <button onclick="loadAppeals()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;cursor:pointer;font-size:0.75rem;font-weight:700;"><i class="fa-solid fa-rotate"></i> Refresh</button>
         </div>
-        <div id="appealsContainer">
-          <!-- Populated via JS -->
-        </div>
+        <div id="appealsContainer"></div>
       </div>
     </div>
 
-    <!-- TAB 4: ALL REPORTS FEED -->
+    <!-- TAB 5: ALL REPORTS FEED -->
     <div id="view-reports" class="dashboard-view" style="display:none;">
       <div class="glass-card">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:10px;">
           <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;">All Platform Reports / Flags</h3>
           <button onclick="loadAllReports()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;cursor:pointer;font-size:0.75rem;font-weight:700;"><i class="fa-solid fa-rotate"></i> Refresh</button>
         </div>
-        <div id="reportsContainer">
-          <!-- Populated via JS -->
-        </div>
+        <div id="reportsContainer"></div>
       </div>
     </div>
 
-    <!-- TAB 5: PUSH BROADCAST & NOTIFICATIONS -->
+    <!-- TAB 6: REPORTED POSTS (PROOFS) -->
+    <div id="view-postreports" class="dashboard-view" style="display:none;">
+      <div class="glass-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:10px;">
+          <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;">Reported Posts & Proofs</h3>
+          <button onclick="loadPostReports()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 14px;border-radius:10px;cursor:pointer;font-size:0.75rem;font-weight:700;"><i class="fa-solid fa-rotate"></i> Refresh</button>
+        </div>
+        <div id="postReportsContainer"></div>
+      </div>
+    </div>
+
+    <!-- TAB 7: PUSH BROADCAST & NOTIFICATIONS -->
     <div id="view-notify" class="dashboard-view" style="display:none;">
       <div class="glass-card">
         <h3 style="font-family:'Syne',sans-serif;font-size:1.2rem;margin-bottom:18px;">Send Admin Broadcast Notification</h3>
@@ -272,31 +301,23 @@ nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);
 
 <script>
 const API_BASE = "http://localhost:40000/api";
-const ADMIN_API_KEY = "StreakSphere_Security"; // Must match process.env.API_KEY
+const ADMIN_API_KEY = "StreakSphere_Security";
 
 const api = axios.create({
   baseURL: API_BASE,
-  params: {
-    apiKey: ADMIN_API_KEY
-  },
+  params: { apiKey: ADMIN_API_KEY },
   headers: {
     "Content-Type": "application/json",
     "api-key": ADMIN_API_KEY
   }
 });
 
-// Attach JWT access token dynamically
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("accessToken");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
-}, (error) => {
-  return Promise.reject(error);
-}, { synchronous: true });
+}, (error) => Promise.reject(error), { synchronous: true });
 
-// Automatic Refresh Token Rotation Interceptor
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -320,7 +341,6 @@ api.interceptors.response.use(
   }
 );
 
-// --- AUTH ---
 async function handleLogin(e) {
   e.preventDefault();
   const identifier = document.getElementById("loginIdentifier").value;
@@ -334,10 +354,6 @@ async function handleLogin(e) {
   try {
     const res = await api.post("/auth/login", { identifier, password, deviceId: "admin-mobile-web" });
     if (res.data.success) {
-      if (res.data.requires2fa) {
-        showToast("2FA required. Complete verification in app first.", "error");
-        return;
-      }
       localStorage.setItem("accessToken", res.data.accessToken);
       localStorage.setItem("refreshToken", res.data.refreshToken);
       verifyAdminAccess();
@@ -374,19 +390,19 @@ function handleLogout() {
   document.getElementById("navControls").style.display = "none";
 }
 
-// --- TABS ---
 function switchTab(tab) {
-  ['stats', 'moderation', 'appeals', 'reports', 'notify'].forEach(t => {
+  ['stats', 'moderation', 'verifications', 'appeals', 'reports', 'postreports', 'notify'].forEach(t => {
     document.getElementById(`view-${t}`).style.display = t === tab ? 'block' : 'none';
     document.getElementById(`tabBtn-${t}`).className = `tab-btn ${t === tab ? 'active' : ''}`;
   });
 
   if (tab === 'stats') loadMetrics();
+  if (tab === 'verifications') loadVerifications();
   if (tab === 'appeals') loadAppeals();
   if (tab === 'reports') loadAllReports();
+  if (tab === 'postreports') loadPostReports();
 }
 
-// --- METRICS ---
 async function loadMetrics() {
   try {
     const res = await api.get("/admin/notify/stats");
@@ -400,7 +416,73 @@ async function loadMetrics() {
   } catch (e) { showToast("Failed to fetch platform metrics", "error"); }
 }
 
-// --- MODERATION ACTIONS ---
+// --- REPORTED POSTS (PROOFS) ---
+async function loadPostReports() {
+  const container = document.getElementById("postReportsContainer");
+  container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);"><i class="fa-solid fa-spinner fa-spin text-xl"></i></div>`;
+  
+  try {
+    const res = await api.get("/admin/reports/posts");
+    const reports = res.data.reports || [];
+    
+    if (reports.length === 0) {
+      container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:0.85rem;">No pending post reports.</div>`;
+      return;
+    }
+
+    container.innerHTML = reports.map(rep => {
+      const post = rep.reportedPost;
+      
+      if (!post || post.adminRemoved) return '';
+
+      return `
+        <div class="appeal-card">
+          <div class="appeal-header">
+            <div>
+              <div class="appeal-user">Flagged Reason: <span style="color:var(--danger); text-transform:uppercase;">${rep.reason}</span></div>
+              <div class="appeal-sub" style="margin-top:2px;">Reported by: @${rep.reporter?.username || 'user'}</div>
+            </div>
+            <span style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:var(--danger);padding:4px 10px;border-radius:100px;font-size:0.65rem;font-weight:700;text-transform:uppercase;">Pending</span>
+          </div>
+          
+          <div style="margin: 14px 0;">
+            <img src="${API_BASE}/${post.mediaUrl}" style="width: 100%; max-width: 280px; height: 180px; object-fit: cover; border-radius: 12px; border: 1px solid var(--border);" onerror="this.src='https://via.placeholder.com/280x180?text=Media+Error'" />
+            <div style="margin-top: 8px; color: var(--muted); font-size: 0.85rem;">Caption: "${post.caption || 'No caption'}"</div>
+          </div>
+
+          <div class="appeal-actions">
+            <button onclick="adminRemovePost('${post._id}', '${rep._id}')" style="flex:1;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:var(--danger);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Remove Post</button>
+            <button onclick="adminDismissPostReport('${rep._id}')" style="flex:1;background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.3);color:var(--text);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Dismiss Report</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (e) { 
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);font-size:0.85rem;">Failed to load post reports.</div>`; 
+  }
+}
+
+async function adminRemovePost(postId, reportId) {
+  if (!confirm("Are you sure you want to remove this post? It will show as a black blocked box to users.")) return;
+  try {
+    const res = await api.post("/admin/posts/remove", { postId, reportId });
+    if (res.data.success) {
+      showToast("Post removed successfully.");
+      loadPostReports();
+    }
+  } catch (e) { showToast("Failed to remove post.", "error"); }
+}
+
+async function adminDismissPostReport(reportId) {
+  try {
+    const res = await api.post("/admin/reports/posts/dismiss", { reportId });
+    if (res.data.success) {
+      showToast("Report dismissed.");
+      loadPostReports();
+    }
+  } catch (e) { showToast("Failed to dismiss report.", "error"); }
+}
+
 async function executeSanction(type) {
   const userId = document.getElementById("modUserId").value.trim();
   const reason = document.getElementById("modReason").value.trim();
@@ -429,7 +511,6 @@ async function executeSanction(type) {
   } catch (e) { showToast(e.response?.data?.message || "Action failed", "error"); }
 }
 
-// --- TICK MANAGEMENT ---
 async function updateUserTick() {
   const userId = document.getElementById("tickUserId").value.trim();
   const tick = document.getElementById("tickValue").value;
@@ -445,7 +526,82 @@ async function updateUserTick() {
   } catch (e) { showToast(e.response?.data?.message || "Failed to update tick", "error"); }
 }
 
-// --- APPEALS & EVIDENCE ---
+async function loadVerifications() {
+  const container = document.getElementById("verificationsContainer");
+  container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);"><i class="fa-solid fa-spinner fa-spin text-xl"></i></div>`;
+  
+  try {
+    const res = await api.get("/admin/pending");
+    if (res.data.success) {
+      const requests = res.data.requests;
+      if (requests.length === 0) {
+        container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:0.85rem;">No pending verification requests found.</div>`;
+        return;
+      }
+      
+      container.innerHTML = requests.map(req => {
+        const u = req.user || {};
+        return `
+          <div class="appeal-card">
+            <div class="appeal-header">
+              <div>
+                <div class="appeal-user">${req.stageName} <span class="appeal-sub">(@${u.username || 'unknown'})</span></div>
+                <div class="appeal-sub" style="margin-top:2px;">Legal Name: <strong>${req.fullName}</strong> • Category: <span style="color:var(--accent1);">${req.category}</span></div>
+              </div>
+              <span style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:var(--accent5);padding:4px 10px;border-radius:100px;font-size:0.65rem;font-weight:700;text-transform:uppercase;">Pending Review</span>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:12px;font-size:0.85rem;margin-bottom:12px;">
+              <strong>Public Profile Link:</strong><br><a href="${req.publicProfileLink}" target="_blank" style="color:var(--accent1);word-break:break-all;">${req.publicProfileLink}</a>
+            </div>
+
+            <div style="background:rgba(99, 102, 241, 0.1); border:1px solid rgba(99, 102, 241, 0.3); border-radius:12px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.8rem; color:var(--muted); font-weight:bold;">EXPECTED CODE ON PAPER:</span>
+              <span style="font-size:1.1rem; color:var(--accent1); font-weight:800; letter-spacing:1px;">${req.verificationCode || 'N/A'}</span>
+            </div>
+
+            <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Submitted Credentials:</div>
+            <div class="doc-preview-grid">
+              <div class="doc-preview-box">
+                <span style="font-size:0.7rem;color:var(--muted);font-weight:bold;">Government ID</span>
+                <img src="${req.documentUrl}" alt="Government ID" onclick="window.open('${req.documentUrl}', '_blank')" onerror="this.src='https://via.placeholder.com/300x140?text=Image+Load+Error'"/>
+              </div>
+              <div class="doc-preview-box">
+                <span style="font-size:0.7rem;color:var(--muted);font-weight:bold;">Verification Selfie</span>
+                <img src="${req.selfieUrl}" alt="Verification Selfie" onclick="window.open('${req.selfieUrl}', '_blank')" onerror="this.src='https://via.placeholder.com/300x140?text=Image+Load+Error'"/>
+              </div>
+            </div>
+
+            <div class="appeal-actions">
+              <button onclick="promptReviewVerification('${req._id}', 'approve')" style="flex:1;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:var(--accent4);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.78rem;"><i class="fa-solid fa-check"></i> Approve</button>
+              <button onclick="promptReviewVerification('${req._id}', 'reject')" style="flex:1;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:var(--danger);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.78rem;"><i class="fa-solid fa-xmark"></i> Reject</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  } catch (e) { container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);font-size:0.85rem;">Failed to fetch verification requests.</div>`; }
+}
+
+function promptReviewVerification(requestId, action) {
+  let defaultNote = "Approved by administration.";
+  if (action === 'reject') defaultNote = "Application did not meet verification criteria or code mismatch.";
+  const adminNotes = window.prompt(`Enter moderator note for this ${action} action:`, defaultNote);
+  if (adminNotes !== null) {
+    reviewVerification(requestId, action, adminNotes);
+  }
+}
+
+async function reviewVerification(requestId, action, adminNotes = "") {
+  try {
+    const res = await api.put(`/admin/review/${requestId}`, { action, adminNotes });
+    if (res.data.success) {
+      showToast(res.data.message);
+      loadVerifications();
+    }
+  } catch (e) { showToast(e.response?.data?.message || "Failed to process verification action", "error"); }
+}
+
 async function loadAppeals() {
   const container = document.getElementById("appealsContainer");
   container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);"><i class="fa-solid fa-spinner fa-spin text-xl"></i></div>`;
@@ -459,25 +615,8 @@ async function loadAppeals() {
         return;
       }
       container.innerHTML = appeals.map(item => {
-        const appealStatus = item.status || (item.user && item.user.appealDetails && item.user.appealDetails.status) || 'pending';
+        const appealStatus = item.status || 'pending';
         const isPending = appealStatus === 'pending';
-        
-        const statusColor = isPending ? 'var(--accent5)' : (appealStatus === 'rejected' ? 'var(--danger)' : 'var(--accent4)');
-        const statusBg = isPending ? 'rgba(245,158,11,0.1)' : (appealStatus === 'rejected' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)');
-        const statusBorder = isPending ? 'rgba(245,158,11,0.3)' : (appealStatus === 'rejected' ? 'rgba(239,68,68,0.3)' : 'rgba(16,185,129,0.3)');
-
-        const actionHtml = isPending ? `
-          <div class="appeal-actions">
-            <button onclick="resolveAppeal('${item.user._id}', 'approve')" style="flex:1;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:var(--accent4);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.80rem;">Approve & Unlift</button>
-            
-            <!-- ⚡ Updated Reject Button calls promptRejectAppeal -->
-            <button onclick="promptRejectAppeal('${item.user._id}')" style="flex:1;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:var(--danger);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.80rem;">Reject Appeal</button>
-          </div>
-        ` : `
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 12px; border-radius: 12px; margin-top: 16px; font-size: 0.8rem; font-weight: bold; color: var(--muted); text-align: center;">
-            <i class="fa-solid ${appealStatus === 'rejected' ? 'fa-circle-xmark' : 'fa-circle-check'}" style="color: ${statusColor}; margin-right: 6px;"></i> Appeal Processed: ${appealStatus.toUpperCase()}
-          </div>
-        `;
 
         return `
           <div class="appeal-card">
@@ -486,24 +625,19 @@ async function loadAppeals() {
                 <div class="appeal-user">${item.user.name} <span class="appeal-sub">@${item.user.username || 'user'}</span></div>
                 <div class="appeal-sub" style="margin-top:2px;">Reason: <span style="color:var(--danger);">${item.suspensionReason}</span></div>
               </div>
-              <span style="background:${statusBg};border:1px solid ${statusBorder};color:${statusColor};padding:4px 10px;border-radius:100px;font-size:0.65rem;font-weight:700;text-transform:uppercase;">${appealStatus}</span>
+              <span style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.3);color:var(--accent5);padding:4px 10px;border-radius:100px;font-size:0.65rem;font-weight:700;text-transform:uppercase;">${appealStatus}</span>
             </div>
             
             <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:12px;font-size:0.85rem;margin-bottom:12px;">
               <strong>Appeal Message:</strong><br>"${item.appealText || 'No comment provided.'}"
             </div>
 
-            <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Evidence / Reports (${item.evidenceReports.length}):</div>
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              ${item.evidenceReports.map(rep => `
-                <div class="evidence-box" style="margin:0;">
-                  <div>Reported by <strong>@${rep.reporter?.username || 'user'}</strong> for <strong style="text-transform:uppercase;">${rep.reason}</strong></div>
-                  ${rep.details ? `<div style="margin-top:4px;color:#fff;font-style:italic;">"${rep.details}"</div>` : ''}
-                </div>
-              `).join('')}
-            </div>
-
-            ${actionHtml}
+            ${isPending ? `
+              <div class="appeal-actions">
+                <button onclick="resolveAppeal('${item.user._id}', 'approve')" style="flex:1;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.4);color:var(--accent4);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.80rem;">Approve & Unlift</button>
+                <button onclick="resolveAppeal('${item.user._id}', 'reject')" style="flex:1;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:var(--danger);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.80rem;">Reject Appeal</button>
+              </div>
+            ` : ''}
           </div>
         `;
       }).join('');
@@ -511,15 +645,6 @@ async function loadAppeals() {
   } catch (e) { container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);font-size:0.85rem;">Failed to load appeals.</div>`; }
 }
 
-// ⚡ New wrapper function to ask for a moderator note before rejecting
-function promptRejectAppeal(userId) {
-  const note = window.prompt("Enter a moderator note to show the user (optional):", "Your account activity violates our Terms of Service. This decision is final.");
-  if (note !== null) { // User didn't click Cancel
-    resolveAppeal(userId, 'reject', note);
-  }
-}
-
-// ⚡ Updated to accept moderatorNote
 async function resolveAppeal(userId, decision, moderatorNote = "") {
   try {
     const res = await api.post("/admin/appeal/resolve", { userId, decision, moderatorNote });
@@ -530,7 +655,6 @@ async function resolveAppeal(userId, decision, moderatorNote = "") {
   } catch (e) { showToast("Failed to process appeal resolution", "error"); }
 }
 
-// --- ALL REPORTS FEED ---
 async function loadAllReports() {
   const container = document.getElementById("reportsContainer");
   container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);"><i class="fa-solid fa-spinner fa-spin text-xl"></i></div>`;
@@ -540,102 +664,29 @@ async function loadAllReports() {
     const reports = res.data.reports || [];
     
     if (reports.length === 0) {
-      container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:0.85rem;">No active reports found on the platform.</div>`;
+      container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);font-size:0.85rem;">No active reports found.</div>`;
       return;
     }
 
     container.innerHTML = reports.map(rep => {
-      const reportedUserObj = rep.reportedUser;
-      const reportedName = reportedUserObj?.name || "Unknown User";
-      const reportedUsername = reportedUserObj?.username || "unknown";
-      const reportedId = reportedUserObj?._id || reportedUserObj;
-
-      const reporterObj = rep.reporter;
-      const reporterName = reporterObj?.name || "Anonymous";
-      const reporterUsername = reporterObj?.username || "anonymous";
-
-      const repStatus = rep.status || 'pending';
-      const isPending = repStatus === 'pending';
-
-      const statusColor = isPending ? 'var(--danger)' : (repStatus === 'dismissed' ? 'var(--muted)' : 'var(--accent4)');
-      const statusBg = isPending ? 'rgba(239,68,68,0.1)' : (repStatus === 'dismissed' ? 'rgba(255,255,255,0.05)' : 'rgba(16,185,129,0.1)');
-      const statusBorder = isPending ? 'rgba(239,68,68,0.3)' : (repStatus === 'dismissed' ? 'rgba(255,255,255,0.1)' : 'rgba(16,185,129,0.3)');
-
-      const actionHtml = isPending ? `
-        <div class="appeal-actions">
-          <button onclick="quickActionSuspend('${reportedId}')" style="flex:1;background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.4);color:var(--accent5);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Suspend User</button>
-          <button onclick="quickActionBan('${reportedId}')" style="flex:1;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:var(--danger);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Permanent Ban</button>
-          <button onclick="dismissReport('${rep._id}')" style="flex:1;background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.3);color:var(--text);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Dismiss</button>
-        </div>
-      ` : `
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 12px; border-radius: 12px; margin-top: 16px; font-size: 0.8rem; font-weight: bold; color: var(--muted); text-align: center;">
-          <i class="fa-solid fa-check-circle" style="color: ${statusColor}; margin-right: 6px;"></i> Action Taken: ${repStatus.toUpperCase()}
-        </div>
-      `;
-
+      const reportedUserObj = rep.reportedUser || {};
       return `
         <div class="appeal-card">
           <div class="appeal-header">
             <div>
-              <div class="appeal-user">${reportedName} <span class="appeal-sub">@${reportedUsername}</span></div>
-              <div class="appeal-sub" style="margin-top:2px;">Infraction Reason: <span style="color:var(--danger); text-transform:uppercase; font-weight:bold;">${rep.reason}</span></div>
+              <div class="appeal-user">${reportedUserObj.name || 'User'} <span class="appeal-sub">@${reportedUserObj.username || 'unknown'}</span></div>
+              <div class="appeal-sub" style="margin-top:2px;">Reason: <span style="color:var(--danger); text-transform:uppercase; font-weight:bold;">${rep.reason}</span></div>
             </div>
-            <span style="background:${statusBg};border:1px solid ${statusBorder};color:${statusColor};padding:4px 10px;border-radius:100px;font-size:0.65rem;font-weight:700;text-transform:uppercase;">${repStatus}</span>
           </div>
-          
-          <div style="background:rgba(255,255,255,0.03);border-radius:12px;padding:12px;font-size:0.85rem;margin-bottom:12px;">
-            <strong>Report Details:</strong><br>"${rep.details || 'No additional description provided.'}"
-          </div>
-
-          <div style="font-size:0.75rem; color:var(--muted); margin-bottom: 12px;">
-            Filed by: <strong>@${reporterUsername} (${reporterName})</strong> • Date: ${new Date(rep.createdAt).toLocaleString()}
-          </div>
-
-          ${actionHtml}
+          <div style="font-size:0.75rem; color:var(--muted);">Filed on: ${new Date(rep.createdAt).toLocaleString()}</div>
         </div>
       `;
     }).join('');
   } catch (e) { 
-    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);font-size:0.85rem;">Failed to fetch platform reports. Ensure backend route /api/admin/reports is active.</div>`; 
+    container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);font-size:0.85rem;">Failed to fetch reports.</div>`; 
   }
 }
 
-async function quickActionSuspend(userId) {
-  if (!userId) return showToast("Invalid User ID", "error");
-  try {
-    const res = await api.post("/admin/user/suspend", { userId, reason: "Violated community standards based on report", durationHours: 24 });
-    if (res.data.success) {
-      showToast(res.data.message);
-      loadAllReports();
-    }
-  } catch (e) { showToast("Failed to suspend user", "error"); }
-}
-
-async function quickActionBan(userId) {
-  if (!userId) return showToast("Invalid User ID", "error");
-  try {
-    const res = await api.post("/admin/user/ban", { userId, reason: "Permanent ban for repeated reports" });
-    if (res.data.success) {
-      showToast(res.data.message);
-      loadAllReports();
-    }
-  } catch (e) { showToast("Failed to ban user", "error"); }
-}
-
-async function dismissReport(reportId) {
-  if (!reportId) return showToast("Invalid Report ID", "error");
-  try {
-    const res = await api.post("/admin/report/dismiss", { reportId });
-    if (res.data.success) {
-      showToast(res.data.message || "Report dismissed.");
-      loadAllReports(); 
-    }
-  } catch (e) { 
-    showToast("Failed to dismiss report. Ensure backend route /api/admin/report/dismiss exists.", "error"); 
-  }
-}
-
-// --- BROADCAST NOTIFICATION ---
 async function sendBroadcast() {
   const title = document.getElementById("broadcastTitle").value.trim();
   const body = document.getElementById("broadcastBody").value.trim();
@@ -652,7 +703,6 @@ async function sendBroadcast() {
   } catch (e) { showToast(e.response?.data?.message || "Broadcast failed", "error"); }
 }
 
-// --- TOAST ---
 function showToast(text, type = "success") {
   const toast = document.getElementById("toast");
   const icon = document.getElementById("toastIcon");
@@ -666,7 +716,6 @@ function showToast(text, type = "success") {
   setTimeout(() => { toast.classList.remove("show"); }, 3500);
 }
 
-// On page load check session
 window.onload = () => {
   if (localStorage.getItem("accessToken")) {
     verifyAdminAccess();

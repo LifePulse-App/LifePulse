@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import User from '../models/UserSchema.js';
 import ErrorHandler from '../utils/errorHandler.js';
 import catchAsyncErrors from '../utils/catchAsyncErrors.js';
@@ -66,13 +67,11 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
   const scope = normalizeScope(rawScope);
   
   const user = await User.findById(req.user._id).select(
-    'monthlyXp totalXp level currentTitle country city username name avatarUrl following friends tick isPremium blockedUsers blockedBy'
+    'monthlyXp totalXp level currentTitle country city username name avatarUrl following friends tick isPremium premiumPreferences blockedUsers blockedBy'
   );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
   const blockedIds = [...(user.blockedUsers || []), ...(user.blockedBy || [])].map(String);
-
-  // ⚡ Removed effectiveMonthlyXp. The DB value is already doubled for premium.
   const userMonthlyXp = user.monthlyXp || 0;
 
   if (scope === 'friends') {
@@ -80,7 +79,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
 
     const topPlayers = await User.find(
       { accountStatus: 'active', _id: { $in: friendIds } },
-      'username name monthlyXp level currentTitle country city avatarUrl tick isPremium'
+      'username name monthlyXp level currentTitle country city avatarUrl tick isPremium premiumPreferences'
     )
       .sort({ monthlyXp: -1, _id: 1 })
       .limit(100)
@@ -92,25 +91,30 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
     });
 
     const userRank = userMonthlyXp > 0 ? higherCount + 1 : null;
+    const currentUserBadge = user.isPremium && user.premiumPreferences?.premiumBadge !== false;
 
     return res.status(200).json({
       success: true,
       scope,
       filter: { friends: friendIds.length },
-      leaderboard: topPlayers.map((u, idx) => ({
-        rank: idx + 1,
-        userId: u._id,
-        username: u.username,
-        name: u.name,
-        monthlyXp: u.monthlyXp, // ⚡ Raw DB value used directly
-        level: u.level,
-        title: u.currentTitle,
-        country: u.country,
-        city: u.city,
-        avatarUrl: u.avatarUrl,
-        tick: u.tick,
-        isPremium: u.isPremium
-      })),
+      leaderboard: topPlayers.map((u, idx) => {
+        const showBadge = u.isPremium && u.premiumPreferences?.premiumBadge !== false;
+        return {
+          rank: idx + 1,
+          userId: u._id,
+          username: u.username,
+          name: u.name,
+          monthlyXp: u.monthlyXp,
+          level: u.level,
+          title: u.currentTitle,
+          country: u.country,
+          city: u.city,
+          avatarUrl: u.avatarUrl,
+          tick: u.tick,
+          isPremium: showBadge,
+          showPremiumBadge: showBadge
+        };
+      }),
       currentUser: {
         userId: user._id,
         username: user.username,
@@ -123,7 +127,8 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
         city: user.city,
         avatarUrl: user.avatarUrl,
         tick: user.tick,
-        isPremium: user.isPremium
+        isPremium: currentUserBadge,
+        showPremiumBadge: currentUserBadge
       },
     });
   }
@@ -136,7 +141,7 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
       monthlyXp: { $gt: 0 }, 
       ...scopeFilter 
     },
-    'username name monthlyXp level currentTitle country city avatarUrl tick isPremium'
+    'username name monthlyXp level currentTitle country city avatarUrl tick isPremium premiumPreferences'
   )
     .collation({ locale: 'en', strength: 2 })
     .sort({ monthlyXp: -1, _id: 1 })
@@ -150,25 +155,30 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
   }).collation({ locale: 'en', strength: 2 });
 
   const userRank = userMonthlyXp > 0 ? higherCount + 1 : null;
+  const currentUserBadge = user.isPremium && user.premiumPreferences?.premiumBadge !== false;
 
   res.status(200).json({
     success: true,
     scope,
     filter: scopeFilter,
-    leaderboard: topPlayers.map((u, idx) => ({
-      rank: idx + 1,
-      userId: u._id,
-      username: u.username,
-      name: u.name,
-      monthlyXp: u.monthlyXp,
-      level: u.level,
-      title: u.currentTitle,
-      country: u.country,
-      city: u.city,
-      avatarUrl: u.avatarUrl,
-      tick: u.tick,
-      isPremium: u.isPremium
-    })),
+    leaderboard: topPlayers.map((u, idx) => {
+      const showBadge = u.isPremium && u.premiumPreferences?.premiumBadge !== false;
+      return {
+        rank: idx + 1,
+        userId: u._id,
+        username: u.username,
+        name: u.name,
+        monthlyXp: u.monthlyXp,
+        level: u.level,
+        title: u.currentTitle,
+        country: u.country,
+        city: u.city,
+        avatarUrl: u.avatarUrl,
+        tick: u.tick,
+        isPremium: showBadge,
+        showPremiumBadge: showBadge
+      };
+    }),
     currentUser: {
       userId: user._id,
       username: user.username,
@@ -181,7 +191,8 @@ export const getMonthlyLeaderboard = catchAsyncErrors(async (req, res, next) => 
       city: user.city,
       avatarUrl: user.avatarUrl,
       tick: user.tick,
-      isPremium: user.isPremium
+      isPremium: currentUserBadge,
+      showPremiumBadge: currentUserBadge
     },
   });
 });
@@ -195,13 +206,11 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
   const scope = normalizeScope(rawScope);
   
   const user = await User.findById(req.user._id).select(
-    'totalXp level currentTitle country city username name avatarUrl following friends tick isPremium blockedUsers blockedBy'
+    'totalXp level currentTitle country city username name avatarUrl following friends tick isPremium premiumPreferences blockedUsers blockedBy'
   );
   if (!user) return next(new ErrorHandler('User not found', 404));
 
   const blockedIds = [...(user.blockedUsers || []), ...(user.blockedBy || [])].map(String);
-
-  // ⚡ Removed effectiveTotalXp. The DB value is already doubled for premium.
   const userTotalXp = user.totalXp || 0;
 
   if (scope === 'friends') {
@@ -209,7 +218,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
 
     const topPlayers = await User.find(
       { accountStatus: 'active', _id: { $in: friendIds } },
-      'username name totalXp level currentTitle country city avatarUrl tick isPremium'
+      'username name totalXp level currentTitle country city avatarUrl tick isPremium premiumPreferences'
     )
       .sort({ totalXp: -1, _id: 1 })
       .limit(100)
@@ -221,25 +230,30 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
     });
 
     const userRank = userTotalXp > 0 ? higherCount + 1 : null;
+    const currentUserBadge = user.isPremium && user.premiumPreferences?.premiumBadge !== false;
 
     return res.status(200).json({
       success: true,
       scope,
       filter: { friends: friendIds.length },
-      leaderboard: topPlayers.map((u, idx) => ({
-        rank: idx + 1,
-        userId: u._id,
-        username: u.username,
-        name: u.name,
-        xp: u.totalXp, // ⚡ Raw DB value used directly
-        level: u.level,
-        title: u.currentTitle,
-        country: u.country,
-        city: u.city,
-        avatarUrl: u.avatarUrl,
-        tick: u.tick,
-        isPremium: u.isPremium,
-      })),
+      leaderboard: topPlayers.map((u, idx) => {
+        const showBadge = u.isPremium && u.premiumPreferences?.premiumBadge !== false;
+        return {
+          rank: idx + 1,
+          userId: u._id,
+          username: u.username,
+          name: u.name,
+          xp: u.totalXp,
+          level: u.level,
+          title: u.currentTitle,
+          country: u.country,
+          city: u.city,
+          avatarUrl: u.avatarUrl,
+          tick: u.tick,
+          isPremium: showBadge,
+          showPremiumBadge: showBadge,
+        };
+      }),
       currentUser: {
         userId: user._id,
         username: user.username,
@@ -252,7 +266,8 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
         city: user.city,
         avatarUrl: user.avatarUrl,
         tick: user.tick,
-        isPremium: user.isPremium,
+        isPremium: currentUserBadge,
+        showPremiumBadge: currentUserBadge,
       },
     });
   }
@@ -265,7 +280,7 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
       totalXp: { $gt: 0 }, 
       ...scopeFilter 
     },
-    'username name totalXp level currentTitle country city avatarUrl tick isPremium'
+    'username name totalXp level currentTitle country city avatarUrl tick isPremium premiumPreferences'
   )
     .collation({ locale: 'en', strength: 2 })
     .sort({ totalXp: -1, _id: 1 })
@@ -279,25 +294,30 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
   }).collation({ locale: 'en', strength: 2 });
 
   const userRank = userTotalXp > 0 ? higherCount + 1 : null;
+  const currentUserBadge = user.isPremium && user.premiumPreferences?.premiumBadge !== false;
 
   res.status(200).json({
     success: true,
     scope,
     filter: scopeFilter,
-    leaderboard: topPlayers.map((u, idx) => ({
-      rank: idx + 1,
-      userId: u._id,
-      username: u.username,
-      name: u.name,
-      xp: u.totalXp,
-      level: u.level,
-      title: u.currentTitle,
-      country: u.country,
-      city: u.city,
-      avatarUrl: u.avatarUrl,
-      tick: u.tick,
-      isPremium: u.isPremium,
-    })),
+    leaderboard: topPlayers.map((u, idx) => {
+      const showBadge = u.isPremium && u.premiumPreferences?.premiumBadge !== false;
+      return {
+        rank: idx + 1,
+        userId: u._id,
+        username: u.username,
+        name: u.name,
+        xp: u.totalXp,
+        level: u.level,
+        title: u.currentTitle,
+        country: u.country,
+        city: u.city,
+        avatarUrl: u.avatarUrl,
+        tick: u.tick,
+        isPremium: showBadge,
+        showPremiumBadge: showBadge,
+      };
+    }),
     currentUser: {
       userId: user._id,
       username: user.username,
@@ -310,7 +330,8 @@ export const getPermanentLeaderboard = catchAsyncErrors(async (req, res, next) =
       city: user.city,
       avatarUrl: user.avatarUrl,
       tick: user.tick,
-      isPremium: user.isPremium,
+      isPremium: currentUserBadge,
+      showPremiumBadge: currentUserBadge,
     },
   });
 });

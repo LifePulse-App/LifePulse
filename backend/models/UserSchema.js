@@ -336,6 +336,12 @@ appealDetails: {
 blockedBy: [
   { type: mongoose.Schema.Types.ObjectId, ref: "User" }
 ],
+// Add this with your other user fields
+    postVisibility: { 
+      type: String, 
+      enum: ["foryou", "world", "country", "city", "friends", "private"], 
+      default: "friends" 
+    },
 // In your User schema
 resetPasswordCode: String,
 resetPasswordCodeExpire: Date,

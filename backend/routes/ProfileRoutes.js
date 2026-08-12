@@ -27,7 +27,9 @@ import {
   deleteAvatar,
   requestDeleteAccountOtp,
   getPremiumPreferences,
-  updatePremiumPreferences
+  updatePremiumPreferences,
+  updateActivityPrivacy,
+  getActivityPrivacy
 } from "../controllers/ProfileController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 
@@ -75,5 +77,8 @@ router.get("/avatar/:userId", getUserProfile);
 
 router.get("/premium-preferences", isAuthenticatedUser, getPremiumPreferences);
 router.post("/premium-preferences", isAuthenticatedUser, updatePremiumPreferences);
+
+router.get("/activity-privacy", isAuthenticatedUser, getActivityPrivacy);
+router.patch("/activity-privacy", isAuthenticatedUser, updateActivityPrivacy);
 
 export default router;

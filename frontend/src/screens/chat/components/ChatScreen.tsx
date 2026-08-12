@@ -462,14 +462,67 @@ const MessageBubble = memo(({
 
     if (!mediaUrl) return null;
 
-    if (messageType === "image") {
-      return (
-        <View style={styles.mediaContainer}>
-          <Image source={{ uri: mediaUrl }} style={styles.mediaImage} resizeMode="cover" />
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleImagePress} android_ripple={{ color: "rgba(255,255,255,0.10)" }} />
+if (messageType === "image") {
+  // ⚡ CHECK IF SHARED POST WAS REMOVED BY ADMIN
+  if (plaintext?.startsWith("__SHARED_POST_REMOVED__|")) {
+    return (
+      <View style={[styles.sharedPostCard, { backgroundColor: '#0A0A0A', padding: 24, alignItems: 'center', justifyContent: 'center' }]}>
+        <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(239, 68, 68, 0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 12, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+          <Icon name="shield-alert-outline" size={24} color="#EF4444" />
         </View>
-      );
-    }
+        <Text style={{ color: "#F8FAFC", fontSize: 16, fontWeight: "700", textAlign: "center" }}>Post Removed</Text>
+        <Text style={{ color: "#94A3B8", fontSize: 12, textAlign: "center", marginTop: 4, lineHeight: 16 }}>
+          This shared post was removed because it violated our community guidelines.
+        </Text>
+      </View>
+    );
+  }
+
+  // ⚡ NORMAL SHARED POST RENDER
+  if (plaintext?.startsWith("__SHARED_POST__|")) {
+    const parts = plaintext.split("|");
+    const sPostId = parts[1] || "";
+    const sUserId = parts[2] || ""; 
+    const sUsername = parts[3] || "user";
+    const sCaption = parts[4] || "";
+
+    const navData = JSON.stringify({ postId: sPostId, userId: sUserId });
+
+    return (
+      <View style={styles.sharedPostCard}>
+        <View style={styles.sharedPostHeader}>
+          <Icon name="play-box-multiple-outline" size={16} color="#F8FAFC" />
+          <Text style={styles.sharedPostHeaderName}>@{sUsername}</Text>
+        </View>
+        
+        <View style={styles.sharedPostImageWrap}>
+          <Image source={{ uri: mediaUrl }} style={styles.sharedPostImage} resizeMode="cover" />
+        </View>
+        
+        <View style={styles.sharedPostFooter}>
+          <Text style={styles.sharedPostCaption} numberOfLines={2}>{sCaption}</Text>
+          
+          <TouchableOpacity 
+            style={styles.sharedPostBtn} 
+            activeOpacity={0.85}
+            onPress={() => onImagePress("shared_post", mediaUrl, navData)} 
+          >
+            <Text style={styles.sharedPostBtnText}>View Post</Text>
+            <Icon name="chevron-right" size={16} color="#FFF" style={{ marginLeft: 2 }} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ⚡ Normal Image Render (if it's not a shared post)
+  return (
+    <View style={styles.mediaContainer}>
+      <Image source={{ uri: mediaUrl }} style={styles.mediaImage} resizeMode="cover" />
+      <Pressable style={StyleSheet.absoluteFill} onPress={handleImagePress} android_ripple={{ color: "rgba(255,255,255,0.10)" }} />
+    </View>
+  );
+}
 
     if (messageType === "video") {
       return (
@@ -2676,11 +2729,29 @@ const handleReact = useCallback(async (emoji: string) => {
     );
   }, [conversationId, myUserId, messages, dismissMenu, showGlassyError]);
 
-  const handleImagePress = useCallback((type: string, url: string, name: string) => {
+const handleImagePress = useCallback((type: string, url: string, name: string) => {
+    // ⚡ Redirect to UserFeedScreen if it's a shared post
+    if (type === 'shared_post') {
+      try {
+        // Parse the JSON data we sent from the button
+        const data = JSON.parse(name);
+        
+        navigation.navigate("UserFeedScreen", { 
+          userId: data.userId, 
+          initialPostId: data.postId 
+        });
+      } catch (e) {
+        // Fallback for older messages
+        navigation.navigate("UserFeedScreen", { initialPostId: name });
+      }
+      return;
+    }
+    
+    // Normal media handling
     if (type === 'image') openImageViewerCb(url);
     if (type === 'video') openVideoViewerCb(url);
     if (type === 'document') openDocInAppCb(url, name);
-  }, [openImageViewerCb, openVideoViewerCb, openDocInAppCb]);
+  }, [openImageViewerCb, openVideoViewerCb, openDocInAppCb, navigation]);
 
   const handleDoubleTap = useCallback((msgId: string, isMe: boolean) => {
     toggleReaction(msgId, "❤️");
@@ -3747,5 +3818,66 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 8,
+  },
+  // ⚡ SHARED POST STYLES
+  sharedPostCard: {
+    width: 240,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(148, 163, 184, 0.15)",
+  },
+  sharedPostHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+  },
+  sharedPostHeaderName: {
+    color: "#F8FAFC",
+    fontSize: 13,
+    fontWeight: "600",
+    marginLeft: 6,
+  },
+  sharedPostImageWrap: {
+    width: "100%",
+    height: 240,
+    position: "relative",
+  },
+  sharedPostImage: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#1E293B",
+  },
+  sharedPostPlayOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: "rgba(0,0,0,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sharedPostFooter: {
+    padding: 12,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+  },
+  sharedPostCaption: {
+    color: "#CBD5E1",
+    fontSize: 12,
+    marginBottom: 10,
+    lineHeight: 16,
+  },
+  sharedPostBtn: {
+    flexDirection: "row",
+    backgroundColor: "#6366F1",
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sharedPostBtnText: {
+    color: "#FFF",
+    fontSize: 13,
+    fontWeight: "700",
   },
 });

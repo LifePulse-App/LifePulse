@@ -5,6 +5,7 @@ import path from "path";
 
 // ⚡ IMPORT USER SCHEMA TO CHECK BLOCKS
 import User from "../models/UserSchema.js"; 
+import Proof from "../models/ProofSchema.js"; 
 
 import ChatMessage from "../models/ChatMessage.js";
 import Conversation from "../models/Conversation.js";
@@ -327,6 +328,20 @@ export const getThread = async (req, res) => {
       .sort({ createdAt: -1 }) 
       .limit(limit)
       .lean();
+
+    // ⚡ CHECK FOR ADMIN REMOVED PROOFS IN SHARED POSTS
+    for (let m of messages) {
+      if (m.text && m.text.startsWith("__SHARED_POST__|")) {
+        const parts = m.text.split("|");
+        const postId = parts[1];
+        if (postId) {
+          const proof = await Proof.findById(postId).select("adminRemoved").lean();
+          if (proof && proof.adminRemoved) {
+            m.text = `__SHARED_POST_REMOVED__|${postId}`;
+          }
+        }
+      }
+    }
       
     res.json({ messages: messages.reverse(), isPremium: req.user.isPremium, tick: req.user.tick });
   } catch (err) {
@@ -485,11 +500,27 @@ export const listConversationPreviews = async (req, res) => {
 
       let lastText = "";
       if (last) {
-        if (last.messageType === "image") lastText = "📷 Photo";
-        else if (last.messageType === "video") lastText = "🎥 Video";
-        else if (last.messageType === "document") lastText = "📎 Document";
-        else if (last.messageType === "voice" || last.messageType === "audio") lastText = "🎤 Voice message";
-        else lastText = last.text || "";
+        if (last.text && last.text.startsWith("__SHARED_POST_REMOVED__|")) {
+          lastText = "Shared a post";
+        }
+        else if (last.text && last.text.startsWith("__SHARED_POST__|")) {
+          lastText = "Shared a post";
+        } 
+        else if (last.messageType === "image") {
+          lastText = "sent a photo";
+        } 
+        else if (last.messageType === "video") {
+          lastText = "sent a video";
+        } 
+        else if (last.messageType === "document") {
+          lastText = "sent a Document";
+        } 
+        else if (last.messageType === "voice" || last.messageType === "audio") {
+          lastText = "sent a voice message";
+        } 
+        else {
+          lastText = last.text || "";
+        }
       }
 
       out.push({

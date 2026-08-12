@@ -101,6 +101,7 @@ const Dashboard = ({ navigation }: any) => {
   } | null>(null);
 
   const [habits, setHabits] = useState([]);
+  
   const [currentMood, setCurrentMood] = useState<{
     mood: string;
     createdAt: string;
@@ -525,6 +526,14 @@ const Dashboard = ({ navigation }: any) => {
 
             <View style={{ height: 40 }} />
           </ScrollView>
+          {/* Floating Feed Button */}
+<TouchableOpacity
+  activeOpacity={0.8}
+  style={styles.floatingFeedButton}
+  onPress={() => navigation.navigate("PublicActivityFeed")}
+>
+  <Icon name="telescope" size={26} color="#F9FAFB" />
+</TouchableOpacity>
           {/* Floating Camera Button */}
           <TouchableOpacity
             activeOpacity={0.8}
@@ -859,7 +868,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowOffset: { width: 0, height: 14 },
     shadowRadius: 24,
-    elevation: 8,
+    elevation: 0,
   },
   levelSection: {
     flexDirection: "row",
@@ -1042,6 +1051,24 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginBottom: 10,
   },
+ floatingFeedButton: {
+  position: "absolute",
+  left: 20,
+  bottom: Platform.OS === "android" ? 20 : 25, // Aligned at the same bottom level as the camera button
+  width: 56,
+  height: 56,
+  borderRadius: 28,
+  backgroundColor: "rgba(147, 51, 234, 0.25)", // Purple-tinted glass effect
+  justifyContent: "center",
+  alignItems: "center",
+  borderWidth: 1,
+  borderColor: "rgba(216, 180, 254, 0.4)",
+  shadowColor: "#000",
+  shadowOpacity: 0.3,
+  shadowOffset: { width: 0, height: 10 },
+  shadowRadius: 18,
+  elevation: 10,
+},
   errorTitle: {
     color: "#FCA5A5",
     fontSize: 13,
@@ -1161,7 +1188,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowOffset: { width: 0, height: 10 },
     shadowRadius: 18,
-    elevation: 10,
+    elevation: 0,
   },
   badgeBubble: {
     position: "absolute",

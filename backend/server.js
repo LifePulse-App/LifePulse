@@ -41,6 +41,9 @@ mongoose.connect(process.env.MONGO_URI)
 const HOME_DIR = os.homedir();
 app.use('/avatars', express.static(path.join(HOME_DIR, "uploads", "avatars")));
 app.use('/chat-media', express.static(path.join(HOME_DIR, "uploads", "chat")));
+app.use('/proofs', express.static(path.join(HOME_DIR, "uploads", "proofs")));
+// Replace your old /uploads line with this:
+app.use('/api/uploads', express.static(path.join(process.cwd(), "uploads")));
 
 // --- Middlewares
 app.use(cookieParser());
@@ -74,7 +77,9 @@ import AdminRoutes from './routes/AdminRoutes.js';
 import ArPortalRoutes from "./routes/ArPortalRoutes.js";
 import ArPrivatePortalRoutes from "./routes/ArPrivatePortalRoutes.js";
 import ModerationRoutes from "./routes/ModerationRoutes.js";
+import VerifyRoutes from "./routes/VerificationRoutes.js";
 import WebhookRoutes from "./routes/webhook.js";
+import FeedRoutes from "./routes/FeedRoutes.js";
 
 // --- Attach io to req
 app.use((req, res, next) => {
@@ -101,6 +106,8 @@ app.use("/api/call", CallRoutes);
 app.use("/api/ar-portal", ArPortalRoutes);
 app.use("/api/ar-private-portal", ArPrivatePortalRoutes);
 app.use("/api/moderate", ModerationRoutes);
+app.use("/api/verify", VerifyRoutes);
+app.use("/api/feed", FeedRoutes);
 app.use("/api/admin", AdminRoutes);
 app.use("/webhook", WebhookRoutes);
 

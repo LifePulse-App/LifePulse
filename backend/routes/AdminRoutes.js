@@ -16,7 +16,8 @@ import {
   resolveAppeal,
   getAllReports,
 } from '../controllers/AdminController.js';
-import { dismissReport } from '../controllers/ModerationController.js';
+import { dismissPostReport, dismissReport, getPostReports, removeReportedPost } from '../controllers/ModerationController.js';
+import { getPendingVerifications, reviewVerification } from '../controllers/VerificationController.js';
 
 const router = express.Router();
 
@@ -51,5 +52,18 @@ router.post('/appeal/resolve', resolveAppeal);
 
 router.get('/reports', getAllReports);
 router.post('/report/dismiss', dismissReport);
+
+// --- Admin-Facing Routes ---
+router.get("/pending", getPendingVerifications);
+router.put("/review/:requestId", reviewVerification);
+
+// ⚡ 1. Admin fetches all reported posts
+router.get("/reports/posts", getPostReports);
+
+// ⚡ 2. Admin removes the post (blacks it out for users)
+router.post("/posts/remove", removeReportedPost);
+
+// ⚡ 3. Admin dismisses the report (keeps the post visible)
+router.post("/reports/posts/dismiss", dismissPostReport);
 
 export default router;

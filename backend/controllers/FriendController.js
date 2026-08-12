@@ -198,21 +198,26 @@ export const friendStatus = catchAsyncErrors(async (req, res) => {
 export const listFriends = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const me = await User.findById(currentUserId)
-    .populate("friends.user", "name username avatarUrl isPremium tick avatarVersion")
+    .populate("friends.user", "name username avatarUrl isPremium premiumPreferences tick avatarVersion") // ⚡ Fetch premium preferences
     .lean();
   if (!me) return res.status(404).json({ message: "User not found" });
 
   const friends = (me.friends || [])
     .filter(f => f.user)
-    .map(f => ({
-      _id: f.user._id,
-      name: f.user.name,
-      username: f.user.username,
-      avatar: f.user.avatarUrl,
-      isPremium: f.user.isPremium,
-      tick: f.user.tick,
-      since: f.since,
-    }));
+    .map(f => {
+      // ⚡ Safely calculate badge visibility based on preference
+      const showBadge = f.user.isPremium && f.user.premiumPreferences?.premiumBadge !== false;
+      return {
+        _id: f.user._id,
+        name: f.user.name,
+        username: f.user.username,
+        avatar: f.user.avatarUrl,
+        isPremium: showBadge, 
+        showPremiumBadge: showBadge,
+        tick: f.user.tick,
+        since: f.since,
+      };
+    });
 
   res.json({ friends, isPremium: me.isPremium });
 });
@@ -220,22 +225,27 @@ export const listFriends = catchAsyncErrors(async (req, res) => {
 export const pendingFriendRequests = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const me = await User.findById(currentUserId)
-    .populate("friendRequests.user", "name username avatarUrl isPremium tick")
+    .populate("friendRequests.user", "name username avatarUrl isPremium premiumPreferences tick") // ⚡ Fetch premium preferences
     .lean();
   if (!me) return res.status(404).json({ message: "User not found" });
 
   res.json({
     requests: (me.friendRequests || [])
       .filter(r => !me.friends.some(f => String(f.user) === String(r.user?._id)))
-      .map(r => ({
-        _id: r.user?._id,
-        name: r.user?.name,
-        username: r.user?.username,
-        avatar: r.user?.avatarUrl,
-        isPremium: r.user?.isPremium,
-        tick: r.user?.tick,
-        requestedAt: r.requestedAt,
-      })),
+      .map(r => {
+        // ⚡ Safely calculate badge visibility based on preference
+        const showBadge = r.user?.isPremium && r.user?.premiumPreferences?.premiumBadge !== false;
+        return {
+          _id: r.user?._id,
+          name: r.user?.name,
+          username: r.user?.username,
+          avatar: r.user?.avatarUrl,
+          isPremium: showBadge,
+          showPremiumBadge: showBadge,
+          tick: r.user?.tick,
+          requestedAt: r.requestedAt,
+        };
+      }),
     isPremium: me.isPremium,
   });
 });
@@ -263,19 +273,24 @@ export const searchUsers = catchAsyncErrors(async (req, res) => {
     },
     $or: [{ username: searchRegex }, { name: searchRegex }],
   })
-    .select("name username avatarUrl friendRequests friends isPremium tick")
+    .select("name username avatarUrl friendRequests friends isPremium premiumPreferences tick") // ⚡ Fetch premium preferences
     .lean();
 
   users = users.map(u => {
     const friend = isFriend(u, currentUserId);
     const requestSent = u.friendRequests?.some(r => String(r.user) === String(currentUserId));
     const incoming = me?.friendRequests?.some(r => String(r.user) === String(u._id));
+    
+    // ⚡ Safely calculate badge visibility based on preference
+    const showBadge = u.isPremium && u.premiumPreferences?.premiumBadge !== false;
+    
     return {
       _id: u._id,
       name: u.name,
       username: u.username,
       avatar: u.avatarUrl,
-      isPremium: u.isPremium,
+      isPremium: showBadge,
+      showPremiumBadge: showBadge,
       tick: u.tick,
       isFriend: friend,
       requestSent,
@@ -304,7 +319,7 @@ export const suggestedFriends = catchAsyncErrors(async (req, res) => {
   ];
 
   let users = await User.find({ accountStatus: 'active', _id: { $nin: excludeIds } })
-    .select("name username avatarUrl friendRequests friends isPremium tick")
+    .select("name username avatarUrl friendRequests friends isPremium premiumPreferences tick") // ⚡ Fetch premium preferences
     .limit(limit)
     .lean();
 
@@ -312,12 +327,17 @@ export const suggestedFriends = catchAsyncErrors(async (req, res) => {
     const friend = isFriend(u, currentUserId);
     const requestSent = u.friendRequests?.some(r => String(r.user) === String(currentUserId));
     const incoming = me?.friendRequests?.some(r => String(r.user) === String(u._id));
+    
+    // ⚡ Safely calculate badge visibility based on preference
+    const showBadge = u.isPremium && u.premiumPreferences?.premiumBadge !== false;
+    
     return {
       _id: u._id,
       name: u.name,
       username: u.username,
       avatar: u.avatarUrl,
-      isPremium: u.isPremium,
+      isPremium: showBadge,
+      showPremiumBadge: showBadge,
       tick: u.tick,
       isFriend: friend,
       requestSent,
@@ -370,9 +390,8 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
   const { userId } = req.params;
 
-  // ⚡ 1. Added premiumPreferences to the .select()
   let targetDoc = await User.findById(userId)
-    .select("name username avatarUrl avatarVersion avatarThumbnailUrl level isPremium premiumPreferences currentTitle country city isPublic tick partner partnerSince partnerGracePeriodEnd")
+    .select("name username avatarUrl avatarVersion avatarThumbnailUrl level isPremium premiumPreferences currentTitle country city isPublic tick partner partnerSince partnerGracePeriodEnd blockedUsers")
     .lean();
 
   if (!targetDoc || targetDoc.accountStatus === 'suspended' || targetDoc.accountStatus === 'banned') {
@@ -383,19 +402,34 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
   const wasCleanedUp = await checkAndCleanupGracePeriod(targetUserObj);
   if (wasCleanedUp) {
     targetDoc = await User.findById(userId)
-       .select("name username avatarUrl avatarVersion avatarThumbnailUrl level isPremium premiumPreferences currentTitle country city isPublic tick partner partnerSince partnerGracePeriodEnd")
+       .select("name username avatarUrl avatarVersion avatarThumbnailUrl level isPremium premiumPreferences currentTitle country city isPublic tick partner partnerSince partnerGracePeriodEnd blockedUsers")
        .lean();
   }
 
-  const me = await User.findById(currentUserId).select("friends friendRequests relationshipIncoming relationshipOutgoing partner isPremium").lean();
+  const me = await User.findById(currentUserId).select("friends friendRequests relationshipIncoming relationshipOutgoing partner isPremium blockedUsers").lean();
 
-  const theyBlockedMe = targetDoc.blockedUsers?.map(String).includes(currentUserId);
   const iBlockedThem = me?.blockedUsers?.map(String).includes(userId);
+  const theyBlockedMe = targetDoc.blockedUsers?.map(String).includes(currentUserId);
   
   if (theyBlockedMe || iBlockedThem) {
-    return res.status(404).json({ message: "User not found" });
+    return res.json({
+      user: {
+        _id: targetDoc._id,
+        name: iBlockedThem ? "Blocked User" : "User not found",
+        username: "",
+        avatarUrl: null, 
+        isBlockedByMe: iBlockedThem,
+        isBlockedByThem: theyBlockedMe, 
+        isPremium: false,
+        showPremiumBadge: false,
+        relationshipHidden: true,
+      },
+      friendship: { isFriend: false, requestSent: false, requestIncoming: false },
+      relationship: { isPartner: false, requestSent: false, requestIncoming: false, isSuspended: false },
+      isPremium: me?.isPremium
+    });
   }
-  
+
   const isFriendFlag = me ? isFriend(me, userId) : false;
   const requestSent = await User.exists({ _id: userId, "friendRequests.user": currentUserId });
   const requestIncoming = me?.friendRequests?.some((r) => String(r.user) === String(userId));
@@ -409,37 +443,39 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
   const relRequestSent = me?.relationshipOutgoing?.some(r => String(r.user) === userId);
   const relRequestIncoming = me?.relationshipIncoming?.some(r => String(r.user) === userId);
 
-  // ==========================================
-  // ⚡ PREMIUM PRIVACY MASKS
-  // ==========================================
-  
-  // Only hide the relationship if they are Premium, toggled it ON, AND the viewer is NOT their partner
-  const hideRel = targetDoc.isPremium && targetDoc.premiumPreferences?.hideRelationship && !isPartner;
-  
-  // Show badge if Premium AND they haven't explicitly toggled it off
-  const showBadge = targetDoc.isPremium && targetDoc.premiumPreferences?.premiumBadge !== false;
-
   let partnerData = null;
-  
-  // ⚡ If hideRel is true, we skip building the partnerData entirely
-  if (targetDoc.partner && !hideRel) {
-    const partnerUser = await User.findById(targetDoc.partner).select("name").lean();
-    if (partnerUser) {
+  let hideRel = false;
+  let isSuspended = false;
+
+  const targetWantsHidden = targetDoc.isPremium && targetDoc.premiumPreferences?.hideRelationship;
+
+  if (targetDoc.partner) {
+    const partnerDoc = await User.findById(targetDoc.partner).select("name isPremium premiumPreferences").lean();
+    const partnerWantsHidden = partnerDoc?.isPremium && partnerDoc?.premiumPreferences?.hideRelationship;
+
+    if ((targetWantsHidden || partnerWantsHidden) && !isPartner) {
+      hideRel = true;
+    }
+
+    if (!hideRel && partnerDoc) {
       const msInDay = 24 * 60 * 60 * 1000;
       const diff = now.getTime() - new Date(targetDoc.partnerSince).getTime();
       
       partnerData = {
-        _id: partnerUser._id,
-        name: partnerUser.name,
+        _id: partnerDoc._id,
+        name: partnerDoc.name,
         days: Math.floor(diff / msInDay),
         isSuspended: !!targetDoc.partnerGracePeriodEnd,
         gracePeriodEnd: targetDoc.partnerGracePeriodEnd || null
       };
     }
+    
+    isSuspended = !hideRel ? !!targetDoc.partnerGracePeriodEnd : false;
+  } else {
+    if (targetWantsHidden) hideRel = true;
   }
 
-  // ⚡ Hide suspension status if relationship is hidden
-  const isSuspended = !hideRel ? !!targetDoc.partnerGracePeriodEnd : false;
+  const showBadge = targetDoc.isPremium && targetDoc.premiumPreferences?.premiumBadge !== false;
 
   res.json({
     user: {
@@ -456,15 +492,14 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
       moodCreatedAt: moodDoc?.createdAt || null,
       moodExpiresAt: moodDoc?.expiresAt || null,
       tick: targetDoc?.tick,
-      
-      // ⚡ Only return true for isPremium if they want the badge shown!
-      // This ensures older frontend code automatically hides the star icon.
-      isPremium: showBadge, 
-      showPremiumBadge: showBadge, 
+      isPremium: targetDoc.isPremium, 
+      showPremiumBadge: showBadge,    
       relationshipHidden: hideRel,
+      isBlockedByMe: iBlockedThem, 
+      isBlockedByThem: theyBlockedMe,
       isPublic: !!targetDoc.isPublic,
       canSeeLocation,
-      partner: partnerData, // ⚡ Will be null if hidden
+      partner: partnerData, 
     },
     friendship: {
       isFriend: isFriendFlag,
@@ -478,7 +513,7 @@ export const previewProfile = catchAsyncErrors(async (req, res) => {
       isSuspended: isSuspended,
       gracePeriodEnd: !hideRel ? targetDoc.partnerGracePeriodEnd || null : null
     },
-    isPremium: me?.isPremium // This is for the viewer's premium status, keep as is
+    isPremium: me?.isPremium
   });
 });
 
@@ -520,68 +555,6 @@ export const sendRelationshipRequest = catchAsyncErrors(async (req, res) => {
   return res.json({ message: "Relationship request sent!", requestSent: true, isPremium: me.isPremium });
 });
 
-/**
- * Accept a relationship request & Restore Streak for Premium Users
- */
-export const acceptRelationshipRequest = catchAsyncErrors(async (req, res) => {
-  const currentUserId = req.user.id;
-  const { targetUserId } = req.params;
-
-  const me = await User.findById(currentUserId);
-  const them = await User.findById(targetUserId);
-
-  if (!them) return res.status(404).json({ message: "User not found" });
-
-  if (me.partner) return res.status(400).json({ message: "You already have a partner." });
-  if (them.partner) return res.status(400).json({ message: "They already have a partner." });
-
-  const hasIncoming = me.relationshipIncoming?.some(r => String(r.user) === targetUserId);
-  if (!hasIncoming) return res.status(400).json({ message: "No incoming request from this user." });
-
-  const now = new Date();
-  let streakStartDate = now;
-
-  if (me.isPremium || them.isPremium) {
-    const lastRelationship = me.relationshipHistory
-      .slice()
-      .reverse()
-      .find(h => String(h.partnerId) === targetUserId);
-
-    if (lastRelationship) {
-      const hoursSinceBreakup = (now.getTime() - new Date(lastRelationship.endedAt).getTime()) / (1000 * 60 * 60);
-      
-      if (hoursSinceBreakup <= 24) {
-        streakStartDate = lastRelationship.startedAt;
-        me.relationshipHistory = me.relationshipHistory.filter(h => String(h.partnerId) !== targetUserId);
-        them.relationshipHistory = them.relationshipHistory.filter(h => String(h.partnerId) !== currentUserId);
-      }
-    }
-  }
-
-  me.relationshipIncoming = [];
-  me.relationshipOutgoing = [];
-  me.partner = them._id;
-  me.partnerSince = streakStartDate;
-  me.partnerGracePeriodEnd = null;
-
-  them.relationshipIncoming = [];
-  them.relationshipOutgoing = [];
-  them.partner = me._id;
-  them.partnerSince = streakStartDate;
-  them.partnerGracePeriodEnd = null;
-
-  await me.save();
-  await them.save();
-
-  const isRestored = streakStartDate !== now;
-  return res.json({ 
-    message: isRestored 
-      ? "Relationship started! Previous streak restored. (StreakSphere+ Benefit)" 
-      : "Relationship started!", 
-    success: true,
-    isPremium: me.isPremium 
-  });
-});
 
 /**
  * Cancel or Decline a pending relationship request
@@ -621,10 +594,76 @@ export const cancelRelationshipRequest = catchAsyncErrors(async (req, res) => {
 });
 
 /**
+ * Accept a relationship request & Restore Streak for Premium Users
+ */
+export const acceptRelationshipRequest = catchAsyncErrors(async (req, res) => {
+  const currentUserId = req.user.id;
+  const { targetUserId } = req.params;
+
+  const me = await User.findById(currentUserId);
+  const them = await User.findById(targetUserId);
+
+  if (!them) return res.status(404).json({ message: "User not found" });
+
+  if (me.partner) return res.status(400).json({ message: "You already have a partner." });
+  if (them.partner) return res.status(400).json({ message: "They already have a partner." });
+
+  const hasIncoming = me.relationshipIncoming?.some(r => String(r.user) === targetUserId);
+  if (!hasIncoming) return res.status(400).json({ message: "No incoming request from this user." });
+
+  const now = new Date();
+  let streakStartDate = now;
+
+  // Check history
+  const lastRelationship = me.relationshipHistory
+    .slice()
+    .reverse()
+    .find(h => String(h.partnerId) === targetUserId);
+
+  if (lastRelationship) {
+    const hoursSinceBreakup = (now.getTime() - new Date(lastRelationship.endedAt).getTime()) / (1000 * 60 * 60);
+    
+    // ⚡ Strict check: 36h only applies if the person taking the action (ME) is premium
+    const allowedHours = me.isPremium ? 36 : 24;
+
+    if (hoursSinceBreakup <= allowedHours) {
+      streakStartDate = lastRelationship.startedAt;
+      me.relationshipHistory = me.relationshipHistory.filter(h => String(h.partnerId) !== targetUserId);
+      them.relationshipHistory = them.relationshipHistory.filter(h => String(h.partnerId) !== currentUserId);
+    }
+  }
+
+  me.relationshipIncoming = [];
+  me.relationshipOutgoing = [];
+  me.partner = them._id;
+  me.partnerSince = streakStartDate;
+  me.partnerGracePeriodEnd = null;
+
+  them.relationshipIncoming = [];
+  them.relationshipOutgoing = [];
+  them.partner = me._id;
+  them.partnerSince = streakStartDate;
+  them.partnerGracePeriodEnd = null;
+
+  await me.save();
+  await them.save();
+
+  const isRestored = streakStartDate !== now;
+  return res.json({ 
+    message: isRestored 
+      ? "Relationship started! Previous streak restored. (StreakSphere+ Benefit)" 
+      : "Relationship started!", 
+    success: true,
+    isPremium: me.isPremium 
+  });
+});
+
+/**
  * Suspend current partner or Instant Break-up for Premium Users
  */
 export const removeRelationship = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
+  const { instant } = req.body; 
   const me = await User.findById(currentUserId);
 
   if (!me.partner) return res.status(400).json({ message: "You are not in a relationship." });
@@ -632,7 +671,8 @@ export const removeRelationship = catchAsyncErrors(async (req, res) => {
   const them = await User.findById(me.partner);
   const now = new Date();
 
-  if (me.isPremium) {
+  // ⚡ Only do instant break-up if the user taking the action (ME) is premium AND chose instant = true
+  if (me.isPremium && instant === true) {
     me.relationshipHistory.push({
       partnerId: them ? them._id : me.partner,
       partnerName: them ? them.name : "Unknown",
@@ -664,7 +704,9 @@ export const removeRelationship = catchAsyncErrors(async (req, res) => {
       isPremium: me.isPremium 
     });
   } else {
-    const graceEnd = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    // ⚡ Strict check: 36h grace period only applies if the person initiating the break up (ME) is premium
+    const hoursToWait = me.isPremium ? 36 : 24;
+    const graceEnd = new Date(Date.now() + hoursToWait * 60 * 60 * 1000);
     
     me.partnerGracePeriodEnd = graceEnd;
     await me.save();
@@ -675,7 +717,7 @@ export const removeRelationship = catchAsyncErrors(async (req, res) => {
     }
 
     return res.json({ 
-      message: "Relationship suspended. You have 24 hours to restore it.", 
+      message: `Relationship suspended. You have ${hoursToWait} hours to restore it.`, 
       success: true,
       isPremium: me.isPremium 
     });
@@ -800,7 +842,6 @@ export const unblockUser = catchAsyncErrors(async (req, res) => {
   return res.status(200).json({ message: "User unblocked successfully", success: true, isPremium: me.isPremium });
 });
 
-// ⚡ GET My Relationship History
 export const getMyRelationshipHistory = catchAsyncErrors(async (req, res, next) => {
   const user = await User.findById(req.user.id).select("relationshipHistory isPremium");
   if (!user) return next(new ErrorHandler("User not found", 404));
@@ -820,7 +861,6 @@ export const getMyRelationshipHistory = catchAsyncErrors(async (req, res, next) 
   res.status(200).json({ success: true, history });
 });
 
-// ⚡ GET Partner's Relationship History
 export const getPartnerRelationshipHistory = catchAsyncErrors(async (req, res, next) => {
   const user = await User.findById(req.user.id).select("partner isPremium");
   if (!user) return next(new ErrorHandler("User not found", 404));

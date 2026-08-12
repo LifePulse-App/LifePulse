@@ -43,6 +43,15 @@ const formatLastTime = (iso?: string) => {
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 };
 
+// ⚡ HELPER: Formats the snippet so the __SHARED_POST__ signature looks clean
+const formatSnippet = (text: string) => {
+  if (!text) return "No messages yet";
+  if (text.startsWith("__SHARED_POST__|")) {
+    return " Shared a post";
+  }
+  return text;
+};
+
 const saveCache = async (userId: string, data: any[]) => {
   try {
     await AsyncStorage.setItem(`${CACHE_KEY}:${userId}`, JSON.stringify(data));
@@ -216,8 +225,9 @@ const ChatRowItem = ({ item, navigation, onHideRequest, onCallRequest }: any) =>
             <Text style={styles.time}>{formatLastTime(item.lastAt)}</Text>
           </View>
           <View style={styles.rowTop}>
+            {/* ⚡ USE THE formatSnippet HELPER HERE */}
             <Text style={[styles.snippet, isBlockedChat && { color: "#f87171", fontStyle: "italic" }]} numberOfLines={1}>
-              {isBlockedChat ? "" : (item.lastText || "No messages yet")}
+              {isBlockedChat ? "" : formatSnippet(item.lastText)}
             </Text>
             {item.unread > 0 && !isBlockedChat && (
               <View style={styles.badge}>

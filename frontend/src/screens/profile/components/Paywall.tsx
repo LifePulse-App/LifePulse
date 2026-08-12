@@ -408,13 +408,13 @@ export default function PaywallScreen({ navigation }) {
               <Icon name="chevron-right" size={22} color="#9CA3AF" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionCard} onPress={openIconSheet}>
+            <TouchableOpacity style={[styles.actionCard, { opacity: 0.5 }]}>
               <Icon name="palette" size={24} color="#a855f7" />
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={styles.actionCardTitle}>Custom App Icon</Text>
-                <Text style={styles.actionCardSub}>Change home screen icon</Text>
+                <Text style={styles.actionCardSub}>Coming Soon</Text>
               </View>
-              <Icon name="chevron-right" size={22} color="#9CA3AF" />
+               <Icon name="lock-outline" size={20} color="#9CA3AF" />
             </TouchableOpacity>
 
             <View style={[styles.actionCard, { opacity: 0.5 }]}>

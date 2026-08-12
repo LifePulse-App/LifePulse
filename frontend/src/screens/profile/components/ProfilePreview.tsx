@@ -47,7 +47,8 @@ type PreviewUser = {
   streak?: number;
   tick?: string;
   badge?: boolean;
-  relationshipHidden?: boolean; // ⚡ ADDED FLAG
+  isPremium?: boolean; 
+  relationshipHidden?: boolean; 
   partner?: { 
     _id: string; 
     name: string; 
@@ -74,6 +75,7 @@ type PreviewResponse = {
   user: PreviewUser;
   friendship: Friendship;
   relationship?: RelationshipStatus;
+  isPremium?: boolean; 
 };
 
 const cacheKey = (userId: string) => `profilePreview:v3:${userId}`;
@@ -158,6 +160,10 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState(false);
   const [user, setUser] = useState<PreviewUser | null>(null);
+  
+  // ⚡ The Viewer's Premium Status
+  const [isViewerPremium, setIsViewerPremium] = useState(false);
+  
   const [friendship, setFriendship] = useState<Friendship | null>(null);
   const [relationship, setRelationship] = useState<RelationshipStatus | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -170,6 +176,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   // ⚡ TrueSheet Refs
   const menuSheetRef = useRef<TrueSheet>(null);
   const reportSheetRef = useRef<TrueSheet>(null);
+  const breakupSheetRef = useRef<TrueSheet>(null);
 
   // Report Form States
   const [selectedReason, setSelectedReason] = useState("spam");
@@ -201,6 +208,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       isPublic: prev?.isPublic,
       canSeeLocation: prev?.canSeeLocation,
       partner: prev?.partner,
+      isPremium: prev?.isPremium,
       relationshipHidden: prev?.relationshipHidden,
     }));
   }, [userId, route.params?.name, route.params?.username]);
@@ -215,6 +223,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setUser(cached.user); 
       setFriendship(cached.friendship);
       setRelationship(cached.relationship || null);
+      setIsViewerPremium(cached.isPremium || false);
       setLoading(false); 
     }
 
@@ -238,10 +247,12 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setUser(mergedUser);
       setFriendship(payload.friendship);
       setRelationship(payload.relationship || { isPartner: false, requestSent: false, requestIncoming: false, isSuspended: false });
+      setIsViewerPremium(payload.isPremium || false);
       await saveCache(cacheKey(userId), {
         user: mergedUser,
         friendship: payload.friendship,
         relationship: payload.relationship,
+        isPremium: payload.isPremium,
       });
     } catch (e: any) {
       setErrorMsg(
@@ -403,11 +414,13 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setErrorMsg(e?.response?.data?.message || "Could not cancel request.");
     } finally { setBusyAction(false); }
   };
-  const onSuspendRel = async () => {
+  
+  const onSuspendRel = async (instant: boolean) => {
     try { 
+      breakupSheetRef.current?.dismiss();
       setBusyAction(true); 
       setErrorMsg(null);
-      const response = await apiClient.post(`/relationship/remove`);
+      const response = await apiClient.post(`/relationship/remove`, { instant });
       if (!response.ok) {
         throw new Error(response.data?.message || "You are already in a relationship.");
       }
@@ -416,6 +429,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
       setErrorMsg(e?.response?.data?.message || "Could not suspend relationship.");
     } finally { setBusyAction(false); }
   };
+
   const onRestoreRel = async () => {
     try { 
       setBusyAction(true); 
@@ -435,7 +449,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
     try {
       setBusyAction(true);
       setErrorMsg(null);
-      const response = await apiClient.post(`/user/${userId}/block`);
+      const response = await apiClient.post(`/friends/user/${userId}/block`);
       if (!response.ok && response.status !== 200) {
         throw new Error(response.data?.message || "Failed to block user.");
       }
@@ -492,6 +506,8 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   // ⚡ RELATIONSHIP TOGGLE FLAGS
   const isHidden = !!user?.relationshipHidden;
   const hasPartner = !!user?.partner?._id;
+  
+  const anyPremium = isViewerPremium || user?.isPremium;
 
   useEffect(() => {
     const loadLocalAvatar = async () => {
@@ -706,9 +722,15 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                     <Text style={[styles.primaryBtnText, { color: "#34d399" }]}>Restore Relationship</Text>
                   </TouchableOpacity>
                 ) : (
-                  <TouchableOpacity style={[styles.primaryBtn, styles.primaryBtnDanger]} onPress={onSuspendRel} disabled={busyAction}>
+                  <TouchableOpacity 
+                    style={[styles.primaryBtn, styles.primaryBtnDanger]} 
+                    onPress={() => anyPremium ? breakupSheetRef.current?.present() : onSuspendRel(false)} 
+                    disabled={busyAction}
+                  >
                     <Icon name="heart-broken" size={20} color="#f87171" />
-                    <Text style={[styles.primaryBtnText, { color: "#f87171" }]}>Suspend Relationship</Text>
+                    <Text style={[styles.primaryBtnText, { color: "#f87171" }]}>
+                      {anyPremium ? "Break Up Options" : "Break-up (Start 24h Timer)"}
+                    </Text>
                   </TouchableOpacity>
                 )
               ) : relationship?.requestSent ? (
@@ -731,7 +753,7 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                     <Text style={styles.cancelBtnText}>Decline</Text>
                   </TouchableOpacity>
                 </View>
-              ) : (!user?.partner?._id && friendship?.isFriend) ? (
+              ) : (!user?.partner?._id && friendship?.isFriend && !isHidden) ? (
                 <TouchableOpacity style={[styles.primaryBtn, styles.primaryBtnPink]} onPress={onSendRel} disabled={busyAction}>
                   <Icon name="cards-heart" size={20} color="#f43f5e" />
                   <Text style={[styles.primaryBtnText, { color: "#f43f5e" }]}>Ask to be Partner</Text>
@@ -886,6 +908,47 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
           </TouchableOpacity>
           <View style={{ height: 30 }} />
         </ScrollView>
+      </TrueSheet>
+
+      {/* ⚡ 3. Break Up Options Sheet (Premium Shared Access) */}
+      <TrueSheet
+        ref={breakupSheetRef}
+        detents={[0.4]}
+        cornerRadius={30}
+        backgroundColor="#0F172A"
+        grabber={false}
+      >
+        <View style={{ padding: 24, paddingBottom: 40 }}>
+          <View style={{ alignItems: "center", marginBottom: 16 }}>
+            <Icon name="heart-broken" size={36} color="#f87171" style={{ marginBottom: 8 }} />
+            <Text style={styles.sheetTitle}>End Relationship</Text>
+            <Text style={{ color: "#9ca3b8", textAlign: "center" }}>
+              As a StreakSphere+ member, how do you want to handle this?
+            </Text>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.sheetOptionRow} 
+            onPress={() => onSuspendRel(false)}
+          >
+            <Icon name="timer-sand" size={22} color="#fbbf24" style={{ marginRight: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sheetOptionText, { color: "#fbbf24" }]}>Suspend (36h Timer)</Text>
+              <Text style={{ color: "#9ca3b8", fontSize: 12, marginTop: 2 }}>You can restore the streak within 36 hours.</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.sheetOptionRow} 
+            onPress={() => onSuspendRel(true)}
+          >
+            <Icon name="lightning-bolt" size={22} color="#f87171" style={{ marginRight: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sheetOptionText, { color: "#f87171" }]}>Break Up Instantly</Text>
+              <Text style={{ color: "#9ca3b8", fontSize: 12, marginTop: 2 }}>Skip the timer. Move to history immediately.</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </TrueSheet>
 
       {/* Unfriend Confirmation Modal */}
