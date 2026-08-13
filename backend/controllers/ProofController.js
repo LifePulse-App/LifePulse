@@ -33,7 +33,7 @@ export const submitProof = async (req, res) => {
       user: userId,
       habit: habit._id,
       // ⚡ FIX: Use req.file.filename instead of req.file.path for the web URL
-      imageUrl: `/proofs/${req.file.filename}`, 
+      imageUrl: `/uploads/${req.file.filename}`, 
       status: "submitted",
       points: 1,
       verified: false,
