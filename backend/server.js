@@ -59,7 +59,7 @@ dirsToEnsure.forEach((dir) => {
 app.use('/avatars', express.static(path.join(UPLOADS_DIR, "avatars")));
 app.use('/chat-media', express.static(path.join(UPLOADS_DIR, "chat")));
 app.use('/proofs', express.static(path.join(UPLOADS_DIR, "proofs")));
-app.use('/uploads', express.static(path.join(UPLOADS_DIR, "proofs")));
+app.use('/api/uploads', express.static(path.join(UPLOADS_DIR, "proofs")));
 
 // --- Middlewares
 app.use(cookieParser());
