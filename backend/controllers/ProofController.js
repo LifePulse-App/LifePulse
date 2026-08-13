@@ -29,17 +29,8 @@ export const submitProof = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found." });
     }
 
-    // ⏱️ 1. Time Slot Enforcement
+    // ⏱️ 1. Determine time slot just for record-keeping (No restrictions/blocks applied)
     const currentSlot = getTimeSlotForDate(new Date());
-    const expectedSlot = habit.timeSlot;
-    const isTimeValid = !expectedSlot || currentSlot === expectedSlot;
-
-    // if (!isTimeValid) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: `Proof submitted outside allowed time slot. Current slot: ${currentSlot}, Expected: ${expectedSlot}`
-    //   });
-    // }
 
     // ⚡ 2. AI Verification Request (with timeout)
     const formData = new FormData();
@@ -67,10 +58,10 @@ export const submitProof = async (req, res) => {
       verified: isVerified,
       aiScore: aiRes.data.score,
       verifiedAt: isVerified ? new Date() : null,
-      timeSlotAtProof: currentSlot,
+      timeSlotAtProof: currentSlot, // Still saving when they did it, but not blocking them
       isPremiumXP,
       caption: habitName,
-      visibilityScope: userDoc.postVisibility || "friend",
+      visibilityScope: userDoc.postVisibility || "friends", // matched to schema enum
       city: userDoc.city || "",
       country: userDoc.country || ""
     });
