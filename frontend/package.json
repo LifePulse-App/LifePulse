@@ -1,6 +1,6 @@
 {
   "name": "StreakSphere",
-  "version": "5.0.0",
+  "version": "6.0.0",
   "private": true,
   "scripts": {
     "dev": "cp .env.development .env && npx react-native run-android",

@@ -67,3 +67,5 @@
 # 11. Biometrics & KeyChain
 -keep class com.oblador.keychain.** { *; }
 -keep class com.rnbiometrics.** { *; }
+
+-keep class com.revenuecat.purchases.** { *; }

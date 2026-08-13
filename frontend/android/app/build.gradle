@@ -85,7 +85,7 @@ android {
         applicationId "com.streaksphere"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        versionCode 6.0.0
         versionName "6.0.0"
     }
     signingConfigs {
