@@ -5,64 +5,79 @@ import axios from "axios";
 import { recalculateXp } from "./XpController.js";
 import { getTimeSlotForDate } from "../utils/timeSlotCheck.js";
 import fs from "fs";
-import FormData from "form-data"; 
+import FormData from "form-data";
 
 export const submitProof = async (req, res) => {
+  const filePath = req.file?.path;
+
   try {
-    const { habitId, userId } = req.body;
-    if (!habitId || !req.file) {
+    const { habitId } = req.body;
+    // 🔒 Security: Use authenticated user ID over req.body
+    const userId = req.user?.id || req.user?._id || req.body.userId;
+
+    if (!habitId || !filePath) {
       return res.status(400).json({ success: false, message: "habitId and proof image required." });
     }
 
     const habit = await Habit.findOne({ _id: habitId, active: true });
-    if (!habit) return res.status(404).json({ success: false, message: "Habit not found." });
+    if (!habit) {
+      return res.status(404).json({ success: false, message: "Habit not found." });
+    }
 
     const userDoc = await User.findById(userId);
-    const xpMultEnabled = userDoc?.premiumPreferences?.xpMultiplier !== false;
-    const isPremiumXP = !!(userDoc?.isPremium && xpMultEnabled);
+    if (!userDoc) {
+      return res.status(404).json({ success: false, message: "User not found." });
+    }
 
+    // ⏱️ 1. Time Slot Enforcement
     const currentSlot = getTimeSlotForDate(new Date());
     const expectedSlot = habit.timeSlot;
     const isTimeValid = !expectedSlot || currentSlot === expectedSlot;
 
-    // 🔥 DYNAMIC CAPTION & VISIBILITY:
-    // Fallback to habit.key if habit.name doesn't exist on your schema
-    const habitName = habit.name || habit.title || habit.key; 
-    const generatedCaption = `${habitName}`;
+    // if (!isTimeValid) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: `Proof submitted outside allowed time slot. Current slot: ${currentSlot}, Expected: ${expectedSlot}`
+    //   });
+    // }
 
+    // ⚡ 2. AI Verification Request (with timeout)
+    const formData = new FormData();
+    formData.append("habitKey", habit.key);
+    formData.append("image", fs.createReadStream(filePath));
+
+    const aiRes = await axios.post("https://api-ai.streaksphere.app/verify", formData, {
+      headers: formData.getHeaders(),
+      timeout: 10000 // 10-second request timeout
+    });
+
+    const isVerified = !!aiRes.data.verified;
+    const pointsAwarded = isVerified ? 50 : 1;
+    const xpMultEnabled = userDoc?.premiumPreferences?.xpMultiplier !== false;
+    const isPremiumXP = !!(userDoc?.isPremium && xpMultEnabled);
+    const habitName = habit.name || habit.title || habit.key;
+
+    // 💾 3. Database Persistence (after AI response)
     const proof = await Proof.create({
       user: userId,
       habit: habit._id,
-      imageUrl: req.file.path,
-      status: "submitted",
-      points: 1,
-      verified: false,
+      imageUrl: filePath, // Note: Replace with S3/Cloudinary URL in production
+      status: isVerified ? "verified" : "rejected",
+      points: pointsAwarded,
+      verified: isVerified,
+      aiScore: aiRes.data.score,
+      verifiedAt: isVerified ? new Date() : null,
       timeSlotAtProof: currentSlot,
-      isPremiumXP: isPremiumXP,
-      caption: generatedCaption, // ⚡ Automatically sets to Habit Name
-      visibilityScope: userDoc.postVisibility || "friend", // ⚡ Fetches from user settings
+      isPremiumXP,
+      caption: habitName,
+      visibilityScope: userDoc.postVisibility || "friend",
       city: userDoc.city || "",
       country: userDoc.country || ""
     });
 
-    // Send image to FastAPI AI verification
-    const formData = new FormData();
-    formData.append("habitKey", habit.key);
-    formData.append("image", fs.createReadStream(req.file.path));
-
-    const aiRes = await axios.post("https://api-ai.streaksphere.app/verify", formData, {
-      headers: formData.getHeaders(),
-    });
-
-    proof.status = aiRes.data.verified ? "verified" : "rejected";
-    proof.points = aiRes.data.verified ? 50 : 1;
-    proof.verified = !!aiRes.data.verified;
-    proof.aiScore = aiRes.data.score;
-    if (proof.verified) proof.verifiedAt = new Date();
-
-    await proof.save();
-
-    if (proof.verified) await recalculateXp(userId);
+    if (isVerified) {
+      await recalculateXp(userId);
+    }
 
     return res.json({
       success: true,
@@ -72,8 +87,18 @@ export const submitProof = async (req, res) => {
       predictedActivity: aiRes.data.predictedActivity,
       predictedScore: aiRes.data.score
     });
+
   } catch (error) {
-    console.error("Submit Proof Error:", error);
+    console.error("Submit Proof Error:", error?.response?.data || error.message);
     return res.status(500).json({ success: false, message: "Failed to submit proof." });
+  } finally {
+    // 🧹 4. Always Clean Up Disk Storage
+    if (filePath && fs.existsSync(filePath)) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch (cleanupErr) {
+        console.error("Failed to delete temp file:", cleanupErr);
+      }
+    }
   }
 };
