@@ -9,10 +9,10 @@ import FormData from "form-data";
 
 export const submitProof = async (req, res) => {
   const filePath = req.file?.path;
+  const fileName = req.file?.filename;
 
   try {
     const { habitId } = req.body;
-    // 🔒 Security: Use authenticated user ID over req.body
     const userId = req.user?.id || req.user?._id || req.body.userId;
 
     if (!habitId || !filePath) {
@@ -29,17 +29,16 @@ export const submitProof = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found." });
     }
 
-    // ⏱️ 1. Determine time slot just for record-keeping (No restrictions/blocks applied)
     const currentSlot = getTimeSlotForDate(new Date());
 
-    // ⚡ 2. AI Verification Request (with timeout)
+    // ⚡ AI Verification Request
     const formData = new FormData();
     formData.append("habitKey", habit.key);
     formData.append("image", fs.createReadStream(filePath));
 
     const aiRes = await axios.post("https://api-ai.streaksphere.app/verify", formData, {
       headers: formData.getHeaders(),
-      timeout: 10000 // 10-second request timeout
+      timeout: 10000 
     });
 
     const isVerified = !!aiRes.data.verified;
@@ -48,20 +47,20 @@ export const submitProof = async (req, res) => {
     const isPremiumXP = !!(userDoc?.isPremium && xpMultEnabled);
     const habitName = habit.name || habit.title || habit.key;
 
-    // 💾 3. Database Persistence (after AI response)
+    // 💾 Database Persistence
     const proof = await Proof.create({
       user: userId,
       habit: habit._id,
-      imageUrl: filePath, // Note: Replace with S3/Cloudinary URL in production
+      imageUrl: `/proofs/${fileName}`, // Saved as /proofs/filename for web serving
       status: isVerified ? "verified" : "rejected",
       points: pointsAwarded,
       verified: isVerified,
       aiScore: aiRes.data.score,
       verifiedAt: isVerified ? new Date() : null,
-      timeSlotAtProof: currentSlot, // Still saving when they did it, but not blocking them
+      timeSlotAtProof: currentSlot,
       isPremiumXP,
       caption: habitName,
-      visibilityScope: userDoc.postVisibility || "friends", // matched to schema enum
+      visibilityScope: userDoc.postVisibility || "friends",
       city: userDoc.city || "",
       country: userDoc.country || ""
     });
@@ -81,15 +80,9 @@ export const submitProof = async (req, res) => {
 
   } catch (error) {
     console.error("Submit Proof Error:", error?.response?.data || error.message);
+    
+    // File deletion logic removed. Files will stay on disk even if an error occurs.
+    
     return res.status(500).json({ success: false, message: "Failed to submit proof." });
-  } finally {
-    // 🧹 4. Always Clean Up Disk Storage
-    if (filePath && fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-      } catch (cleanupErr) {
-        console.error("Failed to delete temp file:", cleanupErr);
-      }
-    }
   }
 };
