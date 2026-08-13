@@ -167,7 +167,6 @@ const PublicActivityFeed = ({ navigation }: any) => {
   // API STATE
   // ============================================================
   const [posts, setPosts] = useState<any[]>([]);
-  console.log(posts);
   
   const [isLoadingFeed, setIsLoadingFeed] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
