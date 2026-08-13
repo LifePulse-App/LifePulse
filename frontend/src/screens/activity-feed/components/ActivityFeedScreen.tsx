@@ -205,7 +205,7 @@ const PublicActivityFeed = ({ navigation }: any) => {
         const cleanPath = post.mediaUrl.replace(/\\/g, '/');
         const fullImageUrl = cleanPath.startsWith("http") 
           ? cleanPath 
-          : `${BASE_URL}/${cleanPath}`;
+          : `${BASE_URL}${cleanPath}`;
 
         return {
           ...post,
