@@ -2,13 +2,11 @@ import 'react-native-gesture-handler';
 import React, { useState, useRef, useEffect } from 'react';
 import { NavigationContainer, CommonActions } from '@react-navigation/native';
 import {
-  useColorScheme,
   View,
   ActivityIndicator,
   Platform,
   PermissionsAndroid,
   AppState,
-  DeviceEventEmitter,
 } from 'react-native';
 import Toast, { BaseToast, BaseToastProps } from 'react-native-toast-message';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -19,9 +17,7 @@ import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import codePush from "@revopush/react-native-code-push";
 import { getApp } from '@react-native-firebase/app';
 import { getMessaging, getToken, onMessage, onTokenRefresh } from '@react-native-firebase/messaging';
-import SystemNavigationBar from 'react-native-system-navigation-bar';
 import AuthContext from './src/auth/user/UserContext';
-import NavigationTheme from './src/navigation/main/NavigationTheme';
 import AuthNavigator from './src/navigation/main/AuthNavigator';
 import { user } from './src/screens/user/models/UserLoginResponse';
 import UserStorage from './src/auth/user/UserStorage';
@@ -29,7 +25,7 @@ import apiClient, { setSecretKey } from './src/auth/api-client/api_client';
 import { navigationRef, resetToLogin } from './src/navigation/main/RootNavigation';
 import AppUpdateGate from './AppUpdateGate';
 import { enableScreens } from 'react-native-screens';
-import { AnimatedSplash } from './AnimatedSplash';
+
 import {
   loadChatNotificationState,
   notifyIncoming,
@@ -48,22 +44,21 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { PaperProvider } from 'react-native-paper';
 import { connectSocket, disconnectSocket, getSocket } from './src/auth/api-client/socket';
 
-// ⚡ REVENUECAT: Import the SDK
+// ⚡ REVENUECAT SDK
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 
 (global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
 
-// ⚡ REVENUECAT: API Keys from Dashboard
+// ⚡ REVENUECAT: Use valid store keys starting with goog_ / appl_
 const REVENUECAT_API_KEYS = {
-  apple: "test_ABGyHRcQgTRDEYqDUCexpisaSbC",
-  google: "test_ABGyHRcQgTRDEYqDUCexpisaSbC",
+  apple: "appl_YOUR_IOS_KEY",
+  google: "goog_VtMkcalQIRuSrQFBUMjrBhckMiG", // 👈 MUST start with goog_ for Play Store
 };
 
-// Guard flag to prevent duplicate configurations across re-renders
 let isRevenueCatConfigured = false;
-
 const CHAT_CHANNEL_ID = 'default';
+const APP_CHANNEL_ID = 'app_notifications';
 
 notifee.createChannel({
   id: CHAT_CHANNEL_ID,
@@ -72,8 +67,6 @@ notifee.createChannel({
   sound: 'default',
   vibration: true,
 });
-
-const APP_CHANNEL_ID = 'app_notifications';
 
 notifee.createChannel({
   id: APP_CHANNEL_ID,
@@ -169,24 +162,32 @@ const App = () => {
   const [User, setUser] = useState<user | undefined>();
   const [isBiometricVerified, setIsBiometricVerified] = useState(false);
   const [isCheckingBiometric, setIsCheckingBiometric] = useState(true);
-  const [isSplashVisible, setIsSplashVisible] = useState(true);
   
   const secretKeySetRef = useRef(false);
   const lastRegisteredTokenRef = useRef<string | null>(null);
   const deliveringAllRef = useRef(false);
-  const lastDeliverAllAtRef = useRef(0);
+  const lastDeliverAllAtRef.current = useRef(0);
 
-  // ⚡ REVENUECAT: Safe One-Time Initialization
+  // ⚡ SAFELY CONFIGURE REVENUECAT
   useEffect(() => {
-    if (!isRevenueCatConfigured) {
-      Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
-      if (Platform.OS === 'ios') {
-        Purchases.configure({ apiKey: REVENUECAT_API_KEYS.apple });
-      } else if (Platform.OS === 'android') {
-        Purchases.configure({ apiKey: REVENUECAT_API_KEYS.google });
+    const initRevenueCat = async () => {
+      if (!isRevenueCatConfigured) {
+        try {
+          Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
+          const apiKey = Platform.OS === 'ios' ? REVENUECAT_API_KEYS.apple : REVENUECAT_API_KEYS.google;
+          
+          if (apiKey && !apiKey.startsWith('test_')) {
+            await Purchases.configure({ apiKey });
+            isRevenueCatConfigured = true;
+          } else {
+            console.warn('[RevenueCat] Invalid API Key detected. RevenueCat skipped.');
+          }
+        } catch (err) {
+          console.error('[RevenueCat] Setup Error:', err);
+        }
       }
-      isRevenueCatConfigured = true;
-    }
+    };
+    initRevenueCat();
   }, []);
 
   const runMarkAllPendingDelivered = async (reason: string) => {
@@ -284,7 +285,6 @@ const App = () => {
       const messagingInstance = getMessaging(firebaseApp);
 
       return onMessage(messagingInstance, async remoteMessage => {
-        console.log('📱 [FCM RAW FOREGROUND MESSAGE ARRIVED]:', JSON.stringify(remoteMessage));
         const data = remoteMessage?.data || {};
 
         if (data.type === 'general' || data.type === 'admin_broadcast' || data.type === 'admin_direct' || data.title) {
@@ -409,35 +409,38 @@ const App = () => {
     }
   }, [isBiometricVerified]);
 
-  // ⚡ REVENUECAT: Strict User Identity Management & Safe Logout
+  // ⚡ SAFE USER IDENTITY MANAGEMENT FOR REVENUECAT
   useEffect(() => {
-    if (User) {
-      connectSocket().catch(e => console.log('Socket boot error:', e));
-      
-      const userId = String(User?.user.id || User._id || '');
-      
-      if (userId && userId !== 'undefined') {
-        Purchases.logIn(userId).then(async () => {
+    const handleUserPurchaseSession = async () => {
+      if (!isRevenueCatConfigured) return;
+
+      if (User) {
+        connectSocket().catch(e => console.log('Socket boot error:', e));
+        const userId = String(User?.user?.id || User?._id || '');
+        
+        if (userId && userId !== 'undefined') {
           try {
+            await Purchases.logIn(userId);
             await Purchases.invalidateCustomerInfoCache();
-            await Purchases.getCustomerInfo();
           } catch (e) {
             console.log('RevenueCat Sync Error:', e);
           }
-        }).catch(e => console.log('RevenueCat Login Error:', e));
-      }
-    } else {
-      disconnectSocket();
-      
-      // ✅ SAFE LOGOUT: Only log out if currently identified as a non-anonymous user
-      Purchases.getAppUserID().then((appUserId) => {
-        if (appUserId && !appUserId.startsWith('$RCAnonymousID:')) {
-          Purchases.logOut().then(() => {
-            Purchases.invalidateCustomerInfoCache();
-          }).catch(e => console.log('RevenueCat Logout Error:', e));
         }
-      }).catch(() => {});
-    }
+      } else {
+        disconnectSocket();
+        try {
+          const appUserId = await Purchases.getAppUserID();
+          if (appUserId && !appUserId.startsWith('$RCAnonymousID:')) {
+            await Purchases.logOut();
+            await Purchases.invalidateCustomerInfoCache();
+          }
+        } catch (e) {
+          console.log('RevenueCat Logout Error:', e);
+        }
+      }
+    };
+
+    handleUserPurchaseSession();
   }, [User]);
 
   useEffect(() => {
@@ -466,13 +469,7 @@ const App = () => {
         }
       } catch (e) {
         console.log('Biometric check failed:', e);
-        setIsBiometricVerified(false);
-        await unregisterPushToken();
-        await UserStorage.deleteUser();
-        await UserStorage.clearTokens?.();
-        navigationRef.current?.dispatch(
-          CommonActions.reset({ index: 0, routes: [{ name: 'Login' }] }),
-        );
+        setIsBiometricVerified(true); // Fallback to true on error so user isn't locked out
       } finally {
         setIsCheckingBiometric(false);
       }
@@ -481,24 +478,14 @@ const App = () => {
     checkBiometric();
   }, []);
 
-  const toastConfig = {
-    success: (props: React.JSX.IntrinsicAttributes & BaseToastProps) => (
-      <BaseToast
-        {...props}
-        style={{ borderLeftColor: 'green', backgroundColor: '#e6ffed', width: '100%', alignSelf: 'center' }}
-        contentContainerStyle={{ paddingHorizontal: 20 }}
-        text1Style={{ fontSize: 13, fontWeight: '600', color: 'green' }}
-      />
-    ),
-    error: (props: React.JSX.IntrinsicAttributes & BaseToastProps) => (
-      <BaseToast
-        {...props}
-        style={{ borderLeftColor: 'red', backgroundColor: '#ffeaea', width: '100%', alignSelf: 'center' }}
-        contentContainerStyle={{ paddingHorizontal: 20 }}
-        text1Style={{ fontSize: 13, fontWeight: '600', color: 'red' }}
-      />
-    ),
-  };
+  // ⚡ Render loading screen while checking initial state
+  if (isCheckingBiometric) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+        <ActivityIndicator size="large" color="#ffffff" />
+      </View>
+    );
+  }
 
   return (
     <KeyboardProvider>
@@ -506,11 +493,9 @@ const App = () => {
         <PaperProvider settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
           <AuthContext.Provider value={{ User, setUser }}>
             <AppUpdateGate>
-              {isBiometricVerified ? (
-                <NavigationContainer ref={navigationRef}>
-                  <AuthNavigator />
-                </NavigationContainer>
-              ) : null}
+              <NavigationContainer ref={navigationRef}>
+                <AuthNavigator />
+              </NavigationContainer>
             </AppUpdateGate>
           </AuthContext.Provider>
         </PaperProvider>

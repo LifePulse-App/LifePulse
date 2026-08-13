@@ -42,8 +42,7 @@ const HOME_DIR = os.homedir();
 app.use('/avatars', express.static(path.join(HOME_DIR, "uploads", "avatars")));
 app.use('/chat-media', express.static(path.join(HOME_DIR, "uploads", "chat")));
 app.use('/proofs', express.static(path.join(HOME_DIR, "uploads", "proofs")));
-// Replace your old /uploads line with this:
-app.use('/api/uploads', express.static(path.join(process.cwd(), "uploads")));
+app.use('/api/uploads', express.static(path.join(HOME_DIR, "uploads", "proofs")));
 
 // --- Middlewares
 app.use(cookieParser());

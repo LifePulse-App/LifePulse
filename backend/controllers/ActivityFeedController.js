@@ -22,6 +22,9 @@ export const getFeed = async (req, res) => {
       ...(currentUser?.blockedBy || [])
     ].map(id => id.toString());
 
+    // Safely filter out blocked friends
+    const validFriendIds = friendIds.filter(fId => !blockedIds.includes(fId.toString()));
+
     // Base query: Only show verified proofs, excluding blocked users entirely
     let query = { 
       verified: true,
@@ -30,25 +33,59 @@ export const getFeed = async (req, res) => {
     };
     let sortLogic = { createdAt: -1 };
 
-    // 🔥 STRICT TAB ROUTING TO PREVENT LEAKS
+    // 🔥 STRICT TAB ROUTING TO PREVENT LEAKS & APPLY CASCADING PRIVACY
     if (tab === "foryou") {
-      query.visibilityScope = { $in: ["world", "foryou"] };
+      // ForYou should be an aggregate of EVERYTHING the user is allowed to see
+      const forYouConditions = [
+        { visibilityScope: { $in: ["world", "foryou"] } }
+      ];
+      
+      // Add Country posts (if user has a country)
+      if (currentUser?.country) {
+        forYouConditions.push({ 
+          visibilityScope: "country", 
+          country: currentUser.country 
+        });
+      }
+      
+      // Add City posts (if user has a city)
+      if (currentUser?.city) {
+        forYouConditions.push({ 
+          visibilityScope: "city", 
+          city: currentUser.city 
+        });
+      }
+      
+      // Add Friends' posts (any scope except private)
+      if (validFriendIds.length > 0) {
+        forYouConditions.push({ 
+          user: { $in: validFriendIds }, 
+          visibilityScope: { $ne: "private" } 
+        });
+      }
+
+      query.$or = forYouConditions;
       sortLogic = { likesCount: -1, commentsCount: -1, createdAt: -1 };
+
     } else if (tab === "world") {
       query.visibilityScope = { $in: ["world", "foryou"] };
       sortLogic = { createdAt: -1 };
+
     } else if (tab === "country") {
       query.country = currentUser?.country;
+      // Country tab sees Country, World, and ForYou scopes
       query.visibilityScope = { $in: ["world", "foryou", "country"] };
       sortLogic = { createdAt: -1 };
+
     } else if (tab === "city") {
       query.city = currentUser?.city;
+      // City tab sees City, Country, World, and ForYou scopes (Cascading downwards)
       query.visibilityScope = { $in: ["world", "foryou", "country", "city"] };
       sortLogic = { createdAt: -1 };
+
     } else if (tab === "friends") {
-      // Filter friendIds to also exclude anyone who might have been blocked (safeguard)
-      const validFriendIds = friendIds.filter(fId => !blockedIds.includes(fId.toString()));
       query.user = { $in: validFriendIds };
+      // Friends can see ANYTHING you post (world, country, city, friends) EXCEPT private
       query.visibilityScope = { $ne: "private" }; 
       sortLogic = { createdAt: -1 };
     }
@@ -63,7 +100,7 @@ export const getFeed = async (req, res) => {
       .limit(parseInt(limit));
 
     // Format posts to match your React Native Frontend structure
-const formattedPosts = posts.map(post => {
+    const formattedPosts = posts.map(post => {
       const isLiked = post.likes.includes(userId);
 
       return {
@@ -88,7 +125,7 @@ const formattedPosts = posts.map(post => {
         city: post.city,
         country: post.country,
         isAIVerified: post.verified,
-        adminRemoved: post.adminRemoved || false, // ⚡ ADDED THIS LINE
+        adminRemoved: post.adminRemoved || false,
         createdAt: post.createdAt
       };
     });
