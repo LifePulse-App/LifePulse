@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import errorMiddleware from "./utils/errorMiddleware.js";
 import cron from 'node-cron';
 import os from "os";
+import fs from "fs"; // 👈 Added File System import
 import path from "path";
 import http from "http";
 import { startNotificationJobs } from './jobs/scheduledNotifications.js';
@@ -37,12 +38,28 @@ mongoose.connect(process.env.MONGO_URI)
   })
   .catch(err => console.error("DB Error:", err));
 
-// --- Static
+// --- Static Directories (Home Directory Setup & Serving)
 const HOME_DIR = os.homedir();
-app.use('/avatars', express.static(path.join(HOME_DIR, "uploads", "avatars")));
-app.use('/chat-media', express.static(path.join(HOME_DIR, "uploads", "chat")));
-app.use('/proofs', express.static(path.join(HOME_DIR, "uploads", "proofs")));
-app.use('/api/uploads', express.static(path.join(HOME_DIR, "uploads", "proofs")));
+const UPLOADS_DIR = path.join(HOME_DIR, "uploads");
+
+const dirsToEnsure = [
+  path.join(UPLOADS_DIR, "avatars"),
+  path.join(UPLOADS_DIR, "chat"),
+  path.join(UPLOADS_DIR, "proofs"),
+];
+
+// Automatically create missing folders on host server startup
+dirsToEnsure.forEach((dir) => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+    console.log(`📁 Created static upload directory: ${dir}`);
+  }
+});
+
+app.use('/avatars', express.static(path.join(UPLOADS_DIR, "avatars")));
+app.use('/chat-media', express.static(path.join(UPLOADS_DIR, "chat")));
+app.use('/proofs', express.static(path.join(UPLOADS_DIR, "proofs")));
+app.use('/uploads', express.static(path.join(UPLOADS_DIR, "proofs")));
 
 // --- Middlewares
 app.use(cookieParser());
@@ -139,7 +156,7 @@ if (process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE) {
   cron.schedule('0 0 0 1 * *', async () => {
     try {
       console.log('🧹 Running monthly reset on Worker 0');
-      await startNotificationJobs()
+      await startNotificationJobs();
       await runMonthlyReset();
     } catch (err) {
       console.error("Cron error:", err);
