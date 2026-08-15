@@ -13,6 +13,8 @@ for (let i = 1; i <= 12; i++) {
     env: {
       NODE_ENV: "production",
       PORT: 8080 + i, // 8081 - 8092
+      // 👇 NEW: Only true for the first loop iteration
+      IS_PRIMARY_WORKER: i === 1 ? 'true' : 'false', 
     },
 
     autorestart: true,
@@ -35,6 +37,8 @@ for (let i = 1; i <= 2; i++) {
     env: {
       NODE_ENV: "development",
       PORT: 40000 + i, // 40001 - 40002
+      // 👇 NEW: Only true for the first dev loop iteration
+      IS_PRIMARY_WORKER: i === 1 ? 'true' : 'false', 
     },
 
     autorestart: true,

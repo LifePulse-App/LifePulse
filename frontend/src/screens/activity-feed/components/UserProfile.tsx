@@ -104,7 +104,6 @@ const UserProfile = ({ route, navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
-    console.log(posts);
   const [cachedAvatarUri, setCachedAvatarUri] = useState<string | null>(null);
 
   const [postToDelete, setPostToDelete] = useState<any>(null);

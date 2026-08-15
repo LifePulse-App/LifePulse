@@ -247,6 +247,8 @@ PODS:
     - Yoga
   - OpenSSL-Universal (3.6.2000)
   - PromisesObjC (2.4.1)
+  - PurchasesHybridCommon (18.29.0):
+    - RevenueCat (= 5.83.0)
   - QuickCrypto (1.1.5):
     - hermes-engine
     - NitroModules
@@ -1719,6 +1721,28 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-change-icon (5.0.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - react-native-compass-heading (2.0.2):
     - hermes-engine
     - RCTRequired
@@ -2396,6 +2420,29 @@ PODS:
     - ReactNativeDependencies
     - Yoga
   - RecaptchaInterop (101.0.0)
+  - RevenueCat (5.83.0)
+  - RNBootSplash (7.3.2):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - RNCClipboard (1.16.3):
     - hermes-engine
     - RCTRequired
@@ -2595,6 +2642,9 @@ PODS:
     - React-Core
     - RNNotifee/NotifeeCore (= 9.1.8)
   - RNNotifee/NotifeeCore (9.1.8):
+    - React-Core
+  - RNPurchases (10.7.0):
+    - PurchasesHybridCommon (= 18.29.0)
     - React-Core
   - RNReanimated (4.4.1):
     - hermes-engine
@@ -2996,6 +3046,7 @@ DEPENDENCIES:
   - React-mutationobservernativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/mutationobserver`)
   - react-native-biometrics (from `../node_modules/react-native-biometrics`)
   - "react-native-blur (from `../node_modules/@react-native-community/blur`)"
+  - react-native-change-icon (from `../node_modules/react-native-change-icon`)
   - react-native-compass-heading (from `../node_modules/react-native-compass-heading`)
   - react-native-create-thumbnail (from `../node_modules/react-native-create-thumbnail`)
   - "react-native-document-picker (from `../node_modules/@react-native-documents/picker`)"
@@ -3045,6 +3096,7 @@ DEPENDENCIES:
   - ReactNativeIncallManager (from `../node_modules/react-native-incall-manager`)
   - ReactNativeVideo (from `../node_modules/react-native-video`)
   - RecaptchaInterop
+  - RNBootSplash (from `../node_modules/react-native-bootsplash`)
   - "RNCClipboard (from `../node_modules/@react-native-clipboard/clipboard`)"
   - "RNDateTimePicker (from `../node_modules/@react-native-community/datetimepicker`)"
   - RNDeviceInfo (from `../node_modules/react-native-device-info`)
@@ -3057,6 +3109,7 @@ DEPENDENCIES:
   - RNImageCropPicker (from `../node_modules/react-native-image-crop-picker`)
   - RNKeychain (from `../node_modules/react-native-keychain`)
   - "RNNotifee (from `../node_modules/@notifee/react-native`)"
+  - RNPurchases (from `../node_modules/react-native-purchases`)
   - RNReanimated (from `../node_modules/react-native-reanimated`)
   - RNScreens (from `../node_modules/react-native-screens`)
   - RNSound (from `../node_modules/react-native-sound`)
@@ -3084,7 +3137,9 @@ SPEC REPOS:
     - nanopb
     - OpenSSL-Universal
     - PromisesObjC
+    - PurchasesHybridCommon
     - RecaptchaInterop
+    - RevenueCat
     - SDWebImage
     - SDWebImageWebPCoder
     - SSZipArchive
@@ -3195,6 +3250,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-biometrics"
   react-native-blur:
     :path: "../node_modules/@react-native-community/blur"
+  react-native-change-icon:
+    :path: "../node_modules/react-native-change-icon"
   react-native-compass-heading:
     :path: "../node_modules/react-native-compass-heading"
   react-native-create-thumbnail:
@@ -3291,6 +3348,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-incall-manager"
   ReactNativeVideo:
     :path: "../node_modules/react-native-video"
+  RNBootSplash:
+    :path: "../node_modules/react-native-bootsplash"
   RNCClipboard:
     :path: "../node_modules/@react-native-clipboard/clipboard"
   RNDateTimePicker:
@@ -3315,6 +3374,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-keychain"
   RNNotifee:
     :path: "../node_modules/@notifee/react-native"
+  RNPurchases:
+    :path: "../node_modules/react-native-purchases"
   RNReanimated:
     :path: "../node_modules/react-native-reanimated"
   RNScreens:
@@ -3361,6 +3422,7 @@ SPEC CHECKSUMS:
   NitroSound: b34bf12cd3f2771560fd923fa953ec2f3f1a73e5
   OpenSSL-Universal: ecee7b138fa75a74ecf00d7ffd248fb584739b9e
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
+  PurchasesHybridCommon: 94a0fde86cfecdc487fb64667b68f527af930265
   QuickCrypto: 78b9ff82f1fe3710345e250c980ceee93dcaad5a
   RCTDeprecation: 2a74a2c57675e64419bd89078efde81f7c1de90b
   RCTRequired: 30451112e6fef4e6f31b4e7eee0845156e35e4b0
@@ -3401,6 +3463,7 @@ SPEC CHECKSUMS:
   React-mutationobservernativemodule: f0a0d5ae9b51caf7becbeabf836d716cfedb6bf2
   react-native-biometrics: 43ed5b828646a7862dbc7945556446be00798e7d
   react-native-blur: ea6c78ddeaa7aa0fce36ea29d1f81dd23063032a
+  react-native-change-icon: cc3539131bd3b8b6468489b8a8b48e077a68902b
   react-native-compass-heading: d25307d53b0860f0999f76761dc8d50888a8b210
   react-native-create-thumbnail: c15cedc37f3822777d44e6035be041f7961341ea
   react-native-document-picker: 15cca2d1a6bfb6d0d3ff0283bd9b903e57cb028b
@@ -3450,6 +3513,8 @@ SPEC CHECKSUMS:
   ReactNativeIncallManager: dccd3e7499caa3bb73d3acfedf4fb0360f1a87d5
   ReactNativeVideo: 80b4d978438a6b59dba6853962356fcc0ca48108
   RecaptchaInterop: 11e0b637842dfb48308d242afc3f448062325aba
+  RevenueCat: a83de0391a1061302699cb55eb1ff0662f5768b5
+  RNBootSplash: dcf4ccd62104bee81893e3d8c342860a491d3204
   RNCClipboard: 715fa7c6c8366f17d00f05a439ee7488f390fa5f
   RNDateTimePicker: 7b2738f1e595f83c14580a11c476872755c5befc
   RNDeviceInfo: 4c852998208b60dc192ae3529e5867817719ad1e
@@ -3462,6 +3527,7 @@ SPEC CHECKSUMS:
   RNImageCropPicker: 6b9ac564593efdf86b886f93aab4356e80db12de
   RNKeychain: 6778b35b5bd067c322f8479526ac09b1d61f31d0
   RNNotifee: 5e3b271e8ea7456a36eec994085543c9adca9168
+  RNPurchases: d646405958082374e8b3cb5d6398318114750804
   RNReanimated: 80a8d6e0854c9dddedc054efbce746294a8d3a3b
   RNScreens: 991cc417cd396602a6cf59a42139e5a9d91462a9
   RNSound: 79fb9d0b4a20de49e65e657b563982443c1ed21b

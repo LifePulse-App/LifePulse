@@ -30,11 +30,6 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log(`✅ DB Connected [Worker: ${process.env.NODE_APP_INSTANCE || 'Single'}]`);
     
-    // ⚡ FIX: Prevent duplicate notifications across 12 PM2 instances
-    if (process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE) {
-      console.log('⏰ Starting Notification Jobs on Worker 0');
-      startNotificationJobs();
-    }
   })
   .catch(err => console.error("DB Error:", err));
 
@@ -152,10 +147,11 @@ const server = http.createServer(app);
 import { runMonthlyReset } from './helpers/monthlyReset.js';
 
 // ⚡ FIX: Prevent duplicate database resets across 12 PM2 instances
-if (process.env.NODE_APP_INSTANCE === '0' || !process.env.NODE_APP_INSTANCE) {
+// ⚡ FIX: Use the custom variable
+if (process.env.IS_PRIMARY_WORKER === 'true') {
   cron.schedule('0 0 0 1 * *', async () => {
     try {
-      console.log('🧹 Running monthly reset on Worker 0');
+      console.log('🧹 Running monthly reset on Primary Worker');
       await startNotificationJobs();
       await runMonthlyReset();
     } catch (err) {

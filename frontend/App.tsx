@@ -56,7 +56,7 @@ import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 
 // ⚡ REVENUECAT: API Keys from Dashboard
 const REVENUECAT_API_KEYS = {
-  apple: "test_ABGyHRcQgTRDEYqDUCexpisaSbC",
+  apple: "appl_siAiNprmgfLnscftFENGEYmhquY",
   google: "goog_VtMkcalQIRuSrQFBUMjrBhckMiG",
 };
 
