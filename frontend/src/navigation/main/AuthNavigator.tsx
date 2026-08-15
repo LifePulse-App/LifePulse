@@ -190,7 +190,7 @@ import ShareToChatScreen from '../../screens/activity-feed/components/ShareToCha
             if (accessToken && isIOS26Plus) {
               await setAuthHeaders(accessToken);
               authContext?.setUser?.(storedUser);
-              setInitialRoute("Drawer");
+              setInitialRoute("AppTabs");
               return;
             }
 

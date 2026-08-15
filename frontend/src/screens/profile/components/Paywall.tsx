@@ -19,6 +19,32 @@ import apiClient from "../../../auth/api-client/api_client";
 
 const PREMIUM_PREFS_CACHE_KEY = 'streaksphere_premium_prefs';
 
+// ⚡ MOCK PRICING FOR iOS ONLY (To keep UI intact without Apple Dev Account)
+const MOCK_IOS_PACKAGES = [
+  {
+    identifier: '$rc_monthly',
+    packageType: 'MONTHLY',
+    product: {
+      identifier: 'premium_monthly',
+      title: 'Monthly Premium',
+      description: 'Full access billed monthly',
+      priceString: '$4.99',
+      price: 4.99,
+    },
+  },
+  {
+    identifier: '$rc_annual',
+    packageType: 'ANNUAL',
+    product: {
+      identifier: 'premium_annual',
+      title: 'Annual Premium',
+      description: 'Save 30% billed yearly',
+      priceString: '$39.99',
+      price: 39.99,
+    },
+  },
+];
+
 // ⚡ Premium Glassy Result Card
 const GlassyResultCard = ({ visible, type = "success", message, onClose }) => {
   if (!visible) return null;
@@ -64,7 +90,7 @@ export default function PaywallScreen({ navigation }) {
   // ⚡ History & Icon States
   const [relationshipHistory, setRelationshipHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyMode, setHistoryMode] = useState("my"); // "my" or "partner"
+  const [historyMode, setHistoryMode] = useState("my");
   const [currentAppIcon, setCurrentAppIcon] = useState('Default');
 
   // ⚡ UI States
@@ -72,7 +98,6 @@ export default function PaywallScreen({ navigation }) {
   const historySheetRef = useRef(null);
   const iconSheetRef = useRef(null);
 
-  // Available Native App Icons
   const availableIcons = [
     { id: 'Default', name: 'Original', icon: 'star-circle', color: '#6366f1' },
     { id: 'Dark', name: 'Midnight Dark', icon: 'weather-night', color: '#1e293b' },
@@ -81,7 +106,7 @@ export default function PaywallScreen({ navigation }) {
   ];
 
   const updateSubscriptionState = (customerInfo) => {
-    const entitlement = customerInfo.entitlements.active['streaksphere_plus'];
+    const entitlement = customerInfo?.entitlements?.active['streaksphere_plus'];
     if (entitlement) {
       setIsSubscribed(true);
       setWillRenew(entitlement.willRenew);
@@ -100,13 +125,23 @@ export default function PaywallScreen({ navigation }) {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
+        // 1. Fetch Real Subscription Status (Works on both iOS & Android)
         const customerInfo = await Purchases.getCustomerInfo();
         updateSubscriptionState(customerInfo);
-        const offerings = await Purchases.getOfferings();
-        if (offerings.current?.availablePackages.length > 0) {
-          setPackages(offerings.current.availablePackages);
+
+        // 2. Fetch Pricing 
+        if (Platform.OS === 'ios') {
+          // Block iOS StoreKit API call, use UI mock data
+          setPackages(MOCK_IOS_PACKAGES);
+        } else {
+          // Normal Android Google Play fetch
+          const offerings = await Purchases.getOfferings();
+          if (offerings.current?.availablePackages.length > 0) {
+            setPackages(offerings.current.availablePackages);
+          }
         }
 
+        // Fetch user preferences
         const cachedPrefs = await AsyncStorage.getItem(PREMIUM_PREFS_CACHE_KEY);
         if (cachedPrefs) {
           const p = JSON.parse(cachedPrefs);
@@ -133,6 +168,16 @@ export default function PaywallScreen({ navigation }) {
   }, []);
 
   const handlePurchase = async (pkg) => {
+    if (Platform.OS === 'ios') {
+      // ⚡ BLOCK iOS PURCHASES ENTIRELY
+      setResultCard({ 
+        visible: true, 
+        type: "error", 
+        message: "In-app purchases are disabled on this iOS build. Please upgrade via an Android device." 
+      });
+      return;
+    }
+
     setIsPurchasing(true);
     try {
       const { customerInfo } = await Purchases.purchasePackage(pkg);
@@ -147,10 +192,18 @@ export default function PaywallScreen({ navigation }) {
   const handleRestorePurchases = async () => {
     setIsPurchasing(true);
     try {
-      const customerInfo = await Purchases.restorePurchases();
-      if (customerInfo.entitlements.active['streaksphere_plus']) {
+      let customerInfo;
+      if (Platform.OS === 'ios') {
+        // ⚡ Bypass Apple's restore API, just refresh RevenueCat server status
+        customerInfo = await Purchases.getCustomerInfo();
+      } else {
+        // Real restore for Android
+        customerInfo = await Purchases.restorePurchases();
+      }
+
+      if (customerInfo?.entitlements?.active['streaksphere_plus']) {
         updateSubscriptionState(customerInfo);
-        setResultCard({ visible: true, type: "success", message: "Purchases restored successfully!" });
+        setResultCard({ visible: true, type: "success", message: "Premium status verified and restored!" });
       } else {
         setResultCard({ visible: true, type: "error", message: "No active subscription found." });
       }
@@ -162,15 +215,14 @@ export default function PaywallScreen({ navigation }) {
   };
 
   const handleManageSubscription = async () => {
+    if (Platform.OS === 'ios') {
+      setResultCard({ visible: true, type: "error", message: "Subscription management is disabled on this device." });
+      return;
+    }
     try {
       await Purchases.showManageSubscriptions();
     } catch (error) {
-      try {
-        if (Platform.OS === 'ios') await Linking.openURL('https://apps.apple.com/account/subscriptions');
-        else if (Platform.OS === 'android') await Linking.openURL('https://play.google.com/store/account/subscriptions');
-      } catch (linkError) {
-        setResultCard({ visible: true, type: "error", message: "Could not open App Store settings." });
-      }
+      await Linking.openURL('https://play.google.com/store/account/subscriptions');
     }
   };
 
@@ -195,7 +247,6 @@ export default function PaywallScreen({ navigation }) {
     }
   };
 
-  // ⚡ Fetch Real History from Backend
   const openHistorySheet = async (mode) => {
     setHistoryMode(mode);
     setHistoryLoading(true);
@@ -233,7 +284,6 @@ export default function PaywallScreen({ navigation }) {
     }
   };
 
-  // --- Bottom Sheets ---
   const renderHistorySheet = () => (
     <TrueSheet ref={historySheetRef} detents={[0.65]} cornerRadius={28} backgroundColor="#0F172A" grabber={false}>
       <View style={{ padding: 20, paddingBottom: 40 }}>
@@ -398,7 +448,6 @@ export default function PaywallScreen({ navigation }) {
               <Icon name="chevron-right" size={22} color="#9CA3AF" />
             </TouchableOpacity>
 
-            {/* ⚡ NEW: Partner's History Action Card */}
             <TouchableOpacity style={styles.actionCard} onPress={() => openHistorySheet("partner")}>
               <Icon name="account-search" size={24} color="#f43f5e" />
               <View style={{ flex: 1, marginLeft: 12 }}>
@@ -440,24 +489,44 @@ export default function PaywallScreen({ navigation }) {
             <Text style={styles.sectionTitle}>Choose Your Plan</Text>
             
             <View style={{ gap: 12, marginBottom: 24 }}>
-              {packages.map((pkg) => {
+             {packages.map((pkg) => {
                 const isAnnual = pkg.packageType === 'ANNUAL';
+
+                const displayTitle = isAnnual
+                  ? "StreakSphere+ (Yearly)"
+                  : "StreakSphere+ (Monthly)";
+
                 return (
-                  <TouchableOpacity 
-                    key={pkg.identifier} 
-                    style={[styles.packageCard, isAnnual && styles.packageCardHighlighted]}
+                  <TouchableOpacity
+                    key={pkg.identifier}
+                    style={[
+                      styles.packageCard,
+                      isAnnual && styles.packageCardHighlighted
+                    ]}
                     onPress={() => handlePurchase(pkg)}
                     disabled={isPurchasing}
                     activeOpacity={0.8}
                   >
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.packageTitle}>{pkg.product.title}</Text>
-                      <Text style={styles.packageSub}>{pkg.product.description || "Full access to all Plus features"}</Text>
+                      <Text style={styles.packageTitle}>
+                        {displayTitle}
+                      </Text>
+
+                      <Text style={styles.packageSub}>
+                        {pkg.product.description || "Full access to all Plus features"}
+                      </Text>
                     </View>
+
                     <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={styles.packagePrice}>{pkg.product.priceString}</Text>
-                      <Text style={styles.packageDuration}>{isAnnual ? '/ year' : '/ month'}</Text>
+                      <Text style={styles.packagePrice}>
+                        {pkg.product.priceString}
+                      </Text>
+
+                      <Text style={styles.packageDuration}>
+                        {isAnnual ? '/ year' : '/ month'}
+                      </Text>
                     </View>
+
                     {isAnnual && (
                       <View style={styles.badge}>
                         <Text style={styles.badgeText}>BEST VALUE</Text>
@@ -471,7 +540,6 @@ export default function PaywallScreen({ navigation }) {
             <View style={styles.featuresListContainer}>
               <Text style={styles.sectionTitle}>Plus Benefits</Text>
               
-              {/* ⚡ Modified to explicitly state Partner History */}
               <View style={styles.featureItem}>
                 <Icon name="history" size={22} color="#fbbf24" />
                 <Text style={styles.featureText}>View complete relationship history of yours and your partner's past connections</Text>
@@ -531,16 +599,13 @@ const styles = StyleSheet.create({
   rightSpacer: { width: 40, height: 40 },
   overlay: { flex: 1, paddingTop: 20, paddingHorizontal: 18 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
   mainCard: { backgroundColor: "rgba(15,23,42,0.4)", borderRadius: 22, padding: 20, marginBottom: 20, alignItems: "center", borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.15)" },
   badgeWrap: { width: 80, height: 80, borderRadius: 40, backgroundColor: "rgba(251,191,36,0.12)", justifyContent: 'center', alignItems: 'center', marginBottom: 14, borderWidth: 1, borderColor: "rgba(251,191,36,0.3)" },
   headerTitle: { color: "#F9FAFB", fontWeight: "bold", fontSize: 20, textAlign: "center", marginBottom: 6 },
   headerSub: { color: "#9CA3AF", fontSize: 13, textAlign: "center", lineHeight: 18 },
-
   sectionTitle: { fontSize: 16, fontWeight: 'bold', color: "#F9FAFB", marginBottom: 12 },
   settingCard: { backgroundColor: "rgba(15,23,42,0.34)", borderRadius: 14, padding: 16, marginBottom: 10, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.15)" },
   settingLabel: { color: "#F9FAFB", fontWeight: "bold", fontSize: 15, marginLeft: 13 },
-
   toggleRow: { width: "100%", borderRadius: 14, paddingVertical: 14, paddingHorizontal: 16, marginBottom: 10, backgroundColor: "rgba(15,23,42,0.55)", borderWidth: 1, borderColor: "rgba(148,163,184,0.35)", flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   toggleTitle: { color: "#F9FAFB", fontWeight: "800", fontSize: 14 },
   toggleSub: { color: "#9CA3AF", fontSize: 11, marginTop: 3, lineHeight: 14 },
@@ -550,15 +615,12 @@ const styles = StyleSheet.create({
   toggleDot: { width: 18, height: 18, borderRadius: 999 },
   dotOn: { backgroundColor: "#22c55e", alignSelf: "flex-end" },
   dotOff: { backgroundColor: "#e5e7eb", alignSelf: "flex-start" },
-
   actionCard: { backgroundColor: "rgba(15,23,42,0.34)", borderRadius: 14, padding: 16, marginBottom: 10, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.15)" },
   actionCardTitle: { color: "#F9FAFB", fontWeight: "bold", fontSize: 15 },
   actionCardSub: { color: "#9CA3AF", fontSize: 12, marginTop: 2 },
-
   featuresListContainer: { marginBottom: 10, backgroundColor: "rgba(15,23,42,0.2)", padding: 16, borderRadius: 18, borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.1)" },
   featureItem: { flexDirection: "row", alignItems: "center", marginBottom: 14, gap: 12 },
   featureText: { color: "#E5E7EB", fontSize: 14, flex: 1, lineHeight: 20 },
-
   packageCard: { backgroundColor: "rgba(15,23,42,0.34)", borderRadius: 16, padding: 18, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.2)" },
   packageCardHighlighted: { backgroundColor: "rgba(99,102,241,0.15)", borderColor: "rgba(99,102,241,0.5)" },
   packageTitle: { color: "#F9FAFB", fontSize: 16, fontWeight: "bold", marginBottom: 3 },
@@ -567,24 +629,20 @@ const styles = StyleSheet.create({
   packageDuration: { color: "#9CA3AF", fontSize: 11, textAlign: 'right' },
   badge: { position: 'absolute', top: -10, right: 16, backgroundColor: "#6366f1", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
   badgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-
   manageBtn: { borderRadius: 20, paddingVertical: 14, alignItems: 'center' },
   restoreBtn: { alignItems: 'center', padding: 10, marginTop: 10 },
   restoreText: { color: "#6366f1", fontWeight: "bold", fontSize: 14 },
   activeContainer: { width: '100%', marginTop: 10 },
-
   sheetTitle: { color: "#F9FAFB", fontSize: 20, fontWeight: "bold", textAlign: "center" },
   sheetSubtitle: { color: "#9CA3AF", fontSize: 13, textAlign: "center", marginBottom: 16, marginTop: 4 },
   historyCard: { backgroundColor: "rgba(30,41,59,0.5)", padding: 16, borderRadius: 14, marginBottom: 12, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.15)" },
   historyName: { color: "#F9FAFB", fontWeight: "bold", fontSize: 16 },
   historySub: { color: "#94a3b8", fontSize: 12, marginTop: 4 },
   historyDate: { color: "#fbbf24", fontSize: 12, fontWeight: "bold" },
-
   iconSelectionCard: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(30,41,59,0.5)", padding: 14, borderRadius: 16, borderWidth: 1, borderColor: "rgba(148,163,184,0.15)" },
   iconCardActive: { backgroundColor: "rgba(16,185,129,0.1)", borderColor: "rgba(16,185,129,0.4)" },
   iconPreviewBox: { width: 44, height: 44, borderRadius: 12, justifyContent: "center", alignItems: "center", marginRight: 14 },
   iconSelectionName: { color: "#F9FAFB", fontSize: 16, fontWeight: "bold", flex: 1 },
-
   resultOverlay: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, backgroundColor: "rgba(0, 0, 0, 0.65)", justifyContent: "center", alignItems: "center", zIndex: 2000 },
   resultCard: { backgroundColor: "rgba(30, 41, 59, 0.95)", borderColor: "rgba(255, 255, 255, 0.12)", borderWidth: 1, borderRadius: 28, paddingHorizontal: 24, paddingVertical: 32, width: '82%', alignItems: "center" },
   resultIconWrapper: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 1 },

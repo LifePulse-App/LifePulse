@@ -164,6 +164,16 @@
 			<key>isShown</key>
 			<false/>
 		</dict>
+		<key>PurchasesHybridCommon-PurchasesHybridCommon.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
+		<key>PurchasesHybridCommon.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
 		<key>QuickCrypto.xcscheme</key>
 		<dict>
 			<key>isShown</key>
@@ -190,6 +200,11 @@
 			<false/>
 		</dict>
 		<key>RCTTypeSafety.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
+		<key>RNBootSplash.xcscheme</key>
 		<dict>
 			<key>isShown</key>
 			<false/>
@@ -265,6 +280,11 @@
 			<false/>
 		</dict>
 		<key>RNNotifee.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
+		<key>RNPurchases.xcscheme</key>
 		<dict>
 			<key>isShown</key>
 			<false/>
@@ -674,6 +694,16 @@
 			<key>isShown</key>
 			<false/>
 		</dict>
+		<key>RevenueCat-RevenueCat.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
+		<key>RevenueCat.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
 		<key>SDWebImage.xcscheme</key>
 		<dict>
 			<key>isShown</key>
@@ -750,6 +780,11 @@
 			<false/>
 		</dict>
 		<key>react-native-blur.xcscheme</key>
+		<dict>
+			<key>isShown</key>
+			<false/>
+		</dict>
+		<key>react-native-change-icon.xcscheme</key>
 		<dict>
 			<key>isShown</key>
 			<false/>
