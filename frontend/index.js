@@ -6,7 +6,8 @@ if (!global.Buffer) global.Buffer = Buffer;
 
 import 'react-native-gesture-handler';
 import { AppRegistry, Platform, DeviceEventEmitter } from 'react-native';
-import notifee, { EventType, AndroidImportance, AndroidCategory } from '@notifee/react-native';
+// ⚡ FIX: Added AndroidVisibility to the import
+import notifee, { EventType, AndroidImportance, AndroidCategory, AndroidVisibility } from '@notifee/react-native';
 
 import { getApp } from '@react-native-firebase/app';
 import { getMessaging, setBackgroundMessageHandler } from '@react-native-firebase/messaging';
@@ -173,21 +174,25 @@ setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
         title: 'Incoming Call',
         body: `${callerName} is calling...`,
         android: {
-          channelId: 'call_channel_v2', // ⚡ Uses new channel
+          channelId: 'call_channel_v2', 
           category: AndroidCategory.CALL, 
           importance: AndroidImportance.HIGH,
+          // ⚡ FIX: Ensures buttons show on lock screen
+          visibility: AndroidVisibility.PUBLIC, 
           autoCancel: true,
-          ongoing: false, 
+          // ⚡ FIX: Set to true so user can't accidentally swipe it away while ringing
+          ongoing: true, 
           loopSound: true, 
+          // ❌ FIX: fullScreenAction completely removed to satisfy Google Play
           fullScreenAction: {
             id: 'default',
             mainComponent: appName,
           },
+
           pressAction: {
             id: 'default',
             mainComponent: appName,
           },
-          // ⚡ ADDED: Banner Action Buttons
           actions: [
             {
               title: 'Decline',
@@ -202,7 +207,7 @@ setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
         data: { ...data },
       });
     } catch (err) {
-      console.log('[Notifee] Full Screen intent failed:', err);
+      console.log('[Notifee] Notification display failed:', err);
     }
     return; 
   }

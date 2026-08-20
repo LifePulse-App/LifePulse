@@ -34,9 +34,9 @@ const LowNavBAr = () => {
   // Added AR Portal tab here (key: 'arportal')
   const routes = [
     { key: 'attendance', title: 'Map', icon: { active: 'map-marker', inactive: 'map-marker-outline' }, },
-    { key: 'home', title: 'Home', icon: { active: 'home', inactive: 'home-outline' }, },
     // AR Portal tab:
     { key: 'arportal', title: 'AR Portal', icon: { active: 'cube', inactive: 'cube-outline' } }, // or use 'augmented-reality'
+    { key: 'home', title: 'Home', icon: { active: 'home', inactive: 'home-outline' }, },
     { key: 'results', title: 'LeaderBoard', icon: { active: 'chart-box', inactive: 'chart-box-outline' }, },
     { key: 'chat', title: 'Chat', icon: { active: 'chat', inactive: 'chat-outline' }, },
   ];
@@ -44,8 +44,8 @@ const LowNavBAr = () => {
   const getIndexFromRoute = () => {
     switch (route.name) {
       case 'StudentList': return 0;       // Map
-      case 'Dashboard': return 1;         // Home
-      case 'ArPortal': return 2;          // AR Portal
+      case 'ArPortal': return 1;          // AR Portal
+            case 'Dashboard': return 2;         // Home
       case 'EmployeeList': return 3;      // LeaderBoard
       case 'Chat': return 4;              // Chat
       default: return 1;
@@ -63,11 +63,11 @@ const LowNavBAr = () => {
       case 'attendance':
         navigation.navigate('Student');
         break;
-      case 'home':
-        navigation.navigate('Dashboard');
-        break;
       case 'arportal':
         navigation.navigate('ArPortal');        // <---- Must match your screen name in navigation stack!
+        break;
+        case 'home':
+        navigation.navigate('Dashboard');
         break;
       case 'results':
         navigation.navigate('Employee');

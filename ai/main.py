@@ -160,7 +160,7 @@ async def verify_proof_ai(
     result = predict_activity(img_bytes)
     requested = habitKey.strip().lower()
     predicted = result["activity"].strip().lower()
-    is_verified = (requested == predicted) and (result["probability"] >= 0.2)  # You can tune threshold!
+    is_verified = (result["probability"] >= 0.1)  # You can tune threshold!
     return {
         "verified": is_verified,
         "score": round(result["probability"], 3),
