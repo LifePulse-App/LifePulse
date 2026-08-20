@@ -5,6 +5,11 @@ from PIL import Image
 import io
 import clip  # pip install git+https://github.com/openai/CLIP.git
 
+# --- ADD THIS TO SUPPORT HEIC FILES FROM IPHONES ---
+import pillow_heif
+pillow_heif.register_heif_opener()
+# ---------------------------------------------------
+
 app = FastAPI()
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
