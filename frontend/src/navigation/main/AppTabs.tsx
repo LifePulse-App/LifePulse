@@ -101,7 +101,7 @@ export default function AppTabs() {
 
       <Tab.Screen
         name="Employee"
-        component={LazyLeaderboardScreen}
+        component={LeaderboardScreen}
         options={{
           tabBarLabel: 'LeaderBoard',
           tabBarIcon: Platform.select({
