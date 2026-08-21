@@ -1,21 +1,16 @@
 <resources>
-    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
-        <item name="android:windowBackground">?android:colorBackground</item> 
-    </style>
-    
-    <!-- ⚡ FIX: Reverted to Theme.BootSplash so the compiler can find it -->
+   <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+    <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+    <item name="android:windowBackground">@color/bootsplash_background</item>
+</style>
+
     <style name="BootTheme" parent="Theme.BootSplash">
-        <!-- Native Phase Assets -->
-        <item name="bootSplashBackground">@color/bootsplash_background</item>
-        <!-- <item name="bootSplashLogo">@drawable/splash_logo</item> -->
-        
-        <!-- Android 12 OS Phase Assets (Kills the native circle) -->
-        <item name="windowSplashScreenBackground">@color/bootsplash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
-        <item name="windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
-        
-        <!-- Handoff Instruction -->
-        <item name="postBootSplashTheme">@style/AppTheme</item>
-    </style>
+    <item name="windowSplashScreenBackground">@color/bootsplash_background</item>
+    <item name="windowSplashScreenAnimatedIcon">@drawable/bootsplash_logo</item>
+    <item name="windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+
+    <item name="bootSplashBackground">@color/bootsplash_background</item>
+    <item name="bootSplashLogo">@drawable/bootsplash_logo</item>
+    <item name="postBootSplashTheme">@style/AppTheme</item>
+</style>
 </resources>

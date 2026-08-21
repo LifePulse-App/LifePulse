@@ -5,6 +5,11 @@ from PIL import Image
 import io
 import clip  # pip install git+https://github.com/openai/CLIP.git
 
+# --- ADD THIS TO SUPPORT HEIC FILES FROM IPHONES ---
+import pillow_heif
+pillow_heif.register_heif_opener()
+# ---------------------------------------------------
+
 app = FastAPI()
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -160,7 +165,7 @@ async def verify_proof_ai(
     result = predict_activity(img_bytes)
     requested = habitKey.strip().lower()
     predicted = result["activity"].strip().lower()
-    is_verified = (requested == predicted) and (result["probability"] >= 0.2)  # You can tune threshold!
+    is_verified = (result["probability"] >= 0.1)  # You can tune threshold!
     return {
         "verified": is_verified,
         "score": round(result["probability"], 3),

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Animated } from 'react-native';
 import BootSplash from 'react-native-bootsplash';
 
@@ -7,43 +7,38 @@ type Props = {
 };
 
 export const AnimatedSplash = ({ onAnimationEnd }: Props) => {
-  // 1. Set up the animation variables
   const [opacity] = useState(() => new Animated.Value(1));
-  const [scale] = useState(() => new Animated.Value(1));
 
-  // 2. Use the Bootsplash hook
+  useEffect(() => {
+    // 🛡️ FAIL-SAFE TIMER: Force-hide splash if BootSplash native hook hangs after CodePush
+    const safetyTimer = setTimeout(() => {
+      onAnimationEnd();
+    }, 1500);
+
+    return () => clearTimeout(safetyTimer);
+  }, [onAnimationEnd]);
+
   const { container, logo } = BootSplash.useHideAnimation({
-    manifest: require('./src/shared/bootsplash/manifest.json'), 
-    logo: require('./src/shared/bootsplash/logo.png'),         
-    
-    // 3. Define the animation logic
+    manifest: require('./src/shared/bootsplash/manifest.json'),
+    logo: require('./src/shared/bootsplash/logo.png'),
+    statusBarTranslucent: true,
+    navigationBarTranslucent: false,
     animate: () => {
-      Animated.parallel([
-        Animated.timing(scale, {
-          useNativeDriver: true,
-          toValue: 1.5,
-          duration: 500,
-        }),
+      Animated.sequence([
         Animated.timing(opacity, {
           useNativeDriver: true,
-          toValue: 1,
-          duration: 500,
+          toValue: 0,
+          duration: 400,
         }),
       ]).start(() => {
-        onAnimationEnd(); // Trigger callback when done
+        onAnimationEnd();
       });
     },
   });
 
   return (
     <Animated.View {...container} style={[container.style, { opacity }]}>
-      <Animated.Image
-        {...logo}
-        style={[
-          logo.style,
-         
-        ]}
-      />
+      <Animated.Image {...logo} style={logo.style} />
     </Animated.View>
   );
 };

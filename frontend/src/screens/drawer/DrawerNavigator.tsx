@@ -26,6 +26,9 @@ import FriendsListScreen from '../friends/components/FriendsList';
 
 
 
+
+
+
 const Drawer = createDrawerNavigator();
 
 

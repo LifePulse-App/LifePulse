@@ -1,14 +1,15 @@
 #!/bin/bash
 
 ENV=${1:-production}
-BASE_PATH="/home/server-pc/actions-runner/_work/StreakSphere/StreakSphere"
+# 👇 CHANGED: 'server-pc' is now 'ubuntu' for the Oracle server
+BASE_PATH="/home/ubuntu/actions-runner/_work/StreakSphere/StreakSphere"
 NODE_BACKEND_PATH="$BASE_PATH/backend"
 AI_PATH="$BASE_PATH/ai"
 PROJECT_ROOT="$BASE_PATH"
 APP_NAME="StreakSphere"
 
-# 🔒 Define where your permanent secrets live on the server
-SECRETS_VAULT="/home/server-pc/secrets/StreakSphere"
+# 👇 CHANGED: Updated to the ubuntu home directory
+SECRETS_VAULT="/home/ubuntu/secrets/StreakSphere"
 
 echo "🚀 Deploying $APP_NAME in $ENV mode..."
 echo "-----------------------------------------"
@@ -18,7 +19,6 @@ echo "-----------------------------------------"
 # -------------------------------------
 echo "🔐 Injecting secure environment files..."
 
-# Copy both environment files and the Firebase key exactly as named
 cp "$SECRETS_VAULT/.env.development" "$NODE_BACKEND_PATH/.env.development"
 cp "$SECRETS_VAULT/.env.production" "$NODE_BACKEND_PATH/.env.production"
 cp "$SECRETS_VAULT/serviceAccountKey.json" "$NODE_BACKEND_PATH/serviceAccountKey.json"
@@ -85,6 +85,7 @@ echo "🔍 Checking for PyTorch..."
 if ./venv/bin/python -c "import torch" >/dev/null 2>&1; then
     echo "✅ PyTorch already installed."
 else
+    # Note: Oracle Ampere is an ARM64 CPU architecture. It will correctly default to the CPU installation block!
     if command -v nvidia-smi >/dev/null 2>&1; then
         echo "🔥 GPU detected. Installing CUDA PyTorch..."
         ./venv/bin/pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118

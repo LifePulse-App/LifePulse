@@ -1,6 +1,7 @@
 import 'react-native-gesture-handler';
 import React, { useState, useRef, useEffect } from 'react';
 import { NavigationContainer, CommonActions } from '@react-navigation/native';
+import BootSplash from 'react-native-bootsplash';
 import {
   useColorScheme,
   View,
@@ -481,6 +482,12 @@ const App = () => {
     checkBiometric();
   }, []);
 
+  useEffect(() => {
+    if (!isCheckingBiometric) {
+      setIsSplashVisible(false);
+    }
+  }, [isCheckingBiometric]);
+
   const toastConfig = {
     success: (props: React.JSX.IntrinsicAttributes & BaseToastProps) => (
       <BaseToast
@@ -515,6 +522,11 @@ const App = () => {
           </AuthContext.Provider>
         </PaperProvider>
       </GestureHandlerRootView>
+       {isSplashVisible && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
+          <AnimatedSplash onAnimationEnd={() => setIsSplashVisible(false)} />
+        </View>
+      )}
     </KeyboardProvider>
   );
 };

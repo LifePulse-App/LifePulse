@@ -6,7 +6,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.white,
     paddingHorizontal: 5,
-    paddingTop: 5,
+    paddingTop: 4.9,
   },
 
   // HEADER SECTION
