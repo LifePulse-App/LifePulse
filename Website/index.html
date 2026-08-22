@@ -437,15 +437,34 @@ footer{border-top:1px solid var(--border);padding:60px 0 30px;margin-top:60px;ba
 <script>
 document.getElementById('year').textContent = new Date().getFullYear();
 
-const io = new IntersectionObserver((entries) => {
-  entries.forEach(e => { 
-    if(e.isIntersecting){
-      e.target.classList.add('visible');
-      io.unobserve(e.target);
-    } 
+// Wrap the observer initiation in a requestIdleCallback
+// This ensures the browser only sets up the animations when it has free time, preventing forced reflows during load.
+if ('requestIdleCallback' in window) {
+  requestIdleCallback(() => {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { 
+        if(e.isIntersecting){
+          e.target.classList.add('visible');
+          io.unobserve(e.target);
+        } 
+      });
+    }, { threshold:0.1, rootMargin:'0px 0px -20px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
   });
-}, { threshold:0.1, rootMargin:'0px 0px -20px 0px' });
-document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+} else {
+  // Fallback for older browsers (like Safari)
+  setTimeout(() => {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { 
+        if(e.isIntersecting){
+          e.target.classList.add('visible');
+          io.unobserve(e.target);
+        } 
+      });
+    }, { threshold:0.1, rootMargin:'0px 0px -20px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+  }, 1);
+}
 </script>
 </body>
 </html>
