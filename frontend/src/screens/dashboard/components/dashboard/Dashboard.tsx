@@ -440,7 +440,8 @@ const Dashboard = ({ navigation }: any) => {
               </View>
             </TouchableOpacity>
 
-            {/* Today overview cards */}
+            {/* Today overview cards 
+
             <View style={styles.smallCardRow}>
               <View style={styles.smallCard}>
                 <Icon name="white-balance-sunny" size={22} color="#FBBF24" />
@@ -457,7 +458,7 @@ const Dashboard = ({ navigation }: any) => {
                 </Text>
               </View>
             </View>
-
+*/}
             {/* Habits list */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
