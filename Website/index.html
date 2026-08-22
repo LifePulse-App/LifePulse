@@ -36,6 +36,10 @@
   --text:#F8FAFC; --muted:#94A3B8;
   --accent1:#6366F1; --accent2:#A855F7; --accent3:#EC4899; --accent4:#10B981; --accent5:#F59E0B;
 }
+/* Add this anywhere inside your <style> tags */
+section, header, footer, .marquee-section {
+  contain: content;
+}
 *{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
 body{font-family:'DM Sans',sans-serif;color:var(--text);background:var(--bg);min-height:100vh;overflow-x:hidden;line-height:1.5;}
