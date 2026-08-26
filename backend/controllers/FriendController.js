@@ -4,6 +4,7 @@ import Mood from "../models/MoodSchema.js";
 import { sendToUser } from '../helpers/broadcastService.js';
 import { TEMPLATES } from '../utils/notificationTemplates.js';
 import { log } from "console";
+import MoodSchema from "../models/MoodSchema.js";
 
 /**
  * Helpers
@@ -197,25 +198,53 @@ export const friendStatus = catchAsyncErrors(async (req, res) => {
 
 export const listFriends = catchAsyncErrors(async (req, res) => {
   const currentUserId = req.user.id;
+  
   const me = await User.findById(currentUserId)
-    .populate("friends.user", "name username avatarUrl isPremium premiumPreferences tick avatarVersion") // ⚡ Fetch premium preferences
+    .populate("friends.user", "name username avatarUrl isPremium premiumPreferences tick avatarVersion") 
     .lean();
+    
   if (!me) return res.status(404).json({ message: "User not found" });
 
+  // 1. Get an array of just the friend IDs
+  const friendIds = (me.friends || [])
+    .filter(f => f.user)
+    .map(f => f.user._id);
+
+  // 2. Fetch all ACTIVE moods for these friends (sorted by newest first)
+  const activeMoods = await MoodSchema.find({
+    user: { $in: friendIds },
+    expiresAt: { $gt: new Date() }
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  // 3. Create a quick lookup map for the newest mood per user
+  const moodMap = {};
+  for (const m of activeMoods) {
+    // Because it's sorted by newest, the first one we process is the latest mood
+    if (!moodMap[m.user]) {
+      moodMap[m.user] = m.mood;
+    }
+  }
+
+  // 4. Map the friends array and attach the mood
   const friends = (me.friends || [])
     .filter(f => f.user)
     .map(f => {
-      // ⚡ Safely calculate badge visibility based on preference
+      // Safely calculate badge visibility based on preference
       const showBadge = f.user.isPremium && f.user.premiumPreferences?.premiumBadge !== false;
+      
       return {
         _id: f.user._id,
         name: f.user.name,
         username: f.user.username,
-        avatar: f.user.avatarUrl,
+        avatarUrl: f.user.avatarUrl,
+        avatarVersion: f.user.avatarVersion, // Ensure frontend caching works flawlessly
         isPremium: showBadge, 
         showPremiumBadge: showBadge,
         tick: f.user.tick,
         since: f.since,
+        mood: moodMap[f.user._id] || null, // ⚡ Attach the active mood here!
       };
     });
 

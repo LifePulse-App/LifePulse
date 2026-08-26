@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   Animated,
   StyleSheet,
-  TextInput as RNTextInput, // ⚡ ADDED: Native text input for the hidden overlay
+  TextInput as RNTextInput,
+  Image, // ⚡ ADDED: Native text input for the hidden overlay
 } from 'react-native';
 import { Text } from 'react-native-paper';
 import AuthContext from '../../../auth/user/UserContext';
@@ -199,16 +200,20 @@ const VerifyOtp = ({ navigation, route }: any) => {
      <View style={styles.root}>
       {/* Dashboard-like background */}
       <View style={styles.baseBackground} />
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
+
 
       <KeyboardAvoidingView
         style={styles.kbWrapper}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-          <View style={styles.appNameWrapper}>
-            <Text style={styles.appName}>StreakSphere</Text>
-          </View>
+         <View style={styles.appNameWrapper}>
+                             {/* --- REPLACED TEXT WITH LOGO IMAGE --- */}
+                             <Image 
+                               source={require('../../../shared/bootsplash/logo-bg.png')} // Update this path to match your folder structure
+                               style={{ width: 180, height: 100, alignSelf: 'center', marginBottom: 0 }}
+                               resizeMode="contain"
+                             />
+                           </View>
 
           <View style={styles.glassWrapper}>
             <View style={styles.glassContent}>

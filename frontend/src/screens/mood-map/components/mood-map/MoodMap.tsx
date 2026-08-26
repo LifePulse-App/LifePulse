@@ -5,6 +5,7 @@ import {
   Platform,
   TouchableOpacity,
   PermissionsAndroid,
+  StatusBar,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import AppText from "../../../../components/Layout/AppText/AppText";
@@ -367,6 +368,11 @@ useEffect(() => {
 
   return (
     <MainLayout>
+       <StatusBar
+  barStyle="light-content"
+  translucent={true} // ⚡ ADD THIS
+  backgroundColor="transparent"
+/>
       <AppScreen style={styles.root}>
         <View style={styles.topBar}>
           <AppText style={styles.headerText}>Mood Map</AppText>

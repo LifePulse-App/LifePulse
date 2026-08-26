@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, createContext, useContext } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, Modal, DeviceEventEmitter, Pressable, Image } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Modal, DeviceEventEmitter, Pressable, Image, AppState } from 'react-native';
 import InCallManager from 'react-native-incall-manager';
 import { MediaStream } from 'react-native-webrtc';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -13,47 +13,38 @@ import { getSocket, setSocketInCallStatus } from '../../../auth/api-client/socke
 import { IncomingCallScreen } from '../components/IncomingCallScreen';
 import { VoiceCallScreen } from '../components/VoiceCallScreen';
 import { OutgoingCallScreen } from '../components/OutgoingCallScreen';
+import { CallComingScreen } from '../components/CallComingScreen'; // ⚡ Imported Full Screen UI
 import { CallContext } from './CallContext';
 import Sound from 'react-native-sound';
 import apiClient from '../../../auth/api-client/api_client';
 import notifee from '@notifee/react-native';
 import { notificationNavState } from '../../../../index';
 
-  const baseUrl = apiClient.getBaseURL();
-  const newUrl = baseUrl.replace(/\/api\/?$/, "");
+const baseUrl = apiClient.getBaseURL();
+const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
 Sound.setCategory('PlayAndRecord', true);
 
 const playEndTone = () => {
   const tone = new Sound('endcalltone.mp3', Sound.MAIN_BUNDLE, error => {
-    if (!error) {
-      tone.play(() => {
-        tone.release();
-      });
-    }
+    if (!error) tone.play(() => tone.release());
   });
 };
 
 const playOutgoingTone = () => {
-    const tone = new Sound(
-        'outgoingtone.mp3',
-        Sound.MAIN_BUNDLE,
-        error => {
-            if (!error) {
-                tone.setNumberOfLoops(-1); // loop
-                tone.play();
-            }
-        }
-    );
-
-    return tone;
+  const tone = new Sound('outgoingtone.mp3', Sound.MAIN_BUNDLE, error => {
+    if (!error) {
+      tone.setNumberOfLoops(-1);
+      tone.play();
+    }
+  });
+  return tone;
 };
 
-// ⚡ CUSTOM INCOMING RINGTONE SOUND
 const playIncomingTone = () => {
   const tone = new Sound('ringtone.mp3', Sound.MAIN_BUNDLE, error => {
     if (!error) {
-      tone.setNumberOfLoops(-1); // loop infinitely until stopped
+      tone.setNumberOfLoops(-1);
       tone.play();
     }
   });
@@ -66,10 +57,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isMuted, setIsMuted] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   
-  // ⚡ REFS FOR TONES
+  // ⚡ NEW: Track if we should show Banner (Foreground) or Full Screen (Background)
+  const [callPresentation, setCallPresentation] = useState<'banner' | 'fullscreen'>('banner');
+
   const outgoingToneRef = useRef<Sound | null>(null);
   const incomingToneRef = useRef<Sound | null>(null);
-
   const [callDuration, setCallDuration] = useState(0);
 
   useEffect(() => {
@@ -77,12 +69,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (currentSession?.status === 'connected') {
       timer = setInterval(() => setCallDuration(prev => prev + 1), 1000);
     } else {
-      setCallDuration(0); // Reset when call ends
+      setCallDuration(0);
     }
     return () => clearInterval(timer);
   }, [currentSession?.status]);
 
-  // ⚡ AUDIO ROUTING STATES
   const [audioRoute, setAudioRoute] = useState<string>('EARPIECE');
   const [availableRoutes, setAvailableRoutes] = useState<string[]>(['EARPIECE', 'SPEAKER_PHONE']);
   const [routeMenuVisible, setRouteMenuVisible] = useState(false);
@@ -90,7 +81,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const activeCallIdRef = useRef<string | null>(null);
   const hasHandledOfferRef = useRef(false);
 
-  // ⚡ HELPER TO PROPERLY STOP BOTH TONES
   const stopAllTones = () => {
     if (outgoingToneRef.current) {
       outgoingToneRef.current.stop(() => {
@@ -107,22 +97,16 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
-    // ⚡ LISTEN FOR HARDWARE CHANGES (Bluetooth/Headphones plugged in)
     const subscription = DeviceEventEmitter.addListener('onAudioDeviceChanged', (data) => {
       let routes: string[] = [];
-      if (typeof data.availableAudioDeviceList === 'string') {
-        routes = data.availableAudioDeviceList.split(',');
-      } else if (Array.isArray(data.availableAudioDeviceList)) {
-        routes = data.availableAudioDeviceList;
-      }
+      if (typeof data.availableAudioDeviceList === 'string') routes = data.availableAudioDeviceList.split(',');
+      else if (Array.isArray(data.availableAudioDeviceList)) routes = data.availableAudioDeviceList;
       
-      // Ensure Earpiece and Speaker are always options
       if (!routes.includes('EARPIECE')) routes.push('EARPIECE');
       if (!routes.includes('SPEAKER_PHONE')) routes.push('SPEAKER_PHONE');
       
       setAvailableRoutes(routes);
 
-      // Auto-route to Bluetooth or Wired if they just connected
       if (routes.includes('BLUETOOTH') && audioRoute !== 'BLUETOOTH') {
         setAudioRoute('BLUETOOTH');
         InCallManager.chooseAudioRoute('BLUETOOTH');
@@ -131,10 +115,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         InCallManager.chooseAudioRoute('WIRED_HEADSET');
       }
     });
-
-    return () => {
-      subscription.remove();
-    };
+    return () => subscription.remove();
   }, [audioRoute]);
 
   useEffect(() => {
@@ -142,74 +123,47 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     webRTCService.init(
       (candidate) => {
-        if (activeCallIdRef.current) {
-          getSocket()?.emit("webrtc:ice-candidate", { callId: activeCallIdRef.current, candidate });
-        }
+        if (activeCallIdRef.current) getSocket()?.emit("webrtc:ice-candidate", { callId: activeCallIdRef.current, candidate });
       },
       (stream) => setRemoteStream(stream)
     );
 
     const attachListeners = (activeSocket: any) => {
-
-      const handleNoAnswer = (payload: any) => {
-        setCurrentSession((prev) => prev ? { ...prev, status: 'no-answer' } : null);
-        
-        stopAllTones();
-        playEndTone();
-        setTimeout(() => {
-          cleanupCallSession();
-        }, 5000);
-      }; 
-
       const handleIncomingCall = (payload: any) => {
         activeCallIdRef.current = payload.callId;
         hasHandledOfferRef.current = false;
         
-        // ⚡ FIX: Make sure the avatar string is perfectly formatted before setting state
         const rawAvatar = payload.caller?.avatarUrl || payload.caller?.avatar || "";
-        const formattedAvatar = rawAvatar 
-          ? (rawAvatar.startsWith('http') ? rawAvatar : `${apiClient.getBaseURL().replace(/\/api\/?$/, "")}${rawAvatar}`) 
-          : "";
+        const formattedAvatar = rawAvatar ? (rawAvatar.startsWith('http') ? rawAvatar : `${newUrl}${rawAvatar}`) : "";
+
+        // ⚡ INSTAGRAM LOGIC: Banner if open, Fullscreen if in background
+        const isForeground = AppState.currentState === 'active';
+        setCallPresentation(isForeground ? 'banner' : 'fullscreen');
 
         setCurrentSession({
           sessionId: payload.callId,
-          remoteUser: { 
-            id: payload.callerId, 
-            name: payload.caller?.name || 'User', 
-            avatar: formattedAvatar // 👈 USE THE FORMATTED URL HERE
-          },
+          remoteUser: { id: payload.callerId, name: payload.caller?.name || 'User', avatar: formattedAvatar },
           status: 'ringing',
           isIncoming: true,
         });
         
         stopAllTones();
         incomingToneRef.current = playIncomingTone();
-        
         activeSocket.emit("call:ringing", { callId: payload.callId });
-      };
-
-      const handleCallRinging = (payload: any) => {
-        setCurrentSession((prev) => 
-          prev && prev.sessionId === payload.callId ? { ...prev, status: 'ringing' } : prev
-        );
       };
 
       const handleCallAccepted = async (payload: any) => {
         InCallManager.stopRingback();
         InCallManager.stopRingtone();
-        
         stopAllTones();
-        
         InCallManager.start({ media: 'audio', auto: true, ringback: '' });
         
-        // Auto-select route based on connected hardware
         let initialRoute = 'EARPIECE';
         if (availableRoutes.includes('BLUETOOTH')) initialRoute = 'BLUETOOTH';
         else if (availableRoutes.includes('WIRED_HEADSET')) initialRoute = 'WIRED_HEADSET';
         
         InCallManager.chooseAudioRoute(initialRoute);
         setAudioRoute(initialRoute);
-        
         setSocketInCallStatus(true);
         setCurrentSession((prev) => prev ? { ...prev, status: 'connected' } : null);
 
@@ -221,49 +175,38 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       };
 
-      const handleWebRtcOffer = async (payload: any) => {
-        if (hasHandledOfferRef.current) return; 
-        hasHandledOfferRef.current = true; 
-        const answer = await webRTCService.handleOffer(payload.offer);
-        activeSocket.emit("webrtc:answer", { callId: payload.callId, answer });
+      const handleCallEnd = () => cleanupCallSession();
+      const handleNoAnswer = () => {
+        setCurrentSession((prev) => prev ? { ...prev, status: 'no-answer' } : null);
+        stopAllTones();
+        playEndTone();
+        setTimeout(() => cleanupCallSession(), 5000);
       };
 
-      const handleWebRtcAnswer = async (payload: any) => await webRTCService.handleAnswer(payload.answer);
-      const handleIceCandidate = async (payload: any) => await webRTCService.addIceCandidate(payload.candidate);
-      const handleCallEnd = () => cleanupCallSession();
-
       activeSocket.on("call:incoming", handleIncomingCall);
-      activeSocket.on("call:ringing", handleCallRinging);
       activeSocket.on("call:accepted", handleCallAccepted);
-      activeSocket.on("webrtc:offer", handleWebRtcOffer);
-      activeSocket.on("webrtc:answer", handleWebRtcAnswer);
-      activeSocket.on("webrtc:ice-candidate", handleIceCandidate);
       activeSocket.on("call:rejected", handleCallEnd);
       activeSocket.on("call:ended", handleCallEnd);
       activeSocket.on("call:cancelled", handleCallEnd);
-      activeSocket.on("call:answered-elsewhere", handleCallEnd);
-      activeSocket.on("call:missed", handleCallEnd);
       activeSocket.on("call:no-answer", handleNoAnswer);
+      
+      activeSocket.on("webrtc:offer", async (p: any) => {
+        if (hasHandledOfferRef.current) return; 
+        hasHandledOfferRef.current = true; 
+        const answer = await webRTCService.handleOffer(p.offer);
+        activeSocket.emit("webrtc:answer", { callId: p.callId, answer });
+      });
+      activeSocket.on("webrtc:answer", async (p: any) => await webRTCService.handleAnswer(p.answer));
+      activeSocket.on("webrtc:ice-candidate", async (p: any) => await webRTCService.addIceCandidate(p.candidate));
 
       return () => {
-        activeSocket.off("call:incoming", handleIncomingCall);
-        activeSocket.off("call:ringing", handleCallRinging);
-        activeSocket.off("call:accepted", handleCallAccepted);
-        activeSocket.off("webrtc:offer", handleWebRtcOffer);
-        activeSocket.off("webrtc:answer", handleWebRtcAnswer);
-        activeSocket.off("webrtc:ice-candidate", handleIceCandidate);
-        activeSocket.off("call:rejected", handleCallEnd);
-        activeSocket.off("call:ended", handleCallEnd);
-        activeSocket.off("call:cancelled", handleCallEnd);
-        activeSocket.off("call:answered-elsewhere", handleCallEnd);
-        activeSocket.off("call:missed", handleCallEnd);
-        activeSocket.off("call:no-answer", handleNoAnswer);
+        activeSocket.off("call:incoming"); activeSocket.off("call:accepted"); activeSocket.off("call:rejected"); activeSocket.off("call:ended");
+        activeSocket.off("webrtc:offer"); activeSocket.off("webrtc:answer"); activeSocket.off("webrtc:ice-candidate");
       };
     };
 
     let cleanupListeners: (() => void) | undefined;
     let isAttached = false;
-
     const checkSocket = () => {
       const activeSocket = getSocket();
       if (activeSocket && activeSocket.connected && !isAttached) {
@@ -272,108 +215,117 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         cleanupListeners = attachListeners(activeSocket);
       }
     };
-
     checkSocket();
     socketInterval = setInterval(checkSocket, 500);
+    return () => { clearInterval(socketInterval); if (cleanupListeners) cleanupListeners(); };
+  }, [availableRoutes, audioRoute]);
 
-    return () => {
-      clearInterval(socketInterval);
-      if (cleanupListeners) cleanupListeners();
-    };
-  }, []);
-
-  // ⚡ FIX: The Call Interceptor (Handles Lock Screen & Banner Taps)
+  // ⚡ FIX: Instant Global Listener for Background Taps (Auto-Answer)
+ // ⚡ FIX: Bulletproof Call Interceptor
   useEffect(() => {
-    
     const checkPendingCalls = async () => {
-      // 1. Did the phone wake up from a locked screen?
+      // 1. Cold Boot Check (Did the app open from a notification tap?)
       const initial = await notifee.getInitialNotification();
       const initialData = initial?.notification?.data;
+      
+      let callData = null;
+      let autoAccept = false;
 
-      // 2. Did the user tap "Answer" while the app was backgrounded?
-      const pendingData = notificationNavState.pending;
-
-      const callData = initialData?.type === 'incoming_call' ? initialData : 
-                       (pendingData?.type === 'incoming_call' ? pendingData : null);
+      // Determine if we tapped the body or the "Answer" button
+      if (initialData?.type === 'incoming_call') {
+        callData = initialData;
+        autoAccept = initial.pressAction?.id === 'answer_call';
+      } else if (notificationNavState.pending?.type === 'incoming_call') {
+        callData = notificationNavState.pending;
+        autoAccept = !!callData.autoAccept;
+      }
 
       if (callData) {
-        console.log('[CallProvider] Intercepted pending call:', callData);
-        
+        console.log('[CallProvider] Booting directly into call UI:', callData);
+        notificationNavState.pending = null; 
         activeCallIdRef.current = callData.callId;
         
-        // Clear the pending state so it doesn't fire twice
-        notificationNavState.pending = null;
-
-        // Mount the UI immediately!
+        setCallPresentation('fullscreen'); // Force Full Screen because they came from lock screen
+        
         setCurrentSession({
           sessionId: callData.callId,
           remoteUser: { 
             id: callData.callerId, 
             name: callData.callerName || 'User', 
-            avatar: '' 
+            avatar: callData.avatarUrl || '' 
           },
           status: 'ringing',
           isIncoming: true,
         });
 
-        // Start playing the ringing sound
         stopAllTones();
-        incomingToneRef.current = playIncomingTone();
 
-        // If they explicitly tapped "Answer" on the banner, auto-accept!
-        if (callData.autoAccept) {
-          console.log('[CallProvider] Auto-accepting call from banner tap');
-          // Wait 1.5 seconds for socket to finish connecting, then accept
-          setTimeout(() => {
+        if (autoAccept) {
+          // ⚡ FIX: Proper Socket Poller + Microphone Permission check
+          let attempts = 0;
+          const tryAccept = setInterval(async () => {
             const socket = getSocket();
-            if (socket && socket.connected) {
-              socket.emit("call:accept", { callId: callData.callId });
-            } else {
-               // Fallback: Try one more time if socket is slow
-               setTimeout(() => getSocket()?.emit("call:accept", { callId: callData.callId }), 1000);
+            if (socket?.connected) {
+              clearInterval(tryAccept);
+              
+              // Must check permissions before answering!
+              const hasPermission = await PermissionService.checkAndRequestAudioPermission();
+              if (hasPermission) {
+                socket.emit("call:accept", { callId: callData.callId });
+              }
             }
-          }, 1500);
+            attempts++;
+            if (attempts > 15) clearInterval(tryAccept); // Give up after 7.5 seconds
+          }, 500);
+        } else {
+          incomingToneRef.current = playIncomingTone();
         }
       }
     };
 
-    // Run the check when the provider mounts
+    // Run this instantly when CallProvider mounts
     checkPendingCalls();
 
-    // ⚡ FIX: Gracefully handle offline remote terminations via FCM Push
-    const terminateListener = DeviceEventEmitter.addListener('TERMINATE_CALL', (data) => {
-        if (activeCallIdRef.current === data.callId) {
-            console.log("Call terminated via Push Notification Event:", data.type);
-            
-            // If they explicitly rejected, show the UI before cleaning up
-            if (data.type === 'call_rejected') {
-                setCurrentSession(prev => prev ? { ...prev, status: 'rejected' } : null);
-                
-                stopAllTones();
-                
-                playEndTone(); // Play the hangup beep
-                
-                // Wait 2.5 seconds so the caller sees "Call Declined"
-                setTimeout(() => {
-                    cleanupCallSession();
-                }, 2500);
-            } else {
-                // If it was just a normal hangup or miss, clean up instantly
-                cleanupCallSession();
-            }
-        }
-    });
+    // 2. Handle the case where the app is already running in the background
+    const handleBackgroundCall = (data: any) => {
+      activeCallIdRef.current = data.callId;
+      setCallPresentation('fullscreen');
+      
+      setCurrentSession({
+        sessionId: data.callId,
+        remoteUser: { id: data.callerId, name: data.callerName || 'User', avatar: data.avatarUrl || '' },
+        status: 'ringing',
+        isIncoming: true,
+      });
 
-    return () => {
-        terminateListener.remove();
+      stopAllTones();
+
+      if (data.autoAccept) {
+        const socket = getSocket();
+        if (socket?.connected) {
+          socket.emit("call:accept", { callId: data.callId });
+        } else {
+          setTimeout(() => getSocket()?.emit("call:accept", { callId: data.callId }), 1000);
+        }
+      } else {
+        incomingToneRef.current = playIncomingTone();
+      }
     };
 
-  }, []); // Run once on mount
+    const listener = DeviceEventEmitter.addListener('auto_answer_call', handleBackgroundCall);
+    const terminateListener = DeviceEventEmitter.addListener('TERMINATE_CALL', (data) => {
+        if (activeCallIdRef.current === data.callId) cleanupCallSession();
+    });
 
- const startCall = async (targetUser: CallUser, conversationId: string) => {
+    return () => { 
+      listener.remove(); 
+      terminateListener.remove(); 
+    };
+  }, []);
+
+  const startCall = async (targetUser: CallUser, conversationId: string) => {
     const hasPermission = await PermissionService.checkAndRequestAudioPermission();
     if (!hasPermission) return;
-
     stopAllTones();
     outgoingToneRef.current = playOutgoingTone();
     setIsMinimized(false);
@@ -382,29 +334,17 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     InCallManager.chooseAudioRoute('EARPIECE');
     setAudioRoute('EARPIECE');
 
-    // Starts in "initiating" (Calling...)
     setCurrentSession({ sessionId: "pending", remoteUser: targetUser, status: 'initiating', isIncoming: false });
 
     getSocket()?.emit("call:start", { receiverId: targetUser.id, type: "audio", conversationId }, (response: any) => {
       if (response.success) {
         activeCallIdRef.current = response.callId;
-        // ⚡ FIX: Apply the 'ringing' status immediately from the backend response
-        setCurrentSession((prev) => prev ? { 
-            ...prev, 
-            sessionId: response.callId,
-            status: response.status || 'ringing' 
-        } : null);
+        setCurrentSession((prev) => prev ? { ...prev, sessionId: response.callId, status: response.status || 'ringing' } : null);
       } else if (response.message === "User busy") {
-        // ⚡ HANDLE BUSY STATE
         setCurrentSession((prev) => prev ? { ...prev, status: 'busy' } : null);
-
         stopAllTones();
         playEndTone();
-       
-        // Wait 2.5 seconds so the user can read "User Busy", then hang up automatically
-        setTimeout(() => {
-          cleanupCallSession();
-        }, 5000);
+        setTimeout(() => cleanupCallSession(), 5000);
       } else {
         cleanupCallSession();
       }
@@ -444,7 +384,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // ⚡ DYNAMIC AUDIO ROUTE SWITCHER
   const selectAudioRoute = (route: string) => {
     setAudioRoute(route);
     InCallManager.chooseAudioRoute(route);
@@ -453,21 +392,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const handleSpeakerPress = () => {
-    // If multiple options exist, open the menu. If only speaker/earpiece, toggle directly.
-    if (availableRoutes.length > 2) {
-      setRouteMenuVisible(true);
-    } else {
-      selectAudioRoute(audioRoute === 'SPEAKER_PHONE' ? 'EARPIECE' : 'SPEAKER_PHONE');
-    }
+    if (availableRoutes.length > 2) setRouteMenuVisible(true);
+    else selectAudioRoute(audioRoute === 'SPEAKER_PHONE' ? 'EARPIECE' : 'SPEAKER_PHONE');
   };
 
-const toggleMinimize = () => {
-    if (currentSession && !currentSession.isIncoming) {
-      setIsMinimized(!isMinimized);
-    } else if (currentSession?.status === 'connected') {
-      setIsMinimized(!isMinimized);
-    }
-  };
+  const toggleMinimize = () => setIsMinimized(!isMinimized);
   
   const cleanupCallSession = () => {
     InCallManager.stop();
@@ -475,9 +404,7 @@ const toggleMinimize = () => {
     InCallManager.stopRingback();
     webRTCService.cleanup();
     activeCallIdRef.current = null;
-    
     stopAllTones();
-    
     setCurrentSession(null);
     setRemoteStream(null);
     setIsMuted(false);
@@ -486,47 +413,31 @@ const toggleMinimize = () => {
     setSocketInCallStatus(false); 
   };
 
-return (
+  return (
     <CallContext.Provider value={{
-      currentSession,
-      remoteStream,
-      isMuted,
-      audioRoute,
-      availableRoutes,
-      isMinimized,
-      callDuration,
-      startCall,
-      acceptCall,
-      rejectCall,
-      endCall,
-      toggleMute,
-      handleSpeakerPress,
-      toggleMinimize
+      currentSession, remoteStream, isMuted, audioRoute, availableRoutes, isMinimized, callDuration,
+      startCall, acceptCall, rejectCall, endCall, toggleMute, handleSpeakerPress, toggleMinimize
     }}>
       <View style={styles.masterWrapper}>
         
-        {/* 📱 FIX: Show banner anytime it is minimized, not just when connected */}
-        {currentSession && isMinimized && (
-          <MinimizedCallBanner />
-        )}
+        {currentSession && isMinimized && <MinimizedCallBanner />}
 
-        {/* APP VIEWPORT */}
         <View style={styles.appContainer}>
           {children}
 
-          {/* 📱 FULL SCREEN OVERLAYS */}
+          {/* 📱 ⚡ GLOBAL CALL OVERLAYS ⚡ */}
           {currentSession && !isMinimized && (
             <View 
               style={[StyleSheet.absoluteFill, { zIndex: 99999 }]} 
-              pointerEvents={(currentSession.status === 'ringing' && currentSession.isIncoming) ? 'box-none' : 'auto'}
+              pointerEvents={(currentSession.status === 'ringing' && currentSession.isIncoming && callPresentation === 'banner') ? 'box-none' : 'auto'}
             >
-            {/* ⚡ FIX: Render Outgoing Screen for ALL states until it connects or cleans up */}
               {(!currentSession.isIncoming && currentSession.status !== 'connected') && (
                 <OutgoingCallScreen />
               )}
 
-              {currentSession.status === 'ringing' && currentSession.isIncoming && (
-                <IncomingCallScreen />
+              {/* ⚡ The WhatsApp/Instagram Toggle */}
+              {(currentSession.status === 'ringing' && currentSession.isIncoming) && (
+                callPresentation === 'fullscreen' ? <CallComingScreen /> : <IncomingCallScreen />
               )}
 
               {currentSession.status === 'connected' && (
@@ -536,7 +447,6 @@ return (
           )}
         </View>
 
-        {/* ⚡ AUDIO ROUTING MODAL */}
         <Modal visible={routeMenuVisible} transparent animationType="fade" onRequestClose={() => setRouteMenuVisible(false)}>
           <Pressable style={styles.modalBackdrop} onPress={() => setRouteMenuVisible(false)}>
             <View style={styles.modalContainer}>
@@ -565,7 +475,6 @@ return (
                 <Icon name="phone-in-talk" size={24} color={audioRoute === 'EARPIECE' ? "#6366f1" : "#fff"} />
                 <Text style={[styles.routeText, audioRoute === 'EARPIECE' && styles.routeTextActive]}>Phone (Earpiece)</Text>
               </TouchableOpacity>
-
             </View>
           </Pressable>
         </Modal>
@@ -574,6 +483,8 @@ return (
     </CallContext.Provider>
   );
 };
+
+// ... keep your MinimizedCallBanner and StyleSheet code below this just like before
 
 // ==========================================
 // MINIMIZED TOP BLOCK COMPONENT

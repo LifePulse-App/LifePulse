@@ -235,7 +235,7 @@ export const sendMessage = async (req, res) => {
       return res.status(400).json({ message: "Invalid ids" });
     }
 
-    const me = await User.findById(senderId).select("blockedUsers blockedBy isPremium tick").lean();
+    const me = await User.findById(senderId).select("name blockedUsers blockedBy isPremium tick avatarUrl avatarVersion").lean();
     const blockedUsersIds = (me?.blockedUsers || []).map(String);
     const blockedByIds = (me?.blockedBy || []).map(String);
     const peerIdStr = String(receiverId);
@@ -287,8 +287,10 @@ export const sendMessage = async (req, res) => {
     req.io.to(`conversation:${conversationId}`).emit("chat-message", msg);
 
     if (createdNow && notifyUser && String(senderId) !== String(recvObj)) {
-      const fromUsername = req.user?.name || req.user?.username || "Someone";
-      await sendMsgNotification(recvObj, senderId, fromUsername, msg._id, getPushBody(msg));
+      const fromUsername = me?.name || req.user?.username || "Someone";
+      // ⚡ FIX: Pass conversationId as the last argument
+      await sendMsgNotification(recvObj, senderId, fromUsername, msg._id, getPushBody(msg), conversationId, me?.avatarUrl,       // <-- Passed here
+        me?.avatarVersion);
     }
 
     res.json({

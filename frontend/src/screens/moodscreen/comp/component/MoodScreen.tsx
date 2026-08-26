@@ -147,8 +147,6 @@ const handleSelectAndSaveMood = async (moodId) => {
         <AppScreen style={styles.root}>
           {/* Background */}
           <View style={styles.baseBackground} />
-          <View style={styles.glowTop} />
-          <View style={styles.glowBottom} />
 
           <StatusBar
             barStyle="light-content"

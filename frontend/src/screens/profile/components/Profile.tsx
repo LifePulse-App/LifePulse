@@ -741,6 +741,7 @@ export default function ProfileScreen({ navigation }: any) {
         id: userData.user.id,
         username: userData.UserName,
         password: userData.Password,
+        avatarUrl: finalAvatarUri,
         user: userData,
       });
     }

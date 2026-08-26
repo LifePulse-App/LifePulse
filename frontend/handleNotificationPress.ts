@@ -4,6 +4,9 @@ import { navigationRef } from './src/navigation/main/RootNavigation';
 export function handleNotificationPress(data: any) {
   const type = data?.type;
   if (!type) return;
+  if (type === 'incoming_call') {
+    return; 
+  }
 
   // Small delay to ensure navigator is ready
   setTimeout(() => {

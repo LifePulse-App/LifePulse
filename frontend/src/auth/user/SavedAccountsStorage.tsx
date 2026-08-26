@@ -7,6 +7,7 @@ export type SavedAccount = {
   id: string;
   username: string;
   password: string;
+  avatarUrl: string | null;
   user: UserLoginResponse;
 };
 

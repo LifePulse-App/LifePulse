@@ -186,7 +186,9 @@ const ChatRowItem = ({ item, navigation, onHideRequest, onCallRequest }: any) =>
             peerAvatarUrl: item.peerAvatarUrl,
             // ⚡ Pass Block Flags to ChatScreen
             amIBlocked: item.amIBlocked,
-            didIBlock: item.didIBlock
+            didIBlock: item.didIBlock,
+            tick: item.tick,
+            isPremium: item.isPremium
           })
         }
       >
@@ -430,8 +432,6 @@ export default function ChatListScreen({ navigation }: any) {
     <MainLayout>
       <View style={styles.root}>
         <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
 
         <View style={{ flex: 1 }}>
           <View style={styles.topBar}>

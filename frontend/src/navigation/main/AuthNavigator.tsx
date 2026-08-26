@@ -329,16 +329,6 @@ return (
           component={FriendsListScreen}
           options={{ unmountOnBlur: false, freezeOnBlur: true }}
         />
-       <Stack.Screen 
-  name="IncomingCallScreen" 
-  component={CallComingScreen} 
-  options={{ 
-    headerShown: false, 
-    // This animation makes it slide up from the bottom like a native call
-    presentation: 'fullScreenModal',
-    animation: 'slide_from_bottom' 
-  }} 
-/>
       </Stack.Navigator>
       </CallProvider>
 );

@@ -296,8 +296,6 @@ const resolveAvatarUri = async (item: Friend) => {
     <MainLayout hideNavBar={true}>
       <View style={styles.root}>
         <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
 
         <View style={styles.topBar}>
           <TouchableOpacity

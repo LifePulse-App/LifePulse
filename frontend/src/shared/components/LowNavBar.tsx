@@ -13,6 +13,7 @@ const LowNavBAr = () => {
   const route = useRoute();
 
   const [unreadChats, setUnreadChats] = useState(getUnreadChatCount());
+  
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
@@ -35,8 +36,8 @@ const LowNavBAr = () => {
   const routes = [
     { key: 'attendance', title: 'Map', icon: { active: 'map-marker', inactive: 'map-marker-outline' }, },
     // AR Portal tab:
+        { key: 'home', title: 'Home', icon: { active: 'home', inactive: 'home-outline' }, },
     { key: 'arportal', title: 'AR Portal', icon: { active: 'cube', inactive: 'cube-outline' } }, // or use 'augmented-reality'
-    { key: 'home', title: 'Home', icon: { active: 'home', inactive: 'home-outline' }, },
     { key: 'results', title: 'LeaderBoard', icon: { active: 'chart-box', inactive: 'chart-box-outline' }, },
     { key: 'chat', title: 'Chat', icon: { active: 'chat', inactive: 'chat-outline' }, },
   ];
@@ -44,8 +45,8 @@ const LowNavBAr = () => {
   const getIndexFromRoute = () => {
     switch (route.name) {
       case 'StudentList': return 0;       // Map
-      case 'ArPortal': return 1;          // AR Portal
-            case 'Dashboard': return 2;         // Home
+      case 'Dashboard': return 1;         // Home
+      case 'ArPortal': return 2;          // AR Portal
       case 'EmployeeList': return 3;      // LeaderBoard
       case 'Chat': return 4;              // Chat
       default: return 1;

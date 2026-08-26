@@ -124,11 +124,23 @@ async function sendNotificationFCM(tokens, payload) {
 /**
  * CHAT push
  */
-export async function sendMsgNotification(toUserId, fromUserId, fromUsername, messageId, bodyText = 'Sent you a message') {
+// ⚡ FIX: Added conversationId parameter
+// ⚡ FIX: Added avatarUrl and avatarVersion to the function arguments
+export async function sendMsgNotification(
+  toUserId, 
+  fromUserId, 
+  fromUsername, 
+  messageId, 
+  bodyText = 'Sent you a message', 
+  conversationId,
+  avatarUrl = '',       // <-- Add this
+  avatarVersion = 1     // <-- Add this (optional but good for cache busting)
+) {
   const tokens = await PushToken.find({
     userId: toUserId,
     platform: { $in: ['android', 'ios'] },
   }).lean();
+  
   if (!tokens.length) return;
 
   await sendNotificationFCM(tokens, {
@@ -138,6 +150,11 @@ export async function sendMsgNotification(toUserId, fromUserId, fromUsername, me
     username: String(fromUsername || 'Someone'),
     body: String(bodyText || 'Sent you a message'),
     messageId: String(messageId),
+    conversationId: String(conversationId), 
+    
+    // ⚡ FIX: Attach avatar URL and version so the frontend can cache it
+    avatarUrl: String(avatarUrl),
+    avatarVersion: String(avatarVersion),
   });
 }
 

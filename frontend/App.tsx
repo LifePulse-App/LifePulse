@@ -16,7 +16,7 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReactNativeBiometrics from 'react-native-biometrics';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
+import notifee, { AndroidImportance, AndroidStyle, EventType } from '@notifee/react-native';
 import codePush from "@revopush/react-native-code-push";
 import { getApp } from '@react-native-firebase/app';
 import { getMessaging, getToken, onMessage, onTokenRefresh } from '@react-native-firebase/messaging';
@@ -30,7 +30,7 @@ import apiClient, { setSecretKey } from './src/auth/api-client/api_client';
 import { navigationRef, resetToLogin } from './src/navigation/main/RootNavigation';
 import AppUpdateGate from './AppUpdateGate';
 import { enableScreens } from 'react-native-screens';
-import { AnimatedSplash } from './AnimatedSplash';
+import { AnimatedSplash, hideSplash } from './AnimatedSplash';
 import {
   loadChatNotificationState,
   notifyIncoming,
@@ -39,7 +39,7 @@ import {
   markMessagesDeliveredLocally,
 } from './src/screens/chat/services/ChatNotifications';
 
-import { markDelivered, markAllPendingDelivered } from './src/screens/chat/services/api_chat';
+import { markDelivered,sendMessage, markAllPendingDelivered } from './src/screens/chat/services/api_chat';
 import { notificationNavState } from './index'; 
 import { handleNotificationPress } from './handleNotificationPress'; 
 
@@ -51,6 +51,7 @@ import { connectSocket, disconnectSocket, getSocket } from './src/auth/api-clien
 
 // ⚡ REVENUECAT: Import the SDK
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
+import { getAvatar } from './src/storage/AvatarManager';
 
 (global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
@@ -94,6 +95,98 @@ function parseMessageIds(raw: any): string[] {
   }
 }
 
+async function displayMessagingStyleNotification(data, fallback = {}) {
+  const peerId = String(data.peerUserId || 'unknown');
+  const peerName = data.username || data.peerName || fallback.title || 'Someone';
+  const text = data.body || data.message || fallback.body || 'Sent you a message';
+  
+  // ⚡ 1. Extract avatar data from the backend push payload
+  const senderAvatarUrl = data.avatarUrl || data.profileImage;
+  const avatarVersion = data.avatarVersion || 1;
+
+  // ⚡ 2. Download/Cache the avatar locally
+  let localAvatarPath = undefined;
+  if (senderAvatarUrl) {
+    try {
+      localAvatarPath = await getAvatar(peerId, senderAvatarUrl, avatarVersion);
+    } catch (e) {
+      console.log('Failed to cache avatar for notification:', e);
+    }
+  }
+
+  const notificationId = `chat_messaging:${peerId}`; 
+
+  // ⚡ 3. Add the cached file path to the sender's icon
+  const sender = {
+    name: peerName,
+    id: peerId,
+    ...(localAvatarPath ? { icon: localAvatarPath } : {}), 
+  };
+
+  const currentUser = {
+    name: 'Me',
+    id: 'me',
+  };
+
+  const displayed = await notifee.getDisplayedNotifications();
+  const existingNotif = displayed.find(n => n.id === notificationId);
+
+  let messages = [];
+
+  if (
+    existingNotif && 
+    existingNotif.notification.android?.style?.type === AndroidStyle.MESSAGING
+  ) {
+    messages = existingNotif.notification.android.style.messages || [];
+  }
+
+  messages.push({
+    text: text,
+    timestamp: Date.now(),
+    person: sender,
+  });
+
+  const notifData = { 
+    type: 'chat', 
+    peerUserId: peerId, 
+    peerName, 
+    conversationId: String(data.conversationId) 
+  };
+
+  await notifee.displayNotification({
+    id: notificationId,
+    title: peerName,
+    body: text, 
+    data: notifData,
+    android: {
+      channelId: 'default', 
+      smallIcon: 'ic_launcher', // ⚡ Keeps your top status bar icon working!
+      importance: AndroidImportance.HIGH,
+      pressAction: { id: 'default' },
+      sound: 'default',
+      color: '#6366f1',
+      style: {
+        type: AndroidStyle.MESSAGING,
+        person: currentUser,
+        messages: messages, 
+        title: peerName,
+      },
+      actions: [
+        {
+          title: 'Reply',
+          pressAction: { id: 'reply_action' },
+          input: { placeholder: 'Type a reply...' },
+        },
+      ],
+    },
+    ios: {
+      sound: 'default',
+      threadId: `chat:${peerId}`, 
+      foregroundPresentationOptions: ['alert', 'sound', 'badge'],
+    },
+  });
+}
+
 async function displayChatNotificationGroupedBySender(
   data: any,
   fallback?: { title?: string; body?: string }
@@ -105,6 +198,11 @@ async function displayChatNotificationGroupedBySender(
   const groupId = `chat:${peerId}`;
   const summaryId = `chat-summary:${peerId}`;
 
+const notifData = { type: 'chat', peerUserId: peerId, peerName };
+  if (data.conversationId) {
+    notifData.conversationId = String(data.conversationId);
+  }
+
   await notifee.displayNotification({
     id: `chat:${peerId}:msg:${messageId}`,
     title: peerName,
@@ -112,33 +210,31 @@ async function displayChatNotificationGroupedBySender(
     android: {
       channelId: CHAT_CHANNEL_ID,
       groupId,
-      groupSummary: true,
       pressAction: { id: 'default' },
       sound: 'default',
+      actions: [
+        {
+          title: 'Reply',
+          pressAction: { id: 'reply_action' },
+          input: { placeholder: 'Type a reply...' },
+        },
+      ],
     },
     ios: {
       sound: 'default',
       foregroundPresentationOptions: ['alert', 'sound', 'badge'],
     },
-    data: { type: 'chat', peerUserId: peerId, peerName },
+    data: notifData, // 👈 Safely passing the data object
   });
 
+  // ⚡ FIX: Removed the "New messages" body text. Android will now stack them cleanly.
   await notifee.displayNotification({
     id: summaryId,
-    title: peerName,
-    body: 'New messages',
     android: {
       channelId: CHAT_CHANNEL_ID,
       groupId,
       groupSummary: true,
-      pressAction: { id: 'default' },
-      sound: 'default',
-    },
-    ios: {
-      sound: 'default',
-      foregroundPresentationOptions: ['alert', 'sound', 'badge'],
-    },
-    data: { type: 'chat_summary', peerUserId: peerId, peerName },
+    }
   });
 }
 
@@ -233,10 +329,12 @@ const App = () => {
     return () => sub.remove();
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
     const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
-      if (type === EventType.PRESS && detail?.notification?.data) {
-        const data = detail.notification.data;
+      const data = detail?.notification?.data;
+      
+      // Handle tap navigation
+      if (type === EventType.PRESS && data) {
         if (data.type === 'chat' && data.peerUserId) {
           navigationRef.current?.navigate('chat', {
             peerUserId: data.peerUserId,
@@ -244,23 +342,60 @@ const App = () => {
           });
         }
       }
+
+// ⚡ FIX: Handle Inline Reply from the foreground notification banner
+      if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'reply_action') {
+        const replyText = detail.input;
+        
+        if (replyText && data?.peerUserId && data?.conversationId) {
+          try {
+            // ⚡ FIX: Use your dedicated sendMessage service
+            await sendMessage({
+              conversationId: data.conversationId,
+              receiverId: data.peerUserId,
+              text: replyText,
+              clientMessageId: `reply_${Date.now()}`,
+              notifyUser: true
+            });
+
+            // Clear the notification once replied
+            if (detail.notification?.id) {
+              await notifee.cancelNotification(detail.notification.id);
+            }
+          } catch (e) {
+            console.log('[Notifee Foreground] Reply failed', e);
+          }
+        }
+      }
     });
     return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
+useEffect(() => {
     async function checkInitialNotification() {
       const initial = await notifee.getInitialNotification();
       if (initial?.notification?.data) {
         const data = initial.notification.data;
-        setTimeout(() => {
+        
+        // ⚡ FIX: We do ABSOLUTELY NOTHING here for calls. 
+        // CallProvider will read it directly and render the UI.
+        if (data.type === 'incoming_call') {
+          return; 
+        }
+
+        // For chat and other notifications:
+        if (navigationRef.current?.isReady()) {
           if (data.type === 'chat' && data.peerUserId) {
-            navigationRef.current?.navigate('chat', {
+            navigationRef.current.navigate('chat', {
               peerUserId: data.peerUserId,
               peerName: data.peerName,
             });
+          } else {
+             handleNotificationPress(data);
           }
-        }, 600);
+        } else {
+          notificationNavState.pending = data;
+        }
       }
     }
     checkInitialNotification();
@@ -333,7 +468,7 @@ const App = () => {
           const activePeer = getActiveChatPeer();
           if (!activePeer || activePeer !== data.peerUserId) {
             notifyIncoming(data.peerUserId);
-            await displayChatNotificationGroupedBySender(data, {
+            await displayMessagingStyleNotification(data, {
               title: remoteMessage?.notification?.title,
               body: remoteMessage?.notification?.body,
             });
@@ -401,8 +536,13 @@ const App = () => {
     runMarkAllPendingDelivered('user-ready');
   }, [User]);
 
-  useEffect(() => {
+useEffect(() => {
     if (notificationNavState.pending) {
+      // ⚡ FIX: Protect call data! Do NOT wipe it, let CallProvider use it.
+      if (notificationNavState.pending.type === 'incoming_call') {
+        return; 
+      }
+
       setTimeout(() => {
         handleNotificationPress(notificationNavState.pending);
         notificationNavState.pending = null; 
@@ -484,7 +624,7 @@ const App = () => {
 
   useEffect(() => {
     if (!isCheckingBiometric) {
-      setIsSplashVisible(false);
+     hideSplash()
     }
   }, [isCheckingBiometric]);
 
@@ -522,11 +662,6 @@ const App = () => {
           </AuthContext.Provider>
         </PaperProvider>
       </GestureHandlerRootView>
-       {isSplashVisible && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>
-          <AnimatedSplash onAnimationEnd={() => setIsSplashVisible(false)} />
-        </View>
-      )}
     </KeyboardProvider>
   );
 };
