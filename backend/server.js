@@ -146,8 +146,6 @@ const server = http.createServer(app);
 // --- CRON
 import { runMonthlyReset } from './helpers/monthlyReset.js';
 
-// ⚡ FIX: Prevent duplicate database resets across 12 PM2 instances
-// ⚡ FIX: Use the custom variable
 if (process.env.IS_PRIMARY_WORKER === 'true') {
   cron.schedule('0 0 0 1 * *', async () => {
     try {
