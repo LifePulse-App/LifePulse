@@ -40,7 +40,7 @@ import DashboardService from "../../services/api_dashboard";
 import socialApi from "../../../friends/services/api_friends";
 import FeedAPI from "../../../activity-feed/services/api_feed"; 
 import DeviceInfo from "react-native-device-info";
-import { ensureDeviceKeys } from "../../../chat/services/bootstrap"; 
+import { ensureDeviceKeys, getUnreadChatCount, subscribeUnreadChanges } from "../../../chat/services/ChatNotifications"; 
 import AuthContext from "../../../../auth/user/UserContext";
 import { getStableDeviceId } from "../../../../shared/services/stableDeviceId";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -119,9 +119,12 @@ const Dashboard = ({ navigation }: any) => {
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [friendReqCount, setFriendReqCount] = useState(0);
+
+  // ⚡ Live Unread Chat Count State
+  const [unreadChats, setUnreadChats] = useState(getUnreadChatCount());
+
   const userContext = useContext(AuthContext);
   const user = userContext?.User?.user;
-  const userr = userContext?.User;
   const myUserId = user?.id;
 
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
@@ -159,6 +162,16 @@ const Dashboard = ({ navigation }: any) => {
   const [expandedReplies, setExpandedReplies] = useState<{ [key: string]: boolean }>({});
   const [comments, setComments] = useState<Comment[]>([]);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const currentUserIsAdmin = false;
+
+  // Subscribe to live unread chat changes
+  useEffect(() => {
+    const unsub = subscribeUnreadChanges(() => {
+      setUnreadChats(getUnreadChatCount());
+    });
+    return () => unsub();
+  }, []);
 
   // Double-tap heart state for inline feed posts
   const lastTapRef = useRef<{ [key: string]: number }>({});
@@ -272,8 +285,8 @@ const Dashboard = ({ navigation }: any) => {
       const res: any = await FeedAPI.GetFeed(activeTab);
       const feedData = res?.posts || res?.data?.posts || [];
       const formattedPosts = feedData.map((post: any) => {
-        const cleanPath = post.mediaUrl.replace(/\\/g, '/');
-        const fullImageUrl = cleanPath.startsWith("http") ? cleanPath : `${baseUrl.replace(/\/api\/?$/, "")}${cleanPath}`;
+        const cleanPath = post.mediaUrl ? post.mediaUrl.replace(/\\/g, '/') : '';
+        const fullImageUrl = cleanPath.startsWith("http") ? cleanPath : `${baseUrl}${cleanPath}`;
         return { ...post, mediaUrl: fullImageUrl };
       });
       setPosts(formattedPosts);
@@ -290,7 +303,9 @@ const Dashboard = ({ navigation }: any) => {
     loadFeed();
   }, [activeTab]);
 
-  // Feed handlers
+  // ============================================================
+  // FEED & COMMENT HANDLERS
+  // ============================================================
   const handleLike = async (postId: string) => {
     setPosts(prev => prev.map(p => p.id === postId ? { ...p, isLiked: !p.isLiked, likesCount: p.isLiked ? p.likesCount - 1 : p.likesCount + 1 } : p));
     try { await FeedAPI.ToggleLikePost(postId); } catch {}
@@ -322,23 +337,153 @@ const Dashboard = ({ navigation }: any) => {
 
   const getRootComments = () => comments.filter(c => c.postId === selectedPostForComments?.id && !c.parentId);
   const getReplies = (commentId: string) => comments.filter(c => c.parentId === commentId).reverse();
-  const toggleReplies = (commentId: string) => setExpandedReplies(p => ({ ...p, [commentId]: !p[commentId] }));
+
+  const toggleReplies = (commentId: string) => {
+    setExpandedReplies((prev) => ({ ...prev, [commentId]: !prev[commentId] }));
+  };
 
   const handleAddComment = async () => {
     const text = commentText.trim();
     if (!text || !selectedPostForComments) return;
     const parentId = replyingTo ? (replyingTo.parentId || replyingTo.id) : undefined;
-    setCommentText(""); setReplyingTo(null); Keyboard.dismiss();
+    
+    setCommentText(""); 
+    setReplyingTo(null); 
+    Keyboard.dismiss();
+    
     try {
       const res: any = await FeedAPI.AddComment(selectedPostForComments.id, { text, parentId });
       const newComment = res?.comment || res?.data?.comment;
       if (newComment) {
         setComments(prev => [newComment, ...prev]);
         resolveAvatars([newComment]);
-        if (parentId) setExpandedReplies(p => ({ ...p, [parentId]: true }));
+        
+        if (parentId) {
+          setExpandedReplies((prev) => ({ ...prev, [parentId]: true }));
+        }
+
         setPosts(prev => prev.map(p => p.id === selectedPostForComments.id ? { ...p, commentsCount: p.commentsCount + 1 } : p));
       }
     } catch {}
+  };
+
+  const handleLikeComment = async (commentId: string) => {
+    setComments((previous) =>
+      previous.map((comment) => {
+        if (comment.id !== commentId) return comment;
+        const newLikedState = !comment.isLiked;
+        return {
+          ...comment,
+          isLiked: newLikedState,
+          likesCount: newLikedState ? comment.likesCount + 1 : Math.max(0, comment.likesCount - 1),
+        };
+      })
+    );
+    try {
+      await FeedAPI.ToggleLikeComment(commentId);
+    } catch (error) {}
+  };
+
+  const canDeleteComment = (comment: Comment) => {
+    const isCommentOwner = comment.user.id === myUserId;
+    const isPostOwner = selectedPostForComments?.user?.id === myUserId;
+    return isCommentOwner || isPostOwner || currentUserIsAdmin;
+  };
+
+  const handleDeleteComment = async (comment: Comment) => {
+    if (!canDeleteComment(comment)) return;
+    const targetId = comment.id;
+
+    setComments((previous) => previous.filter((item) => item.id !== targetId && item.parentId !== targetId));
+
+    if (selectedPostForComments) {
+      setPosts((previous) =>
+        previous.map((post) =>
+          post.id === selectedPostForComments.id
+            ? { ...post, commentsCount: Math.max(0, post.commentsCount - 1) }
+            : post
+        )
+      );
+    }
+
+    try {
+      await FeedAPI.DeleteComment(targetId);
+    } catch (error) {}
+  };
+
+  const handleReply = (comment: Comment) => {
+    setReplyingTo(comment);
+    setCommentText("");
+    setTimeout(() => { commentInputRef.current?.focus(); }, 100);
+  };
+
+  const renderCommentItem = (item: Comment, isReply = false) => {
+    const canDelete = canDeleteComment(item);
+    const commentAvatarUri = cachedAvatars[item.user.id] || item.user.avatar || 'https://via.placeholder.com/150';
+
+    return (
+      <View style={[styles.commentRow, isReply && styles.replyRow]}>
+        <TouchableOpacity
+          onPress={() => {
+            commentsSheetRef.current?.dismiss();
+            navigation.navigate("UserProfile", { userId: item.user.id });
+          }}
+          activeOpacity={0.85}
+        >
+          <Image
+            source={{ uri: commentAvatarUri }}
+            style={[styles.commentAvatar, isReply && styles.replyAvatar]}
+          />
+        </TouchableOpacity>
+
+        <View style={styles.commentContent}>
+          <View style={styles.commentTopRow}>
+            <TouchableOpacity
+              onPress={() => {
+                commentsSheetRef.current?.dismiss();
+                navigation.navigate("UserProfile", { userId: item.user.id });
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.commentUsername}>@{item.user.username}</Text>
+            </TouchableOpacity>
+
+            {item.user.tick === "golden" ? (
+              <Icon name="check-decagram" size={14} color="#FBBF24" style={{ marginLeft: 4 }} />
+            ) : item.user.tick === "verified" || item.user.isVerified ? (
+              <Icon name="check-decagram" size={14} color="#38BDF8" style={{ marginLeft: 4 }} />
+            ) : null}
+
+            {item.user.isPremium && (
+              <Icon name="crown" size={14} color="#F59E0B" style={{ marginLeft: 4 }} />
+            )}
+
+            <Text style={styles.commentTime}>
+              {getTimeAgo(item.createdAt)}
+            </Text>
+          </View>
+
+          <Text style={styles.commentText}>{item.text}</Text>
+
+          <View style={styles.commentActions}>
+            <TouchableOpacity style={styles.commentLikeButton} onPress={() => handleLikeComment(item.id)} activeOpacity={0.8}>
+              <Icon name={item.isLiked ? "heart" : "heart-outline"} size={17} color={item.isLiked ? "#EF4444" : "#94A3B8"} />
+              {item.likesCount > 0 && <Text style={styles.commentLikeCount}>{item.likesCount}</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => handleReply(item)} activeOpacity={0.8}>
+              <Text style={styles.commentReplyText}>Reply</Text>
+            </TouchableOpacity>
+
+            {canDelete && (
+              <TouchableOpacity onPress={() => handleDeleteComment(item)} activeOpacity={0.8}>
+                <Text style={styles.commentDeleteText}>Delete</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+    );
   };
 
   const submitReport = async (reasonObj: { label: string; type: string }) => {
@@ -410,17 +555,6 @@ const Dashboard = ({ navigation }: any) => {
         anyLoaded = true;
       }
       
-      // ⚡ DUMMY SET TESTING: Uncomment below to test notes with dummy data.
-      // Remember to remove/comment this out when connecting real backend data!
-      /*
-      const dummyTestFriends = [
-        { _id: 'd1', name: 'Alex', username: 'alex99', mood: 'happy', avatarUrl: 'https://via.placeholder.com/150' },
-        { _id: 'd2', name: 'Sarah', username: 'sarah_dev', mood: 'ecstatic', avatarUrl: 'https://via.placeholder.com/150' },
-        { _id: 'd3', name: 'Michael', username: 'mike_9', mood: 'calm', avatarUrl: 'https://via.placeholder.com/150' }
-      ];
-      setFriendsMoods(dummyTestFriends);
-      */
-
       const cachedFriends = await loadCache("dashboard:friends:v1");
       if (cachedFriends) setFriendsMoods(p => p.length > 0 ? p : cachedFriends);
   
@@ -469,6 +603,7 @@ const Dashboard = ({ navigation }: any) => {
       setSecondaryCards(secondaryCards || null);
       setCurrentMood(currentMood || null);
       if (apiFriendsMoods) setFriendsMoods(apiFriendsMoods);
+      
       await saveCache(DASHBOARD_CACHE_KEY, responseData.data);
       setHasLoadedOnce(true);
       setLoading(false);
@@ -535,7 +670,7 @@ const Dashboard = ({ navigation }: any) => {
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
         <View style={styles.overlay}>
-          {/* TOP BAR */}
+          {/* TOP BAR WITH CHAT BUTTON & UNREAD BADGE */}
           <View style={styles.topBar}>
             <TouchableOpacity 
               activeOpacity={0.8} 
@@ -562,252 +697,281 @@ const Dashboard = ({ navigation }: any) => {
               )}
             </TouchableOpacity>
 
-            <View style={styles.topBarRight}>
 
-              <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass} onPress={() => navigation.navigate("Friends")}>
-                <Icon name="account-plus-outline" size={22} color="#E5E7EB" />
+            <View style={styles.topBarRight}>
+              <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass} onPress={() => navigation.navigate("FriendsManage")}>
+                <Icon1 name="people-outline" size={22} color="#E5E7EB" />
                 {friendReqCount > 0 && (
                   <View style={styles.badgeBubble}><Text style={styles.badgeText}>{friendReqCount}</Text></View>
                 )}
               </TouchableOpacity>
-              <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass} onPress={() => navigation.navigate("FriendsManage")}>
-                <Icon1 name="people-outline" size={22} color="#E5E7EB" />
+               {/* ⚡ CHAT BUTTON WITH LIVE UNREAD BADGE */}
+              <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass} onPress={() => navigation.navigate("Chat")}>
+                <Icon name="chat-outline" size={22} color="#E5E7EB" />
+                {unreadChats > 0 && (
+                  <View style={styles.badgeBubble}>
+                    <Text style={styles.badgeText}>{unreadChats > 99 ? '99+' : unreadChats}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
           </View>
             <View style={styles.notesDivider} />
 
-          {/* MAIN SCROLL CONTAINER */}
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          {/* MAIN SCROLL CONTAINER (Optimized with FlatList) */}
+          <FlatList
+            data={posts}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
             
-            {(offline || error) && (
-              <View style={styles.errorCard}>
-                <Icon name="cloud-alert" size={20} color="#F87171" />
-                <View style={{ flex: 1, marginLeft: 10 }}>
-                  <Text style={styles.errorTitle}>{offline ? "Offline mode" : "Something went wrong"}</Text>
-                  <Text style={styles.errorText}>{offline ? "You’re not connected to internet." : error}</Text>
-                </View>
-                <TouchableOpacity style={styles.errorRetryBtn} onPress={() => { fetchDashboardInBackground(); fetchTodayHabitsInBackground(); }}>
-                  <Text style={styles.errorRetryText}>Retry</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            // ⚡ Performance Props for buttery smooth scrolling
+            removeClippedSubviews={Platform.OS === 'android'}
+            initialNumToRender={3}
+            maxToRenderPerBatch={3}
+            windowSize={5}
 
-            {/* MOOD NOTES BAR */}
-            <View style={styles.notesWrapper}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.notesContainer}>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  style={styles.noteItem}
-                  onPress={() => navigation.navigate("MoodScreen", { currentMoodId: currentMood?.mood || null })}
-                >
-                  <View style={styles.noteAvatarContainer}>
-                    <View style={styles.noteSpeechBubble}>
-                      {currentMood && MOOD_METADATA[currentMood.mood] ? (
-                        <View style={styles.noteBubbleContent}>
-                          <Icon name={MOOD_METADATA[currentMood.mood].icon} size={15} color={MOOD_METADATA[currentMood.mood].color || "#F9FAFB"} />
-                          <Text style={styles.noteBubbleText}>{MOOD_METADATA[currentMood.mood].label}</Text>
-                        </View>
-                      ) : (
-                        <View style={styles.noteBubbleContent}>
-                          <Icon name="plus" size={15} color="#9CA3AF" />
-                          <Text style={styles.noteBubbleText}>Share</Text>
-                        </View>
-                      )}
-                      <View style={styles.noteSpeechTail} />
+            // 1. HEADER (Everything above the posts)
+            ListHeaderComponent={
+              <>
+                {(offline || error) && (
+                  <View style={styles.errorCard}>
+                    <Icon name="cloud-alert" size={20} color="#F87171" />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={styles.errorTitle}>{offline ? "Offline mode" : "Something went wrong"}</Text>
+                      <Text style={styles.errorText}>{offline ? "You’re not connected to internet." : error}</Text>
                     </View>
-                    
-                    <View style={[styles.noteAvatarWrap, currentMood && MOOD_METADATA[currentMood.mood] ? { borderColor: MOOD_METADATA[currentMood.mood].color } : null]}>
-                      {finalAvatarUri ? (
-                        <FastImage source={{ uri: finalAvatarUri }} style={styles.noteAvatarImage} />
-                      ) : (
-                        <Icon name="account-circle-outline" size={56} color="#E5E7EB" />
-                      )}
-                    </View>
-
-                    {!currentMood && (
-                      <View style={styles.noteAddBadge}><Icon name="plus" size={12} color="#fff" /></View>
-                    )}
+                    <TouchableOpacity style={styles.errorRetryBtn} onPress={() => { fetchDashboardInBackground(); fetchTodayHabitsInBackground(); }}>
+                      <Text style={styles.errorRetryText}>Retry</Text>
+                    </TouchableOpacity>
                   </View>
-                  <Text style={styles.noteName} numberOfLines={1}>You</Text>
-                </TouchableOpacity>
+                )}
 
-                {friendsMoods
-                  .filter((friend: any) => friend.mood && MOOD_METADATA[friend.mood])
-                  .map((friend: any) => {
-                    const fMoodMeta = MOOD_METADATA[friend.mood];
-                    const rawAvatar = friend.avatarUrl || friend.avatar?.url || friend.avatar;
-                    const friendAvatarUri = rawAvatar ? (rawAvatar.startsWith('http') ? rawAvatar : `${newUrl}${rawAvatar}`) : null;
-
-                    return (
-                      <TouchableOpacity key={friend.id || friend._id} activeOpacity={0.8} style={styles.noteItem}>
-                        <View style={styles.noteAvatarContainer}>
-                          {fMoodMeta && (
-                            <View style={styles.noteSpeechBubble}>
-                              <View style={styles.noteBubbleContent}>
-                                <Icon name={fMoodMeta.icon} size={15} color={fMoodMeta.color || "#F9FAFB"} />
-                                <Text style={styles.noteBubbleText}>{fMoodMeta.label}</Text>
-                              </View>
-                              <View style={styles.noteSpeechTail} />
+                {/* MOOD NOTES BAR */}
+                <View style={styles.notesWrapper}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.notesContainer}>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={styles.noteItem}
+                      onPress={() => navigation.navigate("MoodScreen", { currentMoodId: currentMood?.mood || null })}
+                    >
+                      <View style={styles.noteAvatarContainer}>
+                        <View style={styles.noteSpeechBubble}>
+                          {currentMood && MOOD_METADATA[currentMood.mood] ? (
+                            <View style={styles.noteBubbleContent}>
+                              <Icon name={MOOD_METADATA[currentMood.mood].icon} size={15} color={MOOD_METADATA[currentMood.mood].color || "#F9FAFB"} />
+                              <Text style={styles.noteBubbleText}>{MOOD_METADATA[currentMood.mood].label}</Text>
+                            </View>
+                          ) : (
+                            <View style={styles.noteBubbleContent}>
+                              <Icon name="plus" size={15} color="#9CA3AF" />
+                              <Text style={styles.noteBubbleText}>Share</Text>
                             </View>
                           )}
-                          <View style={[styles.noteAvatarWrap, fMoodMeta ? { borderColor: fMoodMeta.color } : null]}>
-                            {friendAvatarUri ? (
-                              <FastImage source={{ uri: friendAvatarUri }} style={styles.noteAvatarImage} />
-                            ) : (
-                              <Icon name="account-circle-outline" size={56} color="#E5E7EB" />
-                            )}
-                          </View>
+                          <View style={styles.noteSpeechTail} />
                         </View>
-                        <Text style={styles.noteName} numberOfLines={1}>{friend.name || friend.username}</Text>
-                      </TouchableOpacity>
-                    );
-                })} 
-              </ScrollView>
-            </View>
+                        
+                        <View style={[styles.noteAvatarWrap, currentMood && MOOD_METADATA[currentMood.mood] ? { borderColor: MOOD_METADATA[currentMood.mood].color } : null]}>
+                          {finalAvatarUri ? (
+                            <FastImage source={{ uri: finalAvatarUri }} style={styles.noteAvatarImage} />
+                          ) : (
+                            <Icon name="account-circle-outline" size={56} color="#E5E7EB" />
+                          )}
+                        </View>
 
-            {/* ============================================================ */}
-            {/* INTEGRATED ACTIVITY FEED & "YOUR POSTS" TAB */}
-            {/* ============================================================ */}
-           <View style={styles.feedHeaderRow}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.feedTabsContainer}>
-                {[
-                  { key: "foryou", label: "For You" },
-                  { key: "friends", label: "Friends" },
-                ].map((tab) => {
-                  const isActive = activeTab === tab.key;
-                  return (
+                        {!currentMood && (
+                          <View style={styles.noteAddBadge}><Icon name="plus" size={12} color="#fff" /></View>
+                        )}
+                      </View>
+                      <Text style={styles.noteName} numberOfLines={1}>You</Text>
+                    </TouchableOpacity>
+
+                    {friendsMoods
+                      .filter((friend: any) => friend.mood && MOOD_METADATA[friend.mood])
+                      .map((friend: any) => {
+                        const fMoodMeta = MOOD_METADATA[friend.mood];
+                        const rawAvatar = friend.avatarUrl || friend.avatar?.url || friend.avatar;
+                        const friendAvatarUri = rawAvatar 
+                          ? (rawAvatar.startsWith('http') ? rawAvatar : `${newUrl}${rawAvatar}`) 
+                          : null;
+
+                        return (
+                          <TouchableOpacity key={friend.id || friend._id} activeOpacity={0.8} style={styles.noteItem}>
+                            <View style={styles.noteAvatarContainer}>
+                              {fMoodMeta && (
+                                <View style={styles.noteSpeechBubble}>
+                                  <View style={styles.noteBubbleContent}>
+                                    <Icon name={fMoodMeta.icon} size={15} color={fMoodMeta.color || "#F9FAFB"} />
+                                    <Text style={styles.noteBubbleText}>{fMoodMeta.label}</Text>
+                                  </View>
+                                  <View style={styles.noteSpeechTail} />
+                                </View>
+                              )}
+                              <View style={[styles.noteAvatarWrap, fMoodMeta ? { borderColor: fMoodMeta.color } : null]}>
+                                {friendAvatarUri ? (
+                                  <FastImage source={{ uri: friendAvatarUri }} style={styles.noteAvatarImage} />
+                                ) : (
+                                  <Icon name="account-circle-outline" size={56} color="#E5E7EB" />
+                                )}
+                              </View>
+                            </View>
+                            <Text style={styles.noteName} numberOfLines={1}>{friend.name || friend.username}</Text>
+                          </TouchableOpacity>
+                        );
+                    })} 
+                  </ScrollView>
+                </View>
+
+                {/* FEED TABS HEADER */}
+                <View style={styles.feedHeaderRow}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.feedTabsContainer}>
+                    {[
+                      { key: "foryou", label: "For You" },
+                      { key: "friends", label: "Friends" },
+                    ].map((tab) => {
+                      const isActive = activeTab === tab.key;
+                      return (
+                        <TouchableOpacity
+                          key={tab.key}
+                          style={[styles.feedTabPill, isActive && styles.feedTabPillActive]}
+                          onPress={() => setActiveTab(tab.key as any)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.feedTabText, isActive && styles.feedTabTextActive]}>{tab.label}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+
                     <TouchableOpacity
-                      key={tab.key}
-                      style={[styles.feedTabPill, isActive && styles.feedTabPillActive]}
-                      onPress={() => setActiveTab(tab.key as any)}
+                      style={[styles.yourPostsTabPill, { marginLeft: 'auto' }]}
+                      onPress={() => navigation.navigate("UserProfile")}
                       activeOpacity={0.8}
                     >
-                      <Text style={[styles.feedTabText, isActive && styles.feedTabTextActive]}>{tab.label}</Text>
+                      <Icon name="folder-image" size={14} color="#A855F7" style={{ marginRight: 4 }} />
+                      <Text style={styles.yourPostsTabText}>Your Posts</Text>
                     </TouchableOpacity>
-                  );
-                })}
+                  </ScrollView>
+                </View>
+              </>
+            }
 
-                {/* ⚡ YOUR POSTS TAB BUTTON (Pushed to the right using marginLeft: 'auto') */}
-                <TouchableOpacity
-                  style={[styles.yourPostsTabPill, { marginLeft: 'auto' }]}
-                  onPress={() => navigation.navigate("UserProfile")}
-                  activeOpacity={0.8}
-                >
-                  <Icon name="folder-image" size={14} color="#A855F7" style={{ marginRight: 4 }} />
-                  <Text style={styles.yourPostsTabText}>Your Posts</Text>
-                </TouchableOpacity>
+            // 2. EMPTY / LOADING STATE
+            ListEmptyComponent={
+              isLoadingFeed ? (
+                <View style={{ height: 400, justifyContent: "center", alignItems: "center" }}>
+                  <ActivityIndicator size="large" color="#8B5CF6" />
+                </View>
+              ) : (
+                <View style={{ height: 250, justifyContent: "center", alignItems: "center" }}>
+                  <Text style={{ color: "#9CA3AF" }}>No posts found for {activeTab}</Text>
+                </View>
+              )
+            }
 
-              </ScrollView>
-            </View>
+            // 3. RENDER EACH POST
+            renderItem={({ item }) => {
+              const userAvatarUri = cachedAvatars[item.user.id] || item.user.avatar || 'https://via.placeholder.com/150';
 
-            {isLoadingFeed ? (
-              <View style={{ height: 400, justifyContent: "center", alignItems: "center" }}>
-                <ActivityIndicator size="large" color="#8B5CF6" />
-              </View>
-            ) : posts.length === 0 ? (
-              <View style={{ height: 250, justifyContent: "center", alignItems: "center" }}>
-                <Text style={{ color: "#9CA3AF" }}>No posts found for {activeTab}</Text>
-              </View>
-            ) : (
-              posts.map((item) => {
-                const userAvatarUri = cachedAvatars[item.user.id] || item.user.avatar || 'https://via.placeholder.com/150';
-
-                return (
-                  <View key={item.id} style={styles.inlinePostCard}>
-                    {item.adminRemoved ? (
-                      <View style={{ height: 450, backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center', borderRadius: 24 }}>
+              return (
+                <View style={styles.inlinePostCard}>
+                  {item.adminRemoved ? (
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: '#0A0A0A', justifyContent: 'center', alignItems: 'center', zIndex: 999, borderRadius: 24 }]}>
+                      <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(239, 68, 68, 0.1)', justifyContent: 'center', alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' }}>
                         <Icon name="shield-alert-outline" size={40} color="#EF4444" />
-                        <Text style={{ color: "#F8FAFC", fontSize: 18, fontWeight: "700", marginTop: 10 }}>Post Removed</Text>
                       </View>
-                    ) : (
-                      <>
-                        <TouchableWithoutFeedback onPress={() => handleImageDoubleTap(item.id)}>
-                          <View style={StyleSheet.absoluteFill}>
-                            <Image source={{ uri: item.mediaUrl }} style={styles.inlinePostImage} resizeMode="cover" />
-                            <View style={styles.imageOverlayGradient} />
+                      <Text style={{ color: "#F8FAFC", fontSize: 22, fontWeight: "700" }}>Post Removed</Text>
+                      <Text style={{ color: "#94A3B8", fontSize: 14, textAlign: "center", marginTop: 8, paddingHorizontal: 40, lineHeight: 22 }}>
+                        This post was removed because it violated our community guidelines.
+                      </Text>
+                    </View>
+                  ) : (
+                    <>
+                      <TouchableWithoutFeedback onPress={() => handleImageDoubleTap(item.id)}>
+                        <View style={StyleSheet.absoluteFill}>
+                          <Image source={{ uri: item.mediaUrl }} style={styles.inlinePostImage} resizeMode="cover" />
+                          <View style={styles.imageOverlayGradient} />
 
-                            {activeHeartPostId === item.id && (
-                              <View style={styles.doubleTapHeartContainer}>
-                                <Animated.View style={animatedHeartStyle}>
-                                  <Icon name="heart" size={95} color="#EF4444" style={styles.popHeartIcon} />
-                                </Animated.View>
-                              </View>
-                            )}
-                          </View>
-                        </TouchableWithoutFeedback>
+                          {activeHeartPostId === item.id && (
+                            <View style={styles.doubleTapHeartContainer}>
+                              <Animated.View style={animatedHeartStyle}>
+                                <Icon name="heart" size={95} color="#EF4444" style={styles.popHeartIcon} />
+                              </Animated.View>
+                            </View>
+                          )}
+                        </View>
+                      </TouchableWithoutFeedback>
 
-                        {/* Right Action Icons */}
-                        <View style={styles.rightActionContainer}>
-                          <TouchableOpacity style={styles.actionIconButtonClean} onPress={() => handleLike(item.id)} activeOpacity={0.8}>
-                            <Icon name={item.isLiked ? "heart" : "heart-outline"} size={28} color={item.isLiked ? "#EF4444" : "#F9FAFB"} />
-                            <Text style={styles.actionCountText}>{item.likesCount}</Text>
-                          </TouchableOpacity>
+                      {/* Right Action Icons */}
+                      <View style={styles.rightActionContainer}>
+                        <TouchableOpacity style={styles.actionIconButtonClean} onPress={() => handleLike(item.id)} activeOpacity={0.8}>
+                          <Icon name={item.isLiked ? "heart" : "heart-outline"} size={28} color={item.isLiked ? "#EF4444" : "#F9FAFB"} />
+                          <Text style={styles.actionCountText}>{item.likesCount}</Text>
+                        </TouchableOpacity>
 
-                          <TouchableOpacity style={styles.actionIconButtonClean} onPress={() => openComments(item)} activeOpacity={0.8}>
-                            <Icon name="comment-outline" size={26} color="#F9FAFB" />
-                            <Text style={styles.actionCountText}>{item.commentsCount}</Text>
-                          </TouchableOpacity>
+                        <TouchableOpacity style={styles.actionIconButtonClean} onPress={() => openComments(item)} activeOpacity={0.8}>
+                          <Icon name="comment-outline" size={26} color="#F9FAFB" />
+                          <Text style={styles.actionCountText}>{item.commentsCount}</Text>
+                        </TouchableOpacity>
 
+                        <TouchableOpacity 
+                          style={styles.actionIconButtonClean} 
+                          onPress={() => navigation.navigate("ShareToChat", { 
+                            postId: item.id, mediaUrl: item.mediaUrl, postUsername: item.user.username, postCaption: item.caption, postUserId: item.user.id || item.user._id 
+                          })}
+                        >
+                          <Icon name="share-outline" size={26} color="#F9FAFB" />
+                          <Text style={styles.actionCountText}>Share</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity style={styles.actionIconButtonClean} onPress={() => { setSelectedPostForReport(item); reportSheetRef.current?.present(); }} activeOpacity={0.8}>
+                          <Icon name="dots-horizontal" size={26} color="#F9FAFB" />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Bottom Left Author Info & Caption */}
+                      <View style={styles.bottomLeftContent}>
+                        <View style={styles.userInfoRow}>
                           <TouchableOpacity 
-                            style={styles.actionIconButtonClean} 
-                            onPress={() => navigation.navigate("ShareToChat", { 
-                              postId: item.id, mediaUrl: item.mediaUrl, postUsername: item.user.username, postCaption: item.caption, postUserId: item.user.id || item.user._id 
-                            })}
-                          >
-                            <Icon name="share-outline" size={26} color="#F9FAFB" />
-                            <Text style={styles.actionCountText}>Share</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity style={styles.actionIconButtonClean} onPress={() => { setSelectedPostForReport(item); reportSheetRef.current?.present(); }} activeOpacity={0.8}>
-                            <Icon name="dots-horizontal" size={26} color="#F9FAFB" />
-                          </TouchableOpacity>
-                        </View>
-
-                        {/* Bottom Left Author Info & Caption */}
-                        <View style={styles.bottomLeftContent}>
-                          <View style={styles.userInfoRow}>
-                            <View style={styles.avatarContainer}>
-                              <Image source={{ uri: userAvatarUri }} style={styles.avatarImage} />
-                            </View>
-                            <View style={styles.usernameTextWrap}>
-                              <TouchableOpacity onPress={() => navigation.navigate("UserProfile", { userId: item.user.id })} activeOpacity={0.8}>
-                                <View style={styles.nameInlineRow}>
-                                  <Text style={styles.usernameText}>@{item.user.username}</Text>
-                                  {item.user.tick === "golden" ? (
-                                    <Icon name="check-decagram" size={14} color="#FBBF24" style={{ marginLeft: 4 }} />
-                                  ) : item.user.tick === "verified" || item.user.isVerified ? (
-                                    <Icon name="check-decagram" size={14} color="#38BDF8" style={{ marginLeft: 4 }} />
-                                  ) : null}
-                                  {item.user.isPremium && (
-                                    <Icon name="crown" size={14} color="#F59E0B" style={{ marginLeft: 4 }} />
-                                  )}
-                                </View>
-                              </TouchableOpacity>
-                            </View>
+  style={styles.avatarContainer} 
+  onPress={() => navigation.navigate("UserProfile", { userId: item.user.id })} 
+  activeOpacity={0.9}
+>
+  <Image source={{ uri: userAvatarUri }} style={styles.avatarImage} />
+</TouchableOpacity>
+                          <View style={styles.usernameTextWrap}>
+                            <TouchableOpacity onPress={() => navigation.navigate("UserProfile", { userId: item.user.id })} activeOpacity={0.8}>
+                              <View style={styles.nameInlineRow}>
+                                <Text style={styles.usernameText}>@{item.user.username}</Text>
+                                {item.user.tick === "golden" ? (
+                                  <Icon name="check-decagram" size={14} color="#FBBF24" style={{ marginLeft: 4 }} />
+                                ) : item.user.tick === "verified" || item.user.isVerified ? (
+                                  <Icon name="check-decagram" size={14} color="#38BDF8" style={{ marginLeft: 4 }} />
+                                ) : null}
+                                {item.user.isPremium && (
+                                  <Icon name="crown" size={14} color="#F59E0B" style={{ marginLeft: 4 }} />
+                                )}
+                              </View>
+                            </TouchableOpacity>
                           </View>
-                          <Text style={styles.postCaption} numberOfLines={3}>{item.caption}</Text>
                         </View>
-                      </>
-                    )}
-                  </View>
-                );
-              })
-            )}
+                        <Text style={styles.postCaption} numberOfLines={3}>{item.caption}</Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+              );
+            }}
 
-            <View style={{ height: 60 }} />
-          </ScrollView>
-
-          {/* FLOATING CAMERA BUTTON */}
-          <TouchableOpacity activeOpacity={0.8} style={styles.floatingCameraButton} onPress={() => navigation.navigate('ProofCamera', { habitId: null })}>
-            <Icon name="camera-outline" size={26} color="#F9FAFB" />
-          </TouchableOpacity>
+            // 4. FOOTER SPACER
+            ListFooterComponent={<View style={{ height: 60 }} />}
+          />
         </View>
 
         {/* REPORT SHEET */}
         <TrueSheet ref={reportSheetRef} detents={[0.4]} cornerRadius={28} backgroundColor="#0F172A" grabber={false}>
           <View style={styles.sheetContentContainer}>
             <Text style={styles.sheetTitle}>Report Post</Text>
+            {/* ⚡ FIXED: fontSize changed from "12" to 12 */}
             <Text style={styles.sheetSubText}>Why are you reporting this post?</Text>
             {[
               { label: "Inappropriate Content", type: "inappropriate" },
@@ -825,7 +989,7 @@ const Dashboard = ({ navigation }: any) => {
           </View>
         </TrueSheet>
 
-        {/* COMMENTS SHEET */}
+        {/* ⚡ UPDATED COMMENTS SHEET WITH FULL FUNCTIONALITY */}
         <TrueSheet ref={commentsSheetRef} detents={[0.75]} cornerRadius={28} backgroundColor="#0F172A" grabber={false}>
           <View style={{ height: SCREEN_HEIGHT * 0.75 - 20, paddingBottom: keyboardHeight > 0 ? keyboardHeight : 0, flexDirection: "column" }}>
             <View style={styles.commentsHeader}>
@@ -847,46 +1011,95 @@ const Dashboard = ({ navigation }: any) => {
                 data={getRootComments()}
                 keyExtractor={(item) => item.id}
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
+                keyboardDismissMode="interactive"
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled={true} 
+                extraData={{ comments, expandedReplies }}
+                contentContainerStyle={[
+                  getRootComments().length === 0 ? styles.emptyCommentsContainer : styles.commentsList,
+                  { paddingBottom: 20 }
+                ]}
                 renderItem={({ item }) => {
                   const replies = getReplies(item.id);
                   const isExpanded = expandedReplies[item.id];
-                  const commentAvatarUri = cachedAvatars[item.user.id] || item.user.avatar || 'https://via.placeholder.com/150';
 
                   return (
-                    <View style={styles.commentRow}>
-                      <Image source={{ uri: commentAvatarUri }} style={styles.commentAvatar} />
-                      <View style={styles.commentContent}>
-                        <View style={styles.commentTopRow}>
-                          <Text style={styles.commentUsername}>@{item.user.username}</Text>
-                          <Text style={styles.commentTime}>{getTimeAgo(item.createdAt)}</Text>
+                    <View>
+                      {renderCommentItem(item, false)}
+
+                      {replies.length > 0 && (
+                        <View style={styles.repliesWrapper}>
+                          <TouchableOpacity
+                            style={styles.viewRepliesButton}
+                            onPress={() => toggleReplies(item.id)}
+                            activeOpacity={0.8}
+                          >
+                            <View style={styles.replyLineIndicator} />
+                            <Text style={styles.viewRepliesText}>
+                              {isExpanded ? "Hide replies" : `View ${replies.length} replies`}
+                            </Text>
+                          </TouchableOpacity>
+
+                          {isExpanded &&
+                            replies.map((reply) => (
+                              <React.Fragment key={reply.id}>
+                                {renderCommentItem(reply, true)}
+                              </React.Fragment>
+                            ))}
                         </View>
-                        <Text style={styles.commentText}>{item.text}</Text>
-                      </View>
+                      )}
                     </View>
                   );
                 }}
+                ListEmptyComponent={
+                  <View style={styles.noCommentsView}>
+                    <View style={styles.noCommentsIcon}>
+                      <Icon name="comment-outline" size={40} color="#64748B" />
+                    </View>
+                    <Text style={styles.noCommentsTitle}>No comments yet</Text>
+                    <Text style={styles.noCommentsSubtitle}>Be the first to share your thoughts.</Text>
+                  </View>
+                }
               />
             )}
 
             <View style={styles.commentFooterWrapper}>
+              {replyingTo && (
+                <View style={styles.replyingIndicatorBar}>
+                  <Text style={styles.replyingIndicatorText}>
+                    Replying to <Text style={{ fontWeight: '700', color: "#94A3B8" }}>@{replyingTo.user.username}</Text>
+                  </Text>
+                  <TouchableOpacity onPress={() => { setReplyingTo(null); setCommentText(""); }}>
+                    <Icon name="close-circle" size={18} color="#94A3B8" />
+                  </TouchableOpacity>
+                </View>
+              )}
+
               <View style={styles.commentInputContainer}>
                 <View style={styles.commentInputWrapper}>
                   <TextInput
                     ref={commentInputRef}
                     value={commentText}
                     onChangeText={setCommentText}
-                    placeholder="Add a comment..."
+                    placeholder={replyingTo ? `Reply to ${replyingTo.user.username}...` : "Add a comment..."}
                     placeholderTextColor="#64748B"
                     multiline
+                    maxLength={500}
                     style={styles.commentInput}
                   />
-                  <TouchableOpacity style={[styles.commentSendButton, !commentText.trim() && styles.commentSendButtonDisabled]} disabled={!commentText.trim()} onPress={handleAddComment} activeOpacity={0.8}>
+
+                  <TouchableOpacity
+                    style={[styles.commentSendButton, !commentText.trim() && styles.commentSendButtonDisabled]}
+                    disabled={!commentText.trim()}
+                    onPress={handleAddComment}
+                    activeOpacity={0.8}
+                  >
                     <Icon name="send" size={19} color={commentText.trim() ? "#FFFFFF" : "#475569"} />
                   </TouchableOpacity>
                 </View>
               </View>
             </View>
+
           </View>
         </TrueSheet>
 
@@ -920,9 +1133,17 @@ const DashboardSkeleton = () => (
 const styles = StyleSheet.create({
   root: { flex: 1 },
   baseBackground: { ...StyleSheet.absoluteFill, backgroundColor: "#020617" },
-  overlay: { flex: 1, paddingTop: Platform.OS === "android" ? "3%" : "5%", paddingHorizontal: 20 },
-  scrollContent: { paddingBottom: 60 },
-  topBar: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: "2%" },
+  overlay: { flex: 1, paddingTop: Platform.OS === "android" ? "3%" : "5%" },
+  scrollContent: { paddingBottom: 0 },
+   topBar: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    alignItems: "center", 
+    marginBottom: "2%",
+    paddingHorizontal: 20,
+    height: 50,           // <-- Add this
+    position: "relative", // <-- Add this
+  },
   topBarRight: { flexDirection: "row", alignItems: "center" },
   iconGlass: { width: 40, height: 40, borderRadius: 16, backgroundColor: ICON_GLASS_BG, borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.4)", justifyContent: "center", alignItems: "center", marginLeft: 10 },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: "2%" },
@@ -939,8 +1160,8 @@ const styles = StyleSheet.create({
   levelInfo: { flex: 1, marginLeft: 16 },
   levelLabel: { fontSize: 18, fontWeight: "700", color: "#F9FAFB" },
   levelHint: { fontSize: 11, color: "#9CA3AF", marginTop: 8 },
-  notesDivider: { height: 1, backgroundColor: "rgba(148, 163, 184, 0.2)", marginBottom: 10, marginTop: 10 },
-  notesWrapper: { marginHorizontal: -10, marginBottom: 20 },
+  notesDivider: { height: 1, backgroundColor: "rgba(148, 163, 184, 0.2)", marginBottom: 5, marginTop: 0 },
+  notesWrapper: { marginBottom: 2 },
   notesContainer: { paddingHorizontal: 20, paddingVertical: 10, alignItems: 'flex-start' },
   noteItem: { alignItems: 'center', marginRight: 20, width: 76 },
   noteAvatarContainer: { position: 'relative', alignItems: 'center', marginBottom: 6, marginTop: 26 },
@@ -951,16 +1172,23 @@ const styles = StyleSheet.create({
   noteBubbleContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   noteBubbleText: { color: '#F9FAFB', fontSize: 12, fontWeight: '600' },
   noteAddBadge: { position: 'absolute', bottom: -2, right: 0, backgroundColor: '#3B82F6', width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#020617' },
-  noteName: { color: '#E5E7EB', fontSize: 12, fontWeight: '500', textAlign: 'center' },
+  noteName: { color: '#E5E7EB', fontSize: 10, fontWeight: '500', textAlign: 'center' },
   avatarBadge: { position: "absolute", bottom: -4, right: -4, backgroundColor: "#020617", borderRadius: 10, width: 18, height: 18, justifyContent: "center", alignItems: "center", borderwidth: 1, borderColor: "rgba(148, 163, 184, 0.4)" },
 
   // INLINE FEED STYLES
-  feedHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12, marginTop: 10 },
+  feedHeaderRow: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    alignItems: "center", 
+    marginBottom: 12, 
+    marginTop: 10,
+    paddingHorizontal: 20 
+  },
   sectionTitle: { fontSize: 16, fontWeight: "700", color: "#F9FAFB" },
   feedTabsContainer: { 
     flexDirection: "row", 
     alignItems: "center",
-    width: "100%", // ⚡ Ensures it spans the screen width so the button can pin right
+    width: "100%", 
   },
   feedTabPill: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999, marginLeft: 6, backgroundColor: "rgba(15, 23, 42, 0.6)", borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.2)" },
   feedTabPillActive: { backgroundColor: "rgba(139, 92, 246, 0.4)", borderWidth: 1, borderColor: "#A855F7" },
@@ -974,7 +1202,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 14,
     borderRadius: 999,
-    marginLeft: 8,
+    marginLeft: 'auto',
     backgroundColor: "rgba(168, 85, 247, 0.15)",
     borderWidth: 1,
     borderColor: "rgba(168, 85, 247, 0.4)",
@@ -985,7 +1213,14 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 
-  inlinePostCard: { width: "100%", height: 480, borderRadius: 24, overflow: "hidden", backgroundColor: "#000", position: "relative", marginBottom: 16 },
+  inlinePostCard: { 
+    width: "100%", 
+    height: 480, 
+    overflow: "hidden", 
+    backgroundColor: "#000", 
+    position: "relative", 
+    marginBottom: 10 
+  },
   inlinePostImage: { ...StyleSheet.absoluteFill, width: "100%", height: "100%" },
   imageOverlayGradient: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(0, 0, 0, 0.3)" },
   doubleTapHeartContainer: { ...StyleSheet.absoluteFill, justifyContent: "center", alignItems: "center", zIndex: 30 },
@@ -1009,14 +1244,39 @@ const styles = StyleSheet.create({
   commentsSubtitle: { color: "#64748B", fontSize: 10, fontWeight: "500", marginTop: 2 },
   commentsCloseButton: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(148, 163, 184, 0.1)" },
   commentsFlatList: { flex: 1 },
-  commentRow: { flexDirection: "row", paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: "rgba(148,163,184,0.1)" },
-  commentAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#1E293B", marginRight: 11 },
+  
+  // ⚡ ADDED STYLES FOR REPLIES AND COMMENT ACTIONS
+  commentsList: { paddingTop: 8, paddingBottom: 15, paddingHorizontal: 16 },
+  emptyCommentsContainer: { flexGrow: 1, justifyContent: "center", alignItems: "center" },
+  commentRow: { flexDirection: "row", paddingVertical: 11 },
+  replyRow: { paddingLeft: 45, paddingVertical: 8 }, 
+  commentAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#1E293B", marginRight: 11 },
+  replyAvatar: { width: 30, height: 30, borderRadius: 15 }, 
   commentContent: { flex: 1, paddingRight: 5 },
-  commentTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  commentTopRow: { flexDirection: "row", alignItems: "center" },
   commentUsername: { color: "#F9FAFB", fontSize: 13, fontWeight: "700" },
-  commentTime: { color: "#64748B", fontSize: 10 },
-  commentText: { color: "#E2E8F0", fontSize: 13, lineHeight: 18, marginTop: 3 },
+  commentTime: { color: "#64748B", fontSize: 10, marginLeft: 8 },
+  commentText: { color: "#E2E8F0", fontSize: 14, lineHeight: 20, marginTop: 3 },
+  commentActions: { flexDirection: "row", alignItems: "center", marginTop: 7 },
+  commentLikeButton: { flexDirection: "row", alignItems: "center", marginRight: 20 },
+  commentLikeCount: { color: "#94A3B8", fontSize: 10, fontWeight: "600", marginLeft: 4 },
+  commentReplyText: { color: "#94A3B8", fontSize: 11, fontWeight: "600", marginRight: 20 },
+  commentDeleteText: { color: "#EF4444", fontSize: 11, fontWeight: "600" },
+  
+  repliesWrapper: { marginTop: -5, marginBottom: 5 },
+  viewRepliesButton: { flexDirection: "row", alignItems: "center", marginLeft: 51, paddingVertical: 10 },
+  replyLineIndicator: { width: 30, height: 1, backgroundColor: "#475569", marginRight: 10 },
+  viewRepliesText: { color: "#94A3B8", fontSize: 12, fontWeight: "600" },
+  
+  noCommentsView: { alignItems: "center", justifyContent: "center", paddingHorizontal: 30 },
+  noCommentsIcon: { width: 72, height: 72, borderRadius: 36, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(30, 41, 59, 0.6)", borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.2)", marginBottom: 15 },
+  noCommentsTitle: { color: "#F9FAFB", fontSize: 16, fontWeight: "700" },
+  noCommentsSubtitle: { color: "#64748B", fontSize: 12, textAlign: "center", marginTop: 5 },
+
   commentFooterWrapper: { width: "100%", backgroundColor: "#0F172A", borderTopWidth: 1, borderTopColor: "rgba(148, 163, 184, 0.15)" },
+  replyingIndicatorBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "rgba(30, 41, 59, 0.5)", borderTopWidth: 1, borderTopColor: "rgba(148, 163, 184, 0.15)" },
+  replyingIndicatorText: { color: "#94A3B8", fontSize: 12 },
+  
   commentInputContainer: { width: "100%", flexDirection: "row", alignItems: "flex-end", paddingTop: 10, paddingBottom: Platform.OS === "ios" ? 18 : 10, backgroundColor: "#0F172A", paddingHorizontal: 16 },
   commentInputWrapper: { flex: 1, minHeight: 42, maxHeight: 100, flexDirection: "row", alignItems: "flex-end", borderRadius: 22, backgroundColor: "#111827", borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.2)", paddingLeft: 14, paddingRight: 5 },
   commentInput: { flex: 1, minHeight: 40, maxHeight: 90, color: "#F8FAFC", fontSize: 14, paddingTop: Platform.OS === "ios" ? 9 : 7, paddingBottom: Platform.OS === "ios" ? 9 : 7 },
@@ -1026,7 +1286,7 @@ const styles = StyleSheet.create({
   // Report & Glass Modal
   sheetContentContainer: { padding: 20, paddingBottom: 35 },
   sheetTitle: { color: "#F9FAFB", fontSize: 18, fontWeight: "700", textAlign: "center", marginBottom: 4 },
-  sheetSubText: { color: "#94A3B8", fontSize: "12", textAlign: "center", marginBottom: 20 },
+  sheetSubText: { color: "#94A3B8", fontSize: 12, textAlign: "center", marginBottom: 20 },
   sheetOptionRow: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(30, 41, 59, 0.5)", paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, marginBottom: 10, borderWidth: 1, borderColor: GLASS_BORDER },
   sheetOptionText: { color: "#E2E8F0", fontSize: 14, fontWeight: "600" },
   sheetCancelButton: { backgroundColor: "rgba(148, 163, 184, 0.2)", paddingVertical: 14, borderRadius: 14, alignItems: "center", marginTop: 8 },
@@ -1034,7 +1294,7 @@ const styles = StyleSheet.create({
 
   glassModalOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0, 0, 0, 0.8)", justifyContent: "center", alignItems: "center", zIndex: 99999, elevation: 99999, paddingHorizontal: 24 },
   glassModalCard: { width: "100%", maxWidth: 320, backgroundColor: "rgba(15, 23, 42, 0.95)", borderRadius: 24, borderWidth: 1, borderColor: GLASS_BORDER, padding: 24, alignItems: "center", shadowColor: "#000", shadowOpacity: 0.6, shadowOffset: { width: 0, height: 12 }, shadowRadius: 24, elevation: 20 },
-  glassModalTitle: { color: "#F9FAFB", fontSize: 18, fontWeight: "700", textAlign: "center", marginBottom: 8 },
+  glassModalTitle: { color: "#F8FAFC", fontSize: 18, fontWeight: "700", textAlign: "center", marginBottom: 8 },
   glassModalSubText: { color: "#94A3B8", fontSize: 13, textAlign: "center", lineHeight: 18, marginBottom: 24 },
   glassModalBtn: { width: "100%", paddingVertical: 14, borderRadius: 14, backgroundColor: "rgba(148, 163, 184, 0.15)", borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.2)", alignItems: "center" },
   glassModalBtnText: { color: "#F8FAFC", fontSize: 14, fontWeight: "700" },
@@ -1047,6 +1307,31 @@ const styles = StyleSheet.create({
   badgeBubble: { position: "absolute", top: -10, right: -5.5, backgroundColor: "#EF4444", borderRadius: 10, minWidth: 18, height: 18, justifyContent: "center", alignItems: "center", paddingHorizontal: 4 },
   badgeText: { color: "#fff", fontSize: 12, fontWeight: "600", textAlign: "center" },
   floatingCameraButton: { position: "absolute", right: 20, bottom: Platform.OS === "android" ? 20 : 25, width: 56, height: 56, borderRadius: 28, backgroundColor: "rgba(30, 64, 175, 0.2)", justifyContent: "center", alignItems: "center", borderWidth: 1, borderColor: "rgba(191, 219, 254, 0.4)", shadowColor: "#000", shadowOpacity: 0.3, shadowOffset: { width: 0, height: 10 }, shadowRadius: 18, elevation: 15, zIndex: 99 },
+  // ⚡ UPDATE YOUR EXISTING topBar STYLE:
+
+  
+  // ⚡ ADD THESE NEW STYLES:
+  logoContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1, 
+  },
+  logoTextMain: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: "#F8FAFC",
+    fontStyle: "italic",
+    letterSpacing: -0.5,
+  },
+  logoTextSub: {
+    color: "#A855F7",
+    textShadowColor: "rgba(168, 85, 247, 0.4)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
+  },
 });
 
 export default Dashboard;

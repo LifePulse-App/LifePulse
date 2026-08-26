@@ -48,7 +48,6 @@ const loadCache = async (key: string): Promise<Friend[] | null> => {
     const raw = await AsyncStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    // FIX 1: Check key existence rather than truthiness — an empty array [] is valid cache.
     return "friends" in parsed ? parsed.friends : null;
   } catch {
     return null;
@@ -62,8 +61,6 @@ export default function FriendsListScreen({ navigation }: any) {
 
   const [search, setSearch] = useState("");
 
-  // FIX 2: Use a ref for offline status so loadFriends always reads the latest
-  // value synchronously without a stale closure.
   const offlineRef = useRef(false);
   const [offline, setOffline] = useState(false);
 
@@ -71,15 +68,15 @@ export default function FriendsListScreen({ navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [avatarMap, setAvatarMap] = useState({});
+  
+  // ⚡ ADDED STATE FOR FRIEND REQUESTS COUNT
+  const [friendReqCount, setFriendReqCount] = useState(0);
 
   const baseUrl = apiClient.getBaseURL();
   const newUrl = baseUrl.replace(/\/api\/?$/, "");
 
-  // FIX 3: Track mount so useFocusEffect doesn't double-fire with useEffect on first render.
   const hasMountedRef = useRef(false);
 
-  // FIX 4: Populate offlineRef immediately on mount via NetInfo.fetch(),
-  // not just on change events — so the very first loadFriends call has correct state.
   useEffect(() => {
     NetInfo.fetch().then((state) => {
       const isOffline = !(state.isConnected === true && state.isInternetReachable !== false);
@@ -98,20 +95,16 @@ export default function FriendsListScreen({ navigation }: any) {
   const loadFriends = useCallback(async () => {
     setErrorMsg(null);
 
-    // FIX 5: Always load cache first, unconditionally — before any online/offline checks.
-    // This guarantees cached data is shown immediately regardless of network state.
     const cached = await loadCache(cacheKey);
     if (cached) {
       setFriends(cached);
     }
 
-    // FIX 6: Read offlineRef.current (synchronous) instead of offline state
-    // to avoid stale closure where offline is still false on first call.
     if (offlineRef.current) {
       if (!cached) {
         setErrorMsg("You are offline and no cached friends list is available yet.");
       } else {
-        setErrorMsg(null); // Cache loaded fine — no error needed.
+        setErrorMsg(null);
       }
       return;
     }
@@ -121,7 +114,6 @@ export default function FriendsListScreen({ navigation }: any) {
       const res = await socialApi.getFriends();
       const list: Friend[] = res?.data?.friends || [];
 
-      // FIX 7: Guard against undefined/empty API response — don't overwrite good cache.
       if (!res?.data?.friends) {
         console.log("[FriendsList] API returned no friends data — keeping cache.");
         if (!cached) setErrorMsg("No friends data available right now.");
@@ -133,7 +125,6 @@ export default function FriendsListScreen({ navigation }: any) {
       await saveCache(cacheKey, list);
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || "Failed to load friends list.";
-      // FIX 8: On error, keep the cache already set above — don't clear friends state.
       if (!cached) {
         setErrorMsg(msg);
       } else {
@@ -142,63 +133,71 @@ export default function FriendsListScreen({ navigation }: any) {
     } finally {
       setLoading(false);
     }
-  }, [cacheKey]); // FIX 9: Removed `offline` and `seedFromCache` dependencies — using ref instead.
+  }, [cacheKey]);
 
-  // FIX 10: Single mount load via useEffect.
+  // ⚡ ADDED FUNCTION TO FETCH PENDING REQUESTS
+  const refreshPendingCount = useCallback(async () => {
+    try {
+      const res = await socialApi.getPendingFriendRequests();
+      const cleaned = (res?.data?.requests ?? []).map((r: any) => r?.user?._id ? r : { ...r, user: { _id: r._id, name: r.name, username: r.username } }).filter((r: any) => r?.user?._id);
+      setFriendReqCount(cleaned.length);
+    } catch { 
+      setFriendReqCount(0); 
+    }
+  }, []);
+
   useEffect(() => {
     loadFriends();
-  }, [loadFriends]);
+    refreshPendingCount(); // ⚡ LOAD COUNT ON MOUNT
+  }, [loadFriends, refreshPendingCount]);
 
-  // FIX 11: useFocusEffect only re-loads on subsequent focus events (not first mount),
-  // preventing the double-fire race condition with the useEffect above.
   useFocusEffect(
     useCallback(() => {
+      refreshPendingCount(); // ⚡ REFRESH COUNT ON SCREEN FOCUS
       if (!hasMountedRef.current) {
         hasMountedRef.current = true;
         return;
       }
       loadFriends();
-    }, [loadFriends])
+    }, [loadFriends, refreshPendingCount])
   );
 
-  // FIX 12: Re-run loadFriends when coming back online so live data replaces cache.
-  // The offlineRef ensures loadFriends won't incorrectly block on a stale offline value.
   useEffect(() => {
     if (!offline) {
       loadFriends();
+      refreshPendingCount(); // ⚡ REFRESH WHEN BACK ONLINE
     }
-  }, [offline]); // intentionally only triggers on offline toggle, not on loadFriends change
+  }, [offline]);
 
-useEffect(() => {
-  let isMounted = true;
+  useEffect(() => {
+    let isMounted = true;
 
-  const preload = async () => {
-    const entries = await Promise.all(
-      friends.map(async (f) => {
-        const raw =
-          f.avatarThumbnailUrl ||
-          f.avatarUrl ||
-          (typeof f.avatar === "string" ? f.avatar : f.avatar?.url) ||
-          "";
+    const preload = async () => {
+      const entries = await Promise.all(
+        friends.map(async (f) => {
+          const raw =
+            f.avatarThumbnailUrl ||
+            f.avatarUrl ||
+            (typeof f.avatar === "string" ? f.avatar : f.avatar?.url) ||
+            "";
 
-        const local = await getAvatar(f._id, raw);
-        return [f._id, local];
-      })
-    );
+          const local = await getAvatar(f._id, raw);
+          return [f._id, local];
+        })
+      );
 
-    if (!isMounted) return;
+      if (!isMounted) return;
 
-    const map = Object.fromEntries(entries);
-    setAvatarMap(map);
-  };
+      const map = Object.fromEntries(entries);
+      setAvatarMap(map);
+    };
 
-  if (friends.length) preload();
+    if (friends.length) preload();
 
-  return () => {
-    isMounted = false;
-  };
-}, [friends]);
-
+    return () => {
+      isMounted = false;
+    };
+  }, [friends]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -209,20 +208,6 @@ useEffect(() => {
       return name.includes(q) || username.includes(q);
     });
   }, [friends, search]);
-
-const resolveAvatarUri = async (item: Friend) => {
-  const raw =
-    item.avatarThumbnailUrl ||
-    item.avatarUrl ||
-    (typeof item.avatar === "string"
-      ? item.avatar
-      : item.avatar?.url) ||
-    "";
-
-  const local = await getAvatar(item._id, raw);
-  return local;
-};
-
 
   const renderFriend = ({ item }: { item: Friend }) => {
     const uri = avatarMap[item._id];
@@ -240,51 +225,50 @@ const resolveAvatarUri = async (item: Friend) => {
         }
       >
         <View style={styles.left}>
+          {uri ? (
+            <FastImage
+              source={{
+                uri,
+                priority: FastImage.priority.high,
+                cache: FastImage.cacheControl.immutable,
+              }}
+              style={{ width: 40, height: 40, borderRadius: 999, marginRight: 10, }}
+            />
+          ) : (
+            <View style={styles.avatarCircle}>
+              <Icon name="account" size={20} color="#E5E7EB" />
+            </View>
+          )}
 
-{uri ? (
-  <FastImage
-    source={{
-      uri,
-      priority: FastImage.priority.high,
-      cache: FastImage.cacheControl.immutable,
-    }}
-    style={{ width: 40, height: 40, borderRadius: 999, marginRight: 10, }}
-  />
-) : (
-  <View style={styles.avatarCircle}>
-    <Icon name="account" size={20} color="#E5E7EB" />
-  </View>
-)}
-
-         <View style={{ flex: 1 }}>
-  <View style={{ flexDirection: "row", alignItems: "center" }}>
-    <Text style={styles.name} numberOfLines={1}>
-      {item.name}
-    </Text>
-    {item.tick === 'verified' && (
-      <Icon
-        name="check-decagram"
-        size={17}
-        color="#3b82f6"
-        style={{ marginLeft: 6, marginTop: 2 }}
-      />
-    )}
-    {item.tick === 'golden' && (
-      <Icon
-        name="check-decagram"
-        size={17}
-        color="#fbbf24"
-        style={{ marginLeft: 6, marginTop: 2 }}
-      />
-    )}
-    {item?.isPremium && (
-        <Icon name="star-circle" size={17} color="#fbbf24" style={{ marginLeft: 5, marginTop: 2 }} />
-      )}
-  </View>
-  <Text style={styles.username} numberOfLines={1}>
-    {item.username ? `@${item.username}` : "@"}
-  </Text>
-</View>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={styles.name} numberOfLines={1}>
+                {item.name}
+              </Text>
+              {item.tick === 'verified' && (
+                <Icon
+                  name="check-decagram"
+                  size={17}
+                  color="#3b82f6"
+                  style={{ marginLeft: 6, marginTop: 2 }}
+                />
+              )}
+              {item.tick === 'golden' && (
+                <Icon
+                  name="check-decagram"
+                  size={17}
+                  color="#fbbf24"
+                  style={{ marginLeft: 6, marginTop: 2 }}
+                />
+              )}
+              {item?.isPremium && (
+                <Icon name="star-circle" size={17} color="#fbbf24" style={{ marginLeft: 5, marginTop: 2 }} />
+              )}
+            </View>
+            <Text style={styles.username} numberOfLines={1}>
+              {item.username ? `@${item.username}` : "@"}
+            </Text>
+          </View>
         </View>
 
         <Icon name="chevron-right" size={22} color="#9CA3AF" />
@@ -306,16 +290,22 @@ const resolveAvatarUri = async (item: Friend) => {
             <Icon name="arrow-left" size={22} color="#E5E7EB" />
           </TouchableOpacity>
 
-          <View style={{ flex: 1, marginLeft: 10 }}>
+          <View style={{ flex: 1, alignItems: "center" }}>
             <Text style={styles.title}>Friends</Text>
           </View>
 
+          {/* ⚡ UPDATED BUTTON TO SHOW BADGE IF FRIEND REQUESTS EXIST */}
           <TouchableOpacity
             activeOpacity={0.8}
             style={styles.iconGlass}
             onPress={() => navigation.navigate("Friends")}
           >
             <Icon name="account-plus-outline" size={22} color="#E5E7EB" />
+            {friendReqCount > 0 && (
+              <View style={styles.badgeBubble}>
+                <Text style={styles.badgeText}>{friendReqCount > 99 ? '99+' : friendReqCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
@@ -371,24 +361,6 @@ const resolveAvatarUri = async (item: Friend) => {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#0f172a", padding: 12 },
   baseBackground: { ...StyleSheet.absoluteFill, backgroundColor: "#020617" },
-  glowTop: {
-    position: "absolute",
-    top: -120,
-    left: -40,
-    width: 220,
-    height: 220,
-    borderRadius: 220,
-    backgroundColor: "rgba(59, 130, 246, 0.28)",
-  },
-  glowBottom: {
-    position: "absolute",
-    bottom: -140,
-    right: -40,
-    width: 220,
-    height: 220,
-    borderRadius: 220,
-    backgroundColor: "rgba(168, 85, 247, 0.28)",
-  },
   topBar: { flexDirection: "row", alignItems: "center", marginBottom: 12, marginTop: Platform.OS === "android" ? 4 : 8 },
   iconGlass: {
     width: 40,
@@ -400,10 +372,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  
+  // ⚡ ADDED STYLES FOR THE BADGE
+  badgeBubble: { 
+    position: "absolute", 
+    top: -6, 
+    right: -6, 
+    backgroundColor: "#EF4444", 
+    borderRadius: 10, 
+    minWidth: 18, 
+    height: 18, 
+    justifyContent: "center", 
+    alignItems: "center", 
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: "#020617" 
+  },
+  badgeText: { 
+    color: "#fff", 
+    fontSize: 10, 
+    fontWeight: "700", 
+    textAlign: "center" 
+  },
+
   title: { color: "#fff", fontSize: 20, fontWeight: "800" },
-  netStatus: { fontSize: 12, marginTop: 2 },
-  netOnline: { color: "#22c55e" },
-  netOffline: { color: "#f59e0b" },
   searchBox: {
     flexDirection: "row",
     alignItems: "center",

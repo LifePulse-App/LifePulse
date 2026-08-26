@@ -164,6 +164,7 @@ import VerifySelfScreen from '../../screens/profile/components/VerifySelfScreen'
 import UserProfile from '../../screens/activity-feed/components/UserProfile';
 import UserFeedScreen from '../../screens/activity-feed/components/UserFeedScreen';
 import ShareToChatScreen from '../../screens/activity-feed/components/ShareToChat';
+import ChatListScreen from '../../screens/chat/components/Chat';
 
   const AuthNavigator = () => {
     const [initialRoute, setInitialRoute] = useState<'Drawer' | 'AppTabs' | 'Login' | 'SavedAccounts' | null>(null);
@@ -267,7 +268,7 @@ return (
         <Stack.Screen name="UserProfile" component={UserProfile} />
         <Stack.Screen name="UserFeedScreen" component={UserFeedScreen} />
         <Stack.Screen name="ShareToChat" component={ShareToChatScreen} />
-
+        <Stack.Screen name="Chat" component={ChatListScreen}  options={{ unmountOnBlur: false, freezeOnBlur: true }} />
 
         <Stack.Screen name="AvatarCustomize" component={AvatarCustomizeScreen} />
         <Stack.Screen name="AvatarCreator" component={AvatarCreatorScreen} />

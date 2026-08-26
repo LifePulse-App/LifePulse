@@ -660,24 +660,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
               </View>
             )}
 
-            {/* Modern Inline Stats */}
-            <View style={styles.statsContainer}>
-              <View style={styles.statBlock}>
-                <Text style={styles.statNumber}>{user?.points?.toLocaleString() ?? "—"}</Text>
-                <Text style={styles.statLabel}>Points</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statBlock}>
-                <Text style={styles.statNumber}>{user?.leaderboardRank ? `#${user.leaderboardRank}` : "—"}</Text>
-                <Text style={styles.statLabel}>Rank</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statBlock}>
-                <Text style={styles.statNumber}>{user?.streak ?? "—"}</Text>
-                <Text style={styles.statLabel}>Streak</Text>
-              </View>
-            </View>
-
             {/* Details Grid */}
             <View style={styles.detailsGrid}>
               <View style={[styles.detailCard, { flex: 1 }]}>

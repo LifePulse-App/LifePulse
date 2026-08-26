@@ -147,7 +147,7 @@ const UserProfile = ({ route, navigation }: any) => {
             const fullImageUrl = cleanPath.startsWith("http") 
               ? cleanPath 
               : `${BASE_URL}${cleanPath}`;
-
+            
             return {
               ...post,
               mediaUrl: fullImageUrl,
