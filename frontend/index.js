@@ -7,7 +7,7 @@ if (!global.Buffer) global.Buffer = Buffer;
 import 'react-native-gesture-handler';
 import { AppRegistry, Platform, DeviceEventEmitter } from 'react-native';
 // ⚡ FIX: Added AndroidVisibility to the import
-import notifee, { EventType, AndroidImportance, AndroidCategory, AndroidVisibility } from '@notifee/react-native';
+import notifee, { EventType, AndroidImportance, AndroidCategory, AndroidVisibility, AndroidStyle } from '@notifee/react-native';
 
 import { getApp } from '@react-native-firebase/app';
 import { getMessaging, setBackgroundMessageHandler } from '@react-native-firebase/messaging';
@@ -20,11 +20,12 @@ import {
   markMessagesDeliveredLocally,
 } from './src/screens/chat/services/ChatNotifications';
 
-import { markDelivered } from './src/screens/chat/services/api_chat';
+import { markDelivered, sendMessage } from './src/screens/chat/services/api_chat';
 import { navigationRef } from './src/navigation/main/RootNavigation';
 import { setSecretKey } from './src/auth/api-client/api_client';
 import UserStorage from './src/auth/user/UserStorage';
 import apiClient from './src/auth/api-client/api_client';
+import { getAvatar } from './src/storage/AvatarManager';
 
 /*
 |--------------------------------------------------------------------------
@@ -65,6 +66,98 @@ notifee.createChannel({
 | Helpers 
 |--------------------------------------------------------------------------
 */
+
+async function displayMessagingStyleNotification(data, fallback = {}) {
+  const peerId = String(data.peerUserId || 'unknown');
+  const peerName = data.username || data.peerName || fallback.title || 'Someone';
+  const text = data.body || data.message || fallback.body || 'Sent you a message';
+  
+  // ⚡ 1. Extract avatar data from the backend push payload
+  const senderAvatarUrl = data.avatarUrl || data.profileImage;
+  const avatarVersion = data.avatarVersion || 1;
+
+  // ⚡ 2. Download/Cache the avatar locally
+  let localAvatarPath = undefined;
+  if (senderAvatarUrl) {
+    try {
+      localAvatarPath = await getAvatar(peerId, senderAvatarUrl, avatarVersion);
+    } catch (e) {
+      console.log('Failed to cache avatar for notification:', e);
+    }
+  }
+
+  const notificationId = `chat_messaging:${peerId}`; 
+
+  // ⚡ 3. Add the cached file path to the sender's icon
+  const sender = {
+    name: peerName,
+    id: peerId,
+    ...(localAvatarPath ? { icon: localAvatarPath } : {}), 
+  };
+
+  const currentUser = {
+    name: 'Me',
+    id: 'me',
+  };
+
+  const displayed = await notifee.getDisplayedNotifications();
+  const existingNotif = displayed.find(n => n.id === notificationId);
+
+  let messages = [];
+
+  if (
+    existingNotif && 
+    existingNotif.notification.android?.style?.type === AndroidStyle.MESSAGING
+  ) {
+    messages = existingNotif.notification.android.style.messages || [];
+  }
+
+  messages.push({
+    text: text,
+    timestamp: Date.now(),
+    person: sender,
+  });
+
+  const notifData = { 
+    type: 'chat', 
+    peerUserId: peerId, 
+    peerName, 
+    conversationId: String(data.conversationId) 
+  };
+
+  await notifee.displayNotification({
+    id: notificationId,
+    title: peerName,
+    body: text, 
+    data: notifData,
+    android: {
+      channelId: 'default', 
+      smallIcon: 'ic_launcher', // ⚡ Keeps your top status bar icon working!
+      importance: AndroidImportance.HIGH,
+      pressAction: { id: 'default' },
+      sound: 'default',
+      color: '#6366f1',
+      style: {
+        type: AndroidStyle.MESSAGING,
+        person: currentUser,
+        messages: messages, 
+        title: peerName,
+      },
+      actions: [
+        {
+          title: 'Reply',
+          pressAction: { id: 'reply_action' },
+          input: { placeholder: 'Type a reply...' },
+        },
+      ],
+    },
+    ios: {
+      sound: 'default',
+      threadId: `chat:${peerId}`, 
+      foregroundPresentationOptions: ['alert', 'sound', 'badge'],
+    },
+  });
+}
 
 function parseMessageIds(raw) {
   if (!raw) return [];
@@ -165,10 +258,24 @@ setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
   const data = remoteMessage?.data || {};
 
   // ── ⚡ WHATSAPP-STYLE CUSTOM WAKE UP ──
+// ── ⚡ WHATSAPP-STYLE CUSTOM WAKE UP (FULL SCREEN INTENT) ──
   if (data.type === 'incoming_call') {
-    const { callId, callerName } = data;
+    const { callId, callerName, callerId } = data;
 
-    try {
+    // 1. Download/Cache the caller's avatar locally
+    const callerAvatarUrl = data.avatarUrl || data.profileImage;
+    const avatarVersion = data.avatarVersion || 1;
+    let localAvatarPath = undefined;
+    
+    if (callerAvatarUrl) {
+      try {
+        localAvatarPath = await getAvatar(String(callerId || 'caller'), callerAvatarUrl, avatarVersion);
+      } catch (err) {
+        console.log('Failed to cache caller avatar', err);
+      }
+    }
+
+try {
       await notifee.displayNotification({
         id: String(callId),
         title: 'Incoming Call',
@@ -177,13 +284,17 @@ setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
           channelId: 'call_channel_v2', 
           category: AndroidCategory.CALL, 
           importance: AndroidImportance.HIGH,
-          // ⚡ FIX: Ensures buttons show on lock screen
           visibility: AndroidVisibility.PUBLIC, 
           autoCancel: true,
-          // ⚡ FIX: Set to true so user can't accidentally swipe it away while ringing
-          ongoing: true, 
+          ongoing: true, // Prevents swiping it away accidentally
           loopSound: true, 
-          // ❌ FIX: fullScreenAction completely removed to satisfy Google Play
+
+          // ⚡ FIX: Add this so Android badges the app icon over the caller's avatar!
+          smallIcon: 'ic_launcher', 
+
+          ...(localAvatarPath ? { largeIcon: localAvatarPath, circularLargeIcon: true } : {}),
+
+          // ⚡ THIS IS THE MAGIC! It wakes the phone screen and launches your app's UI
           fullScreenAction: {
             id: 'default',
             mainComponent: appName,
@@ -236,28 +347,16 @@ setBackgroundMessageHandler(messagingInstance, async remoteMessage => {
         console.log('[BGHandler] ❌ markDelivered failed:', e);
       }
     }
-
+   
     const peerId = String(data.peerUserId || 'unknown');
     const peerName = data.username || data.peerName || 'Someone';
     const messageId = data.messageId || data.msgId || data._id || Date.now();
     const body = data.body || data.message || 'Sent you a message';
 
-    await notifee.displayNotification({
-      id: `chat:${peerId}:msg:${messageId}`,
-      title: peerName,
-      body,
-      android: {
-        channelId: 'default',
-        groupId: `chat:${peerId}`,
-        pressAction: { id: 'default' },
-        sound: 'default',
-        color: '#6366f1',
-      },
-      ios: {
-        sound: 'default',
-        foregroundPresentationOptions: ['alert', 'sound', 'badge'],
-      },
-      data: { type: 'chat', peerUserId: peerId, peerName },
+// ⚡ FIX: Use the new MessagingStyle function instead of the old grouping logic!
+    await displayMessagingStyleNotification(data, {
+      title: remoteMessage?.notification?.title,
+      body: remoteMessage?.notification?.body,
     });
     return;
   }
@@ -292,20 +391,20 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
   
 
   // 1. User clicked "Decline" from the banner while app was killed
+// 1. User clicked "Decline" from the banner while app was killed
   if (type === EventType.ACTION_PRESS && pressAction?.id === 'decline_call') {
     if (notification?.id) {
       await notifee.cancelNotification(notification.id);
     }
     
-    // ⚡ FIX: Tell backend via REST API since socket is dead
     if (data?.callId) {
       try {
         const tokens = await UserStorage.getAccessToken();
         apiClient.setAuthToken(tokens);
         setSecretKey()
         if (tokens) {
-          // Send request to your backend to reject the call
-          await apiClient.post('/call/reject-offline', { callId: data.callId });
+          // ⚡ FIX: Change this URL from /call/reject-offline to /call/reject
+          await apiClient.post('/call/reject', { callId: data.callId });
         }
       } catch (e) {
         console.log('[Notifee] Failed to reject call via API', e);
@@ -315,26 +414,66 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
   }
 
   // 2. User clicked "Answer" from the banner
+// 2. User clicked "Answer" from the banner
   if (type === EventType.ACTION_PRESS && pressAction?.id === 'answer_call') {
-    // ⚡ FIX: We save this intent so CallProvider knows they explicitly want to answer!
-    if (notification?.id) {
-      await notifee.cancelNotification(notification.id);
-    }
+    if (notification?.id) await notifee.cancelNotification(notification.id);
 
     if (data) {
       data.autoAccept = true; 
       notificationNavState.pending = data; 
+      // ⚡ FIX: Broadcast instant signal!
+      DeviceEventEmitter.emit('auto_answer_call', data);
     }
     return;
   }
 
-  // Handle standard push routing for chat
+  // 3. User just tapped the notification body (wants to open app and see ringing screen)
+  if (type === EventType.PRESS && data?.type === 'incoming_call') {
+    if (notification?.id) await notifee.cancelNotification(notification.id);
+    data.autoAccept = false;
+    DeviceEventEmitter.emit('auto_answer_call', data);
+    return;
+  }
+
+// Handle standard push routing for chat
   if (type === EventType.PRESS && data) {
     if (navigationRef.current) {
       handleNotificationPress(data);
     } else {
       notificationNavState.pending = data;
     }
+  }
+
+// ⚡ FIX: Handle the inline reply when app is in the background
+  if (type === EventType.ACTION_PRESS && pressAction?.id === 'reply_action') {
+    const replyText = detail.input;
+    
+    if (replyText && data?.peerUserId && data?.conversationId) {
+      try {
+        const tokens = await UserStorage.getAccessToken();
+        if (tokens) {
+          apiClient.setAuthToken(tokens);
+          setSecretKey();
+
+          // ⚡ FIX: Use your dedicated sendMessage service
+          await sendMessage({
+            conversationId: data.conversationId,
+            receiverId: data.peerUserId,
+            text: replyText,
+            clientMessageId: `reply_${Date.now()}`,
+            notifyUser: true
+          });
+
+          // Cancel notification after replying
+          if (notification?.id) {
+            await notifee.cancelNotification(notification.id);
+          }
+        }
+      } catch (e) {
+        console.log('[Notifee] Reply failed', e);
+      }
+    }
+    return;
   }
 });
 

@@ -1,20 +1,32 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Platform, View } from 'react-native';
 import { createNativeBottomTabNavigator } from '@react-navigation/bottom-tabs/unstable';
-import { useIsFocused } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 
 import Dashboard from '../../screens/dashboard/components/dashboard/Dashboard';
-import ChatScreen from '../../screens/chat/components/Chat';
+// import ChatScreen from '../../screens/chat/components/Chat'; // Omitted to match LowNavBAr screens
 import ARCameraView from '../../screens/AR-Model/components/ar_screen';
 import MoodMap from '../../screens/mood-map/components/mood-map/MoodMap';
 import LeaderboardScreen from '../../screens/leaderboard/components/leaderboard/leaderboard';
-import { getUnreadChatCount, subscribeUnreadChanges } from '../../screens/chat/services/ChatNotifications';
+// import { getUnreadChatCount, subscribeUnreadChanges } from '../../screens/chat/services/ChatNotifications';
 
 const Tab = createNativeBottomTabNavigator();
 
+const ProofCameraProxyScreen = ({ navigation }: any) => {
+  useFocusEffect(
+    useCallback(() => {
+      // Immediately open the camera screen
+      navigation.navigate('ProofCamera', { habitId: null });
+      
+      // Optional: switch back to Home so the tab doesn't get "stuck" on the proxy
+      // navigation.navigate('Dashboard'); 
+    }, [navigation])
+  );
+
+  return <View style={{ flex: 1, backgroundColor: '#050816' }} />; // Match app bg color
+};
+
 // 1. Create a Lazy Load Wrapper
-// This prevents the screen from mounting its heavy logic until the tab is clicked.
-// Once clicked, it stays mounted in memory so you don't lose state when switching back.
 const withLazyLoad = (Component) => (props) => {
   const isFocused = useIsFocused();
   const [hasMounted, setHasMounted] = useState(false);
@@ -26,8 +38,6 @@ const withLazyLoad = (Component) => (props) => {
   }, [isFocused, hasMounted]);
 
   if (!hasMounted) {
-    // Return a blank screen while in the background. 
-    // Match this color to your app's main background color.
     return <View style={{ flex: 1, backgroundColor: '#050816' }} />;
   }
 
@@ -36,20 +46,23 @@ const withLazyLoad = (Component) => (props) => {
 
 // 2. Wrap your heavy components
 const LazyMoodMap = withLazyLoad(MoodMap);
-const LazyARCameraView = withLazyLoad(ARCameraView);
 const LazyDashboard = withLazyLoad(Dashboard);
 const LazyLeaderboardScreen = withLazyLoad(LeaderboardScreen);
-const LazyChatScreen = withLazyLoad(ChatScreen);
+const LazyARCameraView = withLazyLoad(ARCameraView);
+
+// Dummy component for the center camera tab that doesn't actually render
+const DummyScreen = () => null;
 
 export default function AppTabs() {
+  /* Chat notification logic kept for your reference if you need it later
   const [unreadChats, setUnreadChats] = useState(getUnreadChatCount());
-
   useEffect(() => {
     const unsub = subscribeUnreadChanges(() => {
       setUnreadChats(getUnreadChatCount());
     });
     return () => unsub();
   }, []);
+  */
 
   return (
     <Tab.Navigator
@@ -62,6 +75,7 @@ export default function AppTabs() {
         tabBarActiveIndicatorEnabled: false
       }}
     >
+      {/* 1. Map */}
       <Tab.Screen
         name="Student"
         component={LazyMoodMap}
@@ -74,6 +88,7 @@ export default function AppTabs() {
         }}
       />
 
+      {/* 2. Home */}
       <Tab.Screen
         name="Dashboard"
         component={LazyDashboard}
@@ -86,22 +101,23 @@ export default function AppTabs() {
         }}
       />
 
-      <Tab.Screen
-        name="ArPortal"
-        component={LazyARCameraView}
-        options={{
-          tabBarLabel: 'AR Portal',
-          tabBarStyle: { display: 'none' },
-          tabBarIcon: Platform.select({
-            ios: { type: 'sfSymbol', name: 'cube' },
-            android: { type: 'materialSymbol', name: 'view_in_ar' },
-          }),
-        }}
-      />
+      {/* 3. Center Camera (Action Trigger) */}
+    <Tab.Screen
+  name="ProofCameraProxy"
+  component={ProofCameraProxyScreen}
+  options={{
+    tabBarLabel: 'Camera',
+    tabBarIcon: Platform.select({
+      ios: { type: 'sfSymbol', name: 'camera' },
+      android: { type: 'materialSymbol', name: 'camera' },
+    }),
+  }}
+/>
 
+      {/* 4. LeaderBoard */}
       <Tab.Screen
         name="Employee"
-        component={LeaderboardScreen}
+        component={LazyLeaderboardScreen}
         options={{
           tabBarLabel: 'LeaderBoard',
           tabBarIcon: Platform.select({
@@ -111,15 +127,16 @@ export default function AppTabs() {
         }}
       />
 
+      {/* 5. AR Portal */}
       <Tab.Screen
-        name="Chat"
-        component={LazyChatScreen}
+        name="ArPortal"
+        component={LazyARCameraView}
         options={{
-          tabBarLabel: 'Chat',
-          tabBarBadge: unreadChats > 0 ? (unreadChats > 99 ? '99+' : unreadChats) : undefined,
+          tabBarLabel: 'AR Portal',
+          tabBarStyle: { display: 'none' }, // Hides the tab bar inside AR mode
           tabBarIcon: Platform.select({
-            ios: { type: 'sfSymbol', name: 'message' },
-            android: { type: 'materialSymbol', name: 'chat' },
+            ios: { type: 'sfSymbol', name: 'cube' },
+            android: { type: 'materialSymbol', name: 'view_in_ar' },
           }),
         }}
       />

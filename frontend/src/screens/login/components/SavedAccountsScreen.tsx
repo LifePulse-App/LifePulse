@@ -1,8 +1,10 @@
 import React, { useEffect, useState, useContext } from "react";
-import { View, TouchableOpacity, ScrollView, StyleSheet, Platform } from "react-native";
+import { View, TouchableOpacity, ScrollView, StyleSheet, Platform, StatusBar, Image } from "react-native";
 import { Text } from "@rneui/themed";
 import { CommonActions } from "@react-navigation/native";
 import DeviceInfo from "react-native-device-info";
+import FastImage from "react-native-fast-image"; 
+import Icon from "react-native-vector-icons/MaterialCommunityIcons"; // ⚡ IMPORTED ICON FOR FALLBACK
 
 import SavedAccountsStorage, { SavedAccount } from "../../../auth/user/SavedAccountsStorage";
 import AuthContext from "../../../auth/user/UserContext";
@@ -11,19 +13,22 @@ import { setAuthHeaders, setSecretKey } from "../../../auth/api-client/api_clien
 import UserStorage from "../../../auth/user/UserStorage";
 import { loginStyles } from "./Loginstyles";
 import { connectSocket } from "../../../auth/api-client/socket";
+import { getAvatar } from "../../../storage/AvatarManager";
+
+interface SavedAccountWithAvatar extends SavedAccount {
+  localAvatarUri?: string | null;
+}
 
 const SavedAccountsScreen = ({ navigation }: any) => {
   const styles = loginStyles();
   const localStyles = savedStyles();
   const authContext = useContext(AuthContext);
 
-  const [accounts, setAccounts] = useState<SavedAccount[]>([]);
+  const [accounts, setAccounts] = useState<SavedAccountWithAvatar[]>([]);
   
-  // ⚡ Separate state for target account and action type ("login" vs "remove")
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [actionType, setActionType] = useState<"login" | "remove" | null>(null);
 
-  // Keep only unique usernames (case-insensitive)
   const getUniqueByUsername = (list: SavedAccount[]) => {
     const seen = new Set<string>();
     const unique: SavedAccount[] = [];
@@ -44,7 +49,26 @@ const SavedAccountsScreen = ({ navigation }: any) => {
   const load = async () => {
     const list = await SavedAccountsStorage.getAll();
     const unique = getUniqueByUsername(list);
-    setAccounts(unique);
+
+    const accountsWithAvatars = await Promise.all(
+      unique.map(async (acc) => {
+        const rawUrl = acc?.user?.user?.avatarUrl || acc?.user?.user?.avatarThumbnailUrl || acc?.user?.user?.avatar || acc?.user?.user?.profile_picture;
+        const userId = acc?.user?.user?._id || acc?.user?.user?.id || acc.id; 
+        const avatarVersion = acc?.user?.user?.avatarVersion || 1;
+
+        let localUri = null;
+        if (rawUrl && rawUrl.trim() !== '' && rawUrl !== 'null' && rawUrl !== 'undefined') {
+          localUri = await getAvatar(userId, rawUrl, avatarVersion);
+        }
+
+        return {
+          ...acc,
+          localAvatarUri: localUri, 
+        };
+      })
+    );
+
+    setAccounts(accountsWithAvatars);
   };
 
   useEffect(() => {
@@ -89,23 +113,22 @@ const SavedAccountsScreen = ({ navigation }: any) => {
 
       await connectSocket();
 
-      const isIOS26Plus =
-             Platform.OS === 'ios' &&
-             parseInt(Platform.Version, 10) >= 26;
-           if (isIOS26Plus) {
-             navigation.dispatch(
-             CommonActions.reset({
-               index: 0,
-               routes: [{ name: 'AppTabs' }],
-             }),
-           );
-           } else {
-           navigation.dispatch(
-             CommonActions.reset({
-               index: 0,
-               routes: [{ name: 'Drawer' }],
-             }),
-           )}
+      const isIOS26Plus = Platform.OS === 'ios' && parseInt(Platform.Version, 10) >= 26;
+      if (isIOS26Plus) {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'AppTabs' }],
+          }),
+        );
+      } else {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'Drawer' }],
+          }),
+        );
+      }
     } finally {
       setLoadingId(null);
       setActionType(null);
@@ -115,7 +138,7 @@ const SavedAccountsScreen = ({ navigation }: any) => {
   const handleRemove = async (acc: SavedAccount) => {
     try {
       setLoadingId(acc.id); 
-      setActionType("remove"); // ⚡ Explicitly flag as removal
+      setActionType("remove"); 
       const deviceId = await DeviceInfo.getUniqueId();
 
       const res = await api_Login.getLogin(
@@ -142,11 +165,19 @@ const SavedAccountsScreen = ({ navigation }: any) => {
   return (
     <View style={styles.root}>
       <View style={styles.baseBackground} />
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
+       <StatusBar
+          barStyle="light-content"
+          translucent
+          backgroundColor="transparent"
+        />
 
       <View style={styles.kbWrapper}>
         <View style={localStyles.header}>
+          <Image 
+            source={require('../../../shared/bootsplash/logo-bg.png')}
+            style={{ width: 180, height: 100, alignSelf: 'center', marginBottom: 0 }}
+            resizeMode="contain"
+          />
           <Text style={localStyles.appName}>StreakSphere</Text>
           <Text style={localStyles.subTitle}>Saved Accounts</Text>
         </View>
@@ -155,12 +186,35 @@ const SavedAccountsScreen = ({ navigation }: any) => {
           <ScrollView showsVerticalScrollIndicator={false}>
             {accounts.map((acc) => {
               const isThisLoading = loadingId === acc.id;
+              const displayName = acc?.user?.user?.name || acc.username || "User";
+              
+              const avatarVersion = acc?.user?.user?.avatarVersion || 1;
+              const finalAvatarUri = acc.avatarUrl? acc.avatarUrl : null;
 
               return (
                 <View key={acc.id} style={localStyles.accountRow}>
-                  <View style={localStyles.userInfo}>
-                    <Text style={localStyles.username}>{acc?.user?.user?.name || acc.username}</Text>
-                    <Text style={localStyles.smallText}>Tap login to continue</Text>
+                  
+                  <View style={localStyles.accountHeader}>
+                    {/* ⚡ UPDATED: Check if finalAvatarUri exists, else show grey person icon */}
+                    {finalAvatarUri ? (
+                      <FastImage
+                        style={localStyles.avatar}
+                        source={{
+                          uri: finalAvatarUri,
+                          priority: FastImage.priority.high,
+                        }}
+                        resizeMode={FastImage.resizeMode.cover}
+                      />
+                    ) : (
+                      <View style={localStyles.avatarFallback}>
+                        <Icon name="account" size={32} color="#94a3b8" />
+                      </View>
+                    )}
+                    
+                    <View style={localStyles.userInfo}>
+                      <Text style={localStyles.username}>{displayName}</Text>
+                      <Text style={localStyles.smallText}>Tap login to continue</Text>
+                    </View>
                   </View>
 
                   <View style={localStyles.rowActions}>
@@ -188,15 +242,26 @@ const SavedAccountsScreen = ({ navigation }: any) => {
               );
             })}
           </ScrollView>
-
-          <TouchableOpacity
-            style={localStyles.otherBtn}
-            onPress={() => navigation.navigate("Login")}
-          >
-            <Text style={localStyles.otherText}>Use another account</Text>
-          </TouchableOpacity>
         </View>
       </View>
+      
+      <View style={{ 
+            paddingVertical: 20, 
+            paddingBottom: Platform.OS === 'ios' ? 40 : 40, 
+            alignItems: 'center',
+            borderTopWidth: 0.5,
+            borderTopColor: 'rgba(255, 255, 255, 0.1)' 
+        }}>
+          <Text style={{ color: '#c7cbcf', fontSize: 13 }}>
+            Log in to another account?{' '}
+            <Text
+              style={{ fontWeight: '700', color: '#fff' }}
+              onPress={() => navigation.navigate('Login')}
+            >
+              Login
+            </Text>
+          </Text>
+        </View>
     </View>
   );
 };
@@ -230,16 +295,45 @@ const savedStyles = () =>
       shadowOpacity: 0.5,
       shadowRadius: 20,
       shadowOffset: { width: 0, height: 10 },
+      maxHeight: '80%', 
     },
     accountRow: {
       borderWidth: 1.5,
       borderColor: "rgba(255,255,255,0.35)",
-      borderRadius: 10,
+      borderRadius: 14,
       padding: 14,
       marginBottom: 12,
     },
+    accountHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    avatar: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: '#1a1a1a', 
+      marginRight: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+      overflow: 'hidden' 
+    },
+    // ⚡ ADDED: Fallback style for the grey person icon
+    avatarFallback: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: '#1e293b', // Slate 800 (Dark Grey/Blue)
+      marginRight: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
     userInfo: {
-      marginBottom: 10,
+      flex: 1,
+      justifyContent: 'center',
     },
     username: {
       color: "white",
@@ -247,7 +341,7 @@ const savedStyles = () =>
       fontSize: 16,
     },
     smallText: {
-      color: "white",
+      color: "rgba(255,255,255,0.7)",
       fontSize: 12,
       marginTop: 2,
     },
@@ -275,18 +369,6 @@ const savedStyles = () =>
     },
     removeText: {
       color: "#fff",
-      fontWeight: "700",
-    },
-    otherBtn: {
-      marginTop: 10,
-      borderRadius: 12,
-      paddingVertical: 12,
-      borderWidth: 1,
-      borderColor: "rgba(148,163,184,0.7)",
-      alignItems: "center",
-    },
-    otherText: {
-      color: "#E5E7EB",
       fontWeight: "700",
     },
   });

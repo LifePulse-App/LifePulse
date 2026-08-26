@@ -396,7 +396,7 @@ const Friends = ({ navigation }: any) => {
             >
               <Icon name="check" size={18} color="#F9FAFB" />
               <Text style={styles.addBtnText}>
-                {loadingActions === user._id ? "..." : "Accept"}
+                {loadingActions === user._id ? "Accepting" : "Accept"}
               </Text>
             </TouchableOpacity>
 
@@ -434,7 +434,7 @@ const Friends = ({ navigation }: any) => {
           >
             <Icon name="account-arrow-left" size={18} color="#F9FAFB" />
             <Text style={styles.addBtnText}>
-              {loadingActions === user._id ? "..." : "Accept"}
+              {loadingActions === user._id ? "Accepting" : "Accept"}
             </Text>
           </TouchableOpacity>
         ) : user.requestSent ? (
@@ -446,7 +446,7 @@ const Friends = ({ navigation }: any) => {
           >
             <Icon name="check" size={18} color="#F9FAFB" />
             <Text style={styles.addBtnText}>
-              {loadingActions === user._id ? "..." : "Added"}
+              {loadingActions === user._id ? "Removing" : "Added"}
             </Text>
           </TouchableOpacity>
         ) : (
@@ -458,7 +458,7 @@ const Friends = ({ navigation }: any) => {
           >
             <Icon name="account-plus-outline" size={18} color="#F9FAFB" />
             <Text style={styles.addBtnText}>
-              {loadingActions === user._id ? "..." : "Add"}
+              {loadingActions === user._id ? "Adding" : "Add"}
             </Text>
           </TouchableOpacity>
         )}
@@ -484,16 +484,7 @@ const Friends = ({ navigation }: any) => {
           onRemove={handleRemoveModalRemove}
         />
 
-        <GlassNotification
-          visible={!!notification}
-          type={notification?.type}
-          message={notification?.message}
-          onDismiss={() => setNotification(null)}
-        />
-
         <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
         <View style={styles.overlay}>
           <View style={styles.topBar}>

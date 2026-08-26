@@ -144,7 +144,7 @@ export const loginStyles = () => {
       fontWeight: '800',
       color: '#fff', // White text
       textAlign: 'center',
-      marginBottom: 5,
+      marginBottom: 10,
     },
     mainSubtitle: {
       fontSize: 13,

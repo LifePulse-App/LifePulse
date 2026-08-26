@@ -6,6 +6,7 @@ import {
   Keyboard,
   TouchableOpacity,
   Animated,
+  Image, // <-- Imported Image
 } from 'react-native';
 import { TextInput, Text } from 'react-native-paper';
 import NetInfo from '@react-native-community/netinfo';
@@ -30,7 +31,7 @@ const Login = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false); // show characters by default
+  const [showPassword, setShowPassword] = useState(false);
   const authContext = useContext(AuthContext);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -210,72 +211,45 @@ const Login = ({ navigation }: any) => {
     }
   };
 
-  // Interpolated transforms for subtle motion
   const blob1Style = {
     transform: [
-      {
-        translateX: anim1.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-40, 40],
-        }),
-      },
-      {
-        translateY: anim1.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, 30],
-        }),
-      },
+      { translateX: anim1.interpolate({ inputRange: [0, 1], outputRange: [-40, 40] }) },
+      { translateY: anim1.interpolate({ inputRange: [0, 1], outputRange: [0, 30] }) },
     ],
   };
 
   const blob2Style = {
     transform: [
-      {
-        translateX: anim2.interpolate({
-          inputRange: [0, 1],
-          outputRange: [30, -30],
-        }),
-      },
-      {
-        translateY: anim2.interpolate({
-          inputRange: [0, 1],
-          outputRange: [10, -20],
-        }),
-      },
+      { translateX: anim2.interpolate({ inputRange: [0, 1], outputRange: [30, -30] }) },
+      { translateY: anim2.interpolate({ inputRange: [0, 1], outputRange: [10, -20] }) },
     ],
   };
 
   const blob3Style = {
     transform: [
-      {
-        translateX: anim3.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-20, 20],
-        }),
-      },
-      {
-        translateY: anim3.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-30, 10],
-        }),
-      },
+      { translateX: anim3.interpolate({ inputRange: [0, 1], outputRange: [-20, 20] }) },
+      { translateY: anim3.interpolate({ inputRange: [0, 1], outputRange: [-30, 10] }) },
     ],
   };
 
   return (
     <>
-      <View style={styles.root}>
+      {/* Added flex: 1 to ensure the root container takes up the whole screen */}
+      <View style={[styles.root, { flex: 1 }]}>
         <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
 
+        {/* Added flex: 1 so the KeyboardAvoidingView takes the available space above the footer */}
         <KeyboardAvoidingView
-          style={styles.kbWrapper}
+          style={[styles.kbWrapper, { flex: 1, justifyContent: 'center' }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-
           <View style={styles.appNameWrapper}>
-            <Text style={styles.appName}>StreakSphere</Text>
+            {/* --- REPLACED TEXT WITH LOGO IMAGE --- */}
+            <Image 
+              source={require('../../../shared/bootsplash/logo-bg.png')} // Update this path to match your folder structure
+              style={{ width: 180, height: 100, alignSelf: 'center', marginBottom: 0 }}
+              resizeMode="contain"
+            />
           </View>
 
           <View style={styles.glassWrapper}>
@@ -286,7 +260,6 @@ const Login = ({ navigation }: any) => {
               </Text>
 
               <TextInput
-                
                 placeholder="Username or Email"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -296,13 +269,12 @@ const Login = ({ navigation }: any) => {
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
-                textColor="#fff"              // White text
-                placeholderTextColor="#94a3b8" // Slate gray placeholder
+                textColor="#fff"
+                placeholderTextColor="#94a3b8"
                 cursorColor="#fff"
               />
 
               <TextInput
-                
                 placeholder="Password"
                 value={password}
                 onChangeText={setPassword}
@@ -315,13 +287,13 @@ const Login = ({ navigation }: any) => {
                 mode="flat"
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
-                textColor="#fff"              // White text
-                placeholderTextColor="#94a3b8" // Slate gray placeholder
+                textColor="#fff"
+                placeholderTextColor="#94a3b8"
                 cursorColor="#fff"
                 right={
                   <TextInput.Icon
                     icon={showPassword ? 'eye-off' : 'eye'}
-                    color="#cbd5e1" // Added icon color
+                    color="#cbd5e1"
                     onPress={() => setShowPassword((prev) => !prev)}
                   />
                 }
@@ -346,14 +318,11 @@ const Login = ({ navigation }: any) => {
                 </TouchableOpacity>
               )}
 
-              <View style={{ marginTop: 4, alignItems: 'center' }}>
+              <View style={{ marginTop: 5, alignItems: 'center' }}>
                 <Text style={{ color: '#cbd5e1', fontSize: 13 }}>
                   Want to reset password?{' '}
                   <Text
-                    style={{
-                      fontWeight: '700',
-                      color: '#fff', // Purple accent to match the glow
-                    }}
+                    style={{ fontWeight: '700', color: '#fff' }}
                     onPress={() => navigation.navigate('ForgotPass')}
                   >
                     Forget Password
@@ -361,28 +330,32 @@ const Login = ({ navigation }: any) => {
                 </Text>
               </View>
 
-              <View style={{ marginTop: 5, alignItems: 'center' }}>
-                <Text style={{ color: '#c7cbcf', fontSize: 13 }}>
-                  Don’t have an account?{' '}
-                  <Text
-                    style={{
-                      fontWeight: '700',
-                      color: '#fff', // Purple accent
-                    }}
-                    onPress={() => navigation.navigate('Register')}
-                  >
-                    Register
-                  </Text>
-                </Text>
-              </View>
-
-              <Text style={styles.termsText}>
+              <Text style={[styles.termsText, { marginTop: 10 }]}>
                 By continuing, you agree to our Terms of Service
                 and Privacy Policy
               </Text>
             </View>
           </View>
         </KeyboardAvoidingView>
+
+        {/* --- MOVED REGISTRATION TO BOTTOM FOOTER --- */}
+        <View style={{ 
+            paddingVertical: 20, 
+            paddingBottom: Platform.OS === 'ios' ? 40 : 40, 
+            alignItems: 'center',
+            borderTopWidth: 0.5,
+            borderTopColor: 'rgba(255, 255, 255, 0.1)' // subtle separator line 
+        }}>
+          <Text style={{ color: '#c7cbcf', fontSize: 13 }}>
+            Don’t have an account?{' '}
+            <Text
+              style={{ fontWeight: '700', color: '#fff' }}
+              onPress={() => navigation.navigate('Register')}
+            >
+              Register
+            </Text>
+          </Text>
+        </View>
       </View>
 
       <GlassyErrorModal

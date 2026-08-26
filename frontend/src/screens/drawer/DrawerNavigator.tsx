@@ -44,7 +44,6 @@ const DrawerNavigator = () => (
     <Drawer.Screen name="Student" component={StudentNavigator} options={{headerShown: false}} />
     <Drawer.Screen name="Employee" component={EmployeeNavigator} options={{headerShown: false}} />
     <Drawer.Screen name="User" component={UserNavigator} options={{headerShown: false}} />
-    <Drawer.Screen name="Chat" component={ChatScreen} options={{headerShown: false}} />
   </Drawer.Navigator>
 );
 

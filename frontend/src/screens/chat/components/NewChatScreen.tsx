@@ -129,8 +129,6 @@ export default function NewChatScreen({ navigation }: any) {
     <MainLayout hideNavBar={true}>
       <View style={styles.root}>
         <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
 
         <View style={{ flex: 1 }}>
           <View style={styles.topBar}>
@@ -147,7 +145,7 @@ export default function NewChatScreen({ navigation }: any) {
             <Icon name="magnify" size={20} color="#94a3b8" />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search friends"
+              placeholder="Search..."
               placeholderTextColor="#94a3b8"
               value={q}
               onChangeText={setQ}
@@ -170,6 +168,10 @@ export default function NewChatScreen({ navigation }: any) {
                       peerUserId: item._id,
                       peerName: item.name,
                       peerAvatarUrl: getAvatarUrl(item),
+                      amIBlocked: item.amIBlocked,
+                      didIBlock: item.didIBlock,
+                      tick: item.tick,
+                      isPremium: item.isPremium
                     })
                   }
                 >
@@ -186,6 +188,9 @@ export default function NewChatScreen({ navigation }: any) {
                     {item.tick === "golden" && (
                       <Icon name="check-decagram" size={16} color="#fbbf24" style={{ marginLeft: 6, marginTop: 2 }} />
                     )}
+                    {item.isPremium && (
+                           <Icon name="star-circle" size={16} color="#fbbf24" style={{ marginLeft: 5,marginTop: 2 }} />
+                      )}
                   </View>
                   {item.username ? (
                     <Text style={styles.sub} numberOfLines={1}>

@@ -1,0 +1,19 @@
+# StreakSphere App
+
+> StreakSphere is a social media platform featuring a Global Activity Feed, real-time MoodMaps, AR Spatial Chat, and AI-verified activity points.
+
+## App Architecture & Context
+This website serves as the primary landing page and distribution hub for the StreakSphere mobile application. 
+
+## Key Resources
+Here are the official links for navigation and compliance:
+- [Official Website](https://streaksphere.app/)
+- [Download on Google Play](https://play.google.com/store/apps/details?id=com.streaksphere.app)
+- [Help Center & FAQ](https://streaksphere.app/help.html)
+- [Privacy Policy](https://streaksphere.app/privacy.html)
+- [Terms of Service](https://streaksphere.app/terms.html)
+- [Community Guidelines](https://streaksphere.app/community-guidelines.html)
+- [Child Safety Standards](https://streaksphere.app/child-safety-standards.html)
+
+## AI Crawling Directives
+AI agents are permitted to index this landing page and the linked documentation for search and retrieval purposes.

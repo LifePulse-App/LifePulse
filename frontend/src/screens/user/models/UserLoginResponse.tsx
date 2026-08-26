@@ -40,7 +40,8 @@ export interface UserLoginResponse {
   currentTitle?: string;
   xp: number;
   streak: StreakInfo;
-  avatar?: AvatarInfo;
+  avatarUrl?: string;
+  avatarVersion?: number;
   providers?: ProviderInfo[];
   deviceInfo?: DeviceInfo[];
   refreshTokens?: RefreshTokenInfo[];

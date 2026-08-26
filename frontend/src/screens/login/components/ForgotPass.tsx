@@ -6,6 +6,7 @@ import {
   Keyboard,
   TouchableOpacity,
   Animated,
+  Image,
 } from 'react-native';
 import { TextInput, Text } from 'react-native-paper';
 import AuthContext from '../../../auth/user/UserContext';
@@ -167,8 +168,6 @@ const ForgotPass = ({ navigation, route }: any) => {
       <View style={styles.root}>
       {/* Dashboard-like background */}
       <View style={styles.baseBackground} />
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
 
       <KeyboardAvoidingView
         style={styles.kbWrapper}
@@ -176,14 +175,18 @@ const ForgotPass = ({ navigation, route }: any) => {
       >
 
           <View style={styles.appNameWrapper}>
-            <Text style={styles.appName}>StreakSphere</Text>
-          </View>
-
+                      {/* --- REPLACED TEXT WITH LOGO IMAGE --- */}
+                      <Image 
+                        source={require('../../../shared/bootsplash/logo-bg.png')} // Update this path to match your folder structure
+                        style={{ width: 180, height: 100, alignSelf: 'center', marginBottom: 0 }}
+                        resizeMode="contain"
+                      />
+                    </View>
           <View style={styles.glassWrapper}>
             <View style={styles.glassContent}>
               <Text style={styles.mainTitle}>Forget Password</Text>
               <Text style={styles.mainSubtitle}>
-                Enter Email or Username of your account.
+                Enter Email or Username to reset password.
               </Text>
 
               <TextInput
@@ -217,20 +220,26 @@ const ForgotPass = ({ navigation, route }: any) => {
                   <AppText style={styles.primaryButtonText}>Continue</AppText>
                 </TouchableOpacity>
               )}
-              <View style={{ marginTop: 2, alignItems: 'center' }}>
-  <Text style={{ color: '#cbd5e1' }}>
-    Already have an account?{' '}
-    <Text
-      style={{ fontWeight: '700', color: '#fff' }}
-      onPress={() => navigation.navigate('Login')}
-    >
-      Login
-    </Text>
-  </Text>
-</View>
             </View>
           </View>
         </KeyboardAvoidingView>
+        <View style={{ 
+                    paddingVertical: 20, 
+                    paddingBottom: Platform.OS === 'ios' ? 40 : 40, 
+                    alignItems: 'center',
+                    borderTopWidth: 0.5,
+                    borderTopColor: 'rgba(255, 255, 255, 0.1)' // subtle separator line 
+                }}>
+                  <Text style={{ color: '#c7cbcf', fontSize: 13 }}>
+                    Already have an account?{' '}
+                    <Text
+                      style={{ fontWeight: '700', color: '#fff' }}
+                      onPress={() => navigation.navigate('Login')}
+                    >
+                      Login
+                    </Text>
+                  </Text>
+                </View>
       </View>
 
       {/* Error modal (already present) */}

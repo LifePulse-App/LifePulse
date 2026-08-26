@@ -6,6 +6,9 @@ import {
   Keyboard,
   TouchableOpacity,
   Animated,
+  Image,
+  StyleSheet,
+  Modal, // ⚡ ADDED: Modal for success popup
 } from 'react-native';
 import { TextInput, Text } from 'react-native-paper';
 import AuthContext from '../../../auth/user/UserContext';
@@ -15,8 +18,6 @@ import api_Login from '../services/api_Login';
 import LoaderKitView from 'react-native-loader-kit';
 import AppText from '../../../components/Layout/AppText/AppText';
 import { loginStyles } from './Loginstyles';
-import DeviceInfo from 'react-native-device-info';
-import { BlurView } from '@react-native-community/blur';
 import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
 
 const SetPassVerifiedOTP = ({ navigation, route }: any) => {
@@ -30,9 +31,8 @@ const SetPassVerifiedOTP = ({ navigation, route }: any) => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorVisible, setErrorVisible] = useState(false);
 
-  // toast-like message for success / info
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [toastVisible, setToastVisible] = useState(false);
+  // ⚡ ADDED: State to control the Success Modal visibility
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
 
   const showError = (message: string) => {
     setErrorMessage(message);
@@ -42,16 +42,6 @@ const SetPassVerifiedOTP = ({ navigation, route }: any) => {
   const hideError = () => {
     setErrorVisible(false);
     setErrorMessage(null);
-  };
-
-  const showToast = (message: string) => {
-    setToastMessage(message);
-    setToastVisible(true);
-  };
-
-  const hideToast = () => {
-    setToastVisible(false);
-    setToastMessage(null);
   };
 
   // Optional: identifier/email passed from previous screen
@@ -85,72 +75,33 @@ const SetPassVerifiedOTP = ({ navigation, route }: any) => {
     makeLoop(anim3, 3000).start();
   }, [anim1, anim2, anim3]);
 
-  const blob1Style = {
-    transform: [
-      {
-        translateX: anim1.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-40, 40],
-        }),
-      },
-      {
-        translateY: anim1.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, 30],
-        }),
-      },
-    ],
-  };
-
-  const blob2Style = {
-    transform: [
-      {
-        translateX: anim2.interpolate({
-          inputRange: [0, 1],
-          outputRange: [30, -30],
-        }),
-      },
-      {
-        translateY: anim2.interpolate({
-          inputRange: [0, 1],
-          outputRange: [10, -20],
-        }),
-      },
-    ],
-  };
-
-  const blob3Style = {
-    transform: [
-      {
-        translateX: anim3.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-20, 20],
-        }),
-      },
-      {
-        translateY: anim3.interpolate({
-          inputRange: [0, 1],
-          outputRange: [-30, 10],
-        }),
-      },
-    ],
+  // ⚡ ADDED: Password Complexity Validation Logic
+  const validatePassword = (pass: string) => {
+    // Requires at least 8 characters, 1 uppercase letter, and 1 number
+    const regex = /^(?=.*[A-Z])(?=.*\d).{8,}$/;
+    return regex.test(pass);
   };
 
   const handleVerify = async () => {
     Keyboard.dismiss();
-    setLoading(true);
 
     if (!newPassword || !newPasswordMatch) {
-      setLoading(false);
       showError('All fields are required!');
       return;
     }
 
     if (newPassword !== newPasswordMatch) {
-        setLoading(false);
-        showError('Password does not match!');
-        return;
-      }
+      showError('Passwords do not match!');
+      return;
+    }
+
+    // ⚡ ADDED: Check against our regex rules before hitting the API
+    if (!validatePassword(newPassword)) {
+      showError('Password must be at least 8 characters long, include 1 uppercase letter, and 1 number.');
+      return;
+    }
+
+    setLoading(true);
 
     try {
       setSecretKey();
@@ -158,21 +109,29 @@ const SetPassVerifiedOTP = ({ navigation, route }: any) => {
 
       if (!response.ok) {
         setLoading(false);
-        navigation.navigate('ForgotPass')
+        navigation.navigate('ForgotPass');
         showError(response.data?.message || 'Process Failed');
         return;
       }
 
-      const user = response.data as UserLoginResponse;
-      setAuthHeaders(user.accessToken);
-      authContext?.setUser(user);
+      // const user = response.data as UserLoginResponse;
+      // setAuthHeaders(user.accessToken);
+      // authContext?.setUser(user);
 
-      navigation.navigate('Login');
+      // ⚡ TRIGGER SUCCESS MODAL INSTEAD OF IMMEDIATE NAVIGATION
+      setSuccessModalVisible(true);
+
     } catch (e) {
-      showError('Unexpected error while verifying OTP');
+      showError('Unexpected error while changing password');
     } finally {
       setLoading(false);
     }
+  };
+
+  // ⚡ ADDED: Function to handle the "Dismiss" button on the success modal
+  const handleSuccessDismiss = () => {
+    setSuccessModalVisible(false);
+    navigation.navigate('Login'); 
   };
 
 
@@ -181,24 +140,32 @@ const SetPassVerifiedOTP = ({ navigation, route }: any) => {
       <View style={styles.root}>
       {/* Dashboard-like background */}
       <View style={styles.baseBackground} />
-      <View style={styles.glowTop} />
-      <View style={styles.glowBottom} />
+
 
       <KeyboardAvoidingView
         style={styles.kbWrapper}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
 
-          <View style={styles.appNameWrapper}>
-            <Text style={styles.appName}>StreakSphere</Text>
+         <View style={styles.appNameWrapper}>
+            {/* --- REPLACED TEXT WITH LOGO IMAGE --- */}
+            <Image 
+              source={require('../../../shared/bootsplash/logo-bg.png')} 
+              style={{ width: 180, height: 100, alignSelf: 'center', marginBottom: 0 }}
+              resizeMode="contain"
+            />
           </View>
 
           <View style={styles.glassWrapper}>
             <View style={styles.glassContent}>
               <Text style={styles.mainTitle}>Reset Password</Text>
+              
+              <Text style={localStyles.ruleText}>
+                 Must be at least 8 characters, 1 uppercase letter, and 1 number.
+              </Text>
+
               <TextInput
-               
-                placeholder="Password"
+                placeholder="New Password"
                 value={newPassword}
                 onChangeText={setNewPassword}
                 secureTextEntry
@@ -207,13 +174,11 @@ const SetPassVerifiedOTP = ({ navigation, route }: any) => {
                 underlineColor="transparent"
                 activeUnderlineColor="transparent"
                 textColor="#fff"
-
                 placeholderTextColor="grey"
                 cursorColor='white'
               />
 
               <TextInput
-                
                 placeholder="Confirm Password"
                 value={newPasswordMatch}
                 onChangeText={setNewPasswordMatch}
@@ -235,7 +200,7 @@ const SetPassVerifiedOTP = ({ navigation, route }: any) => {
                     animationSpeedMultiplier={1.0}
                     color={'#FFFFFF'}
                   />
-                  <AppText style={styles.loadingText}>Reseting...</AppText>
+                  <AppText style={styles.loadingText}>Resetting...</AppText>
                 </View>
               ) : (
                 <TouchableOpacity
@@ -245,30 +210,113 @@ const SetPassVerifiedOTP = ({ navigation, route }: any) => {
                   <AppText style={styles.primaryButtonText}>Reset Password</AppText>
                 </TouchableOpacity>
               )}
-
-              <Text style={styles.termsText} numberOfLines={2}>
-                Remember this now...
-              </Text>
             </View>
           </View>
         </KeyboardAvoidingView>
       </View>
 
-      {/* Error modal (already present) */}
       <GlassyErrorModal
         visible={errorVisible}
         message={errorMessage}
         onClose={hideError}
       />
 
-      {/* Toast-style info modal (reuse same component; you can style it differently if it supports it) */}
-      <GlassyErrorModal
-        visible={toastVisible}
-        message={toastMessage}
-        onClose={hideToast}
-      />
+      {/* ⚡ ADDED: Instagram-style Success Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={successModalVisible}
+        onRequestClose={handleSuccessDismiss}
+      >
+        <View style={localStyles.modalBackground}>
+          <View style={localStyles.modalContainer}>
+            {/* Success Icon */}
+            <View style={localStyles.iconCircle}>
+               <Text style={localStyles.iconCheckmark}>✓</Text>
+            </View>
+            
+            <Text style={localStyles.modalTitle}>Password Updated</Text>
+            <Text style={localStyles.modalMessage}>
+              Your password has been changed successfully. You can now log in with your new password.
+            </Text>
+
+            <TouchableOpacity
+              style={localStyles.dismissButton}
+              onPress={handleSuccessDismiss}
+            >
+              <Text style={localStyles.dismissButtonText}>Dismiss</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
     </>
   );
 };
+
+// ⚡ ADDED: Local styles for the success modal and rule text
+const localStyles = StyleSheet.create({
+  ruleText: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 15,
+    paddingHorizontal: 10,
+  },
+  modalBackground: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Instagram dims the background heavily
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '80%',
+    backgroundColor: '#262626', // Instagram dark mode gray
+    borderRadius: 14,
+    paddingTop: 24,
+    alignItems: 'center',
+  },
+  iconCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: '#4ADE80', // Success green
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  iconCheckmark: {
+    color: '#4ADE80',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  modalMessage: {
+    color: '#A8A8A8',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 24,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  dismissButton: {
+    width: '100%',
+    borderTopWidth: 0.5,
+    borderTopColor: '#363636',
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  dismissButtonText: {
+    color: '#0064E0', // Instagram Blue
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
 
 export default SetPassVerifiedOTP;

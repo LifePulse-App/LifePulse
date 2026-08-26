@@ -525,8 +525,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
   return (
     <View style={styles.root}>
       <View style={styles.bg} />
-      <View style={styles.glowTL} />
-      <View style={styles.glowBR} />
       <View style={[styles.header, { paddingTop: safeTopPadding + 12 }]}>
         <TouchableOpacity
           style={styles.backBtn}
@@ -580,13 +578,16 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                   {user?.name || "—"}
                 </Text>
                 {user?.tick === "verified" && (
-                  <Icon name="check-decagram" size={22} color="#3b82f6" style={styles.tickIcon} />
+                  <Icon name="check-decagram" size={20} color="#3b82f6" style={styles.tickIcon} />
                 )}
                 {user?.tick === "golden" && (
-                  <Icon name="check-decagram" size={22} color="#fbbf24" style={styles.tickIcon} />
+                  <Icon name="check-decagram" size={20} color="#fbbf24" style={styles.tickIcon} />
                 )}
                 {user?.badge && (
                   <Icon name="star-circle" size={20} color="#fbbf24" style={styles.tickIcon} />
+                )}
+                {user?.isPremium && (
+                  <Icon name="star-circle" size={20} color="#fbbf24" style={{ marginLeft: 3, marginTop: 2 }} />
                 )}
               </View>
 
@@ -658,24 +659,6 @@ export default function ProfilePreviewScreen({ navigation, route }: Props) {
                 <Text style={styles.offlineText}>Offline — showing cached data</Text>
               </View>
             )}
-
-            {/* Modern Inline Stats */}
-            <View style={styles.statsContainer}>
-              <View style={styles.statBlock}>
-                <Text style={styles.statNumber}>{user?.points?.toLocaleString() ?? "—"}</Text>
-                <Text style={styles.statLabel}>Points</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statBlock}>
-                <Text style={styles.statNumber}>{user?.leaderboardRank ? `#${user.leaderboardRank}` : "—"}</Text>
-                <Text style={styles.statLabel}>Rank</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statBlock}>
-                <Text style={styles.statNumber}>{user?.streak ?? "—"}</Text>
-                <Text style={styles.statLabel}>Streak</Text>
-              </View>
-            </View>
 
             {/* Details Grid */}
             <View style={styles.detailsGrid}>

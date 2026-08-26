@@ -156,7 +156,6 @@ export const clearCallHistory = async (req, res) => {
 
 export const rejectCallViaApi = async (req, res) => {
     try {
-      console.log("ohyes");
       
         const { callId } = req.body;
         const receiverId = req.user.id; // Assuming your auth middleware sets req.user
@@ -203,3 +202,4 @@ export const rejectCallViaApi = async (req, res) => {
         res.status(500).json({ success: false, message: "Internal server error" });
     }
 };
+

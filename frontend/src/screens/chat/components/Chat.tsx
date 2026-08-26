@@ -186,7 +186,9 @@ const ChatRowItem = ({ item, navigation, onHideRequest, onCallRequest }: any) =>
             peerAvatarUrl: item.peerAvatarUrl,
             // ⚡ Pass Block Flags to ChatScreen
             amIBlocked: item.amIBlocked,
-            didIBlock: item.didIBlock
+            didIBlock: item.didIBlock,
+            tick: item.tick,
+            isPremium: item.isPremium
           })
         }
       >
@@ -427,14 +429,15 @@ export default function ChatListScreen({ navigation }: any) {
   };
 
   return (
-    <MainLayout>
+     <MainLayout hideNavBar={true}>
       <View style={styles.root}>
         <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
 
         <View style={{ flex: 1 }}>
           <View style={styles.topBar}>
+            <TouchableOpacity activeOpacity={0.8} style={styles.iconGlass} onPress={() => navigation.goBack()}>
+             <Icon name="arrow-left" size={24} color="#E5E7EB" />
+           </TouchableOpacity>
             <View>
               <Text style={styles.title}>Chats</Text>
             </View>
@@ -712,6 +715,14 @@ const styles = StyleSheet.create({
     color: "#cbd5e1",
     fontWeight: "700",
     fontSize: 15,
+  },
+  iconGlass: {
+    width: 40, height: 40, borderRadius: 16,
+    backgroundColor: "rgba(15, 23, 42, 0.0)",
+    borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.4)",
+    justifyContent: "center", alignItems: "center",
+    shadowColor: "#000", shadowOpacity: 0.15, shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 10, elevation: 4, marginLeft: 12, marginTop: 5,
   },
   modalBtnConfirm: {
     flex: 1,

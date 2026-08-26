@@ -136,7 +136,7 @@ export default function registerCallSocket(io, socket) {
                         try {
                             await admin.messaging().send({
                                 token: device.token,
-                                data: { type: "incoming_call", callId: String(callId), callerId: String(callerId), callerName: String(caller.name || "User"), conversationId: String(conversationId) },
+                                data: { type: "incoming_call", callId: String(callId), callerId: String(callerId), callerName: String(caller.name || "User"), conversationId: String(conversationId), avatarUrl: String(caller.avatarUrl || "") },
                                 android: { priority: "high", ttl: 30000 }
                             });
                         } catch (e) {

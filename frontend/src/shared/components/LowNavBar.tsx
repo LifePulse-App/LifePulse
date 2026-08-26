@@ -1,26 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Keyboard } from 'react-native';
+import { View, Text, Keyboard, TouchableOpacity, StyleSheet } from 'react-native';
 import styles from '../styling/styles';
 import { BottomNavigation } from 'react-native-paper';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
 import colors from '../styling/colors';
-import { getUnreadChatCount, subscribeUnreadChanges } from '../../screens/chat/services/ChatNotifications';
 
 const LowNavBAr = () => {
   const navigation = useNavigation<NativeStackNavigationProp<any>>();
   const route = useRoute();
-
-  const [unreadChats, setUnreadChats] = useState(getUnreadChatCount());
+  
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-
-  useEffect(() => {
-    const unsub = subscribeUnreadChanges(() => {
-      setUnreadChats(getUnreadChatCount());
-    });
-    return () => unsub();
-  }, []);
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
@@ -31,23 +22,22 @@ const LowNavBAr = () => {
     };
   }, []);
 
-  // Added AR Portal tab here (key: 'arportal')
+  // 4 standard tabs (Map, Home, [Spacer for Center Camera], LeaderBoard, AR Portal)
+  // We place a dummy/transparent route in the middle so the bar reserves its layout space.
   const routes = [
-    { key: 'attendance', title: 'Map', icon: { active: 'map-marker', inactive: 'map-marker-outline' }, },
-    // AR Portal tab:
-    { key: 'arportal', title: 'AR Portal', icon: { active: 'cube', inactive: 'cube-outline' } }, // or use 'augmented-reality'
-    { key: 'home', title: 'Home', icon: { active: 'home', inactive: 'home-outline' }, },
-    { key: 'results', title: 'LeaderBoard', icon: { active: 'chart-box', inactive: 'chart-box-outline' }, },
-    { key: 'chat', title: 'Chat', icon: { active: 'chat', inactive: 'chat-outline' }, },
+    { key: 'attendance', title: 'Map', icon: { active: 'map-marker', inactive: 'map-marker-outline' } },
+    { key: 'home', title: 'Home', icon: { active: 'home', inactive: 'home-outline' } },
+    { key: 'center_spacer', title: '', icon: { active: '', inactive: '' } }, // ⚡ Center placeholder
+       { key: 'results', title: 'LeaderBoard', icon: { active: 'chart-box', inactive: 'chart-box-outline' } },
+    { key: 'arportal', title: 'AR Portal', icon: { active: 'cube', inactive: 'cube-outline' } },
   ];
 
   const getIndexFromRoute = () => {
     switch (route.name) {
       case 'StudentList': return 0;       // Map
-      case 'ArPortal': return 1;          // AR Portal
-            case 'Dashboard': return 2;         // Home
+      case 'Dashboard': return 1;         // Home
+      case 'ArPortal': return 4;          // AR Portal
       case 'EmployeeList': return 3;      // LeaderBoard
-      case 'Chat': return 4;              // Chat
       default: return 1;
     }
   };
@@ -64,16 +54,17 @@ const LowNavBAr = () => {
         navigation.navigate('Student');
         break;
       case 'arportal':
-        navigation.navigate('ArPortal');        // <---- Must match your screen name in navigation stack!
+        navigation.navigate('ArPortal');
         break;
-        case 'home':
+      case 'home':
         navigation.navigate('Dashboard');
         break;
       case 'results':
         navigation.navigate('Employee');
         break;
-      case 'chat':
-        navigation.navigate('Chat');
+      case 'center_spacer':
+        // Camera action triggered from center tab click
+        navigation.navigate('ProofCamera', { habitId: null });
         break;
     }
   };
@@ -81,56 +72,77 @@ const LowNavBAr = () => {
   if (keyboardVisible) return null;
 
   return (
-    <BottomNavigation.Bar
-      navigationState={{ index, routes }}
-      onTabPress={({ route }) => {
-        const i = routes.findIndex((r) => r.key === route.key);
-        handleNavigation(i);
-      }}
-      renderIcon={({ route, color, focused }) => {
-        const r = route as any;
-        const iconConfig = r.icon as { active: string; inactive: string };
-        const iconName = focused ? iconConfig.active : iconConfig.inactive;
-
-        // Unread badge only for chat
-        const showBadge = r.key === 'chat' && unreadChats > 0;
-
-        return (
-          <View style={{ width: 28, height: 28 }}>
-            <MaterialCommunityIcons
-              name={iconName}
-              size={26}
-              color={colors.white}
-            />
-            {showBadge && (
-              <View
-                style={{
-                  position: 'absolute',
-                  right: -6,
-                  top: -4,
-                  minWidth: 16,
-                  height: 16,
-                  borderRadius: 8,
-                  backgroundColor: '#f43f5e',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingHorizontal: 4,
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>
-                  {unreadChats > 99 ? '99+' : unreadChats}
-                </Text>
+    <View style={{ position: 'relative' }}>
+      <BottomNavigation.Bar
+        navigationState={{ index, routes }}
+        onTabPress={({ route }) => {
+          const i = routes.findIndex((r) => r.key === route.key);
+          handleNavigation(i);
+        }}
+        renderIcon={({ route, color, focused }) => {
+          const r = route as any;
+          
+          // ⚡ Render custom prominent camera button if it's the center spacer
+          if (r.key === 'center_spacer') {
+            return (
+              <View style={localStyles.centerButtonOuter}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={localStyles.centerButtonInner}
+                  onPress={() => navigation.navigate('ProofCamera', { habitId: null })}
+                >
+                  <MaterialCommunityIcons name="camera-outline" size={26} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
-            )}
-          </View>
-        );
-      }}
-      activeIndicatorStyle={{ backgroundColor: 'transparent' }}
-      labeled={false}
-      style={styles.bottomBar}
-      safeAreaInsets={{ bottom: 0 }}
-    />
+            );
+          }
+
+          const iconConfig = r.icon as { active: string; inactive: string };
+          const iconName = focused ? iconConfig.active : iconConfig.inactive;
+
+          return (
+            <View style={{ width: 28, height: 28, justifyContent: 'center', alignItems: 'center' }}>
+              <MaterialCommunityIcons
+                name={iconName}
+                size={26}
+                color={colors.white}
+              />
+            </View>
+          );
+        }}
+        activeIndicatorStyle={{ backgroundColor: 'transparent' }}
+        labeled={false}
+        style={styles.bottomBar}
+        safeAreaInsets={{ bottom: 0 }}
+      />
+    </View>
   );
 };
+
+const localStyles = StyleSheet.create({
+  centerButtonOuter: {
+    position: 'absolute',
+    top: -16, // Elevates the camera button slightly above the nav bar line
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 56,
+    height: 56,
+  },
+  centerButtonInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#7C3AED', // Sleeker purple accent matching your app's theme
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+  },
+});
 
 export default LowNavBAr;

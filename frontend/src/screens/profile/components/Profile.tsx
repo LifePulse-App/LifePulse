@@ -134,8 +134,6 @@ function ActivityPrivacyModal({ currentScope, onClose, onChange }: any) {
 
   const scopes = [
     { label: "World (Everyone)", value: "world", icon: "earth" },
-    { label: "Country Only", value: "country", icon: "flag" },
-    { label: "City Only", value: "city", icon: "city" },
     { label: "Friends Only", value: "friends", icon: "account-multiple" },
     { label: "Private (Only Me)", value: "private", icon: "lock" },
   ];
@@ -741,6 +739,7 @@ export default function ProfileScreen({ navigation }: any) {
         id: userData.user.id,
         username: userData.UserName,
         password: userData.Password,
+        avatarUrl: finalAvatarUri,
         user: userData,
       });
     }

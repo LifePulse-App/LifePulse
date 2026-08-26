@@ -1231,7 +1231,7 @@ export default function ChatScreen({ route, navigation }: any) {
   const callContext = useContext(CallContext);
   
   // ⚡ DESTRUCTURE BLOCK FLAGS
-  const { peerUserId, peerName, peerMood, peerAvatarUrl, avatarUrl, amIBlocked, didIBlock } = route.params;
+  const { peerUserId, peerName, peerMood, peerAvatarUrl, avatarUrl, amIBlocked, didIBlock, tick, isPremium } = route.params;
   const isBlockedChat = amIBlocked || didIBlock;
 
   const handleVoiceCallPress = () => {
@@ -3014,7 +3014,17 @@ const handleImagePress = useCallback((type: string, url: string, name: string) =
               )}
               <Text numberOfLines={1} style={styles.title}>
                 {peerName || "Friend"}
-              </Text>
+             
+               {tick === "verified" && (
+                    <Icon name="check-decagram" size={20} color="#3b82f6" style={styles.tickIcon} />
+                )}
+                  {tick === "golden" && (
+                     <Icon name="check-decagram" size={20} color="#fbbf24" style={styles.tickIcon} />
+                  )}
+                {isPremium && (
+                   <Icon name="star-circle" size={20} color="#fbbf24" style={{ marginLeft: 5 }} />
+                              )}
+                               </Text>
             </TouchableOpacity>
 
             {/* ⚡ BLOCK LOGIC: Hide Call Button if blocked */}

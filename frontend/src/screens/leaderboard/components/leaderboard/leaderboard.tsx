@@ -518,8 +518,7 @@ const LeaderboardScreen = ({ navigation }: any) => {
     <MainLayout>
       <View style={styles.root}>
         <View style={styles.baseBackground} />
-        <View style={styles.glowTop} />
-        <View style={styles.glowBottom} />
+
 
         <View style={styles.container}>
           <View style={styles.headerRow}>
