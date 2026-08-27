@@ -450,9 +450,9 @@ async function loadPostReports() {
             <div style="margin-top: 8px; color: var(--muted); font-size: 0.85rem;">Caption: "${post.caption || 'No caption'}"</div>
           </div>
 
-          <div class="appeal-actions">
-            <button onclick="adminRemovePost('${post._id}', '${rep._id}')" style="flex:1;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:var(--danger);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Remove Post</button>
-            <button onclick="adminDismissPostReport('${rep._id}')" style="flex:1;background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.3);color:var(--text);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Dismiss Report</button>
+          <div class="appeal-actions" style="margin-top: 16px; flex-wrap: wrap;">
+            <button onclick="adminRemovePost('${post._id}', '${rep._id}')" style="flex:1; min-width: 45%; background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.4);color:var(--danger);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Remove Post</button>
+            <button onclick="adminDismissPostReport('${rep._id}')" style="flex:1; min-width: 45%; background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.3);color:var(--text);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Dismiss Report</button>
           </div>
         </div>
       `;
@@ -509,6 +509,33 @@ async function executeSanction(type) {
       document.getElementById("modReason").value = "";
     }
   } catch (e) { showToast(e.response?.data?.message || "Action failed", "error"); }
+}
+
+// Quick action directly from report feeds
+async function quickSanction(userId, type) {
+  if (!userId) return showToast("User ID is missing from this report", "error");
+  
+  const reason = window.prompt(`Enter reason to ${type} this user:`, "Violation of guidelines");
+  if (reason === null) return; // Action cancelled
+
+  let durationHours = null;
+  if (type === 'suspend') {
+    const duration = window.prompt("Enter suspension duration in hours (leave blank for indefinite):", "24");
+    if (duration === null) return; // Action cancelled
+    if (duration.trim() !== "") durationHours = Number(duration);
+  }
+
+  try {
+    let endpoint = type === 'ban' ? "/admin/user/ban" : "/admin/user/suspend";
+    let payload = type === 'ban' ? { userId, reason } : { userId, reason, durationHours };
+
+    const res = await api.post(endpoint, payload);
+    if (res.data.success) {
+      showToast(`User successfully ${type === 'ban' ? 'banned' : 'suspended'}!`);
+      // Optional: reload reports feed automatically
+      loadAllReports();
+    }
+  } catch (e) { showToast(e.response?.data?.message || `Failed to ${type} user`, "error"); }
 }
 
 async function updateUserTick() {
@@ -679,12 +706,30 @@ async function loadAllReports() {
             </div>
           </div>
           <div style="font-size:0.75rem; color:var(--muted);">Filed on: ${new Date(rep.createdAt).toLocaleString()}</div>
+          
+          <!-- Newly Added Action Buttons for the Account Reports -->
+          <div class="appeal-actions" style="margin-top: 16px; flex-wrap: wrap;">
+            <button onclick="quickSanction('${reportedUserObj._id || ''}', 'suspend')" style="flex:1; min-width: 30%; background:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:var(--accent5);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Suspend User</button>
+            <button onclick="quickSanction('${reportedUserObj._id || ''}', 'ban')" style="flex:1; min-width: 30%; background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:var(--danger);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Ban User</button>
+            <button onclick="adminDismissAccountReport('${rep._id}')" style="flex:1; min-width: 30%; background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.3);color:var(--text);padding:10px;border-radius:12px;font-weight:700;cursor:pointer;font-size:0.8rem;">Dismiss Report</button>
+          </div>
         </div>
       `;
     }).join('');
   } catch (e) { 
     container.innerHTML = `<div style="text-align:center;padding:40px;color:var(--danger);font-size:0.85rem;">Failed to fetch reports.</div>`; 
   }
+}
+
+async function adminDismissAccountReport(reportId) {
+  try {
+    // Modify this route based on your exact backend structure for dismissing regular account reports
+    const res = await api.post("/admin/reports/dismiss", { reportId });
+    if (res.data.success) {
+      showToast("Account report dismissed.");
+      loadAllReports();
+    }
+  } catch (e) { showToast("Failed to dismiss report.", "error"); }
 }
 
 async function sendBroadcast() {
