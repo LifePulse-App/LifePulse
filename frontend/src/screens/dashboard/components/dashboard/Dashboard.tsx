@@ -490,7 +490,7 @@ const Dashboard = ({ navigation }: any) => {
     reportSheetRef.current?.dismiss();
     if (!selectedPostForReport) return;
     try {
-      await apiClient.post(`/posts/${selectedPostForReport.id}/report`, { reason: reasonObj.label, mediaUrl: selectedPostForReport.mediaUrl });
+      await apiClient.post(`/feed/posts/${selectedPostForReport.id}/report`, { reason: reasonObj.label, mediaUrl: selectedPostForReport.mediaUrl });
       setGlassAlertConfig({ title: "Report Submitted", message: "Thank you. Post sent for review.", type: "success" });
       setGlassAlertVisible(true);
     } catch (e: any) {

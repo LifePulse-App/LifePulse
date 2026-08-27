@@ -28,12 +28,12 @@ const proofSchema = new mongoose.Schema(
       maxLength: [500, "Caption cannot exceed 500 characters"], 
       default: "" 
     },
-    // In your UserSchema.js
-defaultVisibilityScope: {
-  type: String,
-  enum: ["foryou", "world", "country", "city", "friends", "private"],
-  default: "friends",
-},
+// ⚡ FIXED: Renamed to match the Feed controller query
+    visibilityScope: {
+      type: String,
+      enum: ["foryou", "world", "country", "city", "friends", "private"],
+      default: "friends",
+    },
     city: { type: String, default: "" },
     country: { type: String, default: "" },
     

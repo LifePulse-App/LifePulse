@@ -670,18 +670,20 @@ export const updatePremiumPreferences = catchAsyncErrors(async (req, res, next) 
 export const updateActivityPrivacy = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { defaultVisibilityScope } = req.body;
+    // ⚡ FIX: Look for either key, but save it to the correct schema field
+    const requestedVisibility = req.body.postVisibility || req.body.defaultVisibilityScope;
 
     const validScopes = ["foryou", "world", "country", "city", "friends", "private"];
-    if (!validScopes.includes(defaultVisibilityScope)) {
+    if (!validScopes.includes(requestedVisibility)) {
       return res.status(400).json({ success: false, message: "Invalid visibility scope." });
     }
 
+    // ⚡ FIX: Update "postVisibility" as defined in UserSchema
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { defaultVisibilityScope },
-      { new: true }
-    ).select("name username isPublic defaultVisibilityScope");
+      { postVisibility: requestedVisibility },
+      { new: true, runValidators: true }
+    ).select("name username isPublic postVisibility");
 
     res.status(200).json({
       success: true,
@@ -696,10 +698,11 @@ export const updateActivityPrivacy = async (req, res) => {
 
 export const getActivityPrivacy = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("defaultVisibilityScope");
+    // ⚡ FIX: Fetch postVisibility
+    const user = await User.findById(req.user._id).select("postVisibility");
     res.status(200).json({
       success: true,
-      defaultVisibilityScope: user?.defaultVisibilityScope || "friends",
+      defaultVisibilityScope: user?.postVisibility || "friends",
     });
   } catch (error) {
     res.status(500).json({ success: false, message: "Error fetching privacy setting." });

@@ -34,8 +34,9 @@ class MainApplication : Application(), ReactApplication {
 
   override val reactHost: ReactHost by lazy {
     getDefaultReactHost(
-      context = applicationContext,
-      reactNativeHost = reactNativeHost
+      this.applicationContext,
+      this.reactNativeHost,
+      CodePush.getJSBundleFile() ?: "assets://index.android.bundle"
     )
   }
 

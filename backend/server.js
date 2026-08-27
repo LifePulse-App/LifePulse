@@ -60,7 +60,7 @@ app.use('/api/uploads', express.static(path.join(UPLOADS_DIR, "proofs")));
 app.use(cookieParser());
 app.use(express.json());
 app.use(cors({
-  origin: "*", // Or specify your frontend URL if hosting locally/live
+  origin: "*",
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "api-key"],
   credentials: true

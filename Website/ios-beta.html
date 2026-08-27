@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>StreakSphere - iOS Developer Beta</title>
+<meta name="description" content="Exclusive iOS Beta access for StreakSphere. Learn how to sideload the app using Sideloadly or AltStore."/>
+
+<!-- Preconnect to font domains -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" />
+<link rel="icon" type="image/png" href="logo.webp">
+
+<style>
+/* Core Variables & Reset (matching your main site) */
+:root{
+  --bg:#03040A; --bg2:#0a0c16;
+  --surface:rgba(255,255,255,0.03); --surface2:rgba(255,255,255,0.06);
+  --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.15);
+  --text:#F8FAFC; --muted:#94A3B8;
+  --accent1:#6366F1; --accent2:#A855F7; --accent3:#EC4899; --accent4:#10B981; --accent5:#F59E0B;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+body{font-family:'DM Sans',sans-serif;color:var(--text);background:var(--bg);min-height:100vh;overflow-x:hidden;line-height:1.5;}
+a{-webkit-tap-highlight-color:transparent;}
+
+/* Background Noise */
+body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:0;}
+
+.container{position:relative;z-index:1;width:min(1000px, 90%);margin-inline:auto;}
+
+/* Nav */
+nav{position:sticky;top:0;z-index:999;backdrop-filter:blur(24px) saturate(200%);-webkit-backdrop-filter:blur(24px) saturate(200%);border-bottom:1px solid var(--border);background:rgba(3,4,10,0.7);}
+.nav-inner{display:flex;align-items:center;justify-content:space-between;padding:12px 0;}
+.logo-group{display:flex;align-items:center;gap:10px;text-decoration:none;}
+.logo-img{width:32px;height:32px;border-radius:10px;object-fit:cover;border:1px solid rgba(255,255,255,0.1);}
+.logo-name{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:700;color:var(--text);letter-spacing:-0.02em;}
+
+/* Header Section */
+.beta-header{text-align:center;padding:8vh 0 4vh;}
+.eyebrow{display:inline-block;color:var(--accent1);font-size:0.75rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px;background:rgba(99,102,241,0.1);padding:6px 12px;border-radius:100px;border:1px solid rgba(99,102,241,0.2);}
+.title{font-family:'Syne',sans-serif;font-size:clamp(2rem, 5vw, 3.5rem);font-weight:800;line-height:1.1;letter-spacing:-0.03em;margin-bottom:16px;}
+.subtitle{max-width:600px;margin:0 auto 30px;color:var(--muted);font-size:1.05rem;}
+
+/* Warning Banner */
+.warning-banner{background:rgba(245, 158, 11, 0.1);border:1px solid rgba(245, 158, 11, 0.3);border-radius:12px;padding:16px;margin:0 auto 40px;max-width:700px;display:flex;align-items:center;gap:12px;text-align:left;}
+.warning-icon{color:var(--accent5);flex-shrink:0;}
+.warning-text{font-size:0.9rem;}
+.warning-text strong{color:var(--accent5);}
+
+/* Video Container Placeholder */
+.video-container{width:100%;max-width:800px;margin:0 auto 60px;aspect-ratio:16/9;background:var(--surface);border:1px solid var(--border);border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;box-shadow:0 20px 40px rgba(0,0,0,0.5);}
+.video-container::after{content:'';position:absolute;inset:0;background:linear-gradient(45deg, rgba(99,102,241,0.1), transparent);}
+.play-btn{width:64px;height:64px;background:var(--text);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2;transition:transform 0.2s;}
+.play-btn:hover{transform:scale(1.1);}
+.play-btn svg{width:24px;height:24px;fill:var(--bg);margin-left:4px;}
+.video-hint{margin-top:16px;font-size:0.85rem;color:var(--muted);z-index:2;}
+
+/* Steps Layout */
+.steps-grid{display:grid;grid-template-columns:1fr;gap:24px;margin-bottom:60px;}
+@media(min-width:768px){.steps-grid{grid-template-columns:repeat(3, 1fr);}}
+
+.step-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:30px;position:relative;transition:all 0.3s;}
+.step-card:hover{background:var(--surface2);border-color:var(--border2);transform:translateY(-5px);}
+.step-number{position:absolute;top:-15px;left:30px;background:var(--bg);border:1px solid var(--accent2);color:var(--accent2);width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;font-weight:700;font-family:'Syne',sans-serif;}
+.step-card h3{font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:700;margin-bottom:12px;margin-top:10px;}
+.step-card p{color:var(--muted);font-size:0.9rem;margin-bottom:20px;}
+
+/* Buttons */
+.btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:var(--text);color:var(--bg);padding:12px 24px;border-radius:100px;font-weight:700;text-decoration:none;font-size:0.9rem;width:100%;transition:transform 0.2s;}
+.btn-primary:hover{transform:scale(1.02);}
+.btn-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:transparent;color:var(--text);border:1px solid var(--border2);padding:12px 24px;border-radius:100px;font-weight:700;text-decoration:none;font-size:0.9rem;width:100%;transition:background 0.2s;}
+.btn-secondary:hover{background:var(--surface2);}
+
+.dl-link{text-align:center;display:block;margin-top:12px;color:var(--accent1);text-decoration:none;font-size:0.8rem;font-weight:600;}
+.dl-link:hover{text-decoration:underline;}
+
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="container nav-inner">
+    <a href="index.html" class="logo-group">
+      <img src="logo.webp" alt="StreakSphere" class="logo-img" width="32" height="32" onerror="this.style.display='none'"/>
+      <span class="logo-name">StreakSphere</span>
+    </a>
+  </div>
+</nav>
+
+<main class="container">
+  
+  <section class="beta-header">
+    <span class="eyebrow">Invite Only</span>
+    <h1 class="title">iOS Developer Beta</h1>
+    <p class="subtitle">Apple doesn't want you to have this yet. Follow the steps below to bypass the App Store and sideload StreakSphere onto your iPhone using a computer.</p>
+  </section>
+
+  <div class="warning-banner">
+    <svg class="warning-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+    <p class="warning-text"><strong>You must have a Mac or Windows PC to do this.</strong> You cannot install the .ipa file directly from your iPhone browser.</p>
+  </div>
+
+  <!-- NOTE: REPLACE THIS DIV WITH AN ACTUAL <video> OR YOUTUBE EMBED ONCE YOU RECORD IT -->
+<a href="https://youtu.be/hqJcPvHUn40" target="_blank" rel="noopener" class="video-container" style="text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--surface2); border: 1px solid var(--border); border-radius: 24px; aspect-ratio: 16/9; transition: transform 0.2s;">
+    <div class="play-btn" style="width: 64px; height: 64px; background: #FF0000; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 12px;">
+      <svg viewBox="0 0 24 24" style="width: 28px; height: 28px; fill: #FFF; margin-left: 4px;"><path d="M8 5v14l11-7z"/></svg>
+    </div>
+    <span style="color: var(--text); font-weight: 700; font-family: 'Syne', sans-serif;">Watch Installation Tutorial</span>
+    <span style="color: var(--muted); font-size: 0.85rem; margin-top: 4px;">Opens in YouTube</span>
+  </a>
+
+  <div class="steps-grid">
+    
+    <!-- STEP 1 -->
+    <div class="step-card">
+      <div class="step-number">1</div>
+      <h3>Get Sideloadly</h3>
+      <p>Download and install Sideloadly on your Mac or Windows PC. This software allows you to send apps directly to your iPhone.</p>
+      <a href="https://sideloadly.io" target="_blank" class="btn-secondary">Download Sideloadly</a>
+      <a href="https://altstore.io" target="_blank" class="dl-link">Or use AltStore instead</a>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step-card">
+      <div class="step-number">2</div>
+      <h3>Download the App</h3>
+      <p>Download the official StreakSphere .ipa file <strong>to your computer</strong>. Do not download this on your phone.</p>
+      <a href="https://github.com/StreakSphere-App/StreakSphere/releases/download/v6.0.0/StreakSphere.ipa" class="btn-primary" download>
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        Download v6.0.0 .ipa
+      </a>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step-card">
+      <div class="step-number">3</div>
+      <h3>Install & Enable Mode</h3>
+      <p>Plug your iPhone into your computer and drag the .ipa into Sideloadly. Finally, on your iPhone, go to <strong>Settings > Privacy & Security > Developer Mode</strong> and turn it on.</p>
+    </div>
+
+  </div>
+</main>
+
+</body>
+</html>
