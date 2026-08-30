@@ -10,6 +10,7 @@ import {
   PermissionsAndroid,
   AppState,
   DeviceEventEmitter,
+  StyleSheet,
 } from 'react-native';
 import Toast, { BaseToast, BaseToastProps } from 'react-native-toast-message';
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -52,6 +53,9 @@ import { connectSocket, disconnectSocket, getSocket } from './src/auth/api-clien
 // ⚡ REVENUECAT: Import the SDK
 import Purchases, { LOG_LEVEL } from 'react-native-purchases';
 import { getAvatar } from './src/storage/AvatarManager';
+
+// ⚡ IMPORT GLASSY RATE CARD
+import GlassyRateCard from './src/shared/components/GlassyRateCard'; // Adjust path if needed
 
 (global as any).TextEncoder = TextEncoder;
 (global as any).TextDecoder = TextDecoder;
@@ -100,11 +104,9 @@ async function displayMessagingStyleNotification(data, fallback = {}) {
   const peerName = data.username || data.peerName || fallback.title || 'Someone';
   const text = data.body || data.message || fallback.body || 'Sent you a message';
   
-  // ⚡ 1. Extract avatar data from the backend push payload
   const senderAvatarUrl = data.avatarUrl || data.profileImage;
   const avatarVersion = data.avatarVersion || 1;
 
-  // ⚡ 2. Download/Cache the avatar locally
   let localAvatarPath = undefined;
   if (senderAvatarUrl) {
     try {
@@ -116,7 +118,6 @@ async function displayMessagingStyleNotification(data, fallback = {}) {
 
   const notificationId = `chat_messaging:${peerId}`; 
 
-  // ⚡ 3. Add the cached file path to the sender's icon
   const sender = {
     name: peerName,
     id: peerId,
@@ -160,7 +161,7 @@ async function displayMessagingStyleNotification(data, fallback = {}) {
     data: notifData,
     android: {
       channelId: 'default', 
-      smallIcon: 'ic_launcher', // ⚡ Keeps your top status bar icon working!
+      smallIcon: 'ic_launcher',
       importance: AndroidImportance.HIGH,
       pressAction: { id: 'default' },
       sound: 'default',
@@ -198,7 +199,7 @@ async function displayChatNotificationGroupedBySender(
   const groupId = `chat:${peerId}`;
   const summaryId = `chat-summary:${peerId}`;
 
-const notifData = { type: 'chat', peerUserId: peerId, peerName };
+  const notifData = { type: 'chat', peerUserId: peerId, peerName };
   if (data.conversationId) {
     notifData.conversationId = String(data.conversationId);
   }
@@ -224,10 +225,9 @@ const notifData = { type: 'chat', peerUserId: peerId, peerName };
       sound: 'default',
       foregroundPresentationOptions: ['alert', 'sound', 'badge'],
     },
-    data: notifData, // 👈 Safely passing the data object
+    data: notifData,
   });
 
-  // ⚡ FIX: Removed the "New messages" body text. Android will now stack them cleanly.
   await notifee.displayNotification({
     id: summaryId,
     android: {
@@ -267,11 +267,20 @@ const App = () => {
   const [isBiometricVerified, setIsBiometricVerified] = useState(false);
   const [isCheckingBiometric, setIsCheckingBiometric] = useState(true);
   const [isSplashVisible, setIsSplashVisible] = useState(true);
+
+  // ⚡ RATE CARD STATE
+  const [showRateCard, setShowRateCard] = useState(false);
   
   const secretKeySetRef = useRef(false);
   const lastRegisteredTokenRef = useRef<string | null>(null);
   const deliveringAllRef = useRef(false);
   const lastDeliverAllAtRef = useRef(0);
+
+
+  const handleDismissRateCard = async () => {
+    setShowRateCard(false);
+    await AsyncStorage.setItem("has_seen_rate_card", "true");
+  };
 
   // ⚡ REVENUECAT: Safe One-Time Initialization
   useEffect(() => {
@@ -329,11 +338,10 @@ const App = () => {
     return () => sub.remove();
   }, []);
 
-useEffect(() => {
+  useEffect(() => {
     const unsubscribe = notifee.onForegroundEvent(async ({ type, detail }) => {
       const data = detail?.notification?.data;
       
-      // Handle tap navigation
       if (type === EventType.PRESS && data) {
         if (data.type === 'chat' && data.peerUserId) {
           navigationRef.current?.navigate('chat', {
@@ -343,13 +351,11 @@ useEffect(() => {
         }
       }
 
-// ⚡ FIX: Handle Inline Reply from the foreground notification banner
       if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'reply_action') {
         const replyText = detail.input;
         
         if (replyText && data?.peerUserId && data?.conversationId) {
           try {
-            // ⚡ FIX: Use your dedicated sendMessage service
             await sendMessage({
               conversationId: data.conversationId,
               receiverId: data.peerUserId,
@@ -358,7 +364,6 @@ useEffect(() => {
               notifyUser: true
             });
 
-            // Clear the notification once replied
             if (detail.notification?.id) {
               await notifee.cancelNotification(detail.notification.id);
             }
@@ -371,19 +376,16 @@ useEffect(() => {
     return () => unsubscribe();
   }, []);
 
-useEffect(() => {
+  useEffect(() => {
     async function checkInitialNotification() {
       const initial = await notifee.getInitialNotification();
       if (initial?.notification?.data) {
         const data = initial.notification.data;
         
-        // ⚡ FIX: We do ABSOLUTELY NOTHING here for calls. 
-        // CallProvider will read it directly and render the UI.
         if (data.type === 'incoming_call') {
           return; 
         }
 
-        // For chat and other notifications:
         if (navigationRef.current?.isReady()) {
           if (data.type === 'chat' && data.peerUserId) {
             navigationRef.current.navigate('chat', {
@@ -420,7 +422,6 @@ useEffect(() => {
       const messagingInstance = getMessaging(firebaseApp);
 
       return onMessage(messagingInstance, async remoteMessage => {
-        console.log('📱 [FCM RAW FOREGROUND MESSAGE ARRIVED]:', JSON.stringify(remoteMessage));
         const data = remoteMessage?.data || {};
 
         if (data.type === 'general' || data.type === 'admin_broadcast' || data.type === 'admin_direct' || data.title) {
@@ -536,9 +537,8 @@ useEffect(() => {
     runMarkAllPendingDelivered('user-ready');
   }, [User]);
 
-useEffect(() => {
+  useEffect(() => {
     if (notificationNavState.pending) {
-      // ⚡ FIX: Protect call data! Do NOT wipe it, let CallProvider use it.
       if (notificationNavState.pending.type === 'incoming_call') {
         return; 
       }
@@ -550,7 +550,6 @@ useEffect(() => {
     }
   }, [isBiometricVerified]);
 
-  // ⚡ REVENUECAT: Strict User Identity Management & Safe Logout
   useEffect(() => {
     if (User) {
       connectSocket().catch(e => console.log('Socket boot error:', e));
@@ -570,7 +569,6 @@ useEffect(() => {
     } else {
       disconnectSocket();
       
-      // ✅ SAFE LOGOUT: Only log out if currently identified as a non-anonymous user
       Purchases.getAppUserID().then((appUserId) => {
         if (appUserId && !appUserId.startsWith('$RCAnonymousID:')) {
           Purchases.logOut().then(() => {
@@ -624,41 +622,56 @@ useEffect(() => {
 
   useEffect(() => {
     if (!isCheckingBiometric) {
-     hideSplash()
+     hideSplash();
     }
   }, [isCheckingBiometric]);
 
-  const toastConfig = {
-    success: (props: React.JSX.IntrinsicAttributes & BaseToastProps) => (
-      <BaseToast
-        {...props}
-        style={{ borderLeftColor: 'green', backgroundColor: '#e6ffed', width: '100%', alignSelf: 'center' }}
-        contentContainerStyle={{ paddingHorizontal: 20 }}
-        text1Style={{ fontSize: 13, fontWeight: '600', color: 'green' }}
-      />
-    ),
-    error: (props: React.JSX.IntrinsicAttributes & BaseToastProps) => (
-      <BaseToast
-        {...props}
-        style={{ borderLeftColor: 'red', backgroundColor: '#ffeaea', width: '100%', alignSelf: 'center' }}
-        contentContainerStyle={{ paddingHorizontal: 20 }}
-        text1Style={{ fontSize: 13, fontWeight: '600', color: 'red' }}
-      />
-    ),
-  };
+    // ⚡ 30-SECOND TIMER FOR RATE CARD
+ // Replace your existing checkRateStatus useEffect in App.tsx with this robust version:
+
+  // ⚡ 30-SECOND TIMER FOR RATE CARD (FIXED)
+  // ⚡ 30-SECOND TIMER FOR RATE CARD (FIXED)
+  // ⚡ FORCED RATE CARD TIMER FOR TESTING
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+
+    const checkRateStatus = async () => {
+      try {
+        // ⚡ FORCE CLEAR CACHE SO IT SHOWS EVERY TIME YOU REBUILD
+        // await AsyncStorage.removeItem("has_seen_rate_card");
+
+        const hasSeenRateCard = await AsyncStorage.getItem("has_seen_rate_card");
+        
+        if (!hasSeenRateCard) {
+          // Set to 3 seconds (3000ms) for quick testing, change back to 30000 later if needed
+          timer = setTimeout(() => {
+            setShowRateCard(true);
+          }, 45000); 
+        }
+      } catch (e) {
+        console.log("Error checking rate status:", e);
+      }
+    };
+
+    if (!isCheckingBiometric) {
+      checkRateStatus();
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isCheckingBiometric]);
 
   return (
     <KeyboardProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <PaperProvider settings={{ icon: ({ name, size, color }) => <MaterialCommunityIcons name={name as string} size={size} color={color} /> }}>
           <AuthContext.Provider value={{ User, setUser }}>
-            <AppUpdateGate>
-              {isBiometricVerified ? (
-                <NavigationContainer ref={navigationRef}>
-                  <AuthNavigator />
-                </NavigationContainer>
-              ) : null}
-            </AppUpdateGate>
+            <View style={{ flex: 1 }}>
+              <NavigationContainer ref={navigationRef}>
+                <AuthNavigator />
+              </NavigationContainer>
+            </View>
           </AuthContext.Provider>
         </PaperProvider>
       </GestureHandlerRootView>
@@ -666,9 +679,19 @@ useEffect(() => {
   );
 };
 
+const styles = StyleSheet.create({
+  floatingRateCardWrapper: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 20 : 25,
+    left: 0,
+    right: 0,
+    zIndex: 9999,
+  },
+});
+
 const codePushOptions = { 
   checkFrequency: codePush.CheckFrequency.ON_APP_RESUME,
-  installMode: codePush.InstallMode.ON_NEXT_RESTART,
+  installMode: codePush.InstallMode.ON_NEXT_RESUME,
   mandatoryInstallMode: codePush.InstallMode.ON_NEXT_RESTART,
 };
 

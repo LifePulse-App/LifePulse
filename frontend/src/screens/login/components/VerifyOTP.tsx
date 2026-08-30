@@ -21,6 +21,8 @@ import { loginStyles } from './Loginstyles';
 import DeviceInfo from 'react-native-device-info';
 import { BlurView } from '@react-native-community/blur';
 import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
+import UserStorage from '../../../auth/user/UserStorage';
+import { connectSocket } from '../../../auth/api-client/socket';
 
 const OTP_LENGTH = 6;
 
@@ -63,6 +65,8 @@ const VerifyOtp = ({ navigation, route }: any) => {
 
   // Optional: identifier/email passed from previous screen
   const email = route?.params?.identifier;
+  const username = route?.params?.username;
+  const password = route?.params?.password;
 
   // background animations (same as login/register)
   const anim1 = useRef(new Animated.Value(0)).current;
@@ -164,7 +168,29 @@ const VerifyOtp = ({ navigation, route }: any) => {
         return;
       }
 
-      navigation.navigate('Login');
+           const data = response.data as any;
+      
+      const user = data as UserLoginResponse;
+      user.UserName = username;
+      user.Password = password;
+
+      // Ensure we set headers and context safely
+      if (user.accessToken) {
+        setAuthHeaders(user.accessToken);
+        await UserStorage.setAccessToken(user.accessToken);
+      }
+
+      // Safely check and store refresh token only if it exists
+      if (user.refreshToken) {
+        await UserStorage.setRefreshToken(user.refreshToken);
+      }
+
+      authContext?.setUser(user);
+      await UserStorage.setUser(user);
+
+      await connectSocket().catch(e => console.log('Socket connect error:', e));
+
+      navigation.navigate('ConnectFriend');
     } catch (e) {
       showError('Unexpected error while verifying OTP');
     } finally {

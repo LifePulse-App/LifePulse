@@ -49,6 +49,7 @@ import FastImage from "react-native-fast-image";
 import { getAvatar } from "../../../../storage/AvatarManager"; 
 import api_profile from "../../../profile/services/api_profile";
 import apiClient from "../../../../auth/api-client/api_client"; 
+import GlassyRateCard from "../../../../shared/components/GlassyRateCard";
 
 const BASE_DIR = RNFS.DocumentDirectoryPath + "/streaksphere/avatar";
 const baseUrl = apiClient.getBaseURL();
@@ -119,6 +120,8 @@ const Dashboard = ({ navigation }: any) => {
   const [offline, setOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [friendReqCount, setFriendReqCount] = useState(0);
+  // 2. Inside your Dashboard component, add this state:
+const [showRateCard, setShowRateCard] = useState(false);
 
   // ⚡ Live Unread Chat Count State
   const [unreadChats, setUnreadChats] = useState(getUnreadChatCount());
@@ -222,6 +225,31 @@ const Dashboard = ({ navigation }: any) => {
     const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
     return () => { showSub.remove(); hideSub.remove(); };
   }, []);
+
+  // ⚡ SMART RATE CARD LOGIC
+  useEffect(() => {
+    const checkRateStatus = async () => {
+      try {
+        const hasSeenRateCard = await AsyncStorage.getItem("has_seen_rate_card");
+        if (!hasSeenRateCard) {
+          // Show the card 10 seconds after the dashboard loads
+          setTimeout(() => {
+            setShowRateCard(true);
+          }, 10000);
+        }
+      } catch (e) {
+        console.log("Error checking rate status:", e);
+      }
+    };
+    
+    checkRateStatus();
+  }, []);
+
+  // Function to dismiss and never show again
+  const handleDismissRateCard = async () => {
+    setShowRateCard(false);
+    await AsyncStorage.setItem("has_seen_rate_card", "true");
+  };
 
   const getTimeAgo = (dateInput: string) => {
     const date = new Date(dateInput);
@@ -967,6 +995,18 @@ const Dashboard = ({ navigation }: any) => {
           />
         </View>
 
+  {/* ⚡ FLOATING GLASSY RATE CARD OVERLAY */}
+              {showRateCard && (
+                <View style={styles.floatingRateCardWrapper} pointerEvents="box-none">
+                  <GlassyRateCard 
+                    onDismiss={handleDismissRateCard} 
+                    onSendFeedback={() => {
+                      handleDismissRateCard();
+                    }} 
+                  />
+                </View>
+              )}
+
         {/* REPORT SHEET */}
         <TrueSheet ref={reportSheetRef} detents={[0.4]} cornerRadius={28} backgroundColor="#0F172A" grabber={false}>
           <View style={styles.sheetContentContainer}>
@@ -1284,6 +1324,14 @@ const styles = StyleSheet.create({
   commentSendButtonDisabled: { backgroundColor: "#1E293B" },
 
   // Report & Glass Modal
+  // Add this inside styles = StyleSheet.create({ ... })
+  floatingRateCardWrapper: {
+    position: "absolute",
+    bottom: Platform.OS === "ios" ? 10 : 20, // Adjust so it sits right above your AppTabs
+    left: 0,
+    right: 0,
+    zIndex: 90, // Keeps it above the feed but below TrueSheet modals
+  },
   sheetContentContainer: { padding: 20, paddingBottom: 35 },
   sheetTitle: { color: "#F9FAFB", fontSize: 18, fontWeight: "700", textAlign: "center", marginBottom: 4 },
   sheetSubText: { color: "#94A3B8", fontSize: 12, textAlign: "center", marginBottom: 20 },
@@ -1299,7 +1347,7 @@ const styles = StyleSheet.create({
   glassModalBtn: { width: "100%", paddingVertical: 14, borderRadius: 14, backgroundColor: "rgba(148, 163, 184, 0.15)", borderWidth: 1, borderColor: "rgba(148, 163, 184, 0.2)", alignItems: "center" },
   glassModalBtnText: { color: "#F8FAFC", fontSize: 14, fontWeight: "700" },
 
-  errorCard: { flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 16, backgroundColor: "rgba(127, 29, 29, 0.4)", borderWidth: 1, borderColor: "rgba(248, 113, 113, 0.45)", marginTop: 5, marginBottom: 10 },
+  errorCard: { marginLeft: 10, marginRight:10, flexDirection: "row", alignItems: "center", padding: 12, borderRadius: 16, backgroundColor: "rgba(127, 29, 29, 0.4)", borderWidth: 1, borderColor: "rgba(248, 113, 113, 0.45)", marginTop: 5, marginBottom: 10 },
   errorTitle: { color: "#FCA5A5", fontSize: 13, fontWeight: "700", marginBottom: 2 },
   errorText: { color: "#FEE2E2", fontSize: 11 },
   errorRetryBtn: { paddingHorizontal: 10, paddingVerification: 6, borderRadius: 999, borderWidth: 1, borderColor: "rgba(248, 250, 252, 0.5)", marginLeft: 8 },

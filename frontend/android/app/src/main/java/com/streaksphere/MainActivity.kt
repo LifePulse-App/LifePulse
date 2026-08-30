@@ -1,8 +1,9 @@
 package com.streaksphere
 
-import android.os.Build // ⚡ ADDED
+import android.os.Build
 import android.os.Bundle
-import android.view.WindowManager // ⚡ ADDED
+import android.view.WindowManager
+import androidx.activity.enableEdgeToEdge // 👈 Import modern edge-to-edge API
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
 import com.facebook.react.defaults.DefaultNewArchitectureEntryPoint.fabricEnabled
@@ -12,9 +13,11 @@ import com.zoontek.rnbootsplash.RNBootSplash
 class MainActivity : ReactActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
-    RNBootSplash.init(this, R.style.BootTheme) // 👈 must be called BEFORE super.onCreate()
+    RNBootSplash.init(this, R.style.BootTheme)
 
-    // ⚡ FIX: TELL ANDROID TO WAKE THE SCREEN AND BYPASS THE LOCK SCREEN
+    // ⚡ Clear Google Play warning: Enable modern Android 15 Edge-to-Edge
+    enableEdgeToEdge()
+
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
         setShowWhenLocked(true)
         setTurnScreenOn(true)

@@ -35,12 +35,10 @@ export const getFeed = async (req, res) => {
 
     // 🔥 STRICT TAB ROUTING TO PREVENT LEAKS & APPLY CASCADING PRIVACY
     if (tab === "foryou") {
-      // ForYou should be an aggregate of EVERYTHING the user is allowed to see
       const forYouConditions = [
         { visibilityScope: { $in: ["world", "foryou"] } }
       ];
       
-      // Add Country posts (if user has a country)
       if (currentUser?.country) {
         forYouConditions.push({ 
           visibilityScope: "country", 
@@ -48,7 +46,6 @@ export const getFeed = async (req, res) => {
         });
       }
       
-      // Add City posts (if user has a city)
       if (currentUser?.city) {
         forYouConditions.push({ 
           visibilityScope: "city", 
@@ -56,7 +53,6 @@ export const getFeed = async (req, res) => {
         });
       }
       
-      // Add Friends' posts (any scope except private)
       if (validFriendIds.length > 0) {
         forYouConditions.push({ 
           user: { $in: validFriendIds }, 
@@ -65,7 +61,9 @@ export const getFeed = async (req, res) => {
       }
 
       query.$or = forYouConditions;
-      sortLogic = { likesCount: -1, commentsCount: -1, createdAt: -1 };
+      
+      // ⚡ FIX: Prioritize newest-to-oldest first, followed by engagement metrics as tie-breakers
+      sortLogic = { createdAt: -1, likesCount: -1, commentsCount: -1 };
 
     } else if (tab === "world") {
       query.visibilityScope = { $in: ["world", "foryou"] };
