@@ -702,7 +702,7 @@ export const getActivityPrivacy = async (req, res) => {
     const user = await User.findById(req.user._id).select("postVisibility");
     res.status(200).json({
       success: true,
-      defaultVisibilityScope: user?.postVisibility || "friends",
+      defaultVisibilityScope: user?.postVisibility,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: "Error fetching privacy setting." });

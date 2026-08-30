@@ -340,7 +340,7 @@ blockedBy: [
     postVisibility: { 
       type: String, 
       enum: ["foryou", "world", "country", "city", "friends", "private"], 
-      default: "friends" 
+      default: "foryou" 
     },
 // In your User schema
 resetPasswordCode: String,

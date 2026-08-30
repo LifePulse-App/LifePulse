@@ -8,7 +8,7 @@ import com.facebook.react.ReactNativeHost
 import com.facebook.react.defaults.DefaultReactNativeHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
-import com.microsoft.codepush.react.CodePush // ⚡ CODEPUSH IMPORT
+import com.microsoft.codepush.react.CodePush 
 
 class MainApplication : Application(), ReactApplication {
 
@@ -22,22 +22,19 @@ class MainApplication : Application(), ReactApplication {
       override fun getJSMainModuleName(): String = "index"
       override fun getUseDeveloperSupport(): Boolean = BuildConfig.DEBUG
       
-      // ⚡ REQUIRED FOR RN 0.76+ / 0.86 TO PREVENT CRASHES
       override val isNewArchEnabled: Boolean = BuildConfig.IS_NEW_ARCHITECTURE_ENABLED
       override val isHermesEnabled: Boolean = BuildConfig.IS_HERMES_ENABLED
 
-      // ⚡ Tell Android to use the CodePush bundle from the hard drive
+      // ⚡ CodePush hook: Android will pull the updated bundle from here
       override fun getJSBundleFile(): String? {
         return CodePush.getJSBundleFile()
       }
     }
 
   override val reactHost: ReactHost by lazy {
-    getDefaultReactHost(
-      this.applicationContext,
-      this.reactNativeHost,
-      CodePush.getJSBundleFile() ?: "assets://index.android.bundle"
-    )
+    // ⚡ FIX: Removed the invalid String parameter. 
+    // It now correctly takes just context + reactNativeHost and reads the CodePush bundle directly from it.
+    getDefaultReactHost(this.applicationContext, this.reactNativeHost)
   }
 
   override fun onCreate() {

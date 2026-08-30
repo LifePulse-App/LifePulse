@@ -26,6 +26,9 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+        
+        // ⚡ ADDED THIS LINE FOR NOTIFEE:
+        maven { url "$rootDir/../node_modules/@notifee/react-native/android/libs" }
     }
      configurations.all {
         resolutionStrategy {

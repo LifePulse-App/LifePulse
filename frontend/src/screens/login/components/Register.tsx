@@ -130,7 +130,7 @@ const Register = ({ navigation }: any) => {
   // ⚡ ADDED: Function to handle the "Continue" button on the success modal
   const handleSuccessDismiss = () => {
     setSuccessModalVisible(false);
-    navigation.navigate('VerifyOtp', { identifier });
+    navigation.navigate('VerifyOtp', { identifier, username, password });
   };
 
   return (

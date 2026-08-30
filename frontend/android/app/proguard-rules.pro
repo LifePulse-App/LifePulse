@@ -69,3 +69,10 @@
 -keep class com.rnbiometrics.** { *; }
 
 -keep class com.revenuecat.purchases.** { *; }
+
+# 12. BootSplash (Prevent R8 from stripping splash screen logic)
+-keep class com.zoontek.rnbootsplash.** { *; }
+
+# 13. Fresco & WebP (Bitmap Optimisation engine)
+-keep class com.facebook.fresco.** { *; }
+-keep class com.facebook.imagepipeline.** { *; }
