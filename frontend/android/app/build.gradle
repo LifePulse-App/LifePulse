@@ -85,7 +85,7 @@ android {
         applicationId "com.streaksphere"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 15
+        versionCode 17
         versionName "6.1.0"
 
         externalNativeBuild {
@@ -136,9 +136,6 @@ dependencies {
     
     // ⚡ FIX: Change 1.1.0 to 1.2.0 (The actual latest stable release)
     implementation("androidx.core:core-splashscreen:1.2.0")
-
-    implementation("com.facebook.fresco:webpsupport:3.7.0")
-    implementation("com.facebook.fresco:animated-webp:3.7.0")
     
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

@@ -23,11 +23,17 @@ const proofSchema = new mongoose.Schema(
     // ==========================================
     // ACTIVITY FEED / SOCIAL FEATURES
     // ==========================================
+    // ⚡ NEW SOCIAL FIELDS
     caption: { 
       type: String, 
       maxLength: [500, "Caption cannot exceed 500 characters"], 
       default: "" 
     },
+    hashtags: [{ 
+      type: String, 
+      lowercase: true, 
+      trim: true 
+    }], // Array of strings without the '#' symbol
 // ⚡ FIXED: Renamed to match the Feed controller query
     visibilityScope: {
       type: String,

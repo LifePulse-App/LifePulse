@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { 
   View, 
   Text, 
@@ -17,16 +17,25 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { CommonActions, useNavigation } from '@react-navigation/native';
 import FastImage from 'react-native-fast-image';
 import { loginStyles } from './Loginstyles'; 
-import socialApi from '../../friends/services/api_friends'; // ⚡ Hooked up to your real friend service
-import { getAvatar } from '../../../storage/AvatarManager'; // ⚡ Utilizing your cached Avatar manager
+import socialApi from '../../friends/services/api_friends';
+import { getAvatar } from '../../../storage/AvatarManager';
+
+// ⚡ NEW: Import your AuthContext to get the current user's username
+import AuthContext from '../../../auth/user/UserContext';
 
 const APP_LINK = "https://play.google.com/store/apps/details?id=com.streaksphere"; 
-const INVITE_TEXT = `Hey👋
- Add me on StreakSphere! Let's explore new Era of Social Media together: ${APP_LINK}`;
 
 export default function ConnectFriendsScreen() {
   const styles = loginStyles();
   const navigation = useNavigation<any>();
+  
+  // ⚡ NEW: Pull the username dynamically from your context
+  const authContext = useContext(AuthContext);
+  const username = authContext?.User?.user?.username || authContext?.User?.UserName || "me";
+
+  // ⚡ NEW: Moved INVITE_TEXT inside so it can use the dynamic 'username' variable
+  const INVITE_TEXT = `Hey👋\nI am on StreakSphere. Add me on there for new things! Let's explore new Era Of Social Media together: ${APP_LINK}`;
+
   const [suggestedUsers, setSuggestedUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingActions, setLoadingActions] = useState<string | null>(null);
