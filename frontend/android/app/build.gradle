@@ -85,9 +85,22 @@ android {
         applicationId "com.streaksphere"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 14
+        versionCode 17
         versionName "6.1.0"
+
+        externalNativeBuild {
+            cmake {
+                arguments "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON",
+                          "-DCMAKE_SHARED_LINKER_FLAGS=-Wl,-z,max-page-size=16384"
+            }
+        }
     }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -123,10 +136,6 @@ dependencies {
     
     // ⚡ FIX: Change 1.1.0 to 1.2.0 (The actual latest stable release)
     implementation("androidx.core:core-splashscreen:1.2.0")
-
-    // Fresco WebP optimizations
-    implementation("com.facebook.fresco:webpsupport:3.2.0")
-    implementation("com.facebook.fresco:animated-webp:3.2.0")
     
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

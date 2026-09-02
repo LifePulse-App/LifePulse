@@ -166,6 +166,7 @@ import UserFeedScreen from '../../screens/activity-feed/components/UserFeedScree
 import ShareToChatScreen from '../../screens/activity-feed/components/ShareToChat';
 import ChatListScreen from '../../screens/chat/components/Chat';
 import ConnectFriendsScreen from '../../screens/login/components/ConnectFriendScreen';
+import InviteFriendsScreen from '../../screens/profile/components/InviteFriendsScreen';
 
   const AuthNavigator = () => {
     const [initialRoute, setInitialRoute] = useState<'Drawer' | 'AppTabs' | 'Login' | 'SavedAccounts' | null>(null);
@@ -251,6 +252,7 @@ return (
         <Stack.Screen name="TwoFA" component={TwoFAScreen} />
         <Stack.Screen name="VerifyOtp" component={VerifyOtp} />
         <Stack.Screen name="ConnectFriend" component={ConnectFriendsScreen} />
+        <Stack.Screen name="InviteFriends" component={InviteFriendsScreen} />
         <Stack.Screen name="ForgotPass" component={ForgotPass} />
         <Stack.Screen name="ResetPassVerifyOtp" component={ResetPassVerifyOTP} />
         <Stack.Screen name="SetPass" component={SetPassVerifiedOTP} />

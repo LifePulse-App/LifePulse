@@ -570,6 +570,7 @@ const settingSections = [
       { icon: "account-edit", label: "Edit Profile", route: "EditProfile" },
       { icon: "key", label: "Change Password", route: "ChangePassword" },
       { icon: "link", label: "Manage Linked Account", route: "LinkedAccount" },
+      { icon: "account-multiple-plus", label: "Invite Friends", route: "InviteFriends" },
       { icon: "crown-outline", label: "StreakSphere+", route: "plus" },
     ],
   },
@@ -1165,7 +1166,7 @@ export default function ProfileScreen({ navigation }: any) {
                 disabled={item.disabled}
                 onPress={() => {
                   if (!item.disabled) {
-                    if (["Enable2FA", "Devices", "HelpSupport", "ReportProblem", "LegalPolicy", "BlockedUsers", "VerifySelf", "plus"].includes(item.route)) {
+                    if (["Enable2FA", "Devices", "HelpSupport", "ReportProblem", "LegalPolicy", "BlockedUsers", "VerifySelf", "plus", "InviteFriends"].includes(item.route)) {
                       navigation.navigate(item.route);
                     } else {
                       openSheet(item.route);

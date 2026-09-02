@@ -446,7 +446,7 @@ async function loadPostReports() {
           </div>
           
           <div style="margin: 14px 0;">
-            <img src="${API_BASE}/${post.mediaUrl}" style="width: 100%; max-width: 280px; height: 180px; object-fit: cover; border-radius: 12px; border: 1px solid var(--border);" onerror="this.src='https://via.placeholder.com/280x180?text=Media+Error'" />
+            <img src="${post.mediaUrl}" style="width: 100%; max-width: 280px; height: 180px; object-fit: cover; border-radius: 12px; border: 1px solid var(--border);" onerror="this.src='https://via.placeholder.com/280x180?text=Media+Error'" />
             <div style="margin-top: 8px; color: var(--muted); font-size: 0.85rem;">Caption: "${post.caption || 'No caption'}"</div>
           </div>
 

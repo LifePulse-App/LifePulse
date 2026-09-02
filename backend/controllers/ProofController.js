@@ -9,7 +9,9 @@ import FormData from "form-data";
 
 export const submitProof = async (req, res) => {
   try {
-    const { habitId, userId } = req.body;
+    // ⚡ 1. Extract caption and visibilityScope from req.body
+    const { habitId, userId, caption: userCaption, visibilityScope } = req.body;
+    
     if (!habitId || !req.file) {
       return res.status(400).json({ success: false, message: "habitId and proof image required." });
     }
@@ -25,22 +27,42 @@ export const submitProof = async (req, res) => {
     const expectedSlot = habit.timeSlot;
     const isTimeValid = !expectedSlot || currentSlot === expectedSlot;
 
-    // 🔥 DYNAMIC CAPTION & VISIBILITY:
+    // ⚡ 2. Format the Final Caption (User's text + Activity Name)
     const habitName = habit.name || habit.title || habit.key; 
-    const generatedCaption = `${habitName}`;
+    let finalCaption = userCaption ? userCaption.trim() : "";
+    
+    // Automatically append the activity name so it always shows up in the feed
+    if (finalCaption) {
+      finalCaption += `\n\n— Activity: ${habitName}`;
+    } else {
+      finalCaption = `Completed Activity: ${habitName}`;
+    }
+
+    // ⚡ 3. Extract Hashtags from the final caption
+    let extractedHashtags = [];
+    const matches = finalCaption.match(/#[a-z0-9_]+/gi);
+    if (matches) {
+      // Remove '#' and make lowercase for clean database storage
+      extractedHashtags = matches.map(tag => tag.replace('#', '').toLowerCase());
+    }
+
+    // ⚡ 4. Determine Privacy Scope (Request overrides default user settings)
+    const finalVisibility = visibilityScope || userDoc.postVisibility || "friends";
 
     const proof = await Proof.create({
       user: userId,
       habit: habit._id,
-      // ⚡ FIX: Use req.file.filename instead of req.file.path for the web URL
       imageUrl: `/uploads/${req.file.filename}`, 
       status: "submitted",
       points: 1,
       verified: false,
       timeSlotAtProof: currentSlot,
       isPremiumXP: isPremiumXP,
-      caption: generatedCaption,
-      visibilityScope: userDoc.postVisibility || "friends", // Fixed from "friend" to "friends"
+      
+      // ⚡ 5. Save the new social fields
+      caption: finalCaption,
+      hashtags: extractedHashtags,
+      visibilityScope: finalVisibility, 
       city: userDoc.city || "",
       country: userDoc.country || ""
     });
@@ -48,7 +70,6 @@ export const submitProof = async (req, res) => {
     // Send image to FastAPI AI verification
     const formData = new FormData();
     formData.append("habitKey", habit.key);
-    // Note: We still use req.file.path here because Node.js needs the disk path to read it!
     formData.append("image", fs.createReadStream(req.file.path));
 
     const aiRes = await axios.post("https://api-ai.streaksphere.app/verify", formData, {

@@ -76,3 +76,4 @@
 # 13. Fresco & WebP (Bitmap Optimisation engine)
 -keep class com.facebook.fresco.** { *; }
 -keep class com.facebook.imagepipeline.** { *; }
+
