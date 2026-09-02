@@ -15,7 +15,8 @@ import {
   enable2FAConfirm,
   disable2FA,
   getDevices,
-  logoutDevice
+  logoutDevice,
+  switchAccount
 } from "../controllers/AuthController.js";
 import { isAuthenticatedUser } from "../middlewares/auth.js";
 import { verifyEmail } from "../controllers/OtpController.js";
@@ -26,6 +27,7 @@ router.post("/register", register);
 router.post("/verify-email", verifyEmail);
 router.post("/resend-otp", resendVerificationOtp);
 router.post("/login", login);
+router.post("/switch-account", switchAccount);
 router.post("/2fa/verify-login", verify2FALogin);
 router.post("/2fa/enable/init", isAuthenticatedUser, enable2FAInit);
 router.post("/2fa/enable/confirm", isAuthenticatedUser, enable2FAConfirm);

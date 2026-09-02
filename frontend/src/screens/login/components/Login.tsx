@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { TextInput, Text } from 'react-native-paper';
 import NetInfo from '@react-native-community/netinfo';
-
+import * as Keychain from 'react-native-keychain';
 import AuthContext from '../../../auth/user/UserContext';
 import UserStorage from '../../../auth/user/UserStorage';
 import { UserLoginResponse } from '../../user/models/UserLoginResponse';
@@ -24,6 +24,7 @@ import { BlurView } from '@react-native-community/blur';
 import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
 import { CommonActions } from '@react-navigation/native';
 import { connectSocket } from '../../../auth/api-client/socket';
+import SavedAccountsStorage from '../../../auth/user/SavedAccountsStorage';
 
 const Login = ({ navigation }: any) => {
   const styles = loginStyles();
@@ -89,36 +90,17 @@ const Login = ({ navigation }: any) => {
     makeLoop(anim3, 3000).start();
   }, [anim1, anim2, anim3]);
 
-  // ---------- Restore user from Keychain (NO login API here) ----------
-  const restoreUser = async () => {
-    try {
-      const creds = await UserStorage.getUser();
-      if (!creds || !creds.username) return;
-
-      const storedUser: UserLoginResponse = JSON.parse(creds.username);
-
-      if (storedUser.UserName) setUsername(storedUser.UserName);
-      if (creds.password) setPassword(creds.password);
-
-      if (storedUser.accessToken) {
-        setAuthHeaders(storedUser.accessToken);
-        authContext?.setUser(storedUser);
-        await connectSocket()
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'Drawer' }],
-          }),
-        );
-      }
-    } catch (e) {
-      await UserStorage.deleteUser();
-    }
-  };
-
+// ---------- Prefill Username if redirected from Saved Accounts ----------
   useEffect(() => {
-    restoreUser();
-  }, []);
+    // If we were sent here from SavedAccountsScreen because a token expired,
+    // prefill the username so the user only has to type their password.
+    if (navigation.getState()?.routes) {
+      const currentRoute = navigation.getState().routes.find((r: any) => r.name === 'Login');
+      if (currentRoute?.params?.prefillUsername) {
+        setUsername(currentRoute.params.prefillUsername);
+      }
+    }
+  }, [navigation]);
 
   // ---------- Email/Password login (ONLY here you hit API) ----------
   const handleSubmit = async (values: { username: string; password: string }) => {
@@ -174,7 +156,25 @@ const Login = ({ navigation }: any) => {
 
       const user = data as UserLoginResponse;
       user.UserName = values.username;
-      user.Password = values.password;
+      //user.Password = values.password;
+
+      // 1. Save UI metadata to AsyncStorage
+await SavedAccountsStorage.save({
+  id: user.user.id,
+  username: values.username,
+  name: user.user.name,
+  avatarUrl: user.avatarUrl || null,
+  avatarVersion: user.avatarVersion || 1,
+});
+
+// 2. Save the refreshToken in the secure hardware keychain
+if (user.refreshToken) {
+  await Keychain.setGenericPassword(
+    user.user.id, 
+    user.refreshToken, 
+    { service: `auth_token_${user.user.id}` }
+  );
+}
 
       setAuthHeaders(user.accessToken);
       authContext?.setUser(user);
