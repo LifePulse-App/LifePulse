@@ -4,8 +4,8 @@ import { Text } from "@rneui/themed";
 import { CommonActions } from "@react-navigation/native";
 import DeviceInfo from "react-native-device-info";
 import FastImage from "react-native-fast-image"; 
-import Icon from "react-native-vector-icons/MaterialCommunityIcons"; // ⚡ IMPORTED ICON FOR FALLBACK
-
+import Icon from "react-native-vector-icons/MaterialCommunityIcons"; 
+import * as Keychain from 'react-native-keychain';
 import SavedAccountsStorage, { SavedAccount } from "../../../auth/user/SavedAccountsStorage";
 import AuthContext from "../../../auth/user/UserContext";
 import api_Login from "../services/api_Login";
@@ -14,6 +14,8 @@ import UserStorage from "../../../auth/user/UserStorage";
 import { loginStyles } from "./Loginstyles";
 import { connectSocket } from "../../../auth/api-client/socket";
 import { getAvatar } from "../../../storage/AvatarManager";
+// ⚡ 1. IMPORT THE ERROR MODAL
+import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
 
 interface SavedAccountWithAvatar extends SavedAccount {
   localAvatarUri?: string | null;
@@ -29,6 +31,20 @@ const SavedAccountsScreen = ({ navigation }: any) => {
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [actionType, setActionType] = useState<"login" | "remove" | null>(null);
 
+  // ⚡ 2. ADD ERROR STATE
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorVisible, setErrorVisible] = useState(false);
+
+  const showError = (message: string) => {
+    setErrorMessage(message);
+    setErrorVisible(true);
+  };
+
+  const hideError = () => {
+    setErrorVisible(false);
+    setErrorMessage(null);
+  };
+
   const getUniqueByUsername = (list: SavedAccount[]) => {
     const seen = new Set<string>();
     const unique: SavedAccount[] = [];
@@ -42,7 +58,6 @@ const SavedAccountsScreen = ({ navigation }: any) => {
         unique.push(acc);
       }
     }
-
     return unique;
   };
 
@@ -52,9 +67,11 @@ const SavedAccountsScreen = ({ navigation }: any) => {
 
     const accountsWithAvatars = await Promise.all(
       unique.map(async (acc) => {
-        const rawUrl = acc?.user?.user?.avatarUrl || acc?.user?.user?.avatarThumbnailUrl || acc?.user?.user?.avatar || acc?.user?.user?.profile_picture;
-        const userId = acc?.user?.user?._id || acc?.user?.user?.id || acc.id; 
-        const avatarVersion = acc?.user?.user?.avatarVersion || 1;
+        // Handle nested or direct user data
+        const userData = (acc as any)?.user?.user || (acc as any)?.user || acc;
+        const rawUrl = userData?.avatarUrl || userData?.avatarThumbnailUrl || userData?.avatar || userData?.profile_picture;
+        const userId = userData?._id || userData?.id || acc.id; 
+        const avatarVersion = userData?.avatarVersion || 1;
 
         let localUri = null;
         if (rawUrl && rawUrl.trim() !== '' && rawUrl !== 'null' && rawUrl !== 'undefined') {
@@ -81,54 +98,62 @@ const SavedAccountsScreen = ({ navigation }: any) => {
       setActionType("login");
       setSecretKey();
 
-      const deviceId = await DeviceInfo.getUniqueId();
-      const deviceName = await DeviceInfo.getDeviceName();
-      const deviceModel = DeviceInfo.getModel();
-      const deviceBrand = DeviceInfo.getBrand();
+      // Retrieve the refresh token securely from the Keychain
+      const credentials = await Keychain.getGenericPassword({
+        service: `auth_token_${acc.id}`,
+      });
 
-      const res = await api_Login.getLogin(
-        acc.username,
-        acc.password,
-        deviceId,
-        deviceName,
-        deviceModel,
-        deviceBrand
-      );
-
-      if (!res.ok) {
-        await SavedAccountsStorage.remove(acc.id);
-        await load();
+      if (!credentials) {
+        // Token is missing from secure storage, force manual login
+        navigation.navigate('Login', { prefillUsername: acc.username });
         return;
       }
 
-      const user = res.data;
-      user.UserName = acc.username;
-      user.Password = acc.password;
+      const refreshToken = credentials.password;
+      const deviceId = await DeviceInfo.getUniqueId();
 
-      setAuthHeaders(user.accessToken);
+      // Authenticate using the switch-account endpoint
+      const res = await api_Login.switchAccount({ userId: acc.id, refreshToken, deviceId });
+
+      if (!res.ok) {
+        // Token is invalid/revoked on the server. Wipe local traces and force manual login.
+        await Keychain.resetGenericPassword({ service: `auth_token_${acc.id}` });
+        await SavedAccountsStorage.remove(acc.id);
+        await load();
+        navigation.navigate('Login', { prefillUsername: acc.username });
+        return;
+      }
+
+      const { user, accessToken, refreshToken: newRefreshToken } = res.data;
+      user.UserName = acc.username;
+
+      // Update Keychain with the newly rotated refresh token
+      if (newRefreshToken) {
+        await Keychain.setGenericPassword(acc.id, newRefreshToken, {
+          service: `auth_token_${acc.id}`,
+        });
+      }
+
+      // Setup context and navigate
+      setAuthHeaders(accessToken);
       authContext?.setUser(user);
       await UserStorage.setUser(user);
-      if (user.accessToken) await UserStorage.setAccessToken(user.accessToken);
-      if (user.refreshToken) await UserStorage.setRefreshToken(user.refreshToken);
+      await UserStorage.setAccessToken(accessToken);
+      await UserStorage.setRefreshToken(newRefreshToken);
 
       await connectSocket();
 
       const isIOS26Plus = Platform.OS === 'ios' && parseInt(Platform.Version, 10) >= 26;
-      if (isIOS26Plus) {
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'AppTabs' }],
-          }),
-        );
-      } else {
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'Drawer' }],
-          }),
-        );
-      }
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: isIOS26Plus ? 'AppTabs' : 'Drawer' }],
+        }),
+      );
+    } catch (error) {
+      console.error("Fast login error:", error);
+      // ⚡ 3. SHOW THE ERROR IN THE UI
+      showError("Connection failed. Please check your internet or try logging in manually.");
     } finally {
       setLoadingId(null);
       setActionType(null);
@@ -139,130 +164,129 @@ const SavedAccountsScreen = ({ navigation }: any) => {
     try {
       setLoadingId(acc.id); 
       setActionType("remove"); 
-      const deviceId = await DeviceInfo.getUniqueId();
-
-      const res = await api_Login.getLogin(
-        acc.username,
-        acc.password,
-        deviceId
-      );
-
-      if (res.ok && res.data?.accessToken) {
-        setAuthHeaders(res.data.accessToken);
-        await api_Login.logoutDevice(deviceId); 
-        setAuthHeaders(null);
-      }
-    } catch (error) {
-      console.log("Failed to remove device from backend:", error);
-    } finally {
+      
+      // Wipe from secure storage
+      await Keychain.resetGenericPassword({ service: `auth_token_${acc.id}` });
+      
+      // Wipe from AsyncStorage
       await SavedAccountsStorage.remove(acc.id);
       await load();
+    } catch (error) {
+      console.log("Failed to remove account locally:", error);
+      // ⚡ 4. OPTIONAL: Show error on remove fail
+      showError("Failed to remove account. Please try again.");
+    } finally {
       setLoadingId(null);
       setActionType(null);
     }
   };
 
   return (
-    <View style={styles.root}>
-      <View style={styles.baseBackground} />
-       <StatusBar
-          barStyle="light-content"
-          translucent
-          backgroundColor="transparent"
-        />
+    <>
+      <View style={styles.root}>
+        <View style={styles.baseBackground} />
+        <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      <View style={styles.kbWrapper}>
-        <View style={localStyles.header}>
-          <Image 
-            source={require('../../../shared/bootsplash/logo-bg.png')}
-            style={{ width: 180, height: 100, alignSelf: 'center', marginBottom: 0 }}
-            resizeMode="contain"
-          />
-          <Text style={localStyles.appName}>StreakSphere</Text>
-          <Text style={localStyles.subTitle}>Saved Accounts</Text>
-        </View>
+        <View style={styles.kbWrapper}>
+          <View style={localStyles.header}>
+            <Image 
+              source={require('../../../shared/bootsplash/logo-bg.png')}
+              style={{ width: 180, height: 100, alignSelf: 'center', marginBottom: 0 }}
+              resizeMode="contain"
+            />
+            <Text style={localStyles.appName}>StreakSphere</Text>
+            <Text style={localStyles.subTitle}>Saved Accounts</Text>
+          </View>
 
-        <View style={localStyles.card}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {accounts.map((acc) => {
-              const isThisLoading = loadingId === acc.id;
-              const displayName = acc?.user?.user?.name || acc.username || "User";
-              
-              const avatarVersion = acc?.user?.user?.avatarVersion || 1;
-              const finalAvatarUri = acc.avatarUrl? acc.avatarUrl : null;
+          <View style={localStyles.card}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {accounts.map((acc) => {
+                const isThisLoading = loadingId === acc.id;
+                
+                // Safely extract data based on old vs new storage formats
+                const userData = (acc as any)?.user?.user || (acc as any)?.user || acc;
+                const displayName = userData?.name || acc.username || acc.name || "User";
+                const finalAvatarUri = acc.localAvatarUri || userData?.avatarUrl || null;
 
-              return (
-                <View key={acc.id} style={localStyles.accountRow}>
-                  
-                  <View style={localStyles.accountHeader}>
-                    {/* ⚡ UPDATED: Check if finalAvatarUri exists, else show grey person icon */}
-                    {finalAvatarUri ? (
-                      <FastImage
-                        style={localStyles.avatar}
-                        source={{
-                          uri: finalAvatarUri,
-                          priority: FastImage.priority.high,
-                        }}
-                        resizeMode={FastImage.resizeMode.cover}
-                      />
-                    ) : (
-                      <View style={localStyles.avatarFallback}>
-                        <Icon name="account" size={32} color="#94a3b8" />
-                      </View>
-                    )}
+                return (
+                  <View key={acc.id} style={localStyles.accountRow}>
                     
-                    <View style={localStyles.userInfo}>
-                      <Text style={localStyles.username}>{displayName}</Text>
-                      <Text style={localStyles.smallText}>Tap login to continue</Text>
+                    <View style={localStyles.accountHeader}>
+                      {finalAvatarUri ? (
+                        <FastImage
+                          style={localStyles.avatar}
+                          source={{
+                            uri: finalAvatarUri,
+                            priority: FastImage.priority.high,
+                          }}
+                          resizeMode={FastImage.resizeMode.cover}
+                        />
+                      ) : (
+                        <View style={localStyles.avatarFallback}>
+                          <Icon name="account" size={32} color="#94a3b8" />
+                        </View>
+                      )}
+                      
+                      <View style={localStyles.userInfo}>
+                        <Text style={localStyles.username}>{displayName}</Text>
+                        <Text style={localStyles.smallText}>Tap login to continue</Text>
+                      </View>
+                    </View>
+
+                    <View style={localStyles.rowActions}>
+                      <TouchableOpacity
+                        style={localStyles.loginBtn}
+                        onPress={() => handleLogin(acc)}
+                        disabled={isThisLoading}
+                      >
+                        <Text style={localStyles.loginText}>
+                          {isThisLoading && actionType === "login" ? "Loading..." : "Login"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={localStyles.removeBtn}
+                        onPress={() => handleRemove(acc)}
+                        disabled={isThisLoading}
+                      >
+                        <Text style={localStyles.removeText}>
+                          {isThisLoading && actionType === "remove" ? "Removing..." : "Remove"}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
-
-                  <View style={localStyles.rowActions}>
-                    <TouchableOpacity
-                      style={localStyles.loginBtn}
-                      onPress={() => handleLogin(acc)}
-                      disabled={isThisLoading}
-                    >
-                      <Text style={localStyles.loginText}>
-                        {isThisLoading && actionType === "login" ? "Loading..." : "Login"}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={localStyles.removeBtn}
-                      onPress={() => handleRemove(acc)}
-                      disabled={isThisLoading}
-                    >
-                      <Text style={localStyles.removeText}>
-                        {isThisLoading && actionType === "remove" ? "Removing..." : "Remove"}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
-          </ScrollView>
+                );
+              })}
+            </ScrollView>
+          </View>
         </View>
-      </View>
-      
-      <View style={{ 
-            paddingVertical: 20, 
-            paddingBottom: Platform.OS === 'ios' ? 40 : 40, 
-            alignItems: 'center',
-            borderTopWidth: 0.5,
-            borderTopColor: 'rgba(255, 255, 255, 0.1)' 
-        }}>
-          <Text style={{ color: '#c7cbcf', fontSize: 13 }}>
-            Log in to another account?{' '}
-            <Text
-              style={{ fontWeight: '700', color: '#fff' }}
-              onPress={() => navigation.navigate('Login')}
-            >
-              Login
+        
+        <View style={{ 
+              paddingVertical: 20, 
+              paddingBottom: Platform.OS === 'ios' ? 40 : 40, 
+              alignItems: 'center',
+              borderTopWidth: 0.5,
+              borderTopColor: 'rgba(255, 255, 255, 0.1)' 
+          }}>
+            <Text style={{ color: '#c7cbcf', fontSize: 13 }}>
+              Log in to another account?{' '}
+              <Text
+                style={{ fontWeight: '700', color: '#fff' }}
+                onPress={() => navigation.navigate('Login')}
+              >
+                Login
+              </Text>
             </Text>
-          </Text>
-        </View>
-    </View>
+          </View>
+      </View>
+
+      {/* ⚡ 5. RENDER THE ERROR MODAL */}
+      <GlassyErrorModal
+        visible={errorVisible}
+        message={errorMessage || ''}
+        onClose={hideError}
+      />
+    </>
   );
 };
 
@@ -319,12 +343,11 @@ const savedStyles = () =>
       borderColor: 'rgba(255,255,255,0.2)',
       overflow: 'hidden' 
     },
-    // ⚡ ADDED: Fallback style for the grey person icon
     avatarFallback: {
       width: 50,
       height: 50,
       borderRadius: 25,
-      backgroundColor: '#1e293b', // Slate 800 (Dark Grey/Blue)
+      backgroundColor: '#1e293b', 
       marginRight: 12,
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.2)',

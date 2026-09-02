@@ -10,7 +10,7 @@ const setUser = async (User: UserLoginResponse) => {
   try {
     await Keychain.setGenericPassword(
       JSON.stringify(User),
-      User.Password ?? '',
+      User.Password || 'SECURE_TOKEN_AUTH', // ⚡ FIX: Provide a dummy string instead of ''
     );
   } catch (error: any) {
     console.log('Keychain setUser error:', error);

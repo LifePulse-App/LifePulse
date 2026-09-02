@@ -916,3 +916,45 @@ export const logoutDevice = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Failed to logout device", 500));
   }
 });
+
+export const switchAccount = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const { userId, refreshToken, deviceId } = req.body;
+
+    if (!userId || !refreshToken || !deviceId) {
+      return next(new ErrorHandler("Missing required fields", 400));
+    }
+
+    const user = await User.findById(userId);
+    if (!user) return next(new ErrorHandler("User not found", 404));
+
+    // Verify the provided refresh token exists and is valid for this device
+    const now = Date.now();
+    const storedToken = user.refreshTokens.find(
+      (t) => t.token === refreshToken && t.deviceId === deviceId
+    );
+
+    if (!storedToken || new Date(storedToken.expiresAt).getTime() <= now) {
+      return next(new ErrorHandler("Session expired. Please log in again.", 401));
+    }
+
+    // Rotate the refresh token for security
+    user.refreshTokens = user.refreshTokens.filter((t) => t.token !== refreshToken);
+    await user.save({ validateBeforeSave: false });
+
+    // Issue fresh tokens
+    const tokens = await sendTokens(res, user, deviceId);
+
+    // Update location and last login
+    await registerDeviceWithLocation({
+      user,
+      deviceId,
+      req,
+    });
+
+    res.status(200).json({ success: true, ...tokens });
+  } catch (err) {
+    console.error(err);
+    return next(new ErrorHandler("Failed to switch account", 500));
+  }
+});

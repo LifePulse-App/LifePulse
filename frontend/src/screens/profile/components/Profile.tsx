@@ -735,18 +735,28 @@ export default function ProfileScreen({ navigation }: any) {
 
   const confirmLogout = async () => {
     const userData = authContext?.User;
-    if (userData?.user?.id && userData?.UserName && userData?.Password) {
+    
+    // ⚡ FIX: Removed the `userData.Password` check. 
+    // We only need the ID and Username now to save the UI profile!
+    if (userData?.user?.id && userData?.UserName) {
       await SavedAccountsStorage.save({
         id: userData.user.id,
         username: userData.UserName,
-        password: userData.Password,
-        avatarUrl: finalAvatarUri,
-        user: userData,
+        name: userData.user.name || userData.UserName,
+        avatarUrl: finalAvatarUri || null,
+        avatarVersion: profile?.avatarVersion || 1,
       });
     }
+
     await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
-    await logout(userId);
-    disconnectSocket()
+    
+    // Note: If your `logout(userId)` function calls the backend to delete the 
+    // refresh token, the Saved Accounts screen will force the user to enter a 
+    // password next time. If you want seamless 1-tap login from Saved Accounts, 
+    // you should ONLY clear local UserStorage here, and NOT hit the backend logout API.
+    await logout(userId); 
+    
+    disconnectSocket();
     authContext?.setUser(null);
     UserStorage.clearTokens();
     UserStorage.deleteUser();

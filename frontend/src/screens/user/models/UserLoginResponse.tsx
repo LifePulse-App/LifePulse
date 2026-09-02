@@ -50,5 +50,4 @@ export interface UserLoginResponse {
   createdAt: string;
   updatedAt: string;
   UserName: string;
-  Password: string;
 }

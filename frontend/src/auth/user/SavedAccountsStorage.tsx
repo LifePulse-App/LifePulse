@@ -1,14 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { UserLoginResponse } from "../../screens/user/models/UserLoginResponse";
 
 const KEY = "SAVED_ACCOUNTS";
 
 export type SavedAccount = {
-  id: string;
+  id: string; // This is the user._id
   username: string;
-  password: string;
+  name: string;
   avatarUrl: string | null;
-  user: UserLoginResponse;
+  avatarVersion: number;
 };
 
 const getAll = async (): Promise<SavedAccount[]> => {

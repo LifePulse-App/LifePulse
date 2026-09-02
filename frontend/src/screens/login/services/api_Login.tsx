@@ -215,6 +215,22 @@ const logoutDevice = async (deviceId: string) => {
   }
 };
 
+// ⚡ ADDED: Switch Account API (For Saved Accounts Fast-Login)
+const switchAccount = async ({ userId, refreshToken, deviceId }: { userId: string, refreshToken: string, deviceId: string }) => {
+  try {
+    return await client.post<object>('/auth/switch-account', {
+      userId,
+      refreshToken,
+      deviceId
+    });
+  } catch (error: any) {
+    if (!error.response) {
+      throw new Error('Server is offline, try again later.');
+    }
+    throw error;
+  }
+};
+
 // GetProfile API
 const GetProfile = () =>
   client.get<DashboardResponse>('/auth/me');
@@ -234,5 +250,6 @@ export default {
   verify2faLogin,
   disable2fa,
   getDevices,
-  logoutDevice
+  logoutDevice,
+  switchAccount
 };
