@@ -38,7 +38,7 @@ const proofSchema = new mongoose.Schema(
     visibilityScope: {
       type: String,
       enum: ["foryou", "world", "country", "city", "friends", "private"],
-      default: "friends",
+      default: "foryou",
     },
     city: { type: String, default: "" },
     country: { type: String, default: "" },
