@@ -1,0 +1,4 @@
+steps:
+  - wait: 5000
+  - tap: "results-tab"
+  - wait: 10000

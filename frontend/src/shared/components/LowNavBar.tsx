@@ -75,6 +75,7 @@ const LowNavBAr = () => {
     <View style={{ position: 'relative' }}>
       <BottomNavigation.Bar
         navigationState={{ index, routes }}
+        getTestID={({ route }) => `${route.key}-tab`} // <-- ADD THIS
         onTabPress={({ route }) => {
           const i = routes.findIndex((r) => r.key === route.key);
           handleNavigation(i);
@@ -87,6 +88,7 @@ const LowNavBAr = () => {
             return (
               <View style={localStyles.centerButtonOuter}>
                 <TouchableOpacity
+                testID="camera-tab"
                   activeOpacity={0.85}
                   style={localStyles.centerButtonInner}
                   onPress={() => navigation.navigate('ProofCamera', { habitId: null })}

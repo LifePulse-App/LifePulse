@@ -624,7 +624,7 @@ const UserFeedScreen = ({ route, navigation }: any) => {
                     )}
                   </View>
 
-                  <Text style={styles.caption} numberOfLines={2}>{item.caption}</Text>
+                  <Text style={styles.caption} numberOfLines={3}>{item.caption}</Text>
                 </View>
               </>
             )}

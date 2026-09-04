@@ -1,0 +1,28 @@
+{
+  "device": "pixel-10-pro",
+  "udid": "emulator-5554",
+  "capturedAt": "2026-09-03T08:17:11.874Z",
+  "screenshots": [
+    {
+      "sceneId": "feed",
+      "file": "/Users/apple/Documents/My_Projects/StreakSphere/out/raw/pixel-10-pro/feed.png"
+    },
+    {
+      "sceneId": "moods",
+      "file": "/Users/apple/Documents/My_Projects/StreakSphere/out/raw/pixel-10-pro/moods.png"
+    },
+    {
+      "sceneId": "archat",
+      "file": "/Users/apple/Documents/My_Projects/StreakSphere/out/raw/pixel-10-pro/archat.png"
+    },
+    {
+      "sceneId": "aiproof",
+      "file": "/Users/apple/Documents/My_Projects/StreakSphere/out/raw/pixel-10-pro/aiproof.png"
+    },
+    {
+      "sceneId": "streaks",
+      "file": "/Users/apple/Documents/My_Projects/StreakSphere/out/raw/pixel-10-pro/streaks.png"
+    }
+  ],
+  "preview": null
+}

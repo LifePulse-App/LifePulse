@@ -167,6 +167,7 @@ await SavedAccountsStorage.save({
   avatarVersion: user.avatarVersion || 1,
 });
 
+
 // 2. Save the refreshToken in the secure hardware keychain
 if (user.refreshToken) {
   await Keychain.setGenericPassword(
