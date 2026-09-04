@@ -554,7 +554,7 @@ const App = () => {
     if (User) {
       connectSocket().catch(e => console.log('Socket boot error:', e));
       
-      const userId = String(User?.user.id || User._id || '');
+      const userId = String(User?.user?.id || User?._id || User?.id || '');
       
       if (userId && userId !== 'undefined') {
         Purchases.logIn(userId).then(async () => {

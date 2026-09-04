@@ -1,5 +1,5 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { View, TouchableOpacity, StyleSheet, ScrollView, TextInput, Image, ActivityIndicator } from "react-native";
+import { View, TouchableOpacity, StyleSheet, ScrollView, TextInput, Image, ActivityIndicator, Platform } from "react-native";
 import { Text } from "@rneui/themed";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import MainLayout from "../../../shared/components/MainLayout";
@@ -16,6 +16,8 @@ import { TrueSheet } from "@lodev09/react-native-true-sheet";
 import FastImage from 'react-native-fast-image';
 import { getAvatar } from "../../../storage/AvatarManager";
 import { disconnectSocket } from "../../../auth/api-client/socket";
+import { getApp } from "@react-native-firebase/app";
+import { getMessaging, getToken } from "@react-native-firebase/messaging";
 
 const PROFILE_CACHE_KEY = 'sbjkshiuhuw';
 
@@ -748,13 +750,28 @@ export default function ProfileScreen({ navigation }: any) {
       });
     }
 
+    // ⚡ 1. FORCE UNREGISTER PUSH TOKEN BEFORE LOGGING OUT
+    try {
+      const firebaseApp = getApp();
+      const messagingInstance = getMessaging(firebaseApp);
+      const currentToken = await getToken(messagingInstance);
+      
+      if (currentToken) {
+        // Call your backend to delete this specific token from the database
+        await apiClient.post('/push/unregister', { token: currentToken, platform: Platform.OS });
+
+      }
+    } catch (e) {
+      console.log("Failed to unregister push token:", e);
+    }
+
     await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
     
     // Note: If your `logout(userId)` function calls the backend to delete the 
     // refresh token, the Saved Accounts screen will force the user to enter a 
     // password next time. If you want seamless 1-tap login from Saved Accounts, 
     // you should ONLY clear local UserStorage here, and NOT hit the backend logout API.
-    await logout(userId); 
+    //await logout(userId); 
     
     disconnectSocket();
     authContext?.setUser(null);

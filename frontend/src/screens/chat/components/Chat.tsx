@@ -262,10 +262,15 @@ export default function ChatListScreen({ navigation }: any) {
   const user = useContext(AuthContext);
   const callContext = useContext(CallContext); 
 
-  useEffect(() => {
-    let resolvedId = "";
-    if (user?.User?.user?.id) resolvedId = String(user?.User?.user?.id);
-    else if (user?.User?.user?._id) resolvedId = String(user?.User?.user?._id);
+useEffect(() => {
+    // ⚡ FIX: Safely extract ID falling back through all possible structures
+    const resolvedId = String(
+      user?.User?.user?.id || 
+      user?.User?.user?._id || 
+      user?.User?.id || 
+      user?.User?._id || 
+      ""
+    );
     setMyUserId(resolvedId);
     setUserLoaded(!!resolvedId);
   }, [user]);

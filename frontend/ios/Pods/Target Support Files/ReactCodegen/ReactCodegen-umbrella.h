@@ -116,6 +116,8 @@
 #import "rnclipboardJSI.h"
 #import "RNCNetInfoSpec/RNCNetInfoSpec.h"
 #import "RNCNetInfoSpecJSI.h"
+#import "RNCompressorSpec/RNCompressorSpec.h"
+#import "RNCompressorSpecJSI.h"
 #import "RNDateTimePickerCGen/RNDateTimePickerCGen.h"
 #import "RNDateTimePickerCGenJSI.h"
 #import "rndocumentpickerCGen/rndocumentpickerCGen.h"

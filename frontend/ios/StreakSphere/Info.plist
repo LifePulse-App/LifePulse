@@ -32,7 +32,7 @@
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>CodePushDeploymentKey</key>
-	<string>zjVFWY8aiaVBVhfwsOzW4PwaK3CV4ksvOXqog</string>
+	<string>Q7iXnHWRxlcbVeweUuK5wEiMn49F4ksvOXqog</string>
 	<key>CodePushServerURL</key>
 	<string>https://api-updates.streaksphere.app/</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -44,6 +44,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>LSApplicationQueriesSchemes</key>
+<array>
+    <string>whatsapp</string>
+</array>
 	<key>NSCameraUsageDescription</key>
 	<string>This app needs camera access to capture activity proofs.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

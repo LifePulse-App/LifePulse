@@ -500,7 +500,7 @@ if (messageType === "image") {
         </View>
         
         <View style={styles.sharedPostFooter}>
-          <Text style={styles.sharedPostCaption} numberOfLines={2}>{sCaption}</Text>
+          <Text style={styles.sharedPostCaption} numberOfLines={3}>{sCaption}</Text>
           
           <TouchableOpacity 
             style={styles.sharedPostBtn} 

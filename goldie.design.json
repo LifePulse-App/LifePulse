@@ -1,0 +1,13 @@
+{
+  "background": "linear-gradient(160deg, #1E293B 0%, #0F172A 100%)",
+  "frame": "17-pro-blue",
+  "fontFamily": "\"Montserrat\", system-ui, sans-serif",
+  "template": "dynamic",
+  "layout": "classic",
+  "screenOnly": false,
+  "sceneLayouts": {
+    "aiproof": "hero",
+    "archat": "copy-below",
+    "moods": "offset"
+  }
+}

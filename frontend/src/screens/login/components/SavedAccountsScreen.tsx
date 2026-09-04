@@ -16,6 +16,7 @@ import { connectSocket } from "../../../auth/api-client/socket";
 import { getAvatar } from "../../../storage/AvatarManager";
 // ⚡ 1. IMPORT THE ERROR MODAL
 import GlassyErrorModal from '../../../shared/components/GlassyErrorModal';
+import { logout } from "../../../navigation/main/RootNavigation";
 
 interface SavedAccountWithAvatar extends SavedAccount {
   localAvatarUri?: string | null;
@@ -92,7 +93,7 @@ const SavedAccountsScreen = ({ navigation }: any) => {
     load();
   }, []);
 
-  const handleLogin = async (acc: SavedAccount) => {
+const handleLogin = async (acc: SavedAccount) => {
     try {
       setLoadingId(acc.id);
       setActionType("login");
@@ -102,7 +103,7 @@ const SavedAccountsScreen = ({ navigation }: any) => {
       const credentials = await Keychain.getGenericPassword({
         service: `auth_token_${acc.id}`,
       });
-
+      
       if (!credentials) {
         // Token is missing from secure storage, force manual login
         navigation.navigate('Login', { prefillUsername: acc.username });
@@ -124,22 +125,24 @@ const SavedAccountsScreen = ({ navigation }: any) => {
         return;
       }
 
-      const { user, accessToken, refreshToken: newRefreshToken } = res.data;
-      user.UserName = acc.username;
+      // ⚡ FIX: Do NOT destructure the inner user object! 
+      // Treat the entire response payload as the UserLoginResponse to preserve the structure.
+      const fullPayload = res.data as UserLoginResponse;
+      fullPayload.UserName = acc.username;
 
       // Update Keychain with the newly rotated refresh token
-      if (newRefreshToken) {
-        await Keychain.setGenericPassword(acc.id, newRefreshToken, {
+      if (fullPayload.refreshToken) {
+        await Keychain.setGenericPassword(acc.id, fullPayload.refreshToken, {
           service: `auth_token_${acc.id}`,
         });
       }
 
-      // Setup context and navigate
-      setAuthHeaders(accessToken);
-      authContext?.setUser(user);
-      await UserStorage.setUser(user);
-      await UserStorage.setAccessToken(accessToken);
-      await UserStorage.setRefreshToken(newRefreshToken);
+      // Setup context and navigate using the FULL payload
+      setAuthHeaders(fullPayload.accessToken);
+      authContext?.setUser(fullPayload);
+      await UserStorage.setUser(fullPayload);
+      await UserStorage.setAccessToken(fullPayload.accessToken);
+      await UserStorage.setRefreshToken(fullPayload.refreshToken);
 
       await connectSocket();
 
@@ -152,7 +155,6 @@ const SavedAccountsScreen = ({ navigation }: any) => {
       );
     } catch (error) {
       console.error("Fast login error:", error);
-      // ⚡ 3. SHOW THE ERROR IN THE UI
       showError("Connection failed. Please check your internet or try logging in manually.");
     } finally {
       setLoadingId(null);
@@ -170,6 +172,7 @@ const SavedAccountsScreen = ({ navigation }: any) => {
       
       // Wipe from AsyncStorage
       await SavedAccountsStorage.remove(acc.id);
+      await logout(acc.id)
       await load();
     } catch (error) {
       console.log("Failed to remove account locally:", error);

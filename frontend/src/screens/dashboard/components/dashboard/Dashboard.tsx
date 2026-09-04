@@ -128,7 +128,8 @@ const [showRateCard, setShowRateCard] = useState(false);
 
   const userContext = useContext(AuthContext);
   const user = userContext?.User?.user;
-  const myUserId = user?.id;
+  const myUserId = user?.id || user?._id || userContext?.User?.id;
+  
 
   const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
 
@@ -571,10 +572,14 @@ const [showRateCard, setShowRateCard] = useState(false);
 
   useEffect(() => { cacheUserAvatar(); }, [cacheUserAvatar]);
 
-  useEffect(() => {
+useEffect(() => {
+    // ⚡ FIX: Wait until we have the user ID before loading cache to prevent cross-account leaks
+    if (!myUserId) return; 
+
     (async () => {
       let anyLoaded = false;
-      const cached = await loadCache(DASHBOARD_CACHE_KEY);
+      // ⚡ FIX: Make cache keys unique to the specific user
+      const cached = await loadCache(`dashboard:summary:v1:${myUserId}`);
       if (cached) {
         setProfile(cached.profile);
         setSecondaryCards(cached.secondaryCards || null);
@@ -583,10 +588,10 @@ const [showRateCard, setShowRateCard] = useState(false);
         anyLoaded = true;
       }
       
-      const cachedFriends = await loadCache("dashboard:friends:v1");
+      const cachedFriends = await loadCache(`dashboard:friends:v1:${myUserId}`);
       if (cachedFriends) setFriendsMoods(p => p.length > 0 ? p : cachedFriends);
   
-      const cachedHabits = await loadCache(TODAY_HABITS_CACHE_KEY);
+      const cachedHabits = await loadCache(`dashboard:todayHabits:v1:${myUserId}`);
       if (cachedHabits) { setHabits(cachedHabits); anyLoaded = true; }
       
       setHasLoadedOnce(anyLoaded);
@@ -597,7 +602,7 @@ const [showRateCard, setShowRateCard] = useState(false);
     })();
     refreshPendingCount();
     bootstrapKeys();
-  }, []);
+  }, [myUserId]); // ⚡ FIX: Add myUserId as a dependency
 
   useEffect(() => {
     const unsub = NetInfo.addEventListener(state => setOffline(!state.isConnected || state.isInternetReachable === false));
@@ -619,10 +624,10 @@ const [showRateCard, setShowRateCard] = useState(false);
     } catch {}
   };
 
-  const fetchDashboardInBackground = useCallback(async () => {
+const fetchDashboardInBackground = useCallback(async () => {
     try {
       setError(null);
-      if (offline) return;
+      if (offline || !myUserId) return; // ⚡ Added safety check
       const res = await DashboardService.GetDashboardSummary();
       const responseData = (res as any).data ?? res;
       if (!responseData.success) throw new Error();
@@ -632,33 +637,36 @@ const [showRateCard, setShowRateCard] = useState(false);
       setCurrentMood(currentMood || null);
       if (apiFriendsMoods) setFriendsMoods(apiFriendsMoods);
       
-      await saveCache(DASHBOARD_CACHE_KEY, responseData.data);
+      // ⚡ FIX: Save to dynamic key
+      await saveCache(`dashboard:summary:v1:${myUserId}`, responseData.data);
       setHasLoadedOnce(true);
       setLoading(false);
     } catch {}
-  }, [offline]);
+  }, [offline, myUserId]); // ⚡ Add myUserId
 
   const fetchTodayHabitsInBackground = useCallback(async () => {
     try {
-      if (offline) return;
+      if (offline || !myUserId) return; // ⚡ Added safety check
       const res = await DashboardService.GetTodayHabits();
       if (res.data?.success) {
         setHabits(res?.data.habits);
-        await saveCache(TODAY_HABITS_CACHE_KEY, res?.data.habits);
+        // ⚡ FIX: Save to dynamic key
+        await saveCache(`dashboard:todayHabits:v1:${myUserId}`, res?.data.habits);
       }
     } catch {}
-  }, [offline]);
+  }, [offline, myUserId]); // ⚡ Add myUserId
 
   const fetchFriendsInBackground = useCallback(async () => {
     try {
-      if (offline) return;
+      if (offline || !myUserId) return; // ⚡ Added safety check
       const res = await socialApi.getFriends();
       if (res?.data?.friends) {
         setFriendsMoods(p => p.length > 0 && p[0].mood ? p : res.data.friends);
-        await saveCache("dashboard:friends:v1", res.data.friends);
+        // ⚡ FIX: Save to dynamic key
+        await saveCache(`dashboard:friends:v1:${myUserId}`, res.data.friends);
       }
     } catch {}
-  }, [offline]);
+  }, [offline, myUserId]); // ⚡ Add myUserId
 
   useFocusEffect(
     useCallback(() => {
@@ -815,7 +823,11 @@ const [showRateCard, setShowRateCard] = useState(false);
                     </TouchableOpacity>
 
                     {friendsMoods
-                      .filter((friend: any) => friend.mood && MOOD_METADATA[friend.mood])
+  .filter((friend: any) => 
+    friend.mood && 
+    MOOD_METADATA[friend.mood] && 
+    String(friend.id || friend._id) !== String(myUserId) // ⚡ STRICTLY hide current user from friends list
+  )
                       .map((friend: any) => {
                         const fMoodMeta = MOOD_METADATA[friend.mood];
                         const rawAvatar = friend.avatarUrl || friend.avatar?.url || friend.avatar;
@@ -1255,7 +1267,7 @@ const styles = StyleSheet.create({
 
   inlinePostCard: { 
     width: "100%", 
-    height: 480, 
+    height: 500, 
     overflow: "hidden", 
     backgroundColor: "#000", 
     position: "relative", 

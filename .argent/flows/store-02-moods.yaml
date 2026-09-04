@@ -1,0 +1,4 @@
+steps:
+  - wait: 5000
+  - tap: "attendance-tab"
+  - wait: 10000

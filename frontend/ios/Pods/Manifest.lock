@@ -1765,6 +1765,28 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-compressor (1.16.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - react-native-create-thumbnail (2.2.0):
     - React-Core
   - react-native-document-picker (12.0.1):
@@ -1835,6 +1857,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-in-app-review (4.4.2):
+    - React-Core
   - react-native-keyboard-controller (1.21.11):
     - hermes-engine
     - RCTRequired
@@ -3048,11 +3072,13 @@ DEPENDENCIES:
   - "react-native-blur (from `../node_modules/@react-native-community/blur`)"
   - react-native-change-icon (from `../node_modules/react-native-change-icon`)
   - react-native-compass-heading (from `../node_modules/react-native-compass-heading`)
+  - react-native-compressor (from `../node_modules/react-native-compressor`)
   - react-native-create-thumbnail (from `../node_modules/react-native-create-thumbnail`)
   - "react-native-document-picker (from `../node_modules/@react-native-documents/picker`)"
   - react-native-geolocation-service (from `../node_modules/react-native-geolocation-service`)
   - react-native-get-random-values (from `../node_modules/react-native-get-random-values`)
   - react-native-image-picker (from `../node_modules/react-native-image-picker`)
+  - react-native-in-app-review (from `../node_modules/react-native-in-app-review`)
   - react-native-keyboard-controller (from `../node_modules/react-native-keyboard-controller`)
   - "react-native-netinfo (from `../node_modules/@react-native-community/netinfo`)"
   - react-native-pager-view (from `../node_modules/react-native-pager-view`)
@@ -3254,6 +3280,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-change-icon"
   react-native-compass-heading:
     :path: "../node_modules/react-native-compass-heading"
+  react-native-compressor:
+    :path: "../node_modules/react-native-compressor"
   react-native-create-thumbnail:
     :path: "../node_modules/react-native-create-thumbnail"
   react-native-document-picker:
@@ -3264,6 +3292,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-get-random-values"
   react-native-image-picker:
     :path: "../node_modules/react-native-image-picker"
+  react-native-in-app-review:
+    :path: "../node_modules/react-native-in-app-review"
   react-native-keyboard-controller:
     :path: "../node_modules/react-native-keyboard-controller"
   react-native-netinfo:
@@ -3465,11 +3495,13 @@ SPEC CHECKSUMS:
   react-native-blur: ea6c78ddeaa7aa0fce36ea29d1f81dd23063032a
   react-native-change-icon: cc3539131bd3b8b6468489b8a8b48e077a68902b
   react-native-compass-heading: d25307d53b0860f0999f76761dc8d50888a8b210
+  react-native-compressor: 893ee6d39e9df8de6c2b332f300f2cfc4e57caac
   react-native-create-thumbnail: c15cedc37f3822777d44e6035be041f7961341ea
   react-native-document-picker: 15cca2d1a6bfb6d0d3ff0283bd9b903e57cb028b
   react-native-geolocation-service: 32b2c2a3b91e70ce2a8d0c684801aaeb0a07e0ec
   react-native-get-random-values: 68792987aef40e8aa72dc448d97e009d1f440c88
   react-native-image-picker: 23540feacc79c63c60857f318fdfa8477c26e70a
+  react-native-in-app-review: 1516ba69d60d58053b7eb3aaaf8d2a5a74af8b57
   react-native-keyboard-controller: 633740b52e552dc4154395219823715ffd5f0309
   react-native-netinfo: 2f906d5d9a639090ed1c079135d6485a95f749f1
   react-native-pager-view: c9f0c94cc64041ac70f28f79527ea2ac664cf25c
